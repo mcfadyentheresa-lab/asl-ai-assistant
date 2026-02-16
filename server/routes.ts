@@ -1,16 +1,188 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { api } from "@shared/routes";
+import { z } from "zod";
+import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
+import { authStorage } from "./replit_integrations/auth/storage";
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  // put application routes here
-  // prefix all routes with /api
+  // Auth setup
+  await setupAuth(app);
+  registerAuthRoutes(app);
 
-  // use storage to perform CRUD operations on the storage interface
-  // e.g. storage.insertUser(user) or storage.getUserByUsername(username)
+  // Projects
+  app.get(api.projects.list.path, isAuthenticated, async (req, res) => {
+    const user = req.user as any;
+    const userId = user.claims.sub;
+    const dbUser = await authStorage.getUser(userId);
+
+    if (dbUser?.role === 'client') {
+      const projects = await storage.getProjectsByClient(userId);
+      res.json(projects);
+    } else {
+      // Admin/Crew see all projects (or filter by assignment - simplified to all for now)
+      const projects = await storage.getProjects();
+      res.json(projects);
+    }
+  });
+
+  app.get(api.projects.get.path, isAuthenticated, async (req, res) => {
+    const project = await storage.getProject(Number(req.params.id));
+    if (!project) return res.status(404).json({ message: 'Project not found' });
+    
+    // Basic access control could go here
+    res.json(project);
+  });
+
+  app.post(api.projects.create.path, isAuthenticated, async (req, res) => {
+    try {
+      const input = api.projects.create.input.parse(req.body);
+      const project = await storage.createProject(input);
+      res.status(201).json(project);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      throw err;
+    }
+  });
+
+  app.put(api.projects.update.path, isAuthenticated, async (req, res) => {
+    const project = await storage.updateProject(Number(req.params.id), req.body);
+    res.json(project);
+  });
+
+  // Tasks
+  app.get(api.tasks.list.path, isAuthenticated, async (req, res) => {
+    const tasks = await storage.getTasks(Number(req.params.projectId));
+    res.json(tasks);
+  });
+
+  app.post(api.tasks.create.path, isAuthenticated, async (req, res) => {
+    const input = api.tasks.create.input.parse(req.body);
+    const task = await storage.createTask({ ...input, projectId: Number(req.params.projectId) });
+    res.status(201).json(task);
+  });
+
+  app.put(api.tasks.update.path, isAuthenticated, async (req, res) => {
+    const task = await storage.updateTask(Number(req.params.id), req.body);
+    res.json(task);
+  });
+
+  // Milestones
+  app.get(api.milestones.list.path, isAuthenticated, async (req, res) => {
+    const milestones = await storage.getMilestones(Number(req.params.projectId));
+    res.json(milestones);
+  });
+
+  app.post(api.milestones.create.path, isAuthenticated, async (req, res) => {
+    const input = api.milestones.create.input.parse(req.body);
+    const milestone = await storage.createMilestone({ ...input, projectId: Number(req.params.projectId) });
+    res.status(201).json(milestone);
+  });
+
+  // Photos
+  app.get(api.photos.list.path, isAuthenticated, async (req, res) => {
+    const photos = await storage.getPhotos(Number(req.params.projectId));
+    res.json(photos);
+  });
+
+  app.post(api.photos.create.path, isAuthenticated, async (req, res) => {
+    const input = api.photos.create.input.parse(req.body);
+    const photo = await storage.createPhoto({ ...input, projectId: Number(req.params.projectId) });
+    res.status(201).json(photo);
+  });
+
+  // Documents
+  app.get(api.documents.list.path, isAuthenticated, async (req, res) => {
+    const docs = await storage.getDocuments(Number(req.params.projectId));
+    res.json(docs);
+  });
+
+  app.post(api.documents.create.path, isAuthenticated, async (req, res) => {
+    const input = api.documents.create.input.parse(req.body);
+    const doc = await storage.createDocument({ ...input, projectId: Number(req.params.projectId) });
+    res.status(201).json(doc);
+  });
+
+  // Messages
+  app.get(api.messages.list.path, isAuthenticated, async (req, res) => {
+    const messages = await storage.getMessages(Number(req.params.projectId));
+    res.json(messages);
+  });
+
+  app.post(api.messages.create.path, isAuthenticated, async (req, res) => {
+    const input = api.messages.create.input.parse(req.body);
+    const user = req.user as any;
+    const message = await storage.createMessage({ 
+      ...input, 
+      projectId: Number(req.params.projectId),
+      senderId: user.claims.sub 
+    });
+    res.status(201).json(message);
+  });
+
+  // Time Entries
+  app.get(api.timeEntries.list.path, isAuthenticated, async (req, res) => {
+    const entries = await storage.getTimeEntries(Number(req.params.projectId));
+    res.json(entries);
+  });
+
+  app.post(api.timeEntries.create.path, isAuthenticated, async (req, res) => {
+    const input = api.timeEntries.create.input.parse(req.body);
+    const user = req.user as any;
+    const entry = await storage.createTimeEntry({ 
+      ...input, 
+      projectId: Number(req.params.projectId),
+      userId: user.claims.sub
+    });
+    res.status(201).json(entry);
+  });
+
+  // Initialize seed data
+  await seedDatabase();
 
   return httpServer;
+}
+
+// Seed function to create initial data if needed
+async function seedDatabase() {
+  const projects = await storage.getProjects();
+  if (projects.length === 0) {
+    const project = await storage.createProject({
+      name: "Muskoka Lakefront Renovation",
+      description: "Complete renovation of the main cottage and boathouse, featuring custom millwork, stone fireplaces, and expansive deck systems.",
+      status: "in_progress",
+      address: "123 Lakeview Dr, Muskoka Lakes, ON",
+      startDate: new Date().toISOString(),
+      thumbnailUrl: "https://images.unsplash.com/photo-1564013799919-ab600027ffc6",
+      totalBudget: 500000,
+      budgetUsed: 150000
+    });
+
+    const projectId = project.id;
+
+    // Milestones
+    const m1 = await storage.createMilestone({ projectId, title: "Demolition & Site Prep", date: new Date("2023-05-15").toISOString(), completed: true, order: 1 });
+    const m2 = await storage.createMilestone({ projectId, title: "Foundation & Framing", date: new Date("2023-06-30").toISOString(), completed: true, order: 2 });
+    const m3 = await storage.createMilestone({ projectId, title: "Rough-ins (Plumbing, Electrical)", date: new Date("2023-08-15").toISOString(), completed: false, order: 3 });
+    const m4 = await storage.createMilestone({ projectId, title: "Interior Finishes", date: new Date("2023-10-01").toISOString(), completed: false, order: 4 });
+
+    // Tasks
+    await storage.createTask({ projectId, milestoneId: m3.id, title: "Electrical Rough-in Inspection", status: "todo", dueDate: new Date("2023-08-10").toISOString() });
+    await storage.createTask({ projectId, milestoneId: m3.id, title: "Plumbing Rough-in", status: "in_progress", dueDate: new Date("2023-08-12").toISOString() });
+    await storage.createTask({ projectId, milestoneId: m2.id, title: "Frame Boathouse Roof", status: "done", dueDate: new Date("2023-06-25").toISOString() });
+
+    // Photos
+    await storage.createPhoto({ projectId, url: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c", caption: "Living Room Concept", tags: ["interior", "concept"] });
+    await storage.createPhoto({ projectId, url: "https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3", caption: "Kitchen Materials", tags: ["kitchen", "materials"] });
+
+    // Documents
+    await storage.createDocument({ projectId, title: "Original Contract", url: "#", type: "contract" });
+    await storage.createDocument({ projectId, title: "Site Plan v2", url: "#", type: "plan" });
+  }
 }
