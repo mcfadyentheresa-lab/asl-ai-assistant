@@ -171,6 +171,16 @@ export const api = {
         200: z.array(z.custom<typeof timeEntries.$inferSelect>()),
       },
     },
+    create: {
+      method: 'POST' as const,
+      path: '/api/projects/:projectId/time-entries' as const,
+      input: insertTimeEntrySchema.omit({ projectId: true, userId: true }),
+      responses: {
+        201: z.custom<typeof timeEntries.$inferSelect>(),
+      },
+    },
+  },
+
   // Reports
   reports: {
     generate: {
@@ -181,6 +191,7 @@ export const api = {
       },
     },
   },
+
   // Weather
   weather: {
     get: {

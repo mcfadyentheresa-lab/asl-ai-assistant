@@ -1,12 +1,11 @@
 import { db } from "./db";
 import { 
   users, projects, milestones, tasks, photos, documents, timeEntries, messages,
-  type User, type InsertUser, type Project, type InsertProject, 
-  type Milestone, type InsertMilestone, type Task, type InsertTask,
-  type Photo, type InsertPhoto, type Document, type InsertDocument,
-  type TimeEntry, type InsertTimeEntry, type Message, type InsertMessage
+  type Project, type Milestone, type Task, type Photo, type Document, type TimeEntry, type Message,
+  type InsertProject, type InsertMilestone, type InsertTask, type InsertPhoto, type InsertDocument, type InsertTimeEntry, type InsertMessage
 } from "@shared/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { type User } from "@shared/models/auth";
+import { eq, desc } from "drizzle-orm";
 
 export interface IStorage {
   // Projects
@@ -105,13 +104,16 @@ export class DatabaseStorage implements IStorage {
 
   // Messages
   async getMessages(projectId: number): Promise<(Message & { sender: User | null })[]> {
-    return await db.query.messages.findMany({
-      where: eq(messages.projectId, projectId),
-      orderBy: desc(messages.createdAt),
-      with: {
-        sender: true
-      }
-    });
+    const results = await db.select({
+      message: messages,
+      sender: users
+    })
+    .from(messages)
+    .leftJoin(users, eq(messages.senderId, users.id))
+    .where(eq(messages.projectId, projectId))
+    .orderBy(desc(messages.createdAt));
+
+    return results.map(r => ({ ...r.message, sender: r.sender }));
   }
   async createMessage(message: InsertMessage): Promise<Message> {
     const [newMessage] = await db.insert(messages).values(message).returning();
