@@ -171,15 +171,30 @@ export const api = {
         200: z.array(z.custom<typeof timeEntries.$inferSelect>()),
       },
     },
-    create: {
+  // Reports
+  reports: {
+    generate: {
       method: 'POST' as const,
-      path: '/api/projects/:projectId/time-entries' as const,
-      input: insertTimeEntrySchema.omit({ projectId: true, userId: true }),
+      path: '/api/projects/:projectId/reports' as const,
       responses: {
-        201: z.custom<typeof timeEntries.$inferSelect>(),
+        200: z.object({ url: z.string() }),
       },
     },
-  }
+  },
+  // Weather
+  weather: {
+    get: {
+      method: 'GET' as const,
+      path: '/api/projects/:projectId/weather' as const,
+      responses: {
+        200: z.object({
+          temp: z.number(),
+          condition: z.string(),
+          impact: z.string(),
+        }),
+      },
+    },
+  },
 };
 
 export function buildUrl(path: string, params?: Record<string, string | number>): string {

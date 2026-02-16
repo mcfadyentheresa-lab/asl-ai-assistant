@@ -143,6 +143,24 @@ export async function registerRoutes(
     res.status(201).json(entry);
   });
 
+  // Weather & PDF Reports Stubs
+  app.get('/api/projects/:projectId/weather', isAuthenticated, async (req, res) => {
+    // In a real app, we'd call a weather API. For now, we'll return mock data based on "Muskoka"
+    res.json({
+      temp: 18,
+      condition: "Partly Cloudy",
+      impact: "No immediate impact on outdoor framing. Keep materials covered for potential evening showers."
+    });
+  });
+
+  app.post('/api/projects/:projectId/reports', isAuthenticated, async (req, res) => {
+    const project = await storage.getProject(Number(req.params.projectId));
+    if (!project) return res.status(404).json({ message: "Project not found" });
+    
+    // In a real app, use a library like PDFKit. For now, return a mock URL
+    res.json({ url: `/api/projects/${project.id}/reports/mock-report.pdf` });
+  });
+
   // Initialize seed data
   await seedDatabase();
 

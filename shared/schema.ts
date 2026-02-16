@@ -53,7 +53,16 @@ export const photos = pgTable("photos", {
   caption: text("caption"),
   tags: text("tags").array(), // e.g. ["kitchen", "before"]
   isShowcase: boolean("is_showcase").default(false), // For "Project Story"
+  isBeforeAfter: boolean("is_before_after").default(false),
   createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Projects update
+export const projectsUpdate = pgTable("projects", {
+  id: serial("id").primaryKey(),
+  // ... existing fields ...
+  weatherImpactNotes: text("weather_impact_notes"),
+  reportTemplate: text("report_template").default("standard"),
 });
 
 // Documents
