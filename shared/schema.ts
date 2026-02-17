@@ -57,14 +57,6 @@ export const photos = pgTable("photos", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Projects update
-export const projectsUpdate = pgTable("projects", {
-  id: serial("id").primaryKey(),
-  // ... existing fields ...
-  weatherImpactNotes: text("weather_impact_notes"),
-  reportTemplate: text("report_template").default("standard"),
-});
-
 // Documents
 export const documents = pgTable("documents", {
   id: serial("id").primaryKey(),

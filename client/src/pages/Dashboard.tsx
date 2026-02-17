@@ -5,7 +5,7 @@ import { ProjectCard } from "@/components/project/ProjectCard";
 import { Button } from "@/components/ui/button";
 import { Plus, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
-import { 
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -16,7 +16,6 @@ import {
 import { useCreateProject } from "@/hooks/use-projects";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -27,23 +26,24 @@ import { useToast } from "@/hooks/use-toast";
 export default function Dashboard() {
   const { user } = useAuth();
   const { data: projects, isLoading } = useProjects();
-  
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" data-testid="loader-dashboard" />
       </div>
     );
   }
 
-  // Crew view - simplified for now
   if (user?.email?.includes("crew")) {
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
-        <div className="container py-8">
-          <h1 className="text-3xl font-display font-bold text-primary mb-6">Today's Schedule</h1>
-          <div className="bg-card border rounded-xl p-8 text-center text-muted-foreground">
+        <div className="container py-12 px-6 md:px-10">
+          <h1 className="font-serif text-3xl font-bold text-foreground mb-6" data-testid="text-crew-heading">
+            Today's Schedule
+          </h1>
+          <div className="bg-card border border-card-border rounded-xl p-10 text-center text-muted-foreground" data-testid="text-crew-placeholder">
             Crew dashboard coming soon. Please check with your foreman.
           </div>
         </div>
@@ -54,41 +54,41 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      
-      <main className="container py-12 px-4 md:px-8">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-12">
+
+      <main className="container py-10 md:py-14 px-6 md:px-10">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-10">
           <div>
-            <h1 className="text-4xl font-display font-bold text-primary mb-2">
-              Welcome back, {user?.firstName || "Client"}.
+            <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-1" data-testid="text-greeting">
+              Welcome back, <span className="font-serif">{user?.firstName || "Client"}</span>.
             </h1>
-            <p className="text-muted-foreground">
-              Here's an overview of your active construction projects.
+            <p className="text-muted-foreground" data-testid="text-subtitle">
+              Here is an overview of your active projects.
             </p>
           </div>
-          
+
           <CreateProjectDialog />
         </div>
 
         {projects && projects.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {projects.map((project, idx) => (
               <motion.div
                 key={project.id}
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: idx * 0.1 }}
+                transition={{ delay: idx * 0.08 }}
               >
                 <ProjectCard project={project} />
               </motion.div>
             ))}
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center py-20 bg-secondary/30 rounded-3xl border-2 border-dashed border-border">
+          <div className="flex flex-col items-center justify-center py-20 bg-secondary/30 rounded-xl border-2 border-dashed border-border" data-testid="empty-state">
             <div className="bg-background p-4 rounded-full shadow-sm mb-4">
-              <Plus className="h-8 w-8 text-muted-foreground" />
+              <Plus className="h-6 w-6 text-muted-foreground" />
             </div>
-            <h3 className="font-display text-xl font-semibold text-primary mb-2">No projects yet</h3>
-            <p className="text-muted-foreground mb-6">Start your first project to begin tracking.</p>
+            <h3 className="font-serif text-xl font-semibold text-foreground mb-2">No projects yet</h3>
+            <p className="text-muted-foreground mb-6">Create your first project to get started.</p>
             <CreateProjectDialog />
           </div>
         )}
@@ -101,14 +101,14 @@ function CreateProjectDialog() {
   const [open, setOpen] = useState(false);
   const { mutate, isPending } = useCreateProject();
   const { toast } = useToast();
-  
+
   const form = useForm<InsertProject>({
     resolver: zodResolver(insertProjectSchema),
     defaultValues: {
       name: "",
       description: "",
       status: "planning",
-    }
+    },
   });
 
   const onSubmit = (data: InsertProject) => {
@@ -120,28 +120,28 @@ function CreateProjectDialog() {
       },
       onError: (error) => {
         toast({ title: "Error", description: error.message, variant: "destructive" });
-      }
+      },
     });
   };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="lg" className="rounded-full shadow-lg hover:shadow-xl">
-          <Plus className="mr-2 h-4 w-4" />
+        <Button data-testid="button-new-project">
+          <Plus className="mr-2" />
           New Project
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[480px]">
         <DialogHeader>
-          <DialogTitle className="font-display text-2xl">Create New Project</DialogTitle>
+          <DialogTitle className="font-serif text-2xl" data-testid="text-dialog-title">Create New Project</DialogTitle>
           <DialogDescription>
             Enter the details for your new construction project.
           </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 pt-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5 pt-2">
             <FormField
               control={form.control}
               name="name"
@@ -149,13 +149,13 @@ function CreateProjectDialog() {
                 <FormItem>
                   <FormLabel>Project Name</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g. Muskoka Lake House" {...field} />
+                    <Input placeholder="e.g. Muskoka Lake House" {...field} data-testid="input-project-name" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            
+
             <FormField
               control={form.control}
               name="description"
@@ -163,17 +163,25 @@ function CreateProjectDialog() {
                 <FormItem>
                   <FormLabel>Description</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="Brief description of the project scope..." className="resize-none" {...field} value={field.value || ""} />
+                    <Textarea
+                      placeholder="Brief description of the project scope..."
+                      className="resize-none"
+                      {...field}
+                      value={field.value || ""}
+                      data-testid="input-project-description"
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
-            <div className="flex justify-end gap-3">
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-              <Button type="submit" disabled={isPending}>
-                {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            <div className="flex justify-end gap-3 pt-2">
+              <Button type="button" variant="outline" onClick={() => setOpen(false)} data-testid="button-cancel">
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isPending} data-testid="button-create">
+                {isPending ? <Loader2 className="mr-2 animate-spin" /> : null}
                 Create Project
               </Button>
             </div>

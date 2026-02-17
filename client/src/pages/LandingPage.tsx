@@ -1,6 +1,8 @@
 import { Button } from "@/components/ui/button";
-import { ArrowRight, CheckCircle2, ShieldCheck, Zap } from "lucide-react";
+import { ArrowRight, ShieldCheck, Zap, Eye } from "lucide-react";
 import { motion } from "framer-motion";
+import heroImg from "@assets/download-1_1771288617674.jpg";
+import craftImg from "@assets/download-4_1771288621120.jpg";
 
 export default function LandingPage() {
   const handleLogin = () => {
@@ -9,117 +11,163 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
-      {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 flex h-20 items-center justify-between px-6 md:px-12 backdrop-blur-md bg-background/80 border-b border-border/40">
-        <div className="text-2xl font-display font-bold text-primary">Aster & Spruce</div>
-        <Button onClick={handleLogin} variant="outline" className="font-medium">
-          Client Login
-        </Button>
-      </nav>
+      {/* Hero Section - Full viewport dark section */}
+      <section className="relative h-screen min-h-[600px] flex flex-col">
+        <img
+          src={heroImg}
+          alt="Luxury Muskoka cottage interior"
+          className="absolute inset-0 h-full w-full object-cover"
+          data-testid="img-hero"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/70" />
 
-      {/* Hero Section */}
-      <section className="relative pt-32 pb-20 md:pt-48 md:pb-32 px-6">
-        <div className="absolute inset-0 z-0 overflow-hidden opacity-10 pointer-events-none">
-           <div className="absolute -top-[20%] -right-[10%] w-[600px] h-[600px] rounded-full bg-primary blur-[120px]" />
-           <div className="absolute top-[40%] -left-[10%] w-[400px] h-[400px] rounded-full bg-accent blur-[100px]" />
-        </div>
-
-        <div className="container mx-auto relative z-10 grid gap-12 lg:grid-cols-2 items-center">
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            className="space-y-8"
+        <nav className="relative z-10 flex items-center justify-between px-6 md:px-12 py-6" data-testid="nav-landing">
+          <span className="font-serif text-2xl font-bold text-white tracking-tight" data-testid="text-logo">
+            Aster & Spruce
+          </span>
+          <Button
+            onClick={handleLogin}
+            variant="outline"
+            className="bg-white/10 backdrop-blur-md text-white border-white/20"
+            data-testid="button-login"
           >
-            <h1 className="text-5xl md:text-7xl font-display font-bold leading-[1.1] text-primary">
-              Building Dreams,<br />
-              <span className="text-accent italic">Crafting Legacy.</span>
-            </h1>
-            <p className="text-lg md:text-xl text-muted-foreground max-w-lg leading-relaxed">
-              Experience the transparency of modern construction management combined with the timeless quality of Muskoka craftsmanship.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4">
-              <Button onClick={handleLogin} size="lg" className="h-14 px-8 text-lg rounded-full shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 transition-all">
-                Access Client Portal
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-              <Button variant="outline" size="lg" className="h-14 px-8 text-lg rounded-full border-2">
-                View Our Portfolio
-              </Button>
-            </div>
-          </motion.div>
+            Client Login
+          </Button>
+        </nav>
 
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.8, delay: 0.2 }}
-            className="relative"
-          >
-            {/* Modern cabin living room with large windows overlooking lake */}
-            <div className="relative rounded-2xl overflow-hidden shadow-2xl shadow-primary/20 aspect-[4/3]">
-              <img 
-                src="https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?q=80&w=1974&auto=format&fit=crop" 
-                alt="Modern luxury cottage interior with lake view" 
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-primary/40 to-transparent" />
-              
-              <div className="absolute bottom-6 left-6 right-6 p-6 bg-white/95 backdrop-blur rounded-xl shadow-lg border border-white/20">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-bold tracking-wider uppercase text-accent">Latest Project</span>
-                  <div className="flex gap-1">
-                    {[1,2,3,4,5].map(i => (
-                      <div key={i} className="w-1 h-1 rounded-full bg-primary/20" />
-                    ))}
-                  </div>
-                </div>
-                <h3 className="font-display text-lg font-semibold text-primary">The Lakeside Retreat</h3>
-                <p className="text-sm text-muted-foreground">Muskoka Lakes, ON • Completed Fall 2024</p>
+        <div className="relative z-10 flex-1 flex items-center">
+          <div className="container mx-auto px-6 md:px-12">
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, ease: "easeOut" }}
+              className="max-w-2xl space-y-6"
+            >
+              <h1
+                className="font-serif text-5xl md:text-7xl font-bold text-white leading-[1.1]"
+                data-testid="text-hero-heading"
+              >
+                Crafting Timeless Spaces for Modern Living
+              </h1>
+              <p className="text-lg md:text-xl text-white/80 max-w-lg leading-relaxed">
+                Bespoke cottage renovations in the heart of Muskoka. Transparent project management from blueprint to final walkthrough.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4 pt-2">
+                <Button
+                  onClick={handleLogin}
+                  size="lg"
+                  data-testid="button-portal"
+                >
+                  Access Client Portal
+                  <ArrowRight className="ml-2" />
+                </Button>
               </div>
-            </div>
-          </motion.div>
+            </motion.div>
+          </div>
+        </div>
+      </section>
+
+      {/* Craftsmanship Section */}
+      <section className="py-24 md:py-32 bg-background">
+        <div className="container mx-auto px-6 md:px-12">
+          <div className="grid md:grid-cols-2 gap-12 md:gap-20 items-center">
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+            >
+              <div className="rounded-xl overflow-hidden">
+                <img
+                  src={craftImg}
+                  alt="Muskoka craftsmanship detail"
+                  className="w-full h-auto object-cover aspect-[4/5]"
+                  data-testid="img-craft"
+                />
+              </div>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6, delay: 0.15 }}
+              className="space-y-6"
+            >
+              <p className="text-xs font-semibold tracking-[0.2em] uppercase text-muted-foreground">
+                Our Approach
+              </p>
+              <h2
+                className="font-serif text-3xl md:text-5xl font-bold text-foreground leading-tight"
+                data-testid="text-craft-heading"
+              >
+                Where Heritage Meets Innovation
+              </h2>
+              <p className="text-muted-foreground leading-relaxed text-lg">
+                Every Aster & Spruce project begins with deep respect for the land and the legacy of Muskoka architecture. We pair traditional craftsmanship with modern building science to create homes that endure for generations.
+              </p>
+              <p className="text-muted-foreground leading-relaxed">
+                Our client portal keeps you connected to every decision, every milestone, and every detail of your build -- no matter where you are in the world.
+              </p>
+            </motion.div>
+          </div>
         </div>
       </section>
 
       {/* Features Section */}
-      <section className="py-24 bg-white">
-        <div className="container mx-auto px-6">
-          <div className="text-center max-w-2xl mx-auto mb-16">
-            <h2 className="font-display text-3xl md:text-4xl font-bold text-primary mb-4">The Aster & Spruce Standard</h2>
-            <p className="text-muted-foreground">We believe in complete transparency. Our client portal keeps you connected to your project from anywhere in the world.</p>
-          </div>
+      <section className="py-24 bg-secondary/40">
+        <div className="container mx-auto px-6 md:px-12">
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+            className="text-center max-w-xl mx-auto mb-16"
+          >
+            <p className="text-xs font-semibold tracking-[0.2em] uppercase text-muted-foreground mb-3">
+              The Standard
+            </p>
+            <h2 className="font-serif text-3xl md:text-4xl font-bold text-foreground" data-testid="text-features-heading">
+              Built on Trust and Transparency
+            </h2>
+          </motion.div>
 
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid md:grid-cols-3 gap-8 md:gap-10">
             {[
               {
                 icon: ShieldCheck,
                 title: "Secure Documentation",
-                desc: "Access contracts, plans, and change orders instantly in a secure digital vault."
+                desc: "Contracts, plans, and change orders in a secure digital vault accessible anytime.",
+              },
+              {
+                icon: Eye,
+                title: "Real-Time Visibility",
+                desc: "Daily photo logs, milestone tracking, and live progress updates at your fingertips.",
               },
               {
                 icon: Zap,
-                title: "Real-Time Updates",
-                desc: "Watch your vision come to life with daily photo logs and milestone tracking."
-              },
-              {
-                icon: CheckCircle2,
                 title: "Budget Clarity",
-                desc: "Live budget tracking ensures there are never any surprises on your invoice."
-              }
+                desc: "Transparent budget tracking ensures there are never any surprises on your invoice.",
+              },
             ].map((feature, idx) => (
-              <motion.div 
+              <motion.div
                 key={idx}
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 15 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ delay: idx * 0.1 }}
-                className="p-8 rounded-2xl bg-secondary/30 hover:bg-secondary/50 transition-colors border border-transparent hover:border-border"
+                transition={{ delay: idx * 0.1, duration: 0.5 }}
+                className="space-y-4"
+                data-testid={`feature-card-${idx}`}
               >
-                <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary mb-6">
-                  <feature.icon className="h-6 w-6" />
+                <div className="h-10 w-10 rounded-md bg-foreground/5 flex items-center justify-center text-foreground">
+                  <feature.icon className="h-5 w-5" />
                 </div>
-                <h3 className="font-display text-xl font-semibold text-primary mb-3">{feature.title}</h3>
-                <p className="text-muted-foreground leading-relaxed">{feature.desc}</p>
+                <h3 className="font-serif text-xl font-semibold text-foreground">
+                  {feature.title}
+                </h3>
+                <p className="text-muted-foreground leading-relaxed">
+                  {feature.desc}
+                </p>
               </motion.div>
             ))}
           </div>
@@ -127,12 +175,14 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="bg-primary text-primary-foreground py-12">
-        <div className="container mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6">
-          <div className="text-2xl font-display font-bold">Aster & Spruce</div>
-          <div className="text-sm opacity-60">
-            © {new Date().getFullYear()} Aster & Spruce Construction. All rights reserved.
-          </div>
+      <footer className="py-12 border-t border-border" data-testid="footer">
+        <div className="container mx-auto px-6 md:px-12 flex flex-col md:flex-row justify-between items-center gap-4">
+          <span className="font-serif text-lg font-bold text-foreground">
+            Aster & Spruce
+          </span>
+          <p className="text-sm text-muted-foreground">
+            &copy; {new Date().getFullYear()} Aster & Spruce Construction. All rights reserved.
+          </p>
         </div>
       </footer>
     </div>
