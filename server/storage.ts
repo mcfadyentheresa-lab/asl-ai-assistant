@@ -29,6 +29,7 @@ export interface IStorage {
   // Photos
   getPhotos(projectId: number): Promise<Photo[]>;
   createPhoto(photo: InsertPhoto): Promise<Photo>;
+  deletePhoto(id: number): Promise<void>;
 
   // Documents
   getDocuments(projectId: number): Promise<Document[]>;
@@ -115,6 +116,9 @@ export class DatabaseStorage implements IStorage {
   async createPhoto(photo: InsertPhoto): Promise<Photo> {
     const [newPhoto] = await db.insert(photos).values(photo).returning();
     return newPhoto;
+  }
+  async deletePhoto(id: number): Promise<void> {
+    await db.delete(photos).where(eq(photos.id, id));
   }
 
   // Documents

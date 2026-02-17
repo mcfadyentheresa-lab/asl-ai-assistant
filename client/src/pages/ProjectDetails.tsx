@@ -5,10 +5,11 @@ import {
   useBoardItems, useCreateBoardItem, useDeleteBoardItem,
   useCalendarEvents, useCreateCalendarEvent, useUpdateCalendarEvent, useDeleteCalendarEvent,
   useDocuments, useUploadDocument, useDeleteDocument,
+  usePhotos, useCreatePhoto, useDeletePhoto, useUploadImage,
   useUsers, useUpdateProject,
 } from "@/hooks/use-projects";
 import { Navbar } from "@/components/layout/Navbar";
-import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, ExternalLink, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, CalendarDays, ChevronLeft, Upload, Download, User } from "lucide-react";
+import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, ExternalLink, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, CalendarDays, ChevronLeft, Upload, Download, User, X, Paperclip, ZoomIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -300,20 +301,7 @@ export default function ProjectDetails() {
           </TabsContent>
 
           <TabsContent value="photos">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {[1, 2, 3, 4].map((i) => (
-                <div
-                  key={i}
-                  className="aspect-square bg-muted rounded-xl flex items-center justify-center text-muted-foreground"
-                  data-testid={`photo-placeholder-${i}`}
-                >
-                  <ImageIcon className="h-8 w-8 opacity-40" />
-                </div>
-              ))}
-              <div className="col-span-full text-center py-10 text-muted-foreground text-sm" data-testid="text-photos-soon">
-                Photos feature coming soon.
-              </div>
-            </div>
+            <PhotosTab projectId={projectId} />
           </TabsContent>
 
           <TabsContent value="calendar">
@@ -1096,19 +1084,233 @@ function BoardTab({ projectId }: { projectId: number }) {
   );
 }
 
+function PhotosTab({ projectId }: { projectId: number }) {
+  const { data: photos, isLoading } = usePhotos(projectId);
+  const { mutate: createPhoto } = useCreatePhoto();
+  const { mutate: deletePhoto } = useDeletePhoto();
+  const { mutateAsync: uploadImage, isPending: isUploading } = useUploadImage();
+  const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [lightboxPhoto, setLightboxPhoto] = useState<{ url: string; caption?: string | null } | null>(null);
+  const [caption, setCaption] = useState("");
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    for (const file of Array.from(files)) {
+      try {
+        const { url } = await uploadImage(file);
+        createPhoto(
+          { projectId, url, caption: caption || file.name },
+          {
+            onSuccess: () => {
+              toast({ title: "Uploaded", description: `${file.name} added to gallery.` });
+            },
+            onError: (err) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+          }
+        );
+      } catch (err: any) {
+        toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+      }
+    }
+
+    setCaption("");
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleDelete = (id: number) => {
+    deletePhoto(
+      { id, projectId },
+      {
+        onSuccess: () => toast({ title: "Deleted", description: "Photo removed." }),
+        onError: (err) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+      }
+    );
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" data-testid="loader-photos" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <h3 className="font-serif text-lg font-semibold" data-testid="text-photos-heading">Progress Photos</h3>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Input
+            value={caption}
+            onChange={(e) => setCaption(e.target.value)}
+            placeholder="Caption (optional)"
+            className="w-48"
+            data-testid="input-photo-caption"
+          />
+          <Button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading}
+            data-testid="button-upload-photo"
+          >
+            {isUploading ? <Loader2 className="mr-2 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+            Upload Photos
+          </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/gif,image/webp"
+            className="hidden"
+            onChange={handleFileSelect}
+            multiple
+            data-testid="input-photo-file"
+          />
+        </div>
+      </div>
+
+      {!photos || photos.length === 0 ? (
+        <div className="text-center py-16">
+          <ImageIcon className="h-12 w-12 mx-auto text-muted-foreground/30 mb-4" />
+          <p className="text-muted-foreground text-sm" data-testid="text-photos-empty">
+            No photos yet. Upload progress photos to share with your team.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" data-testid="photo-grid">
+          {photos.map((photo) => (
+            <div
+              key={photo.id}
+              className="group relative aspect-square rounded-md overflow-visible"
+              data-testid={`photo-item-${photo.id}`}
+            >
+              <img
+                src={photo.url}
+                alt={photo.caption || "Project photo"}
+                className="h-full w-full object-cover rounded-md cursor-pointer transition-transform"
+                onClick={() => setLightboxPhoto({ url: photo.url, caption: photo.caption })}
+                data-testid={`img-photo-${photo.id}`}
+              />
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors rounded-md pointer-events-none" />
+              <div className="absolute top-2 right-2 flex gap-1 invisible group-hover:visible">
+                <Button
+                  size="icon"
+                  variant="secondary"
+                  className="h-7 w-7"
+                  onClick={() => setLightboxPhoto({ url: photo.url, caption: photo.caption })}
+                  data-testid={`button-zoom-photo-${photo.id}`}
+                >
+                  <ZoomIn className="h-3 w-3" />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="secondary"
+                  className="h-7 w-7"
+                  onClick={() => handleDelete(photo.id)}
+                  data-testid={`button-delete-photo-${photo.id}`}
+                >
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              </div>
+              {photo.caption && (
+                <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/60 to-transparent rounded-b-md">
+                  <p className="text-white text-xs truncate" data-testid={`text-photo-caption-${photo.id}`}>
+                    {photo.caption}
+                  </p>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {lightboxPhoto && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setLightboxPhoto(null)}
+          data-testid="photo-lightbox"
+        >
+          <Button
+            size="icon"
+            variant="ghost"
+            className="absolute top-4 right-4 text-white"
+            onClick={() => setLightboxPhoto(null)}
+            data-testid="button-close-lightbox"
+          >
+            <X className="h-6 w-6" />
+          </Button>
+          <div className="max-w-4xl max-h-[85vh] flex flex-col items-center" onClick={(e) => e.stopPropagation()}>
+            <img
+              src={lightboxPhoto.url}
+              alt={lightboxPhoto.caption || "Photo"}
+              className="max-h-[80vh] max-w-full object-contain rounded-md"
+              data-testid="img-lightbox"
+            />
+            {lightboxPhoto.caption && (
+              <p className="text-white text-sm mt-3 text-center" data-testid="text-lightbox-caption">
+                {lightboxPhoto.caption}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ChatTab({ projectId }: { projectId: number }) {
   const { user } = useAuth();
   const { data: messages, isLoading } = useMessages(projectId);
   const { mutate: sendMessage, isPending } = useSendMessage();
+  const { mutateAsync: uploadImage, isPending: isUploadingImage } = useUploadImage();
+  const { toast } = useToast();
   const [content, setContent] = useState("");
+  const [attachedImage, setAttachedImage] = useState<string | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const previewUrl = URL.createObjectURL(file);
+    setImagePreview(previewUrl);
+
+    try {
+      const { url } = await uploadImage(file);
+      setAttachedImage(url);
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+      setImagePreview(null);
+      setAttachedImage(null);
+    }
+    if (imageInputRef.current) imageInputRef.current.value = "";
+  };
+
+  const removeAttachment = () => {
+    setAttachedImage(null);
+    setImagePreview(null);
+  };
 
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!content.trim() || !user) return;
+    if ((!content.trim() && !attachedImage) || !user) return;
 
     sendMessage(
-      { projectId, content, senderId: user.id || "unknown" },
-      { onSuccess: () => setContent("") }
+      {
+        projectId,
+        content: content.trim() || (attachedImage ? "Shared a photo" : ""),
+        senderId: user.id || "unknown",
+        imageUrl: attachedImage,
+      },
+      {
+        onSuccess: () => {
+          setContent("");
+          setAttachedImage(null);
+          setImagePreview(null);
+        },
+      }
     );
   };
 
@@ -1121,7 +1323,7 @@ function ChatTab({ projectId }: { projectId: number }) {
       </CardHeader>
       <CardContent className="flex-1 p-0 flex flex-col overflow-hidden">
         <ScrollArea className="flex-1 p-4">
-          <div className="space-y-4">
+          <div className="space-y-4" ref={scrollRef}>
             {isLoading ? (
               <div className="flex justify-center p-4">
                 <Loader2 className="animate-spin text-muted-foreground" />
@@ -1162,7 +1364,21 @@ function ChatTab({ projectId }: { projectId: number }) {
                       >
                         {isMe ? "You" : senderFirst}
                       </span>
-                      <p>{msg.content}</p>
+                      {msg.imageUrl && (
+                        <img
+                          src={msg.imageUrl}
+                          alt="Attached"
+                          className="rounded-md max-w-full max-h-48 object-cover mb-1.5 cursor-pointer"
+                          onClick={() => window.open(msg.imageUrl, "_blank")}
+                          data-testid={`img-message-${msg.id}`}
+                        />
+                      )}
+                      {msg.content && msg.content !== "Shared a photo" && (
+                        <p>{msg.content}</p>
+                      )}
+                      {msg.content === "Shared a photo" && !msg.imageUrl && (
+                        <p>{msg.content}</p>
+                      )}
                       <span className="text-[10px] opacity-60 block mt-1 text-right">
                         {msg.createdAt && format(new Date(msg.createdAt), "h:mm a")}
                       </span>
@@ -1173,19 +1389,70 @@ function ChatTab({ projectId }: { projectId: number }) {
             )}
           </div>
         </ScrollArea>
-        <div className="p-4 border-t bg-background">
-          <form onSubmit={handleSend} className="flex gap-2" data-testid="form-chat">
-            <Input
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder="Type a message..."
-              className="flex-1"
-              data-testid="input-chat-message"
-            />
-            <Button type="submit" disabled={isPending || !content.trim()} data-testid="button-send-message">
-              <Send className="h-4 w-4" />
-            </Button>
-          </form>
+
+        <div className="border-t bg-background">
+          {imagePreview && (
+            <div className="px-4 pt-3 flex items-center gap-2" data-testid="chat-image-preview">
+              <div className="relative">
+                <img
+                  src={imagePreview}
+                  alt="Attachment preview"
+                  className="h-16 w-16 object-cover rounded-md border"
+                  data-testid="img-chat-preview"
+                />
+                {isUploadingImage && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/30 rounded-md">
+                    <Loader2 className="h-4 w-4 animate-spin text-white" />
+                  </div>
+                )}
+                <Button
+                  size="icon"
+                  variant="secondary"
+                  className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full"
+                  onClick={removeAttachment}
+                  data-testid="button-remove-attachment"
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            </div>
+          )}
+          <div className="p-4">
+            <form onSubmit={handleSend} className="flex gap-2" data-testid="form-chat">
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                onClick={() => imageInputRef.current?.click()}
+                disabled={isUploadingImage}
+                data-testid="button-attach-image"
+              >
+                <Paperclip className="h-4 w-4" />
+              </Button>
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/gif,image/webp"
+                className="hidden"
+                onChange={handleImageSelect}
+                data-testid="input-chat-image"
+              />
+              <Input
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                placeholder="Type a message..."
+                className="flex-1"
+                data-testid="input-chat-message"
+              />
+              <Button
+                type="submit"
+                disabled={isPending || isUploadingImage || (!content.trim() && !attachedImage)}
+                data-testid="button-send-message"
+              >
+                <Send className="h-4 w-4" />
+              </Button>
+            </form>
+          </div>
         </div>
       </CardContent>
     </Card>

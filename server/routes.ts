@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
+import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { authStorage } from "./replit_integrations/auth/storage";
 import multer from "multer";
 import path from "path";
@@ -75,6 +76,7 @@ export async function registerRoutes(
   // Auth setup
   await setupAuth(app);
   registerAuthRoutes(app);
+  registerObjectStorageRoutes(app);
 
   // Serve uploaded files
   const express = await import("express");
@@ -235,6 +237,15 @@ export async function registerRoutes(
     const input = api.photos.create.input.parse(req.body);
     const photo = await storage.createPhoto({ ...input, projectId: Number(req.params.projectId) });
     res.status(201).json(photo);
+  });
+
+  app.delete("/api/photos/:id", isAuthenticated, async (req, res) => {
+    try {
+      await storage.deletePhoto(Number(req.params.id));
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete photo" });
+    }
   });
 
   // Documents

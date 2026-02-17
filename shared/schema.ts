@@ -127,6 +127,7 @@ export const messages = pgTable("messages", {
   projectId: integer("project_id").notNull().references(() => projects.id),
   senderId: text("sender_id").notNull().references(() => users.id),
   content: text("content").notNull(),
+  imageUrl: text("image_url"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

@@ -456,6 +456,76 @@ export function useDeleteCalendarEvent() {
   });
 }
 
+// --- Photos ---
+export function usePhotos(projectId: number) {
+  return useQuery<import("@shared/schema").Photo[]>({
+    queryKey: [api.photos.list.path, projectId],
+    queryFn: async () => {
+      const url = buildUrl(api.photos.list.path, { projectId });
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch photos");
+      return res.json();
+    },
+    enabled: !!projectId,
+  });
+}
+
+export function useCreatePhoto() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ projectId, ...data }: { projectId: number; url: string; caption?: string; tags?: string[] }) => {
+      const url = buildUrl(api.photos.create.path, { projectId });
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to create photo");
+      return res.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: [api.photos.list.path, variables.projectId] });
+    },
+  });
+}
+
+export function useDeletePhoto() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, projectId }: { id: number; projectId: number }) => {
+      const res = await fetch(`/api/photos/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to delete photo");
+      return res.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: [api.photos.list.path, variables.projectId] });
+    },
+  });
+}
+
+export function useUploadImage() {
+  return useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append("image", file);
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: "Upload failed" }));
+        throw new Error(err.message);
+      }
+      return res.json() as Promise<{ url: string }>;
+    },
+  });
+}
+
 // --- Documents ---
 export function useDocuments(projectId: number) {
   return useQuery<Document[]>({
