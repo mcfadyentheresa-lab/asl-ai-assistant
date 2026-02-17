@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
-import { type InsertProject, type InsertMilestone, type InsertTask, type InsertMessage, type InsertChecklistItem, type InsertBoardItem } from "@shared/schema";
+import { type InsertProject, type InsertMilestone, type InsertTask, type InsertMessage, type InsertChecklistItem, type InsertBoardItem, type InsertCalendarEvent } from "@shared/schema";
 
 // --- Projects ---
 export function useProjects() {
@@ -347,6 +347,58 @@ export function useDeleteBoardItem() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.board.list.path] });
+    },
+  });
+}
+
+// --- Calendar Events ---
+export function useCalendarEvents(projectId: number) {
+  return useQuery({
+    queryKey: [api.calendar.list.path, projectId],
+    queryFn: async () => {
+      const url = buildUrl(api.calendar.list.path, { projectId });
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch calendar events");
+      return api.calendar.list.responses[200].parse(await res.json());
+    },
+    enabled: !!projectId,
+  });
+}
+
+export function useCreateCalendarEvent() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ projectId, ...data }: InsertCalendarEvent & { projectId: number }) => {
+      const url = buildUrl(api.calendar.create.path, { projectId });
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to create calendar event");
+      return api.calendar.create.responses[201].parse(await res.json());
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: [api.calendar.list.path, variables.projectId] });
+    },
+  });
+}
+
+export function useDeleteCalendarEvent() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const url = buildUrl(api.calendar.delete.path, { id });
+      const res = await fetch(url, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to delete calendar event");
+      return api.calendar.delete.responses[200].parse(await res.json());
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.calendar.list.path] });
     },
   });
 }

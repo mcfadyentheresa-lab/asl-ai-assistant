@@ -1,10 +1,10 @@
 import { db } from "./db";
 import { 
-  users, projects, milestones, tasks, photos, documents, timeEntries, messages, checklistItems, boardItems,
+  users, projects, milestones, tasks, photos, documents, timeEntries, messages, checklistItems, boardItems, calendarEvents,
   type Project, type Milestone, type Task, type Photo, type Document, type TimeEntry, type Message,
-  type ChecklistItem, type BoardItem,
+  type ChecklistItem, type BoardItem, type CalendarEvent,
   type InsertProject, type InsertMilestone, type InsertTask, type InsertPhoto, type InsertDocument, 
-  type InsertTimeEntry, type InsertMessage, type InsertChecklistItem, type InsertBoardItem
+  type InsertTimeEntry, type InsertMessage, type InsertChecklistItem, type InsertBoardItem, type InsertCalendarEvent
 } from "@shared/schema";
 import { type User } from "@shared/models/auth";
 import { eq, desc, and } from "drizzle-orm";
@@ -56,6 +56,12 @@ export interface IStorage {
   createBoardItem(item: InsertBoardItem): Promise<BoardItem>;
   updateBoardItem(id: number, updates: Partial<InsertBoardItem>): Promise<BoardItem>;
   deleteBoardItem(id: number): Promise<void>;
+
+  // Calendar Events
+  getCalendarEvents(projectId: number): Promise<CalendarEvent[]>;
+  createCalendarEvent(event: InsertCalendarEvent): Promise<CalendarEvent>;
+  updateCalendarEvent(id: number, updates: Partial<InsertCalendarEvent>): Promise<CalendarEvent>;
+  deleteCalendarEvent(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -189,6 +195,22 @@ export class DatabaseStorage implements IStorage {
   }
   async deleteBoardItem(id: number): Promise<void> {
     await db.delete(boardItems).where(eq(boardItems.id, id));
+  }
+
+  // Calendar Events
+  async getCalendarEvents(projectId: number): Promise<CalendarEvent[]> {
+    return await db.select().from(calendarEvents).where(eq(calendarEvents.projectId, projectId)).orderBy(calendarEvents.date);
+  }
+  async createCalendarEvent(event: InsertCalendarEvent): Promise<CalendarEvent> {
+    const [newEvent] = await db.insert(calendarEvents).values(event).returning();
+    return newEvent;
+  }
+  async updateCalendarEvent(id: number, updates: Partial<InsertCalendarEvent>): Promise<CalendarEvent> {
+    const [updated] = await db.update(calendarEvents).set(updates).where(eq(calendarEvents.id, id)).returning();
+    return updated;
+  }
+  async deleteCalendarEvent(id: number): Promise<void> {
+    await db.delete(calendarEvents).where(eq(calendarEvents.id, id));
   }
 }
 

@@ -228,6 +228,35 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
+  // Calendar Events
+  app.get(api.calendar.list.path, isAuthenticated, async (req, res) => {
+    const events = await storage.getCalendarEvents(Number(req.params.projectId));
+    res.json(events);
+  });
+
+  app.post(api.calendar.create.path, isAuthenticated, async (req: any, res) => {
+    const input = api.calendar.create.input.parse(req.body);
+    const userId = req.user.claims.sub;
+    const event = await storage.createCalendarEvent({
+      ...input,
+      projectId: Number(req.params.projectId),
+      createdBy: userId,
+    });
+    res.status(201).json(event);
+  });
+
+  app.put("/api/calendar/:id", isAuthenticated, async (req, res) => {
+    const input = api.calendar.update.input.parse(req.body);
+    const event = await storage.updateCalendarEvent(Number(req.params.id), input);
+    if (!event) return res.status(404).json({ message: "Calendar event not found" });
+    res.json(event);
+  });
+
+  app.delete("/api/calendar/:id", isAuthenticated, async (req, res) => {
+    await storage.deleteCalendarEvent(Number(req.params.id));
+    res.json({ success: true });
+  });
+
   // Weather & PDF Reports Stubs
   app.get('/api/projects/:projectId/weather', isAuthenticated, async (req, res) => {
     // In a real app, we'd call a weather API. For now, we'll return mock data based on "Muskoka"

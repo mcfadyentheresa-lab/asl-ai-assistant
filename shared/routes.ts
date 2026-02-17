@@ -2,8 +2,8 @@ import { z } from 'zod';
 import { 
   insertProjectSchema, insertMilestoneSchema, insertTaskSchema, 
   insertPhotoSchema, insertDocumentSchema, insertTimeEntrySchema, insertMessageSchema,
-  insertChecklistItemSchema, insertBoardItemSchema,
-  projects, milestones, tasks, photos, documents, timeEntries, messages, users, checklistItems, boardItems
+  insertChecklistItemSchema, insertBoardItemSchema, insertCalendarEventSchema,
+  projects, milestones, tasks, photos, documents, timeEntries, messages, users, checklistItems, boardItems, calendarEvents
 } from './schema';
 
 export const errorSchemas = {
@@ -252,6 +252,40 @@ export const api = {
     delete: {
       method: 'DELETE' as const,
       path: '/api/board/:id' as const,
+      responses: {
+        200: z.object({ success: z.boolean() }),
+      },
+    },
+  },
+
+  // Calendar Events
+  calendar: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/projects/:projectId/calendar' as const,
+      responses: {
+        200: z.array(z.custom<typeof calendarEvents.$inferSelect>()),
+      },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/projects/:projectId/calendar' as const,
+      input: insertCalendarEventSchema.omit({ projectId: true, createdBy: true }),
+      responses: {
+        201: z.custom<typeof calendarEvents.$inferSelect>(),
+      },
+    },
+    update: {
+      method: 'PUT' as const,
+      path: '/api/calendar/:id' as const,
+      input: insertCalendarEventSchema.partial(),
+      responses: {
+        200: z.custom<typeof calendarEvents.$inferSelect>(),
+      },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/calendar/:id' as const,
       responses: {
         200: z.object({ success: z.boolean() }),
       },
