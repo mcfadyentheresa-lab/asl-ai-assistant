@@ -154,6 +154,7 @@ export class DatabaseStorage implements IStorage {
 
   // Delete project (cascading deletes handled by cleaning up related data)
   async deleteProject(id: number): Promise<void> {
+    await db.delete(calendarEvents).where(eq(calendarEvents.projectId, id));
     await db.delete(checklistItems).where(eq(checklistItems.projectId, id));
     await db.delete(boardItems).where(eq(boardItems.projectId, id));
     await db.delete(messages).where(eq(messages.projectId, id));

@@ -3,9 +3,10 @@ import {
   useProject, useMilestones, useTasks, useMessages, useSendMessage,
   useChecklistItems, useCreateChecklistItem, useUpdateChecklistItem, useDeleteChecklistItem,
   useBoardItems, useCreateBoardItem, useDeleteBoardItem,
+  useCalendarEvents, useCreateCalendarEvent, useDeleteCalendarEvent,
 } from "@/hooks/use-projects";
 import { Navbar } from "@/components/layout/Navbar";
-import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, ExternalLink, Plus, ChevronDown, ChevronRight, Link2, StickyNote } from "lucide-react";
+import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, ExternalLink, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, CalendarDays, ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -33,8 +34,8 @@ import {
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
-import { format } from "date-fns";
-import type { ChecklistItem, BoardItem } from "@shared/schema";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths, isSameDay, isSameMonth, parseISO } from "date-fns";
+import type { ChecklistItem, BoardItem, CalendarEvent } from "@shared/schema";
 
 export default function ProjectDetails() {
   const { id } = useParams();
@@ -120,6 +121,10 @@ export default function ProjectDetails() {
             <TabsTrigger value="board" data-testid="tab-board">
               <LayoutGrid className="mr-2 h-4 w-4" />
               Board
+            </TabsTrigger>
+            <TabsTrigger value="calendar" data-testid="tab-calendar">
+              <CalendarDays className="mr-2 h-4 w-4" />
+              Calendar
             </TabsTrigger>
             <TabsTrigger value="photos" data-testid="tab-photos">
               <ImageIcon className="mr-2 h-4 w-4" />
@@ -247,6 +252,10 @@ export default function ProjectDetails() {
             </div>
           </TabsContent>
 
+          <TabsContent value="calendar">
+            <CalendarTab projectId={projectId} />
+          </TabsContent>
+
           <TabsContent value="docs">
             <div className="flex flex-col gap-2">
               <Card className="flex items-center justify-between p-4" data-testid="doc-contract">
@@ -269,6 +278,16 @@ export default function ProjectDetails() {
   );
 }
 
+const checklistColors = [
+  { value: "", label: "None" },
+  { value: "#e8f5e9", label: "Green" },
+  { value: "#fff3e0", label: "Orange" },
+  { value: "#e3f2fd", label: "Blue" },
+  { value: "#fce4ec", label: "Pink" },
+  { value: "#f3e5f5", label: "Purple" },
+  { value: "#fff9c4", label: "Yellow" },
+];
+
 function ChecklistTab({ projectId }: { projectId: number }) {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -283,6 +302,8 @@ function ChecklistTab({ projectId }: { projectId: number }) {
   const [newPriority, setNewPriority] = useState("normal");
   const [newStatus, setNewStatus] = useState("todo");
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+  const [editItem, setEditItem] = useState<ChecklistItem | null>(null);
+  const [editForm, setEditForm] = useState({ title: "", group: "", priority: "normal", status: "todo", notes: "", priceEstimate: "", color: "" });
 
   const isCrew = user?.email?.includes("crew") || user?.email?.includes("admin");
 
@@ -352,6 +373,43 @@ function ChecklistTab({ projectId }: { projectId: number }) {
 
   const toggleGroup = (group: string) => {
     setCollapsedGroups((prev) => ({ ...prev, [group]: !prev[group] }));
+  };
+
+  const openEditDialog = (item: ChecklistItem) => {
+    setEditForm({
+      title: item.title,
+      group: item.group || "General",
+      priority: item.priority || "normal",
+      status: item.status || "todo",
+      notes: item.notes || "",
+      priceEstimate: item.priceEstimate != null ? String(item.priceEstimate) : "",
+      color: item.color || "",
+    });
+    setEditItem(item);
+  };
+
+  const handleEditSave = () => {
+    if (!editItem) return;
+    updateItem(
+      {
+        id: editItem.id,
+        title: editForm.title,
+        group: editForm.group,
+        priority: editForm.priority,
+        status: editForm.status,
+        completed: editForm.status === "done",
+        notes: editForm.notes || null,
+        priceEstimate: editForm.priceEstimate ? parseInt(editForm.priceEstimate, 10) : null,
+        color: editForm.color || null,
+      },
+      {
+        onSuccess: () => {
+          toast({ title: "Updated", description: "Checklist item updated." });
+          setEditItem(null);
+        },
+        onError: (err) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+      }
+    );
   };
 
   const priorityVariant = (p: string | null) => {
@@ -482,19 +540,29 @@ function ChecklistTab({ projectId }: { projectId: number }) {
                   {groupItems.map((item) => {
                     const isDone = item.status === "done" || !!item.completed;
                     const isNextYear = item.status === "next_year";
+                    const itemColor = item.color || "";
                     return (
                       <div
                         key={item.id}
-                        className={`flex items-start gap-3 px-4 py-3 border-b last:border-b-0 transition-opacity ${isDone ? "opacity-60" : ""} ${isNextYear ? "opacity-50" : ""}`}
+                        className={`relative flex items-start gap-3 px-4 py-3 border-b last:border-b-0 transition-opacity ${isDone ? "opacity-60" : ""} ${isNextYear ? "opacity-50" : ""}`}
                         data-testid={`checklist-item-${item.id}`}
                       >
+                        {itemColor && (
+                          <div
+                            className="absolute inset-0 rounded-none pointer-events-none opacity-20 dark:opacity-10"
+                            style={{ backgroundColor: itemColor }}
+                          />
+                        )}
+                        {itemColor && (
+                          <div className="absolute left-0 top-0 bottom-0 w-1" style={{ backgroundColor: itemColor }} />
+                        )}
                         <Checkbox
                           checked={isDone}
                           onCheckedChange={() => handleToggle(item)}
-                          className="mt-0.5"
+                          className="mt-0.5 relative z-[1]"
                           data-testid={`checkbox-checklist-${item.id}`}
                         />
-                        <div className="flex-1 min-w-0 space-y-1">
+                        <div className="flex-1 min-w-0 space-y-1 relative z-[1]">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span
                               className={`font-medium text-sm ${isDone ? "line-through text-muted-foreground" : "text-foreground"}`}
@@ -512,45 +580,30 @@ function ChecklistTab({ projectId }: { projectId: number }) {
                               </span>
                             )}
                           </div>
-                          {item.notes && !isCrew && (
+                          {item.notes && (
                             <p className="text-xs text-muted-foreground" data-testid={`text-notes-${item.id}`}>
                               {item.notes}
                             </p>
                           )}
-                          {isCrew && (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                              <div>
-                                <label className="text-xs text-muted-foreground mb-1 block">Notes</label>
-                                <Textarea
-                                  defaultValue={item.notes || ""}
-                                  onBlur={(e) => handleNotesChange(item, e.target.value)}
-                                  placeholder="Add notes..."
-                                  className="resize-none text-sm"
-                                  rows={2}
-                                  data-testid={`textarea-notes-${item.id}`}
-                                />
-                              </div>
-                              <div>
-                                <label className="text-xs text-muted-foreground mb-1 block">Price Estimate ($)</label>
-                                <Input
-                                  type="number"
-                                  defaultValue={item.priceEstimate ?? ""}
-                                  onBlur={(e) => handlePriceChange(item, e.target.value)}
-                                  placeholder="0"
-                                  data-testid={`input-price-${item.id}`}
-                                />
-                              </div>
-                            </div>
-                          )}
                         </div>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => handleDelete(item.id)}
-                          data-testid={`button-delete-checklist-${item.id}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <div className="flex items-center gap-1 relative z-[1]">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => openEditDialog(item)}
+                            data-testid={`button-edit-checklist-${item.id}`}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => handleDelete(item.id)}
+                            data-testid={`button-delete-checklist-${item.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                     );
                   })}
@@ -564,6 +617,110 @@ function ChecklistTab({ projectId }: { projectId: number }) {
           No checklist items yet. Add your first item above.
         </div>
       )}
+
+      <Dialog open={!!editItem} onOpenChange={(open) => { if (!open) setEditItem(null); }}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-xl" data-testid="text-edit-dialog-title">Edit Item</DialogTitle>
+            <DialogDescription>Update the checklist item details and color.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div>
+              <label className="text-sm font-medium mb-1 block">Title</label>
+              <Input
+                value={editForm.title}
+                onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                data-testid="input-edit-title"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-sm font-medium mb-1 block">Group</label>
+                <Select value={editForm.group} onValueChange={(v) => setEditForm({ ...editForm, group: v })}>
+                  <SelectTrigger data-testid="select-edit-group">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {allGroups.map((g) => (
+                      <SelectItem key={g} value={g}>{g}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">Priority</label>
+                <Select value={editForm.priority} onValueChange={(v) => setEditForm({ ...editForm, priority: v })}>
+                  <SelectTrigger data-testid="select-edit-priority">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="normal">Normal</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Status</label>
+              <Select value={editForm.status} onValueChange={(v) => setEditForm({ ...editForm, status: v })}>
+                <SelectTrigger data-testid="select-edit-status">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todo">To Do</SelectItem>
+                  <SelectItem value="in_progress">In Progress</SelectItem>
+                  <SelectItem value="done">Done</SelectItem>
+                  <SelectItem value="next_year">Next Year</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Notes</label>
+              <Textarea
+                value={editForm.notes}
+                onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                placeholder="Add notes..."
+                className="resize-none"
+                rows={2}
+                data-testid="textarea-edit-notes"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Price Estimate ($)</label>
+              <Input
+                type="number"
+                value={editForm.priceEstimate}
+                onChange={(e) => setEditForm({ ...editForm, priceEstimate: e.target.value })}
+                placeholder="0"
+                data-testid="input-edit-price"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Color</label>
+              <div className="flex gap-2 flex-wrap" data-testid="edit-color-picker">
+                {checklistColors.map((c) => (
+                  <button
+                    key={c.value || "none"}
+                    type="button"
+                    onClick={() => setEditForm({ ...editForm, color: c.value })}
+                    className={`w-8 h-8 rounded-md border-2 transition-all ${editForm.color === c.value ? "border-foreground scale-110" : "border-border"}`}
+                    style={{ backgroundColor: c.value || "transparent" }}
+                    title={c.label}
+                    data-testid={`button-edit-color-${c.label.toLowerCase()}`}
+                  >
+                    {!c.value && <span className="text-xs text-muted-foreground">-</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setEditItem(null)} data-testid="button-edit-cancel">Cancel</Button>
+              <Button onClick={handleEditSave} disabled={!editForm.title.trim()} data-testid="button-edit-save">Save Changes</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -982,5 +1139,295 @@ function ChatTab({ projectId }: { projectId: number }) {
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+const eventTypeColors: Record<string, string> = {
+  event: "#4f46e5",
+  milestone: "#059669",
+  deadline: "#dc2626",
+  meeting: "#d97706",
+  inspection: "#7c3aed",
+};
+
+function CalendarTab({ projectId }: { projectId: number }) {
+  const { toast } = useToast();
+  const { data: events, isLoading } = useCalendarEvents(projectId);
+  const { mutate: createEvent, isPending: isCreating } = useCreateCalendarEvent();
+  const { mutate: deleteEvent } = useDeleteCalendarEvent();
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [eventForm, setEventForm] = useState({ title: "", description: "", type: "event" });
+
+  const monthStart = startOfMonth(currentMonth);
+  const monthEnd = endOfMonth(currentMonth);
+  const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
+  const startDayOfWeek = getDay(monthStart);
+
+  const getEventsForDate = (date: Date) => {
+    if (!events) return [];
+    return (events as CalendarEvent[]).filter((e) => {
+      const eventDate = parseISO(e.date);
+      return isSameDay(eventDate, date);
+    });
+  };
+
+  const selectedDateEvents = selectedDate ? getEventsForDate(selectedDate) : [];
+
+  const handleAddEvent = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!eventForm.title.trim() || !selectedDate) return;
+    createEvent(
+      {
+        projectId,
+        title: eventForm.title.trim(),
+        description: eventForm.description.trim() || null,
+        date: format(selectedDate, "yyyy-MM-dd"),
+        type: eventForm.type,
+      },
+      {
+        onSuccess: () => {
+          toast({ title: "Added", description: "Event added to calendar." });
+          setAddDialogOpen(false);
+          setEventForm({ title: "", description: "", type: "event" });
+        },
+        onError: (err) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+      }
+    );
+  };
+
+  const handleDeleteEvent = (id: number) => {
+    deleteEvent(id, {
+      onSuccess: () => toast({ title: "Removed", description: "Event deleted." }),
+      onError: (err) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center py-10">
+        <Loader2 className="animate-spin text-muted-foreground" data-testid="loader-calendar" />
+      </div>
+    );
+  }
+
+  const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-3">
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
+            data-testid="button-prev-month"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <h3 className="font-serif text-xl font-bold text-foreground min-w-[180px] text-center" data-testid="text-current-month">
+            {format(currentMonth, "MMMM yyyy")}
+          </h3>
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
+            data-testid="button-next-month"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+        <Button
+          onClick={() => {
+            setSelectedDate(selectedDate || new Date());
+            setAddDialogOpen(true);
+          }}
+          data-testid="button-add-event"
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          Add Event
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-7 gap-px bg-border rounded-md overflow-hidden" data-testid="calendar-grid">
+        {weekDays.map((day) => (
+          <div
+            key={day}
+            className="bg-muted text-center py-2 text-xs font-medium text-muted-foreground"
+          >
+            {day}
+          </div>
+        ))}
+        {Array.from({ length: startDayOfWeek }).map((_, i) => (
+          <div key={`empty-${i}`} className="bg-card min-h-[80px]" />
+        ))}
+        {daysInMonth.map((day) => {
+          const dayEvents = getEventsForDate(day);
+          const isSelected = selectedDate && isSameDay(day, selectedDate);
+          const isToday = isSameDay(day, new Date());
+          return (
+            <div
+              key={day.toISOString()}
+              className={`bg-card min-h-[80px] p-1.5 cursor-pointer transition-colors hover-elevate ${isSelected ? "ring-2 ring-primary ring-inset" : ""}`}
+              onClick={() => setSelectedDate(day)}
+              data-testid={`calendar-day-${format(day, "yyyy-MM-dd")}`}
+            >
+              <span
+                className={`text-xs font-medium inline-flex items-center justify-center w-6 h-6 rounded-full ${isToday ? "bg-primary text-primary-foreground" : "text-foreground"}`}
+              >
+                {format(day, "d")}
+              </span>
+              <div className="mt-0.5 space-y-0.5">
+                {dayEvents.slice(0, 3).map((ev) => (
+                  <div
+                    key={ev.id}
+                    className="text-[10px] leading-tight truncate rounded px-1 py-0.5 text-white"
+                    style={{ backgroundColor: eventTypeColors[ev.type || "event"] || eventTypeColors.event }}
+                    data-testid={`calendar-event-dot-${ev.id}`}
+                  >
+                    {ev.title}
+                  </div>
+                ))}
+                {dayEvents.length > 3 && (
+                  <span className="text-[10px] text-muted-foreground">+{dayEvents.length - 3} more</span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {selectedDate && (
+        <Card data-testid="selected-date-panel">
+          <CardHeader className="pb-3">
+            <CardTitle className="font-serif text-lg flex items-center gap-2" data-testid="text-selected-date">
+              <CalendarIcon className="h-5 w-5 text-muted-foreground" />
+              {format(selectedDate, "EEEE, MMMM d, yyyy")}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {selectedDateEvents.length > 0 ? (
+              selectedDateEvents.map((ev) => (
+                <div
+                  key={ev.id}
+                  className="flex items-start justify-between gap-3 p-3 rounded-md bg-muted"
+                  data-testid={`calendar-event-${ev.id}`}
+                >
+                  <div className="flex items-start gap-3 min-w-0">
+                    <div
+                      className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0"
+                      style={{ backgroundColor: eventTypeColors[ev.type || "event"] || eventTypeColors.event }}
+                    />
+                    <div className="min-w-0">
+                      <p className="font-medium text-sm text-foreground" data-testid={`text-event-title-${ev.id}`}>
+                        {ev.title}
+                      </p>
+                      {ev.description && (
+                        <p className="text-xs text-muted-foreground mt-0.5" data-testid={`text-event-desc-${ev.id}`}>
+                          {ev.description}
+                        </p>
+                      )}
+                      <Badge variant="outline" className="mt-1 text-[10px] no-default-hover-elevate" data-testid={`badge-event-type-${ev.id}`}>
+                        {ev.type || "event"}
+                      </Badge>
+                    </div>
+                  </div>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => handleDeleteEvent(ev.id)}
+                    data-testid={`button-delete-event-${ev.id}`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-4" data-testid="text-no-events">
+                No events on this date.
+              </p>
+            )}
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => setAddDialogOpen(true)}
+              data-testid="button-add-event-for-date"
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Add Event for {format(selectedDate, "MMM d")}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-xl" data-testid="text-add-event-title">
+              Add Event
+            </DialogTitle>
+            <DialogDescription>
+              {selectedDate ? `Add an event for ${format(selectedDate, "MMMM d, yyyy")}` : "Select a date and add an event."}
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleAddEvent} className="space-y-4 pt-2" data-testid="form-add-event">
+            <div>
+              <label className="text-sm font-medium mb-1 block">Title</label>
+              <Input
+                value={eventForm.title}
+                onChange={(e) => setEventForm({ ...eventForm, title: e.target.value })}
+                placeholder="Event title..."
+                data-testid="input-event-title"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Description</label>
+              <Textarea
+                value={eventForm.description}
+                onChange={(e) => setEventForm({ ...eventForm, description: e.target.value })}
+                placeholder="Optional description..."
+                className="resize-none"
+                rows={2}
+                data-testid="textarea-event-description"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Type</label>
+              <Select value={eventForm.type} onValueChange={(v) => setEventForm({ ...eventForm, type: v })}>
+                <SelectTrigger data-testid="select-event-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="event">Event</SelectItem>
+                  <SelectItem value="milestone">Milestone</SelectItem>
+                  <SelectItem value="deadline">Deadline</SelectItem>
+                  <SelectItem value="meeting">Meeting</SelectItem>
+                  <SelectItem value="inspection">Inspection</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Date</label>
+              <Input
+                type="date"
+                value={selectedDate ? format(selectedDate, "yyyy-MM-dd") : ""}
+                onChange={(e) => setSelectedDate(e.target.value ? parseISO(e.target.value) : null)}
+                data-testid="input-event-date"
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="outline" onClick={() => setAddDialogOpen(false)} data-testid="button-cancel-event">
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isCreating || !eventForm.title.trim() || !selectedDate} data-testid="button-save-event">
+                {isCreating ? <Loader2 className="mr-2 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+                Add Event
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }
