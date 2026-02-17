@@ -56,8 +56,12 @@ export async function registerRoutes(
 
   app.post(api.projects.create.path, isAuthenticated, async (req: any, res) => {
     try {
-      const input = api.projects.create.input.parse(req.body);
       const userId = req.user.claims.sub;
+      const dbUser = await authStorage.getUser(userId);
+      if (dbUser?.role === "client") {
+        return res.status(403).json({ message: "Clients cannot create projects" });
+      }
+      const input = api.projects.create.input.parse(req.body);
       const project = await storage.createProject({ ...input, clientId: userId });
       res.status(201).json(project);
     } catch (err) {
