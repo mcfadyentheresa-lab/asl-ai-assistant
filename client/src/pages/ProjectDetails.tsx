@@ -1160,6 +1160,8 @@ function CalendarTab({ projectId }: { projectId: number }) {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [eventForm, setEventForm] = useState({ title: "", description: "", type: "event" });
   const [draggedEventId, setDraggedEventId] = useState<number | null>(null);
+  const [moveEvent, setMoveEvent] = useState<{ id: number; title: string } | null>(null);
+  const [moveDate, setMoveDate] = useState("");
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
@@ -1361,14 +1363,27 @@ function CalendarTab({ projectId }: { projectId: number }) {
                       </Badge>
                     </div>
                   </div>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => handleDeleteEvent(ev.id)}
-                    data-testid={`button-delete-event-${ev.id}`}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => {
+                        setMoveEvent({ id: ev.id, title: ev.title });
+                        setMoveDate("");
+                      }}
+                      data-testid={`button-move-event-${ev.id}`}
+                    >
+                      <CalendarDays className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => handleDeleteEvent(ev.id)}
+                      data-testid={`button-delete-event-${ev.id}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               ))
             ) : (
@@ -1454,6 +1469,58 @@ function CalendarTab({ projectId }: { projectId: number }) {
               </Button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={moveEvent !== null} onOpenChange={(open) => { if (!open) setMoveEvent(null); }}>
+        <DialogContent className="sm:max-w-[360px]">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-xl" data-testid="text-move-event-title">
+              Move Event
+            </DialogTitle>
+            <DialogDescription>
+              Pick a new date for "{moveEvent?.title}".
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div>
+              <label className="text-sm font-medium mb-1 block">New Date</label>
+              <Input
+                type="date"
+                value={moveDate}
+                onChange={(e) => setMoveDate(e.target.value)}
+                data-testid="input-move-date"
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setMoveEvent(null)} data-testid="button-cancel-move">
+                Cancel
+              </Button>
+              <Button
+                disabled={!moveDate}
+                onClick={() => {
+                  if (!moveEvent || !moveDate) return;
+                  const newDate = parseISO(moveDate);
+                  updateEvent(
+                    { id: moveEvent.id, date: moveDate },
+                    {
+                      onSuccess: () => {
+                        toast({ title: "Moved", description: `"${moveEvent.title}" moved to ${format(newDate, "MMMM d, yyyy")}.` });
+                        setCurrentMonth(newDate);
+                        setSelectedDate(newDate);
+                        setMoveEvent(null);
+                      },
+                      onError: (err) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+                    }
+                  );
+                }}
+                data-testid="button-confirm-move"
+              >
+                <CalendarDays className="mr-2 h-4 w-4" />
+                Move Event
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
