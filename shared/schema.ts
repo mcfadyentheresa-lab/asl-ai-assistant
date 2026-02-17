@@ -88,6 +88,8 @@ export const checklistItems = pgTable("checklist_items", {
   notes: text("notes"),
   priceEstimate: integer("price_estimate"),
   priority: text("priority").default("normal"),
+  group: text("group").default("General"),
+  status: text("status").default("todo"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

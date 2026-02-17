@@ -5,7 +5,7 @@ import {
   useBoardItems, useCreateBoardItem, useDeleteBoardItem,
 } from "@/hooks/use-projects";
 import { Navbar } from "@/components/layout/Navbar";
-import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, ExternalLink, Plus } from "lucide-react";
+import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, ExternalLink, Plus, ChevronDown, ChevronRight, Link2, StickyNote } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -18,6 +18,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -275,21 +276,50 @@ function ChecklistTab({ projectId }: { projectId: number }) {
   const { mutate: createItem, isPending: isCreating } = useCreateChecklistItem();
   const { mutate: updateItem } = useUpdateChecklistItem();
   const { mutate: deleteItem } = useDeleteChecklistItem();
+
   const [newTitle, setNewTitle] = useState("");
+  const [newGroup, setNewGroup] = useState("General");
+  const [customGroup, setCustomGroup] = useState("");
   const [newPriority, setNewPriority] = useState("normal");
+  const [newStatus, setNewStatus] = useState("todo");
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
 
   const isCrew = user?.email?.includes("crew") || user?.email?.includes("admin");
+
+  const defaultGroups = ["Boathouse", "Cottage", "General"];
+  const existingGroups = items
+    ? Array.from(new Set(items.map((i: ChecklistItem) => i.group || "General")))
+    : [];
+  const allGroups = Array.from(new Set([...defaultGroups, ...existingGroups]));
+
+  const groupedItems: Record<string, ChecklistItem[]> = {};
+  if (items) {
+    for (const item of items as ChecklistItem[]) {
+      const g = item.group || "General";
+      if (!groupedItems[g]) groupedItems[g] = [];
+      groupedItems[g].push(item);
+    }
+  }
+
+  const totalItems = items?.length || 0;
+  const completedItems = items?.filter((i: ChecklistItem) => i.status === "done" || i.completed).length || 0;
+  const nextYearItems = items?.filter((i: ChecklistItem) => i.status === "next_year").length || 0;
+  const totalEstimate = items?.reduce((sum: number, i: ChecklistItem) => sum + (i.priceEstimate || 0), 0) || 0;
 
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim()) return;
+    const groupValue = newGroup === "__custom__" ? customGroup.trim() || "General" : newGroup;
     createItem(
-      { projectId, title: newTitle.trim(), priority: newPriority },
+      { projectId, title: newTitle.trim(), priority: newPriority, group: groupValue, status: newStatus },
       {
         onSuccess: () => {
           toast({ title: "Success", description: "Checklist item added." });
           setNewTitle("");
           setNewPriority("normal");
+          setNewStatus("todo");
+          setNewGroup("General");
+          setCustomGroup("");
         },
         onError: (err) => toast({ title: "Error", description: err.message, variant: "destructive" }),
       }
@@ -297,11 +327,10 @@ function ChecklistTab({ projectId }: { projectId: number }) {
   };
 
   const handleToggle = (item: ChecklistItem) => {
+    const newStatusValue = item.status === "done" ? "todo" : "done";
     updateItem(
-      { id: item.id, completed: !item.completed },
-      {
-        onError: (err) => toast({ title: "Error", description: err.message, variant: "destructive" }),
-      }
+      { id: item.id, completed: newStatusValue === "done", status: newStatusValue },
+      { onError: (err) => toast({ title: "Error", description: err.message, variant: "destructive" }) }
     );
   };
 
@@ -321,10 +350,29 @@ function ChecklistTab({ projectId }: { projectId: number }) {
     });
   };
 
+  const toggleGroup = (group: string) => {
+    setCollapsedGroups((prev) => ({ ...prev, [group]: !prev[group] }));
+  };
+
   const priorityVariant = (p: string | null) => {
     if (p === "high") return "destructive" as const;
     if (p === "low") return "outline" as const;
     return "secondary" as const;
+  };
+
+  const statusLabel: Record<string, string> = {
+    todo: "To Do",
+    in_progress: "In Progress",
+    done: "Done",
+    next_year: "Next Year",
+  };
+
+  const statusBadge = (status: string | null) => {
+    const s = status || "todo";
+    if (s === "done") return <Badge className="bg-green-600 dark:bg-green-500 text-white border-transparent no-default-hover-elevate" data-testid="badge-status-done">{statusLabel[s]}</Badge>;
+    if (s === "in_progress") return <Badge className="bg-amber-500 dark:bg-amber-400 text-white border-transparent no-default-hover-elevate" data-testid="badge-status-in-progress">{statusLabel[s]}</Badge>;
+    if (s === "next_year") return <Badge variant="outline" className="text-muted-foreground no-default-hover-elevate" data-testid="badge-status-next-year">{statusLabel[s]}</Badge>;
+    return <Badge variant="secondary" className="no-default-hover-elevate" data-testid="badge-status-todo">{statusLabel[s]}</Badge>;
   };
 
   if (isLoading) {
@@ -337,16 +385,52 @@ function ChecklistTab({ projectId }: { projectId: number }) {
 
   return (
     <div className="space-y-6">
-      <form onSubmit={handleAdd} className="flex flex-col sm:flex-row gap-3" data-testid="form-add-checklist">
+      <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground" data-testid="checklist-summary">
+        <span data-testid="text-total-items">{totalItems} items total</span>
+        <span className="text-border">·</span>
+        <span data-testid="text-completed-items">{completedItems} completed</span>
+        <span className="text-border">·</span>
+        <span data-testid="text-next-year-items">{nextYearItems} next year</span>
+        {totalEstimate > 0 && (
+          <>
+            <span className="text-border">·</span>
+            <span className="font-medium text-foreground" data-testid="text-total-estimate">
+              ${totalEstimate.toLocaleString()} estimated
+            </span>
+          </>
+        )}
+      </div>
+
+      <form onSubmit={handleAdd} className="flex flex-col sm:flex-row gap-3 flex-wrap" data-testid="form-add-checklist">
         <Input
           value={newTitle}
           onChange={(e) => setNewTitle(e.target.value)}
           placeholder="Add a checklist item..."
-          className="flex-1"
+          className="flex-1 min-w-[200px]"
           data-testid="input-checklist-title"
         />
+        <Select value={newGroup} onValueChange={(v) => { setNewGroup(v); if (v !== "__custom__") setCustomGroup(""); }}>
+          <SelectTrigger className="w-full sm:w-[160px]" data-testid="select-checklist-group">
+            <SelectValue placeholder="Group" />
+          </SelectTrigger>
+          <SelectContent>
+            {allGroups.map((g) => (
+              <SelectItem key={g} value={g}>{g}</SelectItem>
+            ))}
+            <SelectItem value="__custom__">Custom...</SelectItem>
+          </SelectContent>
+        </Select>
+        {newGroup === "__custom__" && (
+          <Input
+            value={customGroup}
+            onChange={(e) => setCustomGroup(e.target.value)}
+            placeholder="Custom group name..."
+            className="w-full sm:w-[160px]"
+            data-testid="input-custom-group"
+          />
+        )}
         <Select value={newPriority} onValueChange={setNewPriority}>
-          <SelectTrigger className="w-full sm:w-[140px]" data-testid="select-checklist-priority">
+          <SelectTrigger className="w-full sm:w-[120px]" data-testid="select-checklist-priority">
             <SelectValue placeholder="Priority" />
           </SelectTrigger>
           <SelectContent>
@@ -355,83 +439,123 @@ function ChecklistTab({ projectId }: { projectId: number }) {
             <SelectItem value="high">High</SelectItem>
           </SelectContent>
         </Select>
+        <Select value={newStatus} onValueChange={setNewStatus}>
+          <SelectTrigger className="w-full sm:w-[140px]" data-testid="select-checklist-status">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todo">To Do</SelectItem>
+            <SelectItem value="in_progress">In Progress</SelectItem>
+            <SelectItem value="done">Done</SelectItem>
+            <SelectItem value="next_year">Next Year</SelectItem>
+          </SelectContent>
+        </Select>
         <Button type="submit" disabled={isCreating || !newTitle.trim()} data-testid="button-add-checklist">
           {isCreating ? <Loader2 className="mr-2 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
           Add
         </Button>
       </form>
 
-      {items && items.length > 0 ? (
-        <div className="space-y-3">
-          {items.map((item: ChecklistItem) => (
-            <Card key={item.id} data-testid={`checklist-item-${item.id}`}>
-              <CardContent className="p-4 space-y-3">
-                <div className="flex items-start gap-3">
-                  <Checkbox
-                    checked={!!item.completed}
-                    onCheckedChange={() => handleToggle(item)}
-                    className="mt-0.5"
-                    data-testid={`checkbox-checklist-${item.id}`}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span
-                        className={`font-medium text-sm ${item.completed ? "line-through text-muted-foreground" : "text-foreground"}`}
-                        data-testid={`text-checklist-title-${item.id}`}
-                      >
-                        {item.title}
-                      </span>
-                      <Badge variant={priorityVariant(item.priority)} data-testid={`badge-priority-${item.id}`}>
-                        {item.priority || "normal"}
-                      </Badge>
-                      {item.priceEstimate != null && (
-                        <span className="text-xs text-muted-foreground" data-testid={`text-price-${item.id}`}>
-                          ${item.priceEstimate.toLocaleString()}
-                        </span>
-                      )}
-                    </div>
-                    {item.notes && !isCrew && (
-                      <p className="text-xs text-muted-foreground mt-1" data-testid={`text-notes-${item.id}`}>
-                        {item.notes}
-                      </p>
-                    )}
-                  </div>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => handleDelete(item.id)}
-                    data-testid={`button-delete-checklist-${item.id}`}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-
-                {isCrew && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pl-7">
-                    <div>
-                      <label className="text-xs text-muted-foreground mb-1 block">Notes</label>
-                      <Textarea
-                        defaultValue={item.notes || ""}
-                        onBlur={(e) => handleNotesChange(item, e.target.value)}
-                        placeholder="Add notes..."
-                        className="resize-none text-sm"
-                        rows={2}
-                        data-testid={`textarea-notes-${item.id}`}
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-muted-foreground mb-1 block">Price Estimate ($)</label>
-                      <Input
-                        type="number"
-                        defaultValue={item.priceEstimate ?? ""}
-                        onBlur={(e) => handlePriceChange(item, e.target.value)}
-                        placeholder="0"
-                        data-testid={`input-price-${item.id}`}
-                      />
-                    </div>
-                  </div>
+      {totalItems > 0 ? (
+        <div className="space-y-4">
+          {Object.entries(groupedItems).map(([group, groupItems]) => (
+            <Card key={group} data-testid={`checklist-group-${group}`}>
+              <div
+                className="flex items-center gap-2 p-4 cursor-pointer select-none"
+                onClick={() => toggleGroup(group)}
+                data-testid={`button-toggle-group-${group}`}
+              >
+                {collapsedGroups[group] ? (
+                  <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                ) : (
+                  <ChevronDown className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                 )}
-              </CardContent>
+                <span className="font-serif font-semibold text-foreground" data-testid={`text-group-name-${group}`}>
+                  {group}
+                </span>
+                <span className="text-xs text-muted-foreground" data-testid={`text-group-count-${group}`}>
+                  ({groupItems.length})
+                </span>
+              </div>
+              {!collapsedGroups[group] && (
+                <div className="border-t" data-testid={`group-items-${group}`}>
+                  {groupItems.map((item) => {
+                    const isDone = item.status === "done" || !!item.completed;
+                    const isNextYear = item.status === "next_year";
+                    return (
+                      <div
+                        key={item.id}
+                        className={`flex items-start gap-3 px-4 py-3 border-b last:border-b-0 transition-opacity ${isDone ? "opacity-60" : ""} ${isNextYear ? "opacity-50" : ""}`}
+                        data-testid={`checklist-item-${item.id}`}
+                      >
+                        <Checkbox
+                          checked={isDone}
+                          onCheckedChange={() => handleToggle(item)}
+                          className="mt-0.5"
+                          data-testid={`checkbox-checklist-${item.id}`}
+                        />
+                        <div className="flex-1 min-w-0 space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span
+                              className={`font-medium text-sm ${isDone ? "line-through text-muted-foreground" : "text-foreground"}`}
+                              data-testid={`text-checklist-title-${item.id}`}
+                            >
+                              {item.title}
+                            </span>
+                            <Badge variant={priorityVariant(item.priority)} className="no-default-hover-elevate" data-testid={`badge-priority-${item.id}`}>
+                              {item.priority || "normal"}
+                            </Badge>
+                            {statusBadge(item.status)}
+                            {item.priceEstimate != null && (
+                              <span className="text-xs text-muted-foreground" data-testid={`text-price-${item.id}`}>
+                                ${item.priceEstimate.toLocaleString()}
+                              </span>
+                            )}
+                          </div>
+                          {item.notes && !isCrew && (
+                            <p className="text-xs text-muted-foreground" data-testid={`text-notes-${item.id}`}>
+                              {item.notes}
+                            </p>
+                          )}
+                          {isCrew && (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                              <div>
+                                <label className="text-xs text-muted-foreground mb-1 block">Notes</label>
+                                <Textarea
+                                  defaultValue={item.notes || ""}
+                                  onBlur={(e) => handleNotesChange(item, e.target.value)}
+                                  placeholder="Add notes..."
+                                  className="resize-none text-sm"
+                                  rows={2}
+                                  data-testid={`textarea-notes-${item.id}`}
+                                />
+                              </div>
+                              <div>
+                                <label className="text-xs text-muted-foreground mb-1 block">Price Estimate ($)</label>
+                                <Input
+                                  type="number"
+                                  defaultValue={item.priceEstimate ?? ""}
+                                  onBlur={(e) => handlePriceChange(item, e.target.value)}
+                                  placeholder="0"
+                                  data-testid={`input-price-${item.id}`}
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => handleDelete(item.id)}
+                          data-testid={`button-delete-checklist-${item.id}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </Card>
           ))}
         </div>
@@ -450,7 +574,30 @@ function BoardTab({ projectId }: { projectId: number }) {
   const { mutate: createItem, isPending: isCreating } = useCreateBoardItem();
   const { mutate: deleteItem } = useDeleteBoardItem();
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [boardForm, setBoardForm] = useState({ type: "note", title: "", content: "", imageUrl: "", linkUrl: "" });
+  const [boardForm, setBoardForm] = useState({ type: "note", title: "", content: "", imageUrl: "", linkUrl: "", color: "#ffffff" });
+  const [brokenImages, setBrokenImages] = useState<Record<number, boolean>>({});
+
+  const noteColors = [
+    { value: "#fef9ef", label: "Warm Cream", dark: "#e8d9b0" },
+    { value: "#e8ede5", label: "Sage Green", dark: "#b5c4ae" },
+    { value: "#e8f0f8", label: "Soft Blue", dark: "#a8c4de" },
+    { value: "#f0eaf8", label: "Lavender", dark: "#c4b0de" },
+    { value: "#fceef0", label: "Blush Pink", dark: "#e8b0b8" },
+    { value: "#ffffff", label: "White", dark: "#d4d4d4" },
+  ];
+
+  const getDarkerShade = (hex: string) => {
+    const found = noteColors.find((c) => c.value === hex);
+    return found ? found.dark : "#cccccc";
+  };
+
+  const getDomain = (url: string) => {
+    try {
+      return new URL(url).hostname.replace("www.", "");
+    } catch {
+      return url;
+    }
+  };
 
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
@@ -460,14 +607,15 @@ function BoardTab({ projectId }: { projectId: number }) {
         type: boardForm.type,
         title: boardForm.title || null,
         content: boardForm.content || null,
-        imageUrl: boardForm.imageUrl || null,
-        linkUrl: boardForm.linkUrl || null,
+        imageUrl: boardForm.type === "image" ? boardForm.imageUrl || null : null,
+        linkUrl: boardForm.type === "link" ? boardForm.linkUrl || null : null,
+        color: boardForm.type === "note" ? boardForm.color : null,
       },
       {
         onSuccess: () => {
           toast({ title: "Success", description: "Item added to board." });
           setDialogOpen(false);
-          setBoardForm({ type: "note", title: "", content: "", imageUrl: "", linkUrl: "" });
+          setBoardForm({ type: "note", title: "", content: "", imageUrl: "", linkUrl: "", color: "#ffffff" });
         },
         onError: (err) => toast({ title: "Error", description: err.message, variant: "destructive" }),
       }
@@ -489,6 +637,132 @@ function BoardTab({ projectId }: { projectId: number }) {
     );
   }
 
+  const renderNoteCard = (item: BoardItem) => {
+    const bgColor = item.color || "#ffffff";
+    const stripColor = getDarkerShade(bgColor);
+    return (
+      <div
+        className="relative rounded-md overflow-visible hover-elevate transition-shadow bg-card dark:bg-card"
+        data-testid={`board-item-${item.id}`}
+      >
+        <div
+          className="absolute inset-0 rounded-md opacity-30 dark:opacity-15 pointer-events-none"
+          style={{ backgroundColor: bgColor }}
+        />
+        <div className="absolute left-0 top-0 bottom-0 w-1 rounded-l-md" style={{ backgroundColor: stripColor }} />
+        <div className="absolute top-2 right-2 z-10" style={{ visibility: "visible" }}>
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={() => handleDelete(item.id)}
+            data-testid={`button-delete-board-${item.id}`}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+        <div className="relative p-4 pl-5">
+          {item.title && (
+            <h4 className="font-serif font-bold text-sm text-foreground" data-testid={`text-board-title-${item.id}`}>
+              {item.title}
+            </h4>
+          )}
+          {item.content && (
+            <p className="text-xs mt-1.5 text-muted-foreground" data-testid={`text-board-content-${item.id}`}>
+              {item.content}
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderImageCard = (item: BoardItem) => {
+    const isBroken = brokenImages[item.id];
+    return (
+      <div
+        className="relative rounded-md overflow-visible hover-elevate transition-shadow"
+        data-testid={`board-item-${item.id}`}
+      >
+        <div className="absolute top-2 right-2 z-10" style={{ visibility: "visible" }}>
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={() => handleDelete(item.id)}
+            data-testid={`button-delete-board-${item.id}`}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+        {item.imageUrl && !isBroken ? (
+          <div className="relative">
+            <img
+              src={item.imageUrl}
+              alt={item.title || "Board image"}
+              className="w-full object-cover rounded-md"
+              style={{ maxHeight: "300px" }}
+              onError={() => setBrokenImages((prev) => ({ ...prev, [item.id]: true }))}
+              data-testid={`img-board-${item.id}`}
+            />
+            {item.title && (
+              <div className="absolute bottom-0 left-0 right-0 p-3 rounded-b-md" style={{ background: "linear-gradient(transparent, rgba(0,0,0,0.7))" }}>
+                <h4 className="font-serif font-bold text-sm text-white" data-testid={`text-board-title-${item.id}`}>
+                  {item.title}
+                </h4>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-12 rounded-md bg-muted">
+            <ImageIcon className="h-10 w-10 text-muted-foreground opacity-40" />
+            {item.title && (
+              <p className="text-xs text-muted-foreground mt-2" data-testid={`text-board-title-${item.id}`}>{item.title}</p>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderLinkCard = (item: BoardItem) => {
+    return (
+      <a
+        href={item.linkUrl || "#"}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="relative block rounded-md bg-card border border-border overflow-visible hover-elevate transition-shadow"
+        data-testid={`board-item-${item.id}`}
+      >
+        <div className="absolute left-0 top-0 bottom-0 w-1 rounded-l-md" style={{ backgroundColor: "hsl(var(--accent))" }} />
+        <div className="absolute top-2 right-2 z-10" style={{ visibility: "visible" }}>
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDelete(item.id); }}
+            data-testid={`button-delete-board-${item.id}`}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+        <div className="p-4 pl-5">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+            <Link2 className="h-3.5 w-3.5" />
+            <span data-testid={`text-board-domain-${item.id}`}>{item.linkUrl ? getDomain(item.linkUrl) : "Link"}</span>
+          </div>
+          {item.title && (
+            <h4 className="font-serif font-bold text-sm text-foreground" data-testid={`text-board-title-${item.id}`}>
+              {item.title}
+            </h4>
+          )}
+          {item.content && (
+            <p className="text-xs text-muted-foreground mt-1.5" data-testid={`text-board-content-${item.id}`}>
+              {item.content}
+            </p>
+          )}
+        </div>
+      </a>
+    );
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-end">
@@ -502,20 +776,29 @@ function BoardTab({ projectId }: { projectId: number }) {
           <DialogContent className="sm:max-w-[480px]">
             <DialogHeader>
               <DialogTitle className="font-serif text-xl" data-testid="text-board-dialog-title">Add to Board</DialogTitle>
+              <DialogDescription>Pin a note, image, or link to your inspiration board.</DialogDescription>
             </DialogHeader>
             <form onSubmit={handleAdd} className="space-y-4 pt-2" data-testid="form-add-board">
               <div>
-                <label className="text-sm font-medium mb-1 block">Type</label>
-                <Select value={boardForm.type} onValueChange={(v) => setBoardForm({ ...boardForm, type: v })}>
-                  <SelectTrigger data-testid="select-board-type">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="note">Note</SelectItem>
-                    <SelectItem value="image">Image</SelectItem>
-                    <SelectItem value="link">Link</SelectItem>
-                  </SelectContent>
-                </Select>
+                <label className="text-sm font-medium mb-2 block">Type</label>
+                <div className="flex gap-2" data-testid="board-type-selector">
+                  {[
+                    { value: "note", label: "Note", icon: <StickyNote className="h-4 w-4" /> },
+                    { value: "image", label: "Image", icon: <ImageIcon className="h-4 w-4" /> },
+                    { value: "link", label: "Link", icon: <Link2 className="h-4 w-4" /> },
+                  ].map((opt) => (
+                    <Button
+                      key={opt.value}
+                      type="button"
+                      variant={boardForm.type === opt.value ? "default" : "outline"}
+                      onClick={() => setBoardForm({ ...boardForm, type: opt.value })}
+                      data-testid={`button-board-type-${opt.value}`}
+                    >
+                      {opt.icon}
+                      <span className="ml-1.5">{opt.label}</span>
+                    </Button>
+                  ))}
+                </div>
               </div>
               <div>
                 <label className="text-sm font-medium mb-1 block">Title</label>
@@ -537,24 +820,49 @@ function BoardTab({ projectId }: { projectId: number }) {
                   data-testid="input-board-content"
                 />
               </div>
-              <div>
-                <label className="text-sm font-medium mb-1 block">Image URL</label>
-                <Input
-                  value={boardForm.imageUrl}
-                  onChange={(e) => setBoardForm({ ...boardForm, imageUrl: e.target.value })}
-                  placeholder="https://example.com/image.jpg"
-                  data-testid="input-board-image"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-1 block">Link URL</label>
-                <Input
-                  value={boardForm.linkUrl}
-                  onChange={(e) => setBoardForm({ ...boardForm, linkUrl: e.target.value })}
-                  placeholder="https://example.com"
-                  data-testid="input-board-link"
-                />
-              </div>
+              {boardForm.type === "image" && (
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Image URL</label>
+                  <Input
+                    value={boardForm.imageUrl}
+                    onChange={(e) => setBoardForm({ ...boardForm, imageUrl: e.target.value })}
+                    placeholder="https://example.com/image.jpg"
+                    data-testid="input-board-image"
+                  />
+                </div>
+              )}
+              {boardForm.type === "link" && (
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Link URL</label>
+                  <Input
+                    value={boardForm.linkUrl}
+                    onChange={(e) => setBoardForm({ ...boardForm, linkUrl: e.target.value })}
+                    placeholder="https://example.com"
+                    data-testid="input-board-link"
+                  />
+                </div>
+              )}
+              {boardForm.type === "note" && (
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Color</label>
+                  <div className="flex gap-2 flex-wrap" data-testid="board-color-picker">
+                    {noteColors.map((c) => (
+                      <div
+                        key={c.value}
+                        className="h-8 w-8 rounded-full cursor-pointer transition-transform flex-shrink-0"
+                        style={{
+                          backgroundColor: c.value,
+                          border: boardForm.color === c.value ? `2px solid ${c.dark}` : "2px solid transparent",
+                          boxShadow: boardForm.color === c.value ? `0 0 0 2px ${c.dark}` : "none",
+                        }}
+                        title={c.label}
+                        onClick={() => setBoardForm({ ...boardForm, color: c.value })}
+                        data-testid={`color-swatch-${c.label.toLowerCase().replace(/\s/g, "-")}`}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="flex justify-end gap-3 pt-2">
                 <Button type="button" variant="outline" onClick={() => setDialogOpen(false)} data-testid="button-cancel-board">
                   Cancel
@@ -570,61 +878,22 @@ function BoardTab({ projectId }: { projectId: number }) {
       </div>
 
       {items && items.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" style={{ gridAutoRows: "auto" }}>
+        <div
+          style={{ columnGap: "1rem" }}
+          className="[column-count:1] sm:[column-count:2] lg:[column-count:3]"
+          data-testid="board-masonry"
+        >
           {items.map((item: BoardItem) => (
-            <Card key={item.id} className="overflow-visible" data-testid={`board-item-${item.id}`}>
-              {item.imageUrl && (
-                <div className="overflow-hidden rounded-t-xl">
-                  <img
-                    src={item.imageUrl}
-                    alt={item.title || "Board image"}
-                    className="w-full h-48 object-cover"
-                    data-testid={`img-board-${item.id}`}
-                  />
-                </div>
-              )}
-              <CardContent className="p-4 space-y-2">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    {item.title && (
-                      <h4 className="font-serif font-semibold text-sm text-foreground" data-testid={`text-board-title-${item.id}`}>
-                        {item.title}
-                      </h4>
-                    )}
-                    {item.content && (
-                      <p className="text-xs text-muted-foreground mt-1" data-testid={`text-board-content-${item.id}`}>
-                        {item.content}
-                      </p>
-                    )}
-                    {item.linkUrl && (
-                      <a
-                        href={item.linkUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-xs text-primary mt-2"
-                        data-testid={`link-board-${item.id}`}
-                      >
-                        <ExternalLink className="h-3 w-3" />
-                        View Link
-                      </a>
-                    )}
-                  </div>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => handleDelete(item.id)}
-                    data-testid={`button-delete-board-${item.id}`}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+            <div key={item.id} className="mb-4" style={{ breakInside: "avoid" }}>
+              {item.type === "image" ? renderImageCard(item) :
+               item.type === "link" ? renderLinkCard(item) :
+               renderNoteCard(item)}
+            </div>
           ))}
         </div>
       ) : (
         <div className="text-center py-16 text-muted-foreground text-sm" data-testid="text-empty-board">
-          Your moodboard is empty. Pin images, notes, and inspiration to share.
+          Pin images, notes, and inspiration to your board.
         </div>
       )}
     </div>
