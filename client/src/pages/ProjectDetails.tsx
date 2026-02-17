@@ -278,15 +278,7 @@ export default function ProjectDetails() {
   );
 }
 
-const checklistColors = [
-  { value: "", label: "None" },
-  { value: "#e8f5e9", label: "Green" },
-  { value: "#fff3e0", label: "Orange" },
-  { value: "#e3f2fd", label: "Blue" },
-  { value: "#fce4ec", label: "Pink" },
-  { value: "#f3e5f5", label: "Purple" },
-  { value: "#fff9c4", label: "Yellow" },
-];
+const EDITED_TEXT_COLOR = "#b45309";
 
 function ChecklistTab({ projectId }: { projectId: number }) {
   const { user } = useAuth();
@@ -304,7 +296,7 @@ function ChecklistTab({ projectId }: { projectId: number }) {
   const [newStatus, setNewStatus] = useState("todo");
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
   const [editItem, setEditItem] = useState<ChecklistItem | null>(null);
-  const [editForm, setEditForm] = useState({ title: "", group: "", priority: "normal", status: "todo", notes: "", priceEstimate: "", color: "" });
+  const [editForm, setEditForm] = useState({ title: "", group: "", priority: "normal", status: "todo", notes: "", priceEstimate: "" });
 
   const isCrew = user?.email?.includes("crew") || user?.email?.includes("admin");
 
@@ -384,7 +376,6 @@ function ChecklistTab({ projectId }: { projectId: number }) {
       status: item.status || "todo",
       notes: item.notes || "",
       priceEstimate: item.priceEstimate != null ? String(item.priceEstimate) : "",
-      color: item.color || "",
     });
     setEditItem(item);
   };
@@ -401,7 +392,7 @@ function ChecklistTab({ projectId }: { projectId: number }) {
         completed: editForm.status === "done",
         notes: editForm.notes || null,
         priceEstimate: editForm.priceEstimate ? parseInt(editForm.priceEstimate, 10) : null,
-        color: editForm.color || null,
+        color: EDITED_TEXT_COLOR,
       },
       {
         onSuccess: () => {
@@ -548,25 +539,17 @@ function ChecklistTab({ projectId }: { projectId: number }) {
                         className={`relative flex items-start gap-3 px-4 py-3 border-b last:border-b-0 transition-opacity ${isDone ? "opacity-60" : ""} ${isNextYear ? "opacity-50" : ""}`}
                         data-testid={`checklist-item-${item.id}`}
                       >
-                        {itemColor && (
-                          <div
-                            className="absolute inset-0 rounded-none pointer-events-none opacity-20 dark:opacity-10"
-                            style={{ backgroundColor: itemColor }}
-                          />
-                        )}
-                        {itemColor && (
-                          <div className="absolute left-0 top-0 bottom-0 w-1" style={{ backgroundColor: itemColor }} />
-                        )}
                         <Checkbox
                           checked={isDone}
                           onCheckedChange={() => handleToggle(item)}
-                          className="mt-0.5 relative z-[1]"
+                          className="mt-0.5"
                           data-testid={`checkbox-checklist-${item.id}`}
                         />
-                        <div className="flex-1 min-w-0 space-y-1 relative z-[1]">
+                        <div className="flex-1 min-w-0 space-y-1">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span
-                              className={`font-medium text-sm ${isDone ? "line-through text-muted-foreground" : "text-foreground"}`}
+                              className={`font-medium text-sm ${isDone ? "line-through text-muted-foreground" : ""}`}
+                              style={!isDone && itemColor ? { color: itemColor } : undefined}
                               data-testid={`text-checklist-title-${item.id}`}
                             >
                               {item.title}
@@ -718,24 +701,6 @@ function ChecklistTab({ projectId }: { projectId: number }) {
                 placeholder="0"
                 data-testid="input-edit-price"
               />
-            </div>
-            <div>
-              <label className="text-sm font-medium mb-1 block">Color</label>
-              <div className="flex gap-2 flex-wrap" data-testid="edit-color-picker">
-                {checklistColors.map((c) => (
-                  <button
-                    key={c.value || "none"}
-                    type="button"
-                    onClick={() => setEditForm({ ...editForm, color: c.value })}
-                    className={`w-8 h-8 rounded-md border-2 transition-all ${editForm.color === c.value ? "border-foreground scale-110" : "border-border"}`}
-                    style={{ backgroundColor: c.value || "transparent" }}
-                    title={c.label}
-                    data-testid={`button-edit-color-${c.label.toLowerCase()}`}
-                  >
-                    {!c.value && <span className="text-xs text-muted-foreground">-</span>}
-                  </button>
-                ))}
-              </div>
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setEditItem(null)} data-testid="button-edit-cancel">Cancel</Button>
