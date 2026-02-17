@@ -3,7 +3,7 @@ import {
   insertProjectSchema, insertMilestoneSchema, insertTaskSchema, 
   insertPhotoSchema, insertDocumentSchema, insertTimeEntrySchema, insertMessageSchema,
   insertChecklistItemSchema, insertBoardItemSchema, insertCalendarEventSchema,
-  projects, milestones, tasks, photos, documents, timeEntries, messages, users, checklistItems, boardItems, calendarEvents
+  projects, milestones, tasks, photos, documents, timeEntries, messages, users, checklistItems, boardItems, calendarEvents, moodboards
 } from './schema';
 
 export const errorSchemas = {
@@ -254,6 +254,25 @@ export const api = {
       path: '/api/board/:id' as const,
       responses: {
         200: z.object({ success: z.boolean() }),
+      },
+    },
+  },
+
+  // Moodboard Canvas
+  moodboard: {
+    get: {
+      method: 'GET' as const,
+      path: '/api/projects/:projectId/moodboard' as const,
+      responses: {
+        200: z.custom<typeof moodboards.$inferSelect | null>(),
+      },
+    },
+    save: {
+      method: 'PUT' as const,
+      path: '/api/projects/:projectId/moodboard' as const,
+      input: z.object({ canvasData: z.any() }),
+      responses: {
+        200: z.custom<typeof moodboards.$inferSelect>(),
       },
     },
   },

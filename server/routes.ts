@@ -383,6 +383,41 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
+  // Moodboard Canvas
+  app.get(api.moodboard.get.path, isAuthenticated, async (req: any, res) => {
+    const projectId = Number(req.params.projectId);
+    const userId = req.user.claims.sub;
+    const userRecord = await authStorage.getUser(userId);
+    if (userRecord?.role === "client") {
+      const project = await storage.getProject(projectId);
+      if (!project || project.clientId !== userId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+    }
+    const board = await storage.getMoodboard(projectId);
+    res.json(board || null);
+  });
+
+  app.put(api.moodboard.save.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const projectId = Number(req.params.projectId);
+      const userId = req.user.claims.sub;
+      const userRecord = await authStorage.getUser(userId);
+      if (userRecord?.role === "client") {
+        const project = await storage.getProject(projectId);
+        if (!project || project.clientId !== userId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+      const input = api.moodboard.save.input.parse(req.body);
+      const board = await storage.saveMoodboard(projectId, input.canvasData, userId);
+      res.json(board);
+    } catch (err: any) {
+      console.error("Moodboard save error:", err.message);
+      res.status(500).json({ message: "Failed to save moodboard" });
+    }
+  });
+
   // Calendar Events
   app.get(api.calendar.list.path, isAuthenticated, async (req, res) => {
     const events = await storage.getCalendarEvents(Number(req.params.projectId));

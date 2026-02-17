@@ -1,10 +1,10 @@
 import { db } from "./db";
 import { 
-  users, projects, milestones, tasks, photos, documents, timeEntries, messages, checklistItems, boardItems, calendarEvents,
+  users, projects, milestones, tasks, photos, documents, timeEntries, messages, checklistItems, boardItems, calendarEvents, moodboards,
   type Project, type Milestone, type Task, type Photo, type Document, type TimeEntry, type Message,
-  type ChecklistItem, type BoardItem, type CalendarEvent,
+  type ChecklistItem, type BoardItem, type CalendarEvent, type Moodboard,
   type InsertProject, type InsertMilestone, type InsertTask, type InsertPhoto, type InsertDocument, 
-  type InsertTimeEntry, type InsertMessage, type InsertChecklistItem, type InsertBoardItem, type InsertCalendarEvent
+  type InsertTimeEntry, type InsertMessage, type InsertChecklistItem, type InsertBoardItem, type InsertCalendarEvent, type InsertMoodboard
 } from "@shared/schema";
 import { type User } from "@shared/models/auth";
 import { eq, desc, and } from "drizzle-orm";
@@ -64,6 +64,10 @@ export interface IStorage {
   createCalendarEvent(event: InsertCalendarEvent): Promise<CalendarEvent>;
   updateCalendarEvent(id: number, updates: Partial<InsertCalendarEvent>): Promise<CalendarEvent>;
   deleteCalendarEvent(id: number): Promise<void>;
+
+  // Moodboard Canvas
+  getMoodboard(projectId: number): Promise<Moodboard | undefined>;
+  saveMoodboard(projectId: number, canvasData: any, updatedBy: string): Promise<Moodboard>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -220,6 +224,26 @@ export class DatabaseStorage implements IStorage {
   }
   async deleteCalendarEvent(id: number): Promise<void> {
     await db.delete(calendarEvents).where(eq(calendarEvents.id, id));
+  }
+
+  // Moodboard Canvas
+  async getMoodboard(projectId: number): Promise<Moodboard | undefined> {
+    const [board] = await db.select().from(moodboards).where(eq(moodboards.projectId, projectId));
+    return board;
+  }
+  async saveMoodboard(projectId: number, canvasData: any, updatedBy: string): Promise<Moodboard> {
+    const existing = await this.getMoodboard(projectId);
+    if (existing) {
+      const [updated] = await db.update(moodboards)
+        .set({ canvasData, updatedBy, updatedAt: new Date() })
+        .where(eq(moodboards.projectId, projectId))
+        .returning();
+      return updated;
+    }
+    const [created] = await db.insert(moodboards)
+      .values({ projectId, canvasData, updatedBy })
+      .returning();
+    return created;
   }
 }
 

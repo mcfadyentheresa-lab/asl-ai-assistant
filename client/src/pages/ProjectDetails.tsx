@@ -9,7 +9,8 @@ import {
   useUsers, useUpdateProject,
 } from "@/hooks/use-projects";
 import { Navbar } from "@/components/layout/Navbar";
-import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, ExternalLink, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, CalendarDays, ChevronLeft, Upload, Download, User, X, Paperclip, ZoomIn } from "lucide-react";
+import MoodBoard from "@/components/MoodBoard";
+import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, ExternalLink, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, CalendarDays, ChevronLeft, Upload, Download, User, X, Paperclip, ZoomIn, Palette } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -129,8 +130,8 @@ export default function ProjectDetails() {
                 <span className="hidden md:inline">Checklist</span>
               </TabsTrigger>
               <TabsTrigger value="board" data-testid="tab-board">
-                <LayoutGrid className="h-4 w-4 md:mr-2" />
-                <span className="hidden md:inline">Board</span>
+                <Palette className="h-4 w-4 md:mr-2" />
+                <span className="hidden md:inline">Moodboard</span>
               </TabsTrigger>
               <TabsTrigger value="calendar" data-testid="tab-calendar">
                 <CalendarDays className="h-4 w-4 md:mr-2" />
@@ -293,7 +294,7 @@ export default function ProjectDetails() {
           </TabsContent>
 
           <TabsContent value="board">
-            <BoardTab projectId={projectId} />
+            <MoodBoard projectId={projectId} />
           </TabsContent>
 
           <TabsContent value="chat">

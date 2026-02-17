@@ -107,7 +107,7 @@ export const calendarEvents = pgTable("calendar_events", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Board Items (moodboard / workboard)
+// Board Items (moodboard / workboard) - legacy individual items
 export const boardItems = pgTable("board_items", {
   id: serial("id").primaryKey(),
   projectId: integer("project_id").notNull().references(() => projects.id),
@@ -119,6 +119,15 @@ export const boardItems = pgTable("board_items", {
   color: text("color").default("#ffffff"),
   createdBy: text("created_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Moodboard Canvas (Fabric.js freeform canvas per project)
+export const moodboards = pgTable("moodboards", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => projects.id).unique(),
+  canvasData: jsonb("canvas_data"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  updatedBy: text("updated_by").references(() => users.id),
 });
 
 // Messages (Chat)
@@ -224,6 +233,7 @@ export const insertTimeEntrySchema = createInsertSchema(timeEntries).omit({ id: 
 export const insertMessageSchema = createInsertSchema(messages).omit({ id: true, createdAt: true });
 export const insertChecklistItemSchema = createInsertSchema(checklistItems).omit({ id: true, createdAt: true });
 export const insertBoardItemSchema = createInsertSchema(boardItems).omit({ id: true, createdAt: true });
+export const insertMoodboardSchema = createInsertSchema(moodboards).omit({ id: true, updatedAt: true });
 export const insertCalendarEventSchema = createInsertSchema(calendarEvents).omit({ id: true, createdAt: true });
 
 // TYPES
@@ -247,4 +257,6 @@ export type BoardItem = typeof boardItems.$inferSelect;
 export type CalendarEvent = typeof calendarEvents.$inferSelect;
 export type InsertChecklistItem = z.infer<typeof insertChecklistItemSchema>;
 export type InsertBoardItem = z.infer<typeof insertBoardItemSchema>;
+export type Moodboard = typeof moodboards.$inferSelect;
+export type InsertMoodboard = z.infer<typeof insertMoodboardSchema>;
 export type InsertCalendarEvent = z.infer<typeof insertCalendarEventSchema>;

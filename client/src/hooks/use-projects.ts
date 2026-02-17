@@ -384,6 +384,40 @@ export function useDeleteBoardItem() {
   });
 }
 
+// --- Moodboard Canvas ---
+export function useMoodboard(projectId: number) {
+  return useQuery({
+    queryKey: [api.moodboard.get.path, projectId],
+    queryFn: async () => {
+      const url = buildUrl(api.moodboard.get.path, { projectId });
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch moodboard");
+      return await res.json();
+    },
+    enabled: !!projectId,
+  });
+}
+
+export function useSaveMoodboard() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ projectId, canvasData }: { projectId: number; canvasData: any }) => {
+      const url = buildUrl(api.moodboard.save.path, { projectId });
+      const res = await fetch(url, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ canvasData }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to save moodboard");
+      return await res.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: [api.moodboard.get.path, variables.projectId] });
+    },
+  });
+}
+
 // --- Calendar Events ---
 export function useCalendarEvents(projectId: number) {
   return useQuery({
