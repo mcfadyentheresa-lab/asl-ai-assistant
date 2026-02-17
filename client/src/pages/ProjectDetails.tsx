@@ -109,36 +109,38 @@ export default function ProjectDetails() {
 
       <main className="container px-6 md:px-10 mt-8">
         <Tabs defaultValue="overview" className="space-y-8">
-          <TabsList data-testid="tabs-list">
-            <TabsTrigger value="overview" data-testid="tab-overview">
-              <Clock className="mr-2 h-4 w-4" />
-              Overview
-            </TabsTrigger>
-            <TabsTrigger value="checklist" data-testid="tab-checklist">
-              <CheckSquare className="mr-2 h-4 w-4" />
-              Checklist
-            </TabsTrigger>
-            <TabsTrigger value="board" data-testid="tab-board">
-              <LayoutGrid className="mr-2 h-4 w-4" />
-              Board
-            </TabsTrigger>
-            <TabsTrigger value="calendar" data-testid="tab-calendar">
-              <CalendarDays className="mr-2 h-4 w-4" />
-              Calendar
-            </TabsTrigger>
-            <TabsTrigger value="photos" data-testid="tab-photos">
-              <ImageIcon className="mr-2 h-4 w-4" />
-              Photos
-            </TabsTrigger>
-            <TabsTrigger value="docs" data-testid="tab-docs">
-              <FileText className="mr-2 h-4 w-4" />
-              Documents
-            </TabsTrigger>
-            <TabsTrigger value="chat" data-testid="tab-chat">
-              <MessageSquare className="mr-2 h-4 w-4" />
-              Messages
-            </TabsTrigger>
-          </TabsList>
+          <div className="overflow-x-auto -mx-6 px-6 md:mx-0 md:px-0">
+            <TabsList className="w-max md:w-auto" data-testid="tabs-list">
+              <TabsTrigger value="overview" data-testid="tab-overview">
+                <Clock className="h-4 w-4 md:mr-2" />
+                <span className="hidden md:inline">Overview</span>
+              </TabsTrigger>
+              <TabsTrigger value="checklist" data-testid="tab-checklist">
+                <CheckSquare className="h-4 w-4 md:mr-2" />
+                <span className="hidden md:inline">Checklist</span>
+              </TabsTrigger>
+              <TabsTrigger value="board" data-testid="tab-board">
+                <LayoutGrid className="h-4 w-4 md:mr-2" />
+                <span className="hidden md:inline">Board</span>
+              </TabsTrigger>
+              <TabsTrigger value="calendar" data-testid="tab-calendar">
+                <CalendarDays className="h-4 w-4 md:mr-2" />
+                <span className="hidden md:inline">Calendar</span>
+              </TabsTrigger>
+              <TabsTrigger value="photos" data-testid="tab-photos">
+                <ImageIcon className="h-4 w-4 md:mr-2" />
+                <span className="hidden md:inline">Photos</span>
+              </TabsTrigger>
+              <TabsTrigger value="docs" data-testid="tab-docs">
+                <FileText className="h-4 w-4 md:mr-2" />
+                <span className="hidden md:inline">Documents</span>
+              </TabsTrigger>
+              <TabsTrigger value="chat" data-testid="tab-chat">
+                <MessageSquare className="h-4 w-4 md:mr-2" />
+                <span className="hidden md:inline">Messages</span>
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           <TabsContent value="overview" className="space-y-8">
             <div className="grid md:grid-cols-3 gap-8">

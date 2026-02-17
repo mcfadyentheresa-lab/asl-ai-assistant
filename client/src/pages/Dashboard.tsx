@@ -3,7 +3,7 @@ import { useProjects, useDeleteProject, useArchiveProject } from "@/hooks/use-pr
 import { Navbar } from "@/components/layout/Navbar";
 import { ProjectCard } from "@/components/project/ProjectCard";
 import { Button } from "@/components/ui/button";
-import { Plus, Loader2, Eye, EyeOff } from "lucide-react";
+import { Plus, Loader2, Eye, EyeOff, Upload, X } from "lucide-react";
 import { motion } from "framer-motion";
 import {
   Dialog,
@@ -26,7 +26,7 @@ import {
 import { useCreateProject } from "@/hooks/use-projects";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertProjectSchema, type InsertProject } from "@shared/schema";
@@ -181,6 +181,10 @@ function CreateProjectDialog() {
   const [open, setOpen] = useState(false);
   const { mutate, isPending } = useCreateProject();
   const { toast } = useToast();
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<InsertProject>({
     resolver: zodResolver(insertProjectSchema),
@@ -191,12 +195,51 @@ function CreateProjectDialog() {
     },
   });
 
-  const onSubmit = (data: InsertProject) => {
-    mutate(data, {
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImageFile(file);
+    const reader = new FileReader();
+    reader.onload = () => setImagePreview(reader.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const removeImage = () => {
+    setImageFile(null);
+    setImagePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const onSubmit = async (data: InsertProject) => {
+    let thumbnailUrl: string | undefined;
+
+    if (imageFile) {
+      setUploading(true);
+      try {
+        const formData = new FormData();
+        formData.append("image", imageFile);
+        const res = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+          credentials: "include",
+        });
+        if (!res.ok) throw new Error("Upload failed");
+        const result = await res.json();
+        thumbnailUrl = result.url;
+      } catch {
+        toast({ title: "Error", description: "Failed to upload image", variant: "destructive" });
+        setUploading(false);
+        return;
+      }
+      setUploading(false);
+    }
+
+    mutate({ ...data, thumbnailUrl: thumbnailUrl || null }, {
       onSuccess: () => {
         toast({ title: "Success", description: "Project created successfully." });
         setOpen(false);
         form.reset();
+        removeImage();
       },
       onError: (error) => {
         toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -205,7 +248,7 @@ function CreateProjectDialog() {
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) removeImage(); }}>
       <DialogTrigger asChild>
         <Button data-testid="button-new-project">
           <Plus className="mr-2" />
@@ -222,6 +265,53 @@ function CreateProjectDialog() {
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5 pt-2">
+            <div>
+              <FormLabel>Project Image</FormLabel>
+              <div className="mt-2">
+                {imagePreview ? (
+                  <div className="relative rounded-md overflow-hidden">
+                    <img
+                      src={imagePreview}
+                      alt="Preview"
+                      className="w-full h-40 object-cover rounded-md"
+                      data-testid="img-project-preview"
+                    />
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="secondary"
+                      className="absolute top-2 right-2"
+                      onClick={removeImage}
+                      data-testid="button-remove-image"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => fileInputRef.current?.click()}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") fileInputRef.current?.click(); }}
+                    className="w-full py-10 border-2 border-dashed border-border rounded-md flex flex-col items-center justify-center gap-2 text-muted-foreground cursor-pointer transition-colors hover-elevate"
+                    data-testid="button-upload-image"
+                  >
+                    <Upload className="h-8 w-8" />
+                    <span className="text-sm">Click to upload a project image</span>
+                    <span className="text-xs">JPG, PNG, GIF, WebP up to 10MB</span>
+                  </div>
+                )}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/gif,image/webp"
+                  className="hidden"
+                  onChange={handleImageSelect}
+                  data-testid="input-project-image"
+                />
+              </div>
+            </div>
+
             <FormField
               control={form.control}
               name="name"
@@ -260,8 +350,8 @@ function CreateProjectDialog() {
               <Button type="button" variant="outline" onClick={() => setOpen(false)} data-testid="button-cancel">
                 Cancel
               </Button>
-              <Button type="submit" disabled={isPending} data-testid="button-create">
-                {isPending ? <Loader2 className="mr-2 animate-spin" /> : null}
+              <Button type="submit" disabled={isPending || uploading} data-testid="button-create">
+                {(isPending || uploading) ? <Loader2 className="mr-2 animate-spin" /> : null}
                 Create Project
               </Button>
             </div>
