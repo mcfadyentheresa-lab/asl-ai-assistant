@@ -2,17 +2,45 @@ import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { LogOut } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
+import { LogOut, UserCog } from "lucide-react";
 import { Link } from "wouter";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 export function Navbar() {
   const { user, logout } = useAuth();
+  const queryClient = useQueryClient();
+
+  const switchRole = useMutation({
+    mutationFn: async (role: string) => {
+      const res = await fetch("/api/auth/role", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to switch role");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
+    },
+  });
 
   if (!user) return null;
 
-  const initials = `${(user.firstName || "")[0] || ""}${(user.lastName || "")[0] || ""}`.toUpperCase() || "U";
-  const roleName = user.role === "crew" ? "Crew" : "Client";
+  const initials =
+    `${(user.firstName || "")[0] || ""}${(user.lastName || "")[0] || ""}`.toUpperCase() || "U";
+  const roleLabel =
+    user.role === "admin" ? "Admin" : user.role === "crew" ? "Crew" : "Client";
 
   return (
     <nav
@@ -26,15 +54,38 @@ export function Navbar() {
       </Link>
 
       <div className="flex items-center gap-3">
-        <Badge variant="secondary" data-testid="badge-role">
-          {roleName}
-        </Badge>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" data-testid="button-role-switch">
+              <UserCog className="mr-2 h-4 w-4" />
+              {roleLabel}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-40">
+            <DropdownMenuLabel className="text-xs text-muted-foreground">
+              Switch View
+            </DropdownMenuLabel>
+            {["client", "crew", "admin"].map((role) => (
+              <DropdownMenuItem
+                key={role}
+                onClick={() => switchRole.mutate(role)}
+                data-testid={`button-role-${role}`}
+                className={user.role === role ? "font-semibold" : ""}
+              >
+                {role === "admin" ? "Admin" : role === "crew" ? "Crew" : "Client"}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" data-testid="button-user-menu">
               <Avatar className="h-8 w-8">
-                <AvatarImage src={user.profileImageUrl || undefined} alt={user.firstName || "User"} />
+                <AvatarImage
+                  src={user.profileImageUrl || undefined}
+                  alt={user.firstName || "User"}
+                />
                 <AvatarFallback className="text-xs">{initials}</AvatarFallback>
               </Avatar>
             </Button>
@@ -48,10 +99,8 @@ export function Navbar() {
                 {user.email}
               </p>
             </div>
-            <DropdownMenuItem
-              onClick={() => logout()}
-              data-testid="button-logout"
-            >
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => logout()} data-testid="button-logout">
               <LogOut className="mr-2" />
               Sign Out
             </DropdownMenuItem>

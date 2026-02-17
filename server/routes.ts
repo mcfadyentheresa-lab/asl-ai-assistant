@@ -14,6 +14,22 @@ export async function registerRoutes(
   await setupAuth(app);
   registerAuthRoutes(app);
 
+  app.patch("/api/auth/role", isAuthenticated, async (req: any, res) => {
+    try {
+      const { role } = req.body;
+      if (!["client", "crew", "admin"].includes(role)) {
+        return res.status(400).json({ message: "Invalid role" });
+      }
+      const userId = req.user.claims.sub;
+      const user = await authStorage.updateUserRole(userId, role);
+      if (!user) return res.status(404).json({ message: "User not found" });
+      res.json(user);
+    } catch (error) {
+      console.error("Error updating role:", error);
+      res.status(500).json({ message: "Failed to update role" });
+    }
+  });
+
   // Projects
   app.get(api.projects.list.path, isAuthenticated, async (req, res) => {
     const user = req.user as any;
