@@ -90,6 +90,20 @@ export const checklistItems = pgTable("checklist_items", {
   priority: text("priority").default("normal"),
   group: text("group").default("General"),
   status: text("status").default("todo"),
+  color: text("color"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Calendar Events (shared across project for everyone)
+export const calendarEvents = pgTable("calendar_events", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => projects.id),
+  title: text("title").notNull(),
+  description: text("description"),
+  date: date("date").notNull(),
+  endDate: date("end_date"),
+  type: text("type").default("event"),
+  createdBy: text("created_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -129,6 +143,18 @@ export const projectsRelations = relations(projects, ({ one, many }) => ({
   messages: many(messages),
   checklistItems: many(checklistItems),
   boardItems: many(boardItems),
+  calendarEvents: many(calendarEvents),
+}));
+
+export const calendarEventsRelations = relations(calendarEvents, ({ one }) => ({
+  project: one(projects, {
+    fields: [calendarEvents.projectId],
+    references: [projects.id],
+  }),
+  creator: one(users, {
+    fields: [calendarEvents.createdBy],
+    references: [users.id],
+  }),
 }));
 
 export const checklistItemsRelations = relations(checklistItems, ({ one }) => ({
@@ -197,6 +223,7 @@ export const insertTimeEntrySchema = createInsertSchema(timeEntries).omit({ id: 
 export const insertMessageSchema = createInsertSchema(messages).omit({ id: true, createdAt: true });
 export const insertChecklistItemSchema = createInsertSchema(checklistItems).omit({ id: true, createdAt: true });
 export const insertBoardItemSchema = createInsertSchema(boardItems).omit({ id: true, createdAt: true });
+export const insertCalendarEventSchema = createInsertSchema(calendarEvents).omit({ id: true, createdAt: true });
 
 // TYPES
 export type Project = typeof projects.$inferSelect;
@@ -216,5 +243,7 @@ export type InsertTimeEntry = z.infer<typeof insertTimeEntrySchema>;
 export type InsertMessage = z.infer<typeof insertMessageSchema>;
 export type ChecklistItem = typeof checklistItems.$inferSelect;
 export type BoardItem = typeof boardItems.$inferSelect;
+export type CalendarEvent = typeof calendarEvents.$inferSelect;
 export type InsertChecklistItem = z.infer<typeof insertChecklistItemSchema>;
 export type InsertBoardItem = z.infer<typeof insertBoardItemSchema>;
+export type InsertCalendarEvent = z.infer<typeof insertCalendarEventSchema>;
