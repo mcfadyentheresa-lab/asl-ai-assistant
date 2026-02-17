@@ -33,6 +33,7 @@ export interface IStorage {
   // Documents
   getDocuments(projectId: number): Promise<Document[]>;
   createDocument(doc: InsertDocument): Promise<Document>;
+  deleteDocument(id: number): Promise<void>;
 
   // Messages
   getMessages(projectId: number): Promise<(Message & { sender: User | null })[]>;
@@ -123,6 +124,9 @@ export class DatabaseStorage implements IStorage {
   async createDocument(doc: InsertDocument): Promise<Document> {
     const [newDoc] = await db.insert(documents).values(doc).returning();
     return newDoc;
+  }
+  async deleteDocument(id: number): Promise<void> {
+    await db.delete(documents).where(eq(documents.id, id));
   }
 
   // Messages

@@ -21,7 +21,7 @@ const allowedMimeTypes = new Set([
   "image/webp",
 ]);
 
-const upload = multer({
+const imageUpload = multer({
   storage: multer.diskStorage({
     destination: uploadDir,
     filename: (_req, file, cb) => {
@@ -33,6 +33,36 @@ const upload = multer({
   fileFilter: (_req, file, cb) => {
     if (!allowedMimeTypes.has(file.mimetype)) {
       return cb(new Error("Only image files (JPG, PNG, GIF, WebP) are allowed"));
+    }
+    cb(null, true);
+  },
+});
+
+const allowedDocMimeTypes = new Set<string>([
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "text/plain",
+]);
+
+const docUpload = multer({
+  storage: multer.diskStorage({
+    destination: uploadDir,
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase();
+      cb(null, `${randomUUID()}${ext}`);
+    },
+  }),
+  limits: { fileSize: 25 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (!allowedDocMimeTypes.has(file.mimetype)) {
+      return cb(new Error("File type not supported"));
     }
     cb(null, true);
   },
@@ -52,7 +82,7 @@ export async function registerRoutes(
 
   // Image upload endpoint
   app.post("/api/upload", isAuthenticated, (req: any, res) => {
-    upload.single("image")(req, res, (err: any) => {
+    imageUpload.single("image")(req, res, (err: any) => {
       if (err) {
         const message = err instanceof multer.MulterError
           ? (err.code === "LIMIT_FILE_SIZE" ? "File too large (max 10MB)" : err.message)
@@ -187,10 +217,41 @@ export async function registerRoutes(
     res.json(docs);
   });
 
-  app.post(api.documents.create.path, isAuthenticated, async (req, res) => {
-    const input = api.documents.create.input.parse(req.body);
-    const doc = await storage.createDocument({ ...input, projectId: Number(req.params.projectId) });
-    res.status(201).json(doc);
+  app.post("/api/projects/:projectId/documents/upload", isAuthenticated, (req: any, res) => {
+    docUpload.single("file")(req, res, async (err: any) => {
+      if (err) {
+        const message = err instanceof multer.MulterError
+          ? (err.code === "LIMIT_FILE_SIZE" ? "File too large (max 25MB)" : err.message)
+          : err.message || "Upload failed";
+        return res.status(400).json({ message });
+      }
+      if (!req.file) {
+        return res.status(400).json({ message: "No file provided" });
+      }
+      const url = `/uploads/${req.file.filename}`;
+      const title = req.body.title || req.file.originalname;
+      const type = req.body.type || "other";
+      try {
+        const doc = await storage.createDocument({
+          title,
+          url,
+          type,
+          projectId: Number(req.params.projectId),
+        });
+        res.status(201).json(doc);
+      } catch (error) {
+        res.status(500).json({ message: "Failed to save document" });
+      }
+    });
+  });
+
+  app.delete("/api/documents/:id", isAuthenticated, async (req, res) => {
+    try {
+      await storage.deleteDocument(Number(req.params.id));
+      res.json({ success: true });
+    } catch {
+      res.status(500).json({ message: "Failed to delete document" });
+    }
   });
 
   // Messages

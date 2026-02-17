@@ -4,9 +4,10 @@ import {
   useChecklistItems, useCreateChecklistItem, useUpdateChecklistItem, useDeleteChecklistItem,
   useBoardItems, useCreateBoardItem, useDeleteBoardItem,
   useCalendarEvents, useCreateCalendarEvent, useUpdateCalendarEvent, useDeleteCalendarEvent,
+  useDocuments, useUploadDocument, useDeleteDocument,
 } from "@/hooks/use-projects";
 import { Navbar } from "@/components/layout/Navbar";
-import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, ExternalLink, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, CalendarDays, ChevronLeft } from "lucide-react";
+import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, ExternalLink, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, CalendarDays, ChevronLeft, Upload, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -31,7 +32,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths, isSameDay, isSameMonth, parseISO } from "date-fns";
@@ -259,20 +260,7 @@ export default function ProjectDetails() {
           </TabsContent>
 
           <TabsContent value="docs">
-            <div className="flex flex-col gap-2">
-              <Card className="flex items-center justify-between p-4" data-testid="doc-contract">
-                <div className="flex items-center gap-3">
-                  <FileText className="h-5 w-5 text-muted-foreground" />
-                  <span className="font-medium text-sm">Contract.pdf</span>
-                </div>
-                <Button variant="ghost" size="sm" data-testid="button-download-contract">
-                  Download
-                </Button>
-              </Card>
-              <div className="text-center py-10 text-muted-foreground text-sm" data-testid="text-docs-placeholder">
-                More documents will appear here as the project progresses.
-              </div>
-            </div>
+            <DocumentsTab projectId={projectId} />
           </TabsContent>
         </Tabs>
       </main>
@@ -1525,6 +1513,150 @@ function CalendarTab({ projectId }: { projectId: number }) {
           </div>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+const docTypeLabels: Record<string, string> = {
+  contract: "Contract",
+  invoice: "Invoice",
+  plan: "Plan",
+  change_order: "Change Order",
+  permit: "Permit",
+  other: "Other",
+};
+
+function DocumentsTab({ projectId }: { projectId: number }) {
+  const { data: documents, isLoading } = useDocuments(projectId);
+  const { mutate: uploadDoc, isPending: isUploading } = useUploadDocument();
+  const { mutate: deleteDoc } = useDeleteDocument();
+  const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [docType, setDocType] = useState("other");
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    Array.from(files).forEach((file) => {
+      uploadDoc(
+        { projectId, file, title: file.name, type: docType },
+        {
+          onSuccess: () => {
+            toast({ title: "Uploaded", description: `${file.name} uploaded successfully.` });
+          },
+          onError: (err) => {
+            toast({ title: "Error", description: err.message, variant: "destructive" });
+          },
+        }
+      );
+    });
+
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleDownload = (url: string, title: string) => {
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = title;
+    a.target = "_blank";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <h3 className="font-serif text-lg font-semibold" data-testid="text-docs-heading">Documents</h3>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Select value={docType} onValueChange={setDocType}>
+            <SelectTrigger className="w-36" data-testid="select-doc-type">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="contract">Contract</SelectItem>
+              <SelectItem value="invoice">Invoice</SelectItem>
+              <SelectItem value="plan">Plan</SelectItem>
+              <SelectItem value="change_order">Change Order</SelectItem>
+              <SelectItem value="permit">Permit</SelectItem>
+              <SelectItem value="other">Other</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading}
+            data-testid="button-upload-doc"
+          >
+            {isUploading ? <Loader2 className="mr-2 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+            Upload
+          </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.jpg,.jpeg,.png,.gif,.webp"
+            className="hidden"
+            onChange={handleFileSelect}
+            multiple
+            data-testid="input-doc-file"
+          />
+        </div>
+      </div>
+
+      {!documents || documents.length === 0 ? (
+        <div className="text-center py-16 text-muted-foreground text-sm" data-testid="text-docs-empty">
+          No documents yet. Upload files to share with your team.
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {documents.map((doc) => (
+            <Card key={doc.id} className="flex items-center justify-between gap-3 p-4" data-testid={`doc-item-${doc.id}`}>
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <FileText className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                <div className="min-w-0">
+                  <p className="font-medium text-sm truncate" data-testid={`text-doc-title-${doc.id}`}>{doc.title}</p>
+                  <Badge variant="secondary" className="text-xs mt-1" data-testid={`badge-doc-type-${doc.id}`}>
+                    {docTypeLabels[doc.type] || doc.type}
+                  </Badge>
+                </div>
+              </div>
+              <div className="flex items-center gap-1 flex-shrink-0">
+                {doc.url && doc.url !== "#" && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleDownload(doc.url, doc.title)}
+                    data-testid={`button-download-${doc.id}`}
+                  >
+                    <Download className="h-4 w-4" />
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => {
+                    deleteDoc(doc.id, {
+                      onSuccess: () => toast({ title: "Deleted", description: "Document removed." }),
+                      onError: () => toast({ title: "Error", description: "Failed to delete document.", variant: "destructive" }),
+                    });
+                  }}
+                  data-testid={`button-delete-doc-${doc.id}`}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
