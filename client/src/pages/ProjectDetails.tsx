@@ -295,6 +295,7 @@ function ChecklistTab({ projectId }: { projectId: number }) {
   const { mutate: createItem, isPending: isCreating } = useCreateChecklistItem();
   const { mutate: updateItem } = useUpdateChecklistItem();
   const { mutate: deleteItem } = useDeleteChecklistItem();
+  const { mutate: addToCalendar } = useCreateCalendarEvent();
 
   const [newTitle, setNewTitle] = useState("");
   const [newGroup, setNewGroup] = useState("General");
@@ -587,6 +588,28 @@ function ChecklistTab({ projectId }: { projectId: number }) {
                           )}
                         </div>
                         <div className="flex items-center gap-1 relative z-[1]">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => {
+                              addToCalendar(
+                                {
+                                  projectId,
+                                  title: item.title,
+                                  description: item.notes || null,
+                                  date: format(new Date(), "yyyy-MM-dd"),
+                                  type: "event",
+                                },
+                                {
+                                  onSuccess: () => toast({ title: "Added to Calendar", description: `"${item.title}" added to today's calendar.` }),
+                                  onError: (err) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+                                }
+                              );
+                            }}
+                            data-testid={`button-calendar-checklist-${item.id}`}
+                          >
+                            <CalendarIcon className="h-4 w-4" />
+                          </Button>
                           <Button
                             size="icon"
                             variant="ghost"
