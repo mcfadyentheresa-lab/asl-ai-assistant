@@ -1,8 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { ArrowRight, ShieldCheck, Zap, Eye } from "lucide-react";
 import { motion } from "framer-motion";
-import heroImg from "@assets/download-1_1771288617674.jpg";
-import craftImg from "@assets/download-4_1771288621120.jpg";
+import heroImg from "@/assets/images/hero-cottage.jpg";
+import craftImg from "@/assets/images/craft-interior.jpg";
 
 export default function LandingPage() {
   const handleLogin = () => {
