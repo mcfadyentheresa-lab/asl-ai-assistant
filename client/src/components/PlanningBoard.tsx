@@ -115,6 +115,8 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
   const [renameName, setRenameName] = useState("");
   const [newBoardName, setNewBoardName] = useState("");
   const [showNewBoardDialog, setShowNewBoardDialog] = useState(false);
+  const [showImageUrlDialog, setShowImageUrlDialog] = useState(false);
+  const [imageUrl, setImageUrl] = useState("");
 
   const { data: boards = [], isLoading: isLoadingBoards } = usePlanningBoards(projectId);
   const { data: boardData, isLoading: isLoadingBoard } = usePlanningBoard(selectedBoardId);
@@ -208,6 +210,10 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
         }
       });
       canvas.on("path:created", () => {
+        saveStateRef.current();
+        autoSaveRef.current();
+      });
+      canvas.on("text:editing:exited", () => {
         saveStateRef.current();
         autoSaveRef.current();
       });
@@ -449,28 +455,21 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
   const addSticky = () => {
     const canvas = fabricRef.current;
     if (!canvas) return;
-    const bg = new fabric.Rect({
+    const textbox = new fabric.Textbox("Type your note here...", {
+      left: canvas.getWidth() / 2 - 90,
+      top: canvas.getHeight() / 2 - 70,
       width: 180,
-      height: 140,
-      fill: stickyColor,
-      rx: 6,
-      ry: 6,
-      shadow: new fabric.Shadow({ color: "rgba(0,0,0,0.12)", blur: 8, offsetX: 2, offsetY: 2 }),
-    });
-    const label = new fabric.IText("Note", {
       fontFamily: "DM Sans, sans-serif",
       fontSize: 14,
       fill: "#1a1a1a",
-      left: 12,
-      top: 12,
-      width: 156,
+      backgroundColor: stickyColor,
+      padding: 14,
+      editable: true,
+      splitByGrapheme: false,
+      shadow: new fabric.Shadow({ color: "rgba(0,0,0,0.12)", blur: 8, offsetX: 2, offsetY: 2 }),
     });
-    const group = new fabric.Group([bg, label], {
-      left: canvas.getWidth() / 2 - 90,
-      top: canvas.getHeight() / 2 - 70,
-    });
-    canvas.add(group);
-    canvas.setActiveObject(group);
+    canvas.add(textbox);
+    canvas.setActiveObject(textbox);
     setTool("select");
   };
 
@@ -503,6 +502,35 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
       toast({ title: "Upload failed", description: err.message, variant: "destructive" });
     }
     if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleAddImageFromUrl = () => {
+    const canvas = fabricRef.current;
+    if (!canvas || !imageUrl.trim()) return;
+    const url = imageUrl.trim();
+    setShowImageUrlDialog(false);
+    setImageUrl("");
+    const imgEl = new Image();
+    imgEl.crossOrigin = "anonymous";
+    imgEl.onload = () => {
+      const fabricImg = new fabric.FabricImage(imgEl, {
+        left: canvas.getWidth() / 2 - Math.min(imgEl.width, 300) / 2,
+        top: canvas.getHeight() / 2 - Math.min(imgEl.height, 300) / 2,
+      });
+      const maxDim = 300;
+      if (imgEl.width > maxDim || imgEl.height > maxDim) {
+        const scale = maxDim / Math.max(imgEl.width, imgEl.height);
+        fabricImg.scaleX = scale;
+        fabricImg.scaleY = scale;
+      }
+      canvas.add(fabricImg);
+      canvas.setActiveObject(fabricImg);
+      canvas.renderAll();
+    };
+    imgEl.onerror = () => {
+      toast({ title: "Image failed to load", description: "The URL could not be loaded. Make sure it's a direct link to an image.", variant: "destructive" });
+    };
+    imgEl.src = url;
   };
 
   const handleManualSave = async () => {
@@ -770,20 +798,26 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
 
         <Separator orientation="vertical" className="h-6 mx-1" />
 
-        <Tooltip>
-          <TooltipTrigger asChild>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
             <Button
               size="icon"
               variant="ghost"
-              onClick={() => fileInputRef.current?.click()}
               disabled={isUploadingImage}
               data-testid="button-add-image"
             >
               {isUploadingImage ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
             </Button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" className="text-xs">Add Image</TooltipContent>
-        </Tooltip>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            <DropdownMenuItem onClick={() => fileInputRef.current?.click()} data-testid="menu-upload-image">
+              <ImagePlus className="h-4 w-4 mr-2" /> Upload from Device
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => { setImageUrl(""); setShowImageUrlDialog(true); }} data-testid="menu-image-from-url">
+              <Link2 className="h-4 w-4 mr-2" /> Paste Image URL
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
         <input
           ref={fileInputRef}
           type="file"
@@ -924,7 +958,7 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
       {boards.length > 0 && (
         <div className={`flex items-center justify-between mt-2 px-1 ${(!selectedBoardId || isLoadingData) ? "invisible" : ""}`}>
           <p className="text-[10px] text-muted-foreground">
-            Tip: Use Apple Pen or mouse to draw. Drag images to arrange. {hasUnsaved && "(Auto-saving...)"}
+            Tip: Double-click sticky notes to edit text. Use the image button to upload or paste a URL. {hasUnsaved && "(Auto-saving...)"}
           </p>
           <p className="text-[10px] text-muted-foreground" data-testid="text-save-status">
             {isSaving ? "Saving..." : hasUnsaved ? "Unsaved changes" : "All changes saved"}
@@ -1045,6 +1079,26 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
           </div>
           <DialogFooter>
             <Button onClick={() => setShowLinkDialog(false)} data-testid="button-close-link-dialog">Done</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showImageUrlDialog} onOpenChange={setShowImageUrlDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Image from URL</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">Paste the direct link to an image (e.g. ending in .jpg, .png, .webp).</p>
+          <Input
+            placeholder="https://example.com/image.jpg"
+            value={imageUrl}
+            onChange={(e) => setImageUrl(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") handleAddImageFromUrl(); }}
+            data-testid="input-image-url"
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowImageUrlDialog(false)}>Cancel</Button>
+            <Button onClick={handleAddImageFromUrl} disabled={!imageUrl.trim()} data-testid="button-confirm-image-url">Add Image</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
