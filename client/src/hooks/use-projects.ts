@@ -2,6 +2,18 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
 import { type InsertProject, type InsertMilestone, type InsertTask, type InsertMessage, type InsertChecklistItem, type InsertBoardItem, type InsertCalendarEvent, type Document } from "@shared/schema";
 
+// --- Users ---
+export function useUsers() {
+  return useQuery<{ id: string; firstName: string | null; lastName: string | null; email: string | null; role: string | null; profileImageUrl: string | null }[]>({
+    queryKey: ["/api/users"],
+    queryFn: async () => {
+      const res = await fetch("/api/users", { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+}
+
 // --- Projects ---
 export function useProjects() {
   return useQuery({
@@ -42,6 +54,27 @@ export function useCreateProject() {
       return api.projects.create.responses[201].parse(await res.json());
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.projects.list.path] }),
+  });
+}
+
+export function useUpdateProject() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: Partial<InsertProject> }) => {
+      const url = buildUrl(api.projects.update.path, { id });
+      const res = await fetch(url, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to update project");
+      return res.json();
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: [api.projects.list.path] });
+      queryClient.invalidateQueries({ queryKey: [api.projects.get.path, variables.id] });
+    },
   });
 }
 

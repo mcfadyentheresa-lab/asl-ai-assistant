@@ -5,9 +5,10 @@ import {
   useBoardItems, useCreateBoardItem, useDeleteBoardItem,
   useCalendarEvents, useCreateCalendarEvent, useUpdateCalendarEvent, useDeleteCalendarEvent,
   useDocuments, useUploadDocument, useDeleteDocument,
+  useUsers, useUpdateProject,
 } from "@/hooks/use-projects";
 import { Navbar } from "@/components/layout/Navbar";
-import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, ExternalLink, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, CalendarDays, ChevronLeft, Upload, Download } from "lucide-react";
+import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, ExternalLink, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, CalendarDays, ChevronLeft, Upload, Download, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -44,6 +45,12 @@ export default function ProjectDetails() {
   const { data: project, isLoading: loadingProject } = useProject(projectId);
   const { data: milestones } = useMilestones(projectId);
   const { data: tasks } = useTasks(projectId);
+  const { user } = useAuth();
+  const { data: users } = useUsers();
+  const { mutate: updateProject } = useUpdateProject();
+  const { toast } = useToast();
+
+  const assignedClient = users?.find((u) => u.id === project?.clientId);
 
   if (loadingProject) {
     return (
@@ -187,6 +194,60 @@ export default function ProjectDetails() {
               </div>
 
               <div className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="font-serif text-lg" data-testid="text-client-heading">
+                      Assigned Client
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {user?.role !== "client" ? (
+                      <Select
+                        value={project.clientId || "none"}
+                        onValueChange={(val) => {
+                          const clientId = val === "none" ? null : val;
+                          updateProject({ id: projectId, data: { clientId } }, {
+                            onSuccess: () => toast({ title: "Client updated" }),
+                          });
+                        }}
+                      >
+                        <SelectTrigger data-testid="select-project-client">
+                          <SelectValue placeholder="Select a client..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">No client assigned</SelectItem>
+                          {users?.map((u) => (
+                            <SelectItem key={u.id} value={u.id}>
+                              <div className="flex items-center gap-2">
+                                <span>{u.firstName || ""} {u.lastName || ""}</span>
+                                {u.email && <span className="text-muted-foreground text-xs">({u.email})</span>}
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : assignedClient ? (
+                      <div className="flex items-center gap-3" data-testid="text-assigned-client">
+                        <Avatar>
+                          <AvatarFallback>
+                            {(assignedClient.firstName?.[0] || "") + (assignedClient.lastName?.[0] || "")}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="font-medium text-foreground text-sm">
+                            {assignedClient.firstName || ""} {assignedClient.lastName || ""}
+                          </p>
+                          {assignedClient.email && (
+                            <p className="text-muted-foreground text-xs">{assignedClient.email}</p>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-muted-foreground text-sm" data-testid="text-no-client">No client assigned</p>
+                    )}
+                  </CardContent>
+                </Card>
+
                 <Card>
                   <CardHeader>
                     <CardTitle className="font-serif text-lg" data-testid="text-activity-heading">

@@ -113,6 +113,28 @@ export async function registerRoutes(
     }
   });
 
+  // Users (for client assignment)
+  app.get("/api/users", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const dbUser = await authStorage.getUser(userId);
+      if (dbUser?.role === "client") {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      const allUsers = await authStorage.getUsers();
+      res.json(allUsers.map(u => ({
+        id: u.id,
+        firstName: u.firstName,
+        lastName: u.lastName,
+        email: u.email,
+        role: u.role,
+        profileImageUrl: u.profileImageUrl,
+      })));
+    } catch {
+      res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+
   // Projects
   app.get(api.projects.list.path, isAuthenticated, async (req, res) => {
     const user = req.user as any;
@@ -129,11 +151,15 @@ export async function registerRoutes(
     }
   });
 
-  app.get(api.projects.get.path, isAuthenticated, async (req, res) => {
+  app.get(api.projects.get.path, isAuthenticated, async (req: any, res) => {
     const project = await storage.getProject(Number(req.params.id));
     if (!project) return res.status(404).json({ message: 'Project not found' });
-    
-    // Basic access control could go here
+
+    const userId = req.user.claims.sub;
+    const dbUser = await authStorage.getUser(userId);
+    if (dbUser?.role === 'client' && project.clientId !== userId) {
+      return res.status(403).json({ message: 'Not authorized to view this project' });
+    }
     res.json(project);
   });
 
@@ -145,7 +171,7 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Clients cannot create projects" });
       }
       const input = api.projects.create.input.parse(req.body);
-      const project = await storage.createProject({ ...input, clientId: userId });
+      const project = await storage.createProject({ ...input, clientId: input.clientId || null });
       res.status(201).json(project);
     } catch (err) {
       if (err instanceof z.ZodError) {

@@ -8,6 +8,7 @@ export interface IAuthStorage {
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
   updateUserRole(id: string, role: string): Promise<User | undefined>;
+  getUsers(): Promise<User[]>;
 }
 
 class AuthStorage implements IAuthStorage {
@@ -38,6 +39,10 @@ class AuthStorage implements IAuthStorage {
       .where(eq(users.id, id))
       .returning();
     return user;
+  }
+
+  async getUsers(): Promise<User[]> {
+    return await db.select().from(users);
   }
 }
 

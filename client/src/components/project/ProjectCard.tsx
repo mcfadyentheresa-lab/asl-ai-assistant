@@ -2,7 +2,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { MapPin, MoreVertical, Archive, Trash2 } from "lucide-react";
+import { MapPin, MoreVertical, Archive, Trash2, User } from "lucide-react";
 import { Link } from "wouter";
 import type { Project } from "@shared/schema";
 import {
@@ -16,6 +16,7 @@ interface ProjectCardProps {
   project: Project;
   onArchive?: (id: number) => void;
   onDelete?: (id: number) => void;
+  clientName?: string | null;
 }
 
 const statusLabel: Record<string, string> = {
@@ -25,7 +26,7 @@ const statusLabel: Record<string, string> = {
   archived: "Archived",
 };
 
-export function ProjectCard({ project, onArchive, onDelete }: ProjectCardProps) {
+export function ProjectCard({ project, onArchive, onDelete, clientName }: ProjectCardProps) {
   const budget = project.totalBudget || 0;
   const used = project.budgetUsed || 0;
   const pct = budget > 0 ? Math.round((used / budget) * 100) : 0;
@@ -65,6 +66,13 @@ export function ProjectCard({ project, onArchive, onDelete }: ProjectCardProps) 
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <MapPin className="h-3 w-3 flex-shrink-0" />
                 <span data-testid={`text-address-${project.id}`}>{project.address}</span>
+              </div>
+            )}
+
+            {clientName && (
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <User className="h-3 w-3 flex-shrink-0" />
+                <span data-testid={`text-client-${project.id}`}>{clientName}</span>
               </div>
             )}
 

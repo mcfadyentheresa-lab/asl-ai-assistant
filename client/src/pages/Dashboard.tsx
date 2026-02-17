@@ -1,5 +1,5 @@
 import { useAuth } from "@/hooks/use-auth";
-import { useProjects, useDeleteProject, useArchiveProject } from "@/hooks/use-projects";
+import { useProjects, useDeleteProject, useArchiveProject, useUsers } from "@/hooks/use-projects";
 import { Navbar } from "@/components/layout/Navbar";
 import { ProjectCard } from "@/components/project/ProjectCard";
 import { Button } from "@/components/ui/button";
@@ -31,16 +31,27 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertProjectSchema, type InsertProject } from "@shared/schema";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Dashboard() {
   const { user } = useAuth();
   const { data: projects, isLoading } = useProjects();
+  const { data: allUsers } = useUsers();
   const { mutate: deleteProject } = useDeleteProject();
   const { mutate: archiveProject } = useArchiveProject();
   const { toast } = useToast();
   const [showArchived, setShowArchived] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
+
+  const userMap = new Map(allUsers?.map((u) => [u.id, `${u.firstName || ""} ${u.lastName || ""}`.trim()]) || []);
 
   const filteredProjects = projects?.filter((p) =>
     showArchived ? true : p.status !== "archived"
@@ -132,6 +143,7 @@ export default function Dashboard() {
                   project={project}
                   onArchive={handleArchive}
                   onDelete={(id) => setDeleteId(id)}
+                  clientName={project.clientId ? userMap.get(project.clientId) || null : null}
                 />
               </motion.div>
             ))}
@@ -181,9 +193,11 @@ function CreateProjectDialog() {
   const [open, setOpen] = useState(false);
   const { mutate, isPending } = useCreateProject();
   const { toast } = useToast();
+  const { data: users } = useUsers();
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [selectedClient, setSelectedClient] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<InsertProject>({
@@ -234,12 +248,14 @@ function CreateProjectDialog() {
       setUploading(false);
     }
 
-    mutate({ ...data, thumbnailUrl: thumbnailUrl || null }, {
+    const clientId = selectedClient && selectedClient !== "none" ? selectedClient : null;
+    mutate({ ...data, thumbnailUrl: thumbnailUrl || null, clientId }, {
       onSuccess: () => {
         toast({ title: "Success", description: "Project created successfully." });
         setOpen(false);
         form.reset();
         removeImage();
+        setSelectedClient("");
       },
       onError: (error) => {
         toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -345,6 +361,26 @@ function CreateProjectDialog() {
                 </FormItem>
               )}
             />
+
+            <div>
+              <FormLabel>Assign Client</FormLabel>
+              <Select value={selectedClient} onValueChange={setSelectedClient}>
+                <SelectTrigger className="mt-2" data-testid="select-client">
+                  <SelectValue placeholder="Select a client..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No client assigned</SelectItem>
+                  {users?.map((u) => (
+                    <SelectItem key={u.id} value={u.id} data-testid={`option-client-${u.id}`}>
+                      <div className="flex items-center gap-2">
+                        <span>{u.firstName || ""} {u.lastName || ""}</span>
+                        {u.email && <span className="text-muted-foreground text-xs">({u.email})</span>}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
             <div className="flex justify-end gap-3 pt-2">
               <Button type="button" variant="outline" onClick={() => setOpen(false)} data-testid="button-cancel">
