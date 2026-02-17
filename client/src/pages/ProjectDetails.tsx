@@ -3,7 +3,7 @@ import {
   useProject, useMilestones, useTasks, useMessages, useSendMessage,
   useChecklistItems, useCreateChecklistItem, useUpdateChecklistItem, useDeleteChecklistItem,
   useBoardItems, useCreateBoardItem, useDeleteBoardItem,
-  useCalendarEvents, useCreateCalendarEvent, useDeleteCalendarEvent,
+  useCalendarEvents, useCreateCalendarEvent, useUpdateCalendarEvent, useDeleteCalendarEvent,
 } from "@/hooks/use-projects";
 import { Navbar } from "@/components/layout/Navbar";
 import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, ExternalLink, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, CalendarDays, ChevronLeft } from "lucide-react";
@@ -1177,11 +1177,13 @@ function CalendarTab({ projectId }: { projectId: number }) {
   const { toast } = useToast();
   const { data: events, isLoading } = useCalendarEvents(projectId);
   const { mutate: createEvent, isPending: isCreating } = useCreateCalendarEvent();
+  const { mutate: updateEvent } = useUpdateCalendarEvent();
   const { mutate: deleteEvent } = useDeleteCalendarEvent();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [eventForm, setEventForm] = useState({ title: "", description: "", type: "event" });
+  const [draggedEventId, setDraggedEventId] = useState<number | null>(null);
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
@@ -1289,12 +1291,32 @@ function CalendarTab({ projectId }: { projectId: number }) {
           const dayEvents = getEventsForDate(day);
           const isSelected = selectedDate && isSameDay(day, selectedDate);
           const isToday = isSameDay(day, new Date());
+          const dateStr = format(day, "yyyy-MM-dd");
           return (
             <div
               key={day.toISOString()}
-              className={`bg-card min-h-[80px] p-1.5 cursor-pointer transition-colors hover-elevate ${isSelected ? "ring-2 ring-primary ring-inset" : ""}`}
+              className={`bg-card min-h-[80px] p-1.5 cursor-pointer transition-colors hover-elevate ${isSelected ? "ring-2 ring-primary ring-inset" : ""} ${draggedEventId ? "ring-1 ring-inset ring-transparent hover:ring-primary/40" : ""}`}
               onClick={() => setSelectedDate(day)}
-              data-testid={`calendar-day-${format(day, "yyyy-MM-dd")}`}
+              onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add("ring-primary/40"); }}
+              onDragLeave={(e) => { e.currentTarget.classList.remove("ring-primary/40"); }}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.currentTarget.classList.remove("ring-primary/40");
+                const evId = parseInt(e.dataTransfer.getData("text/plain"), 10);
+                if (!evId) return;
+                updateEvent(
+                  { id: evId, date: dateStr },
+                  {
+                    onSuccess: () => {
+                      toast({ title: "Moved", description: `Event moved to ${format(day, "MMM d")}.` });
+                      setSelectedDate(day);
+                    },
+                    onError: (err) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+                  }
+                );
+                setDraggedEventId(null);
+              }}
+              data-testid={`calendar-day-${dateStr}`}
             >
               <span
                 className={`text-xs font-medium inline-flex items-center justify-center w-6 h-6 rounded-full ${isToday ? "bg-primary text-primary-foreground" : "text-foreground"}`}
@@ -1305,7 +1327,14 @@ function CalendarTab({ projectId }: { projectId: number }) {
                 {dayEvents.slice(0, 3).map((ev) => (
                   <div
                     key={ev.id}
-                    className="text-[10px] leading-tight truncate rounded px-1 py-0.5 text-white"
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("text/plain", String(ev.id));
+                      e.dataTransfer.effectAllowed = "move";
+                      setDraggedEventId(ev.id);
+                    }}
+                    onDragEnd={() => setDraggedEventId(null)}
+                    className="text-[10px] leading-tight truncate rounded px-1 py-0.5 text-white cursor-grab active:cursor-grabbing"
                     style={{ backgroundColor: eventTypeColors[ev.type || "event"] || eventTypeColors.event }}
                     data-testid={`calendar-event-dot-${ev.id}`}
                   >

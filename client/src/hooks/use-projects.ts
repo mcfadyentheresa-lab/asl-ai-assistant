@@ -385,6 +385,26 @@ export function useCreateCalendarEvent() {
   });
 }
 
+export function useUpdateCalendarEvent() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...data }: { id: number; date?: string; title?: string; description?: string | null; type?: string }) => {
+      const url = buildUrl(api.calendar.update.path, { id });
+      const res = await fetch(url, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to update calendar event");
+      return api.calendar.update.responses[200].parse(await res.json());
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.calendar.list.path] });
+    },
+  });
+}
+
 export function useDeleteCalendarEvent() {
   const queryClient = useQueryClient();
   return useMutation({
