@@ -1080,8 +1080,13 @@ function ChatTab({ projectId }: { projectId: number }) {
                 No messages yet. Start the conversation!
               </p>
             ) : (
-              messages?.map((msg) => {
+              messages?.map((msg: any) => {
                 const isMe = msg.senderId === user?.id;
+                const sender = msg.sender;
+                const senderFirst = sender?.firstName || sender?.email?.split("@")[0] || "User";
+                const senderInitials = sender?.firstName
+                  ? (sender.firstName[0] + (sender.lastName?.[0] || "")).toUpperCase()
+                  : "?";
                 return (
                   <div
                     key={msg.id}
@@ -1090,7 +1095,7 @@ function ChatTab({ projectId }: { projectId: number }) {
                   >
                     {!isMe && (
                       <Avatar className="h-7 w-7 mr-2 mt-1 flex-shrink-0">
-                        <AvatarFallback className="text-[10px]">AS</AvatarFallback>
+                        <AvatarFallback className="text-[10px]" data-testid={`avatar-sender-${msg.id}`}>{senderInitials}</AvatarFallback>
                       </Avatar>
                     )}
                     <div
@@ -1100,6 +1105,12 @@ function ChatTab({ projectId }: { projectId: number }) {
                           : "bg-muted text-foreground"
                       }`}
                     >
+                      <span
+                        className="text-[10px] font-semibold block mb-0.5 opacity-70"
+                        data-testid={`text-sender-name-${msg.id}`}
+                      >
+                        {isMe ? "You" : senderFirst}
+                      </span>
                       <p>{msg.content}</p>
                       <span className="text-[10px] opacity-60 block mt-1 text-right">
                         {msg.createdAt && format(new Date(msg.createdAt), "h:mm a")}
