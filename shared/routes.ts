@@ -2,7 +2,8 @@ import { z } from 'zod';
 import { 
   insertProjectSchema, insertMilestoneSchema, insertTaskSchema, 
   insertPhotoSchema, insertDocumentSchema, insertTimeEntrySchema, insertMessageSchema,
-  projects, milestones, tasks, photos, documents, timeEntries, messages, users
+  insertChecklistItemSchema, insertBoardItemSchema,
+  projects, milestones, tasks, photos, documents, timeEntries, messages, users, checklistItems, boardItems
 } from './schema';
 
 export const errorSchemas = {
@@ -52,6 +53,14 @@ export const api = {
       responses: {
         200: z.custom<typeof projects.$inferSelect>(),
         400: errorSchemas.validation,
+        404: errorSchemas.notFound,
+      },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/projects/:id' as const,
+      responses: {
+        200: z.object({ success: z.boolean() }),
         404: errorSchemas.notFound,
       },
     },
@@ -177,6 +186,74 @@ export const api = {
       input: insertTimeEntrySchema.omit({ projectId: true, userId: true }),
       responses: {
         201: z.custom<typeof timeEntries.$inferSelect>(),
+      },
+    },
+  },
+
+  // Checklist Items
+  checklist: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/projects/:projectId/checklist' as const,
+      responses: {
+        200: z.array(z.custom<typeof checklistItems.$inferSelect>()),
+      },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/projects/:projectId/checklist' as const,
+      input: insertChecklistItemSchema.omit({ projectId: true, createdBy: true }),
+      responses: {
+        201: z.custom<typeof checklistItems.$inferSelect>(),
+      },
+    },
+    update: {
+      method: 'PUT' as const,
+      path: '/api/checklist/:id' as const,
+      input: insertChecklistItemSchema.partial(),
+      responses: {
+        200: z.custom<typeof checklistItems.$inferSelect>(),
+      },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/checklist/:id' as const,
+      responses: {
+        200: z.object({ success: z.boolean() }),
+      },
+    },
+  },
+
+  // Board Items (Moodboard)
+  board: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/projects/:projectId/board' as const,
+      responses: {
+        200: z.array(z.custom<typeof boardItems.$inferSelect>()),
+      },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/projects/:projectId/board' as const,
+      input: insertBoardItemSchema.omit({ projectId: true, createdBy: true }),
+      responses: {
+        201: z.custom<typeof boardItems.$inferSelect>(),
+      },
+    },
+    update: {
+      method: 'PUT' as const,
+      path: '/api/board/:id' as const,
+      input: insertBoardItemSchema.partial(),
+      responses: {
+        200: z.custom<typeof boardItems.$inferSelect>(),
+      },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/board/:id' as const,
+      responses: {
+        200: z.object({ success: z.boolean() }),
       },
     },
   },

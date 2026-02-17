@@ -1,9 +1,9 @@
 import { useAuth } from "@/hooks/use-auth";
-import { useProjects } from "@/hooks/use-projects";
+import { useProjects, useDeleteProject, useArchiveProject } from "@/hooks/use-projects";
 import { Navbar } from "@/components/layout/Navbar";
 import { ProjectCard } from "@/components/project/ProjectCard";
 import { Button } from "@/components/ui/button";
-import { Plus, Loader2 } from "lucide-react";
+import { Plus, Loader2, Eye, EyeOff } from "lucide-react";
 import { motion } from "framer-motion";
 import {
   Dialog,
@@ -13,6 +13,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useCreateProject } from "@/hooks/use-projects";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -26,6 +36,36 @@ import { useToast } from "@/hooks/use-toast";
 export default function Dashboard() {
   const { user } = useAuth();
   const { data: projects, isLoading } = useProjects();
+  const { mutate: deleteProject } = useDeleteProject();
+  const { mutate: archiveProject } = useArchiveProject();
+  const { toast } = useToast();
+  const [showArchived, setShowArchived] = useState(false);
+  const [deleteId, setDeleteId] = useState<number | null>(null);
+
+  const filteredProjects = projects?.filter((p) =>
+    showArchived ? true : p.status !== "archived"
+  );
+
+  const handleArchive = (id: number) => {
+    archiveProject(id, {
+      onSuccess: () => toast({ title: "Success", description: "Project archived." }),
+      onError: (err) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    });
+  };
+
+  const handleDeleteConfirm = () => {
+    if (deleteId === null) return;
+    deleteProject(deleteId, {
+      onSuccess: () => {
+        toast({ title: "Success", description: "Project deleted." });
+        setDeleteId(null);
+      },
+      onError: (err) => {
+        toast({ title: "Error", description: err.message, variant: "destructive" });
+        setDeleteId(null);
+      },
+    });
+  };
 
   if (isLoading) {
     return (
@@ -66,19 +106,33 @@ export default function Dashboard() {
             </p>
           </div>
 
-          <CreateProjectDialog />
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              onClick={() => setShowArchived(!showArchived)}
+              data-testid="button-toggle-archived"
+            >
+              {showArchived ? <EyeOff className="mr-2 h-4 w-4" /> : <Eye className="mr-2 h-4 w-4" />}
+              {showArchived ? "Hide Archived" : "Show Archived"}
+            </Button>
+            <CreateProjectDialog />
+          </div>
         </div>
 
-        {projects && projects.length > 0 ? (
+        {filteredProjects && filteredProjects.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {projects.map((project, idx) => (
+            {filteredProjects.map((project, idx) => (
               <motion.div
                 key={project.id}
                 initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: idx * 0.08 }}
               >
-                <ProjectCard project={project} />
+                <ProjectCard
+                  project={project}
+                  onArchive={handleArchive}
+                  onDelete={(id) => setDeleteId(id)}
+                />
               </motion.div>
             ))}
           </div>
@@ -93,6 +147,23 @@ export default function Dashboard() {
           </div>
         )}
       </main>
+
+      <AlertDialog open={deleteId !== null} onOpenChange={(open) => { if (!open) setDeleteId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-serif" data-testid="text-delete-title">Delete Project</AlertDialogTitle>
+            <AlertDialogDescription data-testid="text-delete-description">
+              This action cannot be undone. This will permanently delete the project and all associated data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteConfirm} data-testid="button-confirm-delete">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

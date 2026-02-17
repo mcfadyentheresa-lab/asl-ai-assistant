@@ -1,11 +1,13 @@
 import { db } from "./db";
 import { 
-  users, projects, milestones, tasks, photos, documents, timeEntries, messages,
+  users, projects, milestones, tasks, photos, documents, timeEntries, messages, checklistItems, boardItems,
   type Project, type Milestone, type Task, type Photo, type Document, type TimeEntry, type Message,
-  type InsertProject, type InsertMilestone, type InsertTask, type InsertPhoto, type InsertDocument, type InsertTimeEntry, type InsertMessage
+  type ChecklistItem, type BoardItem,
+  type InsertProject, type InsertMilestone, type InsertTask, type InsertPhoto, type InsertDocument, 
+  type InsertTimeEntry, type InsertMessage, type InsertChecklistItem, type InsertBoardItem
 } from "@shared/schema";
 import { type User } from "@shared/models/auth";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 
 export interface IStorage {
   // Projects
@@ -39,6 +41,21 @@ export interface IStorage {
   // Time Entries
   getTimeEntries(projectId: number): Promise<TimeEntry[]>;
   createTimeEntry(entry: InsertTimeEntry): Promise<TimeEntry>;
+
+  // Projects - archive & delete
+  deleteProject(id: number): Promise<void>;
+
+  // Checklist Items
+  getChecklistItems(projectId: number): Promise<ChecklistItem[]>;
+  createChecklistItem(item: InsertChecklistItem): Promise<ChecklistItem>;
+  updateChecklistItem(id: number, updates: Partial<InsertChecklistItem>): Promise<ChecklistItem>;
+  deleteChecklistItem(id: number): Promise<void>;
+
+  // Board Items
+  getBoardItems(projectId: number): Promise<BoardItem[]>;
+  createBoardItem(item: InsertBoardItem): Promise<BoardItem>;
+  updateBoardItem(id: number, updates: Partial<InsertBoardItem>): Promise<BoardItem>;
+  deleteBoardItem(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -127,6 +144,51 @@ export class DatabaseStorage implements IStorage {
   async createTimeEntry(entry: InsertTimeEntry): Promise<TimeEntry> {
     const [newEntry] = await db.insert(timeEntries).values(entry).returning();
     return newEntry;
+  }
+
+  // Delete project (cascading deletes handled by cleaning up related data)
+  async deleteProject(id: number): Promise<void> {
+    await db.delete(checklistItems).where(eq(checklistItems.projectId, id));
+    await db.delete(boardItems).where(eq(boardItems.projectId, id));
+    await db.delete(messages).where(eq(messages.projectId, id));
+    await db.delete(timeEntries).where(eq(timeEntries.projectId, id));
+    await db.delete(documents).where(eq(documents.projectId, id));
+    await db.delete(photos).where(eq(photos.projectId, id));
+    await db.delete(tasks).where(eq(tasks.projectId, id));
+    await db.delete(milestones).where(eq(milestones.projectId, id));
+    await db.delete(projects).where(eq(projects.id, id));
+  }
+
+  // Checklist Items
+  async getChecklistItems(projectId: number): Promise<ChecklistItem[]> {
+    return await db.select().from(checklistItems).where(eq(checklistItems.projectId, projectId)).orderBy(checklistItems.createdAt);
+  }
+  async createChecklistItem(item: InsertChecklistItem): Promise<ChecklistItem> {
+    const [newItem] = await db.insert(checklistItems).values(item).returning();
+    return newItem;
+  }
+  async updateChecklistItem(id: number, updates: Partial<InsertChecklistItem>): Promise<ChecklistItem> {
+    const [updated] = await db.update(checklistItems).set(updates).where(eq(checklistItems.id, id)).returning();
+    return updated;
+  }
+  async deleteChecklistItem(id: number): Promise<void> {
+    await db.delete(checklistItems).where(eq(checklistItems.id, id));
+  }
+
+  // Board Items
+  async getBoardItems(projectId: number): Promise<BoardItem[]> {
+    return await db.select().from(boardItems).where(eq(boardItems.projectId, projectId)).orderBy(desc(boardItems.createdAt));
+  }
+  async createBoardItem(item: InsertBoardItem): Promise<BoardItem> {
+    const [newItem] = await db.insert(boardItems).values(item).returning();
+    return newItem;
+  }
+  async updateBoardItem(id: number, updates: Partial<InsertBoardItem>): Promise<BoardItem> {
+    const [updated] = await db.update(boardItems).set(updates).where(eq(boardItems.id, id)).returning();
+    return updated;
+  }
+  async deleteBoardItem(id: number): Promise<void> {
+    await db.delete(boardItems).where(eq(boardItems.id, id));
   }
 }
 

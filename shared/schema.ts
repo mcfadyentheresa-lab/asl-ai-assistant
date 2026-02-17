@@ -78,6 +78,33 @@ export const timeEntries = pgTable("time_entries", {
   description: text("description"),
 });
 
+// Checklist Items (collaborative wish-list / to-do)
+export const checklistItems = pgTable("checklist_items", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => projects.id),
+  title: text("title").notNull(),
+  completed: boolean("completed").default(false),
+  createdBy: text("created_by").references(() => users.id),
+  notes: text("notes"),
+  priceEstimate: integer("price_estimate"),
+  priority: text("priority").default("normal"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Board Items (moodboard / workboard)
+export const boardItems = pgTable("board_items", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => projects.id),
+  type: text("type").notNull().default("note"),
+  title: text("title"),
+  content: text("content"),
+  imageUrl: text("image_url"),
+  linkUrl: text("link_url"),
+  color: text("color").default("#ffffff"),
+  createdBy: text("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Messages (Chat)
 export const messages = pgTable("messages", {
   id: serial("id").primaryKey(),
@@ -98,6 +125,30 @@ export const projectsRelations = relations(projects, ({ one, many }) => ({
   photos: many(photos),
   documents: many(documents),
   messages: many(messages),
+  checklistItems: many(checklistItems),
+  boardItems: many(boardItems),
+}));
+
+export const checklistItemsRelations = relations(checklistItems, ({ one }) => ({
+  project: one(projects, {
+    fields: [checklistItems.projectId],
+    references: [projects.id],
+  }),
+  creator: one(users, {
+    fields: [checklistItems.createdBy],
+    references: [users.id],
+  }),
+}));
+
+export const boardItemsRelations = relations(boardItems, ({ one }) => ({
+  project: one(projects, {
+    fields: [boardItems.projectId],
+    references: [projects.id],
+  }),
+  creator: one(users, {
+    fields: [boardItems.createdBy],
+    references: [users.id],
+  }),
 }));
 
 export const milestonesRelations = relations(milestones, ({ one, many }) => ({
@@ -142,6 +193,8 @@ export const insertPhotoSchema = createInsertSchema(photos).omit({ id: true, cre
 export const insertDocumentSchema = createInsertSchema(documents).omit({ id: true, createdAt: true });
 export const insertTimeEntrySchema = createInsertSchema(timeEntries).omit({ id: true });
 export const insertMessageSchema = createInsertSchema(messages).omit({ id: true, createdAt: true });
+export const insertChecklistItemSchema = createInsertSchema(checklistItems).omit({ id: true, createdAt: true });
+export const insertBoardItemSchema = createInsertSchema(boardItems).omit({ id: true, createdAt: true });
 
 // TYPES
 export type Project = typeof projects.$inferSelect;
@@ -159,3 +212,7 @@ export type InsertPhoto = z.infer<typeof insertPhotoSchema>;
 export type InsertDocument = z.infer<typeof insertDocumentSchema>;
 export type InsertTimeEntry = z.infer<typeof insertTimeEntrySchema>;
 export type InsertMessage = z.infer<typeof insertMessageSchema>;
+export type ChecklistItem = typeof checklistItems.$inferSelect;
+export type BoardItem = typeof boardItems.$inferSelect;
+export type InsertChecklistItem = z.infer<typeof insertChecklistItemSchema>;
+export type InsertBoardItem = z.infer<typeof insertBoardItemSchema>;

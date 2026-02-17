@@ -54,10 +54,11 @@ export async function registerRoutes(
     res.json(project);
   });
 
-  app.post(api.projects.create.path, isAuthenticated, async (req, res) => {
+  app.post(api.projects.create.path, isAuthenticated, async (req: any, res) => {
     try {
       const input = api.projects.create.input.parse(req.body);
-      const project = await storage.createProject(input);
+      const userId = req.user.claims.sub;
+      const project = await storage.createProject({ ...input, clientId: userId });
       res.status(201).json(project);
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -68,8 +69,18 @@ export async function registerRoutes(
   });
 
   app.put(api.projects.update.path, isAuthenticated, async (req, res) => {
-    const project = await storage.updateProject(Number(req.params.id), req.body);
+    const existing = await storage.getProject(Number(req.params.id));
+    if (!existing) return res.status(404).json({ message: "Project not found" });
+    const input = api.projects.update.input.parse(req.body);
+    const project = await storage.updateProject(Number(req.params.id), input);
     res.json(project);
+  });
+
+  app.delete("/api/projects/:id", isAuthenticated, async (req, res) => {
+    const project = await storage.getProject(Number(req.params.id));
+    if (!project) return res.status(404).json({ message: "Project not found" });
+    await storage.deleteProject(Number(req.params.id));
+    res.json({ success: true });
   });
 
   // Tasks
@@ -157,6 +168,64 @@ export async function registerRoutes(
       userId: user.claims.sub
     });
     res.status(201).json(entry);
+  });
+
+  // Checklist Items
+  app.get(api.checklist.list.path, isAuthenticated, async (req, res) => {
+    const items = await storage.getChecklistItems(Number(req.params.projectId));
+    res.json(items);
+  });
+
+  app.post(api.checklist.create.path, isAuthenticated, async (req: any, res) => {
+    const input = api.checklist.create.input.parse(req.body);
+    const userId = req.user.claims.sub;
+    const item = await storage.createChecklistItem({
+      ...input,
+      projectId: Number(req.params.projectId),
+      createdBy: userId,
+    });
+    res.status(201).json(item);
+  });
+
+  app.put("/api/checklist/:id", isAuthenticated, async (req, res) => {
+    const input = api.checklist.update.input.parse(req.body);
+    const item = await storage.updateChecklistItem(Number(req.params.id), input);
+    if (!item) return res.status(404).json({ message: "Checklist item not found" });
+    res.json(item);
+  });
+
+  app.delete("/api/checklist/:id", isAuthenticated, async (req, res) => {
+    await storage.deleteChecklistItem(Number(req.params.id));
+    res.json({ success: true });
+  });
+
+  // Board Items (Moodboard)
+  app.get(api.board.list.path, isAuthenticated, async (req, res) => {
+    const items = await storage.getBoardItems(Number(req.params.projectId));
+    res.json(items);
+  });
+
+  app.post(api.board.create.path, isAuthenticated, async (req: any, res) => {
+    const input = api.board.create.input.parse(req.body);
+    const userId = req.user.claims.sub;
+    const item = await storage.createBoardItem({
+      ...input,
+      projectId: Number(req.params.projectId),
+      createdBy: userId,
+    });
+    res.status(201).json(item);
+  });
+
+  app.put("/api/board/:id", isAuthenticated, async (req, res) => {
+    const input = api.board.update.input.parse(req.body);
+    const item = await storage.updateBoardItem(Number(req.params.id), input);
+    if (!item) return res.status(404).json({ message: "Board item not found" });
+    res.json(item);
+  });
+
+  app.delete("/api/board/:id", isAuthenticated, async (req, res) => {
+    await storage.deleteBoardItem(Number(req.params.id));
+    res.json({ success: true });
   });
 
   // Weather & PDF Reports Stubs

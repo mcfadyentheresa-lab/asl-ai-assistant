@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
-import { type InsertProject, type InsertMilestone, type InsertTask, type InsertMessage } from "@shared/schema";
+import { type InsertProject, type InsertMilestone, type InsertTask, type InsertMessage, type InsertChecklistItem, type InsertBoardItem } from "@shared/schema";
 
 // --- Projects ---
 export function useProjects() {
@@ -168,6 +168,185 @@ export function useSendMessage() {
     onSuccess: (_, variables) => {
       const url = buildUrl(api.messages.list.path, { projectId: variables.projectId });
       queryClient.invalidateQueries({ queryKey: [url, variables.projectId] });
+    },
+  });
+}
+
+// --- Delete / Archive Projects ---
+export function useDeleteProject() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const url = buildUrl(api.projects.delete.path, { id });
+      const res = await fetch(url, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to delete project");
+      return api.projects.delete.responses[200].parse(await res.json());
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.projects.list.path] }),
+  });
+}
+
+export function useArchiveProject() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const url = buildUrl(api.projects.update.path, { id });
+      const res = await fetch(url, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "archived" }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to archive project");
+      return api.projects.update.responses[200].parse(await res.json());
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.projects.list.path] }),
+  });
+}
+
+// --- Checklist Items ---
+export function useChecklistItems(projectId: number) {
+  return useQuery({
+    queryKey: [api.checklist.list.path, projectId],
+    queryFn: async () => {
+      const url = buildUrl(api.checklist.list.path, { projectId });
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch checklist items");
+      return api.checklist.list.responses[200].parse(await res.json());
+    },
+    enabled: !!projectId,
+  });
+}
+
+export function useCreateChecklistItem() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ projectId, ...data }: InsertChecklistItem & { projectId: number }) => {
+      const url = buildUrl(api.checklist.create.path, { projectId });
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to create checklist item");
+      return api.checklist.create.responses[201].parse(await res.json());
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: [api.checklist.list.path, variables.projectId] });
+    },
+  });
+}
+
+export function useUpdateChecklistItem() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: { id: number } & Partial<InsertChecklistItem>) => {
+      const url = buildUrl(api.checklist.update.path, { id });
+      const res = await fetch(url, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to update checklist item");
+      return api.checklist.update.responses[200].parse(await res.json());
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.checklist.list.path] });
+    },
+  });
+}
+
+export function useDeleteChecklistItem() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const url = buildUrl(api.checklist.delete.path, { id });
+      const res = await fetch(url, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to delete checklist item");
+      return api.checklist.delete.responses[200].parse(await res.json());
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.checklist.list.path] });
+    },
+  });
+}
+
+// --- Board Items (Moodboard) ---
+export function useBoardItems(projectId: number) {
+  return useQuery({
+    queryKey: [api.board.list.path, projectId],
+    queryFn: async () => {
+      const url = buildUrl(api.board.list.path, { projectId });
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch board items");
+      return api.board.list.responses[200].parse(await res.json());
+    },
+    enabled: !!projectId,
+  });
+}
+
+export function useCreateBoardItem() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ projectId, ...data }: InsertBoardItem & { projectId: number }) => {
+      const url = buildUrl(api.board.create.path, { projectId });
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to create board item");
+      return api.board.create.responses[201].parse(await res.json());
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: [api.board.list.path, variables.projectId] });
+    },
+  });
+}
+
+export function useUpdateBoardItem() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: { id: number } & Partial<InsertBoardItem>) => {
+      const url = buildUrl(api.board.update.path, { id });
+      const res = await fetch(url, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to update board item");
+      return api.board.update.responses[200].parse(await res.json());
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.board.list.path] });
+    },
+  });
+}
+
+export function useDeleteBoardItem() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const url = buildUrl(api.board.delete.path, { id });
+      const res = await fetch(url, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to delete board item");
+      return api.board.delete.responses[200].parse(await res.json());
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.board.list.path] });
     },
   });
 }
