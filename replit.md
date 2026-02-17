@@ -63,6 +63,7 @@ Path aliases are configured:
   - `documents` — Project documents (contracts, invoices, etc.)
   - `time_entries` — Crew time tracking per project
   - `messages` — Project-scoped messaging with sender references
+  - `planning_boards` — Planning boards (Fabric.js canvas) with multiple boards per project, linking to milestones/checklist items/calendar events (replaces legacy `moodboards` table)
 
 ### Authentication & Authorization
 

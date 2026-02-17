@@ -11,6 +11,27 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import {
   MousePointer2,
   Pencil,
   Type,
@@ -26,14 +47,29 @@ import {
   Loader2,
   Eraser,
   Copy,
-  Layers,
   ChevronUp,
   ChevronDown,
-  Palette,
   StickyNote,
+  Plus,
+  MoreVertical,
+  Download,
+  Edit3,
+  Link2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { usePlanningBoard, useSavePlanningBoardCanvas, useUploadImage } from "@/hooks/use-projects";
+import {
+  usePlanningBoards,
+  usePlanningBoard,
+  useCreatePlanningBoard,
+  useUpdatePlanningBoard,
+  useDeletePlanningBoard,
+  useSavePlanningBoardCanvas,
+  useUploadImage,
+  useMilestones,
+  useChecklistItems,
+  useCalendarEvents,
+} from "@/hooks/use-projects";
+import type { PlanningBoard as PlanningBoardType } from "@shared/schema";
 
 type ToolMode = "select" | "draw" | "eraser" | "text" | "rect" | "circle" | "sticky";
 
@@ -47,11 +83,11 @@ const STICKY_COLORS = [
   "#fed7aa", "#e2e8f0",
 ];
 
-interface MoodBoardProps {
+interface PlanningBoardProps {
   projectId: number;
 }
 
-export default function MoodBoard({ projectId }: MoodBoardProps) {
+export default function PlanningBoard({ projectId }: PlanningBoardProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const fabricRef = useRef<fabric.Canvas | null>(null);
@@ -70,16 +106,39 @@ export default function MoodBoard({ projectId }: MoodBoardProps) {
   const [canRedo, setCanRedo] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [isSaving, setIsSaving] = useState(false);
+  const [canvasReady, setCanvasReady] = useState(false);
 
-  const { data: moodboardData, isLoading: isLoadingData } = useMoodboard(projectId);
-  const { mutateAsync: saveMoodboard } = useSaveMoodboard();
+  const [selectedBoardId, setSelectedBoardId] = useState<number | null>(null);
+  const [showRenameDialog, setShowRenameDialog] = useState(false);
+  const [showLinkDialog, setShowLinkDialog] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [renameName, setRenameName] = useState("");
+  const [newBoardName, setNewBoardName] = useState("");
+  const [showNewBoardDialog, setShowNewBoardDialog] = useState(false);
+
+  const { data: boards = [], isLoading: isLoadingBoards } = usePlanningBoards(projectId);
+  const { data: boardData, isLoading: isLoadingBoard } = usePlanningBoard(selectedBoardId);
+  const { mutateAsync: createBoard } = useCreatePlanningBoard();
+  const { mutateAsync: updateBoard } = useUpdatePlanningBoard();
+  const { mutateAsync: deleteBoard } = useDeletePlanningBoard();
+  const { mutateAsync: saveCanvas } = useSavePlanningBoardCanvas();
   const { mutateAsync: uploadImage, isPending: isUploadingImage } = useUploadImage();
+  const { data: milestones = [] } = useMilestones(projectId);
+  const { data: checklistItems = [] } = useChecklistItems(projectId);
+  const { data: calendarEvents = [] } = useCalendarEvents(projectId);
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const isLoadingData = isLoadingBoards || isLoadingBoard;
+
+  useEffect(() => {
+    if (boards.length > 0 && !selectedBoardId) {
+      setSelectedBoardId(boards[0].id);
+    }
+  }, [boards, selectedBoardId]);
+
   const saveStateRef = useRef<() => void>(() => {});
   const autoSaveRef = useRef<() => void>(() => {});
-  const [canvasReady, setCanvasReady] = useState(false);
 
   saveStateRef.current = () => {
     const canvas = fabricRef.current;
@@ -94,14 +153,15 @@ export default function MoodBoard({ projectId }: MoodBoardProps) {
   };
 
   autoSaveRef.current = () => {
+    if (!selectedBoardId) return;
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = setTimeout(async () => {
       const canvas = fabricRef.current;
-      if (!canvas) return;
+      if (!canvas || !selectedBoardId) return;
       try {
         setIsSaving(true);
         const canvasData = canvas.toJSON();
-        await saveMoodboard({ projectId, canvasData });
+        await saveCanvas({ id: selectedBoardId, canvasData });
         setHasUnsaved(false);
       } catch {
       } finally {
@@ -185,21 +245,38 @@ export default function MoodBoard({ projectId }: MoodBoardProps) {
 
   useEffect(() => {
     const canvas = fabricRef.current;
-    if (!canvas || !canvasReady || isLoadingData || !moodboardData?.canvasData) return;
+    if (!canvas || !canvasReady) return;
+
+    if (!selectedBoardId || isLoadingBoard) return;
 
     isLoadingCanvas.current = true;
-    canvas.loadFromJSON(moodboardData.canvasData).then(() => {
+
+    if (boardData?.canvasData) {
+      canvas.loadFromJSON(boardData.canvasData).then(() => {
+        canvas.renderAll();
+        const state = JSON.stringify(canvas.toJSON());
+        undoStack.current = [state];
+        redoStack.current = [];
+        setCanUndo(false);
+        setCanRedo(false);
+        setHasUnsaved(false);
+        isLoadingCanvas.current = false;
+      }).catch(() => {
+        isLoadingCanvas.current = false;
+      });
+    } else {
+      canvas.clear();
+      canvas.backgroundColor = "#f8f6f3";
       canvas.renderAll();
       const state = JSON.stringify(canvas.toJSON());
       undoStack.current = [state];
       redoStack.current = [];
       setCanUndo(false);
       setCanRedo(false);
+      setHasUnsaved(false);
       isLoadingCanvas.current = false;
-    }).catch(() => {
-      isLoadingCanvas.current = false;
-    });
-  }, [moodboardData, isLoadingData, canvasReady]);
+    }
+  }, [boardData, isLoadingBoard, canvasReady, selectedBoardId]);
 
   useEffect(() => {
     const canvas = fabricRef.current;
@@ -228,10 +305,8 @@ export default function MoodBoard({ projectId }: MoodBoardProps) {
   const handleUndo = () => {
     const canvas = fabricRef.current;
     if (!canvas || undoStack.current.length <= 1) return;
-
     const current = undoStack.current.pop()!;
     redoStack.current.push(current);
-
     const prev = undoStack.current[undoStack.current.length - 1];
     isLoadingCanvas.current = true;
     canvas.loadFromJSON(JSON.parse(prev)).then(() => {
@@ -247,10 +322,8 @@ export default function MoodBoard({ projectId }: MoodBoardProps) {
   const handleRedo = () => {
     const canvas = fabricRef.current;
     if (!canvas || redoStack.current.length === 0) return;
-
     const next = redoStack.current.pop()!;
     undoStack.current.push(next);
-
     isLoadingCanvas.current = true;
     canvas.loadFromJSON(JSON.parse(next)).then(() => {
       canvas.renderAll();
@@ -434,17 +507,73 @@ export default function MoodBoard({ projectId }: MoodBoardProps) {
 
   const handleManualSave = async () => {
     const canvas = fabricRef.current;
-    if (!canvas) return;
+    if (!canvas || !selectedBoardId) return;
     try {
       setIsSaving(true);
       const canvasData = canvas.toJSON();
-      await saveMoodboard({ projectId, canvasData });
+      await saveCanvas({ id: selectedBoardId, canvasData });
       setHasUnsaved(false);
-      toast({ title: "Saved", description: "Moodboard saved successfully." });
+      toast({ title: "Saved", description: "Planning board saved successfully." });
     } catch {
-      toast({ title: "Error", description: "Failed to save moodboard.", variant: "destructive" });
+      toast({ title: "Error", description: "Failed to save planning board.", variant: "destructive" });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleDownloadImage = () => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    const dataUrl = canvas.toDataURL({ format: "png", multiplier: 2 } as any);
+    const link = document.createElement("a");
+    const boardName = boards.find((b: PlanningBoardType) => b.id === selectedBoardId)?.name || "planning-board";
+    link.download = `${boardName.replace(/\s+/g, "-").toLowerCase()}.png`;
+    link.href = dataUrl;
+    link.click();
+  };
+
+  const handleCreateBoard = async () => {
+    try {
+      const result = await createBoard({ projectId, name: newBoardName || "Untitled Board" });
+      setSelectedBoardId(result.id);
+      setNewBoardName("");
+      setShowNewBoardDialog(false);
+      toast({ title: "Created", description: "New planning board created." });
+    } catch {
+      toast({ title: "Error", description: "Failed to create board.", variant: "destructive" });
+    }
+  };
+
+  const handleRenameBoard = async () => {
+    if (!selectedBoardId || !renameName.trim()) return;
+    try {
+      await updateBoard({ id: selectedBoardId, name: renameName.trim() });
+      setShowRenameDialog(false);
+      toast({ title: "Renamed", description: "Board renamed successfully." });
+    } catch {
+      toast({ title: "Error", description: "Failed to rename board.", variant: "destructive" });
+    }
+  };
+
+  const handleDeleteBoard = async () => {
+    if (!selectedBoardId) return;
+    try {
+      await deleteBoard({ id: selectedBoardId, projectId });
+      setSelectedBoardId(null);
+      setShowDeleteConfirm(false);
+      toast({ title: "Deleted", description: "Board deleted." });
+    } catch {
+      toast({ title: "Error", description: "Failed to delete board.", variant: "destructive" });
+    }
+  };
+
+  const handleLinkUpdate = async (field: string, value: number | null) => {
+    if (!selectedBoardId) return;
+    try {
+      await updateBoard({ id: selectedBoardId, [field]: value });
+      toast({ title: "Updated", description: "Board link updated." });
+    } catch {
+      toast({ title: "Error", description: "Failed to update link.", variant: "destructive" });
     }
   };
 
@@ -476,7 +605,26 @@ export default function MoodBoard({ projectId }: MoodBoardProps) {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [canUndo, canRedo]);
+  }, [canUndo, canRedo, selectedBoardId]);
+
+  const handleBoardSwitch = useCallback(async (boardId: string) => {
+    if (hasUnsaved && selectedBoardId) {
+      const canvas = fabricRef.current;
+      if (canvas) {
+        try {
+          setIsSaving(true);
+          const canvasData = canvas.toJSON();
+          await saveCanvas({ id: selectedBoardId, canvasData });
+          setHasUnsaved(false);
+        } catch {} finally {
+          setIsSaving(false);
+        }
+      }
+    }
+    setSelectedBoardId(Number(boardId));
+  }, [hasUnsaved, selectedBoardId, saveCanvas]);
+
+  const currentBoard = boards.find((b: PlanningBoardType) => b.id === selectedBoardId);
 
   const toolBtn = (
     mode: ToolMode | string,
@@ -502,13 +650,113 @@ export default function MoodBoard({ projectId }: MoodBoardProps) {
   );
 
   return (
-    <div className="flex flex-col h-[calc(100vh-200px)] min-h-[500px]" data-testid="moodboard-container">
-      {isLoadingData && (
+    <div className="flex flex-col h-[calc(100vh-200px)] min-h-[500px]" data-testid="planning-board-container">
+      <div className="flex items-center gap-2 mb-3 flex-wrap">
+        <Select
+          value={selectedBoardId?.toString() || ""}
+          onValueChange={handleBoardSwitch}
+          data-testid="select-board"
+        >
+          <SelectTrigger className="w-[200px]" data-testid="select-board-trigger">
+            <SelectValue placeholder={isLoadingBoards ? "Loading..." : "Select a board"} />
+          </SelectTrigger>
+          <SelectContent>
+            {boards.map((b: PlanningBoardType) => (
+              <SelectItem key={b.id} value={b.id.toString()} data-testid={`select-board-item-${b.id}`}>
+                {b.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => { setNewBoardName(""); setShowNewBoardDialog(true); }}
+              data-testid="button-new-board"
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="text-xs">New Board</TooltipContent>
+        </Tooltip>
+
+        {selectedBoardId && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="icon" variant="ghost" data-testid="button-board-menu">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem
+                onClick={() => { setRenameName(currentBoard?.name || ""); setShowRenameDialog(true); }}
+                data-testid="menu-rename-board"
+              >
+                <Edit3 className="h-4 w-4 mr-2" /> Rename
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => setShowLinkDialog(true)}
+                data-testid="menu-link-board"
+              >
+                <Link2 className="h-4 w-4 mr-2" /> Link to...
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={handleDownloadImage}
+                data-testid="menu-download-board"
+              >
+                <Download className="h-4 w-4 mr-2" /> Download as Image
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => setShowDeleteConfirm(true)}
+                className="text-destructive"
+                data-testid="menu-delete-board"
+              >
+                <Trash2 className="h-4 w-4 mr-2" /> Delete Board
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+
+        {currentBoard?.linkedMilestoneId && (
+          <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-md" data-testid="badge-linked-milestone">
+            Linked: {milestones.find((m: any) => m.id === currentBoard.linkedMilestoneId)?.title || "Milestone"}
+          </span>
+        )}
+        {currentBoard?.linkedChecklistItemId && (
+          <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-md" data-testid="badge-linked-checklist">
+            Linked: {checklistItems.find((c: any) => c.id === currentBoard.linkedChecklistItemId)?.title || "Checklist"}
+          </span>
+        )}
+        {currentBoard?.linkedCalendarEventId && (
+          <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-md" data-testid="badge-linked-event">
+            Linked: {calendarEvents.find((e: any) => e.id === currentBoard.linkedCalendarEventId)?.title || "Event"}
+          </span>
+        )}
+      </div>
+
+      {isLoadingData && !canvasReady && (
         <div className="flex items-center justify-center py-20">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" data-testid="loader-moodboard" />
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" data-testid="loader-planning-board" />
         </div>
       )}
-      <Card className={`flex items-center gap-1 p-1.5 mb-3 flex-wrap ${isLoadingData ? "invisible" : ""}`} data-testid="moodboard-toolbar">
+
+      {boards.length === 0 && !isLoadingBoards && (
+        <div className="flex flex-col items-center justify-center py-20 gap-4" data-testid="empty-boards">
+          <p className="text-muted-foreground">No planning boards yet.</p>
+          <Button
+            onClick={() => { setNewBoardName("Main Board"); setShowNewBoardDialog(true); }}
+            data-testid="button-create-first-board"
+          >
+            <Plus className="h-4 w-4 mr-2" /> Create Your First Board
+          </Button>
+        </div>
+      )}
+
+      <Card className={`flex items-center gap-1 p-1.5 mb-3 flex-wrap ${(!selectedBoardId || isLoadingData) && boards.length > 0 ? "invisible" : ""} ${boards.length === 0 ? "hidden" : ""}`} data-testid="planning-board-toolbar">
         {toolBtn("select", <MousePointer2 className="h-4 w-4" />, "Select (V)")}
         {toolBtn("draw", <Pencil className="h-4 w-4" />, "Draw / Sketch")}
         {toolBtn("eraser", <Eraser className="h-4 w-4" />, "Eraser")}
@@ -542,7 +790,7 @@ export default function MoodBoard({ projectId }: MoodBoardProps) {
           accept="image/jpeg,image/png,image/gif,image/webp"
           className="hidden"
           onChange={handleImageUpload}
-          data-testid="input-moodboard-image"
+          data-testid="input-planning-board-image"
         />
 
         <Separator orientation="vertical" className="h-6 mx-1" />
@@ -634,8 +882,8 @@ export default function MoodBoard({ projectId }: MoodBoardProps) {
               size="icon"
               variant={hasUnsaved ? "default" : "ghost"}
               onClick={handleManualSave}
-              disabled={isSaving}
-              data-testid="button-save-moodboard"
+              disabled={isSaving || !selectedBoardId}
+              data-testid="button-save-planning-board"
             >
               {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             </Button>
@@ -646,7 +894,7 @@ export default function MoodBoard({ projectId }: MoodBoardProps) {
         </Tooltip>
       </Card>
 
-      {tool === "sticky" && (
+      {tool === "sticky" && boards.length > 0 && (
         <div className="flex items-center gap-2 mb-2 px-1" data-testid="sticky-color-bar">
           <span className="text-xs text-muted-foreground">Sticky color:</span>
           {STICKY_COLORS.map((c) => (
@@ -666,21 +914,140 @@ export default function MoodBoard({ projectId }: MoodBoardProps) {
 
       <div
         ref={containerRef}
-        className={`flex-1 border rounded-md overflow-hidden bg-muted/30 ${isLoadingData ? "invisible" : ""}`}
+        className={`flex-1 border rounded-md overflow-hidden bg-muted/30 ${boards.length === 0 ? "hidden" : ""} ${(!selectedBoardId || isLoadingBoard) && boards.length > 0 ? "invisible" : ""}`}
         style={{ cursor: tool === "draw" ? "crosshair" : tool === "eraser" ? "cell" : "default" }}
-        data-testid="moodboard-canvas-container"
+        data-testid="planning-board-canvas-container"
       >
-        <canvas ref={canvasRef} data-testid="moodboard-canvas" />
+        <canvas ref={canvasRef} data-testid="planning-board-canvas" />
       </div>
 
-      <div className={`flex items-center justify-between mt-2 px-1 ${isLoadingData ? "invisible" : ""}`}>
-        <p className="text-[10px] text-muted-foreground">
-          Tip: Use Apple Pen or mouse to draw. Drag images to arrange. {hasUnsaved && "(Auto-saving...)"}
-        </p>
-        <p className="text-[10px] text-muted-foreground" data-testid="text-save-status">
-          {isSaving ? "Saving..." : hasUnsaved ? "Unsaved changes" : "All changes saved"}
-        </p>
-      </div>
+      {boards.length > 0 && (
+        <div className={`flex items-center justify-between mt-2 px-1 ${(!selectedBoardId || isLoadingData) ? "invisible" : ""}`}>
+          <p className="text-[10px] text-muted-foreground">
+            Tip: Use Apple Pen or mouse to draw. Drag images to arrange. {hasUnsaved && "(Auto-saving...)"}
+          </p>
+          <p className="text-[10px] text-muted-foreground" data-testid="text-save-status">
+            {isSaving ? "Saving..." : hasUnsaved ? "Unsaved changes" : "All changes saved"}
+          </p>
+        </div>
+      )}
+
+      <Dialog open={showNewBoardDialog} onOpenChange={setShowNewBoardDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create New Board</DialogTitle>
+          </DialogHeader>
+          <Input
+            placeholder="Board name"
+            value={newBoardName}
+            onChange={(e) => setNewBoardName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleCreateBoard()}
+            data-testid="input-new-board-name"
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowNewBoardDialog(false)} data-testid="button-cancel-new-board">Cancel</Button>
+            <Button onClick={handleCreateBoard} data-testid="button-confirm-new-board">Create</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showRenameDialog} onOpenChange={setShowRenameDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename Board</DialogTitle>
+          </DialogHeader>
+          <Input
+            placeholder="New name"
+            value={renameName}
+            onChange={(e) => setRenameName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleRenameBoard()}
+            data-testid="input-rename-board"
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowRenameDialog(false)} data-testid="button-cancel-rename">Cancel</Button>
+            <Button onClick={handleRenameBoard} data-testid="button-confirm-rename">Rename</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Board</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Are you sure you want to delete "{currentBoard?.name}"? This cannot be undone.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeleteConfirm(false)} data-testid="button-cancel-delete">Cancel</Button>
+            <Button variant="destructive" onClick={handleDeleteBoard} data-testid="button-confirm-delete">Delete</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showLinkDialog} onOpenChange={setShowLinkDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Link Board To...</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium mb-1 block">Milestone</label>
+              <Select
+                value={currentBoard?.linkedMilestoneId?.toString() || "none"}
+                onValueChange={(v) => handleLinkUpdate("linkedMilestoneId", v === "none" ? null : Number(v))}
+              >
+                <SelectTrigger data-testid="select-link-milestone">
+                  <SelectValue placeholder="None" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None</SelectItem>
+                  {milestones.map((m: any) => (
+                    <SelectItem key={m.id} value={m.id.toString()}>{m.title}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Checklist Item</label>
+              <Select
+                value={currentBoard?.linkedChecklistItemId?.toString() || "none"}
+                onValueChange={(v) => handleLinkUpdate("linkedChecklistItemId", v === "none" ? null : Number(v))}
+              >
+                <SelectTrigger data-testid="select-link-checklist">
+                  <SelectValue placeholder="None" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None</SelectItem>
+                  {checklistItems.map((c: any) => (
+                    <SelectItem key={c.id} value={c.id.toString()}>{c.title}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Calendar Event</label>
+              <Select
+                value={currentBoard?.linkedCalendarEventId?.toString() || "none"}
+                onValueChange={(v) => handleLinkUpdate("linkedCalendarEventId", v === "none" ? null : Number(v))}
+              >
+                <SelectTrigger data-testid="select-link-event">
+                  <SelectValue placeholder="None" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None</SelectItem>
+                  {calendarEvents.map((e: any) => (
+                    <SelectItem key={e.id} value={e.id.toString()}>{e.title}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setShowLinkDialog(false)} data-testid="button-close-link-dialog">Done</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

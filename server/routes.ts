@@ -383,8 +383,8 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
-  // Moodboard Canvas
-  app.get(api.moodboard.get.path, isAuthenticated, async (req: any, res) => {
+  // Planning Boards
+  app.get(api.planningBoards.list.path, isAuthenticated, async (req: any, res) => {
     const projectId = Number(req.params.projectId);
     const userId = req.user.claims.sub;
     const userRecord = await authStorage.getUser(userId);
@@ -394,27 +394,84 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Access denied" });
       }
     }
-    const board = await storage.getMoodboard(projectId);
-    res.json(board || null);
+    const boards = await storage.getPlanningBoards(projectId);
+    res.json(boards);
   });
 
-  app.put(api.moodboard.save.path, isAuthenticated, async (req: any, res) => {
+  async function checkBoardAccess(req: any, res: any, boardId: number) {
+    const board = await storage.getPlanningBoard(boardId);
+    if (!board) { res.status(404).json({ message: "Board not found" }); return null; }
+    const userId = req.user.claims.sub;
+    const userRecord = await authStorage.getUser(userId);
+    if (userRecord?.role === "client") {
+      const project = await storage.getProject(board.projectId);
+      if (!project || project.clientId !== userId) { res.status(403).json({ message: "Access denied" }); return null; }
+    }
+    return board;
+  }
+
+  async function checkProjectAccess(req: any, res: any, projectId: number) {
+    const userId = req.user.claims.sub;
+    const userRecord = await authStorage.getUser(userId);
+    if (userRecord?.role === "client") {
+      const project = await storage.getProject(projectId);
+      if (!project || project.clientId !== userId) { res.status(403).json({ message: "Access denied" }); return false; }
+    }
+    return true;
+  }
+
+  app.get(api.planningBoards.get.path, isAuthenticated, async (req: any, res) => {
+    const board = await checkBoardAccess(req, res, Number(req.params.id));
+    if (!board) return;
+    res.json(board);
+  });
+
+  app.post(api.planningBoards.create.path, isAuthenticated, async (req: any, res) => {
     try {
       const projectId = Number(req.params.projectId);
+      const hasAccess = await checkProjectAccess(req, res, projectId);
+      if (!hasAccess) return;
       const userId = req.user.claims.sub;
-      const userRecord = await authStorage.getUser(userId);
-      if (userRecord?.role === "client") {
-        const project = await storage.getProject(projectId);
-        if (!project || project.clientId !== userId) {
-          return res.status(403).json({ message: "Access denied" });
-        }
-      }
-      const input = api.moodboard.save.input.parse(req.body);
-      const board = await storage.saveMoodboard(projectId, input.canvasData, userId);
-      res.json(board);
+      const input = api.planningBoards.create.input.parse(req.body);
+      const board = await storage.createPlanningBoard({ ...input, projectId, updatedBy: userId });
+      res.status(201).json(board);
     } catch (err: any) {
-      console.error("Moodboard save error:", err.message);
-      res.status(500).json({ message: "Failed to save moodboard" });
+      console.error("Planning board create error:", err.message);
+      res.status(500).json({ message: "Failed to create planning board" });
+    }
+  });
+
+  app.patch(api.planningBoards.update.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const board = await checkBoardAccess(req, res, Number(req.params.id));
+      if (!board) return;
+      const input = api.planningBoards.update.input.parse(req.body);
+      const updated = await storage.updatePlanningBoard(board.id, input);
+      res.json(updated);
+    } catch (err: any) {
+      console.error("Planning board update error:", err.message);
+      res.status(500).json({ message: "Failed to update planning board" });
+    }
+  });
+
+  app.delete(api.planningBoards.delete.path, isAuthenticated, async (req: any, res) => {
+    const board = await checkBoardAccess(req, res, Number(req.params.id));
+    if (!board) return;
+    await storage.deletePlanningBoard(board.id);
+    res.json({ success: true });
+  });
+
+  app.put(api.planningBoards.saveCanvas.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const board = await checkBoardAccess(req, res, Number(req.params.id));
+      if (!board) return;
+      const userId = req.user.claims.sub;
+      const input = api.planningBoards.saveCanvas.input.parse(req.body);
+      const updated = await storage.savePlanningBoardCanvas(board.id, input.canvasData, userId);
+      res.json(updated);
+    } catch (err: any) {
+      console.error("Planning board canvas save error:", err.message);
+      res.status(500).json({ message: "Failed to save planning board canvas" });
     }
   });
 

@@ -384,36 +384,109 @@ export function useDeleteBoardItem() {
   });
 }
 
-// --- Moodboard Canvas ---
-export function useMoodboard(projectId: number) {
+// --- Planning Boards ---
+export function usePlanningBoards(projectId: number) {
   return useQuery({
-    queryKey: [api.moodboard.get.path, projectId],
+    queryKey: ['/api/projects', projectId, 'planning-boards'],
     queryFn: async () => {
-      const url = buildUrl(api.moodboard.get.path, { projectId });
+      const url = buildUrl(api.planningBoards.list.path, { projectId });
       const res = await fetch(url, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch moodboard");
+      if (!res.ok) throw new Error("Failed to fetch planning boards");
       return await res.json();
     },
     enabled: !!projectId,
   });
 }
 
-export function useSaveMoodboard() {
+export function usePlanningBoard(id: number | null) {
+  return useQuery({
+    queryKey: ['/api/planning-boards', id],
+    queryFn: async () => {
+      const url = buildUrl(api.planningBoards.get.path, { id: id! });
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch planning board");
+      return await res.json();
+    },
+    enabled: !!id,
+  });
+}
+
+export function useCreatePlanningBoard() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ projectId, canvasData }: { projectId: number; canvasData: any }) => {
-      const url = buildUrl(api.moodboard.save.path, { projectId });
+    mutationFn: async ({ projectId, name }: { projectId: number; name?: string }) => {
+      const url = buildUrl(api.planningBoards.create.path, { projectId });
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name || "Untitled Board" }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to create planning board");
+      return await res.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', variables.projectId, 'planning-boards'] });
+    },
+  });
+}
+
+export function useUpdatePlanningBoard() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: { id: number; name?: string; linkedMilestoneId?: number | null; linkedChecklistItemId?: number | null; linkedCalendarEventId?: number | null }) => {
+      const url = buildUrl(api.planningBoards.update.path, { id });
+      const res = await fetch(url, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to update planning board");
+      return await res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', data.projectId, 'planning-boards'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/planning-boards', data.id] });
+    },
+  });
+}
+
+export function useDeletePlanningBoard() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, projectId }: { id: number; projectId: number }) => {
+      const url = buildUrl(api.planningBoards.delete.path, { id });
+      const res = await fetch(url, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to delete planning board");
+      return await res.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', variables.projectId, 'planning-boards'] });
+    },
+  });
+}
+
+export function useSavePlanningBoardCanvas() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, canvasData }: { id: number; canvasData: any }) => {
+      const url = buildUrl(api.planningBoards.saveCanvas.path, { id });
       const res = await fetch(url, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ canvasData }),
         credentials: "include",
       });
-      if (!res.ok) throw new Error("Failed to save moodboard");
+      if (!res.ok) throw new Error("Failed to save planning board canvas");
       return await res.json();
     },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: [api.moodboard.get.path, variables.projectId] });
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/planning-boards', data.id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', data.projectId, 'planning-boards'] });
     },
   });
 }

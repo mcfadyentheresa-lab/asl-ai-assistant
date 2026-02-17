@@ -2,8 +2,8 @@ import { z } from 'zod';
 import { 
   insertProjectSchema, insertMilestoneSchema, insertTaskSchema, 
   insertPhotoSchema, insertDocumentSchema, insertTimeEntrySchema, insertMessageSchema,
-  insertChecklistItemSchema, insertBoardItemSchema, insertCalendarEventSchema,
-  projects, milestones, tasks, photos, documents, timeEntries, messages, users, checklistItems, boardItems, calendarEvents, moodboards
+  insertChecklistItemSchema, insertBoardItemSchema, insertCalendarEventSchema, insertPlanningBoardSchema,
+  projects, milestones, tasks, photos, documents, timeEntries, messages, users, checklistItems, boardItems, calendarEvents, planningBoards
 } from './schema';
 
 export const errorSchemas = {
@@ -258,21 +258,51 @@ export const api = {
     },
   },
 
-  // Moodboard Canvas
-  moodboard: {
-    get: {
+  // Planning Boards
+  planningBoards: {
+    list: {
       method: 'GET' as const,
-      path: '/api/projects/:projectId/moodboard' as const,
+      path: '/api/projects/:projectId/planning-boards' as const,
       responses: {
-        200: z.custom<typeof moodboards.$inferSelect | null>(),
+        200: z.array(z.custom<typeof planningBoards.$inferSelect>()),
       },
     },
-    save: {
+    get: {
+      method: 'GET' as const,
+      path: '/api/planning-boards/:id' as const,
+      responses: {
+        200: z.custom<typeof planningBoards.$inferSelect>(),
+      },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/projects/:projectId/planning-boards' as const,
+      input: insertPlanningBoardSchema.pick({ name: true, linkedMilestoneId: true, linkedChecklistItemId: true, linkedCalendarEventId: true }).partial(),
+      responses: {
+        201: z.custom<typeof planningBoards.$inferSelect>(),
+      },
+    },
+    update: {
+      method: 'PATCH' as const,
+      path: '/api/planning-boards/:id' as const,
+      input: insertPlanningBoardSchema.pick({ name: true, linkedMilestoneId: true, linkedChecklistItemId: true, linkedCalendarEventId: true }).partial(),
+      responses: {
+        200: z.custom<typeof planningBoards.$inferSelect>(),
+      },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/planning-boards/:id' as const,
+      responses: {
+        200: z.object({ success: z.boolean() }),
+      },
+    },
+    saveCanvas: {
       method: 'PUT' as const,
-      path: '/api/projects/:projectId/moodboard' as const,
+      path: '/api/planning-boards/:id/canvas' as const,
       input: z.object({ canvasData: z.any() }),
       responses: {
-        200: z.custom<typeof moodboards.$inferSelect>(),
+        200: z.custom<typeof planningBoards.$inferSelect>(),
       },
     },
   },

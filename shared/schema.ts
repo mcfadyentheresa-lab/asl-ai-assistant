@@ -121,13 +121,18 @@ export const boardItems = pgTable("board_items", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Moodboard Canvas (Fabric.js freeform canvas per project)
-export const moodboards = pgTable("moodboards", {
+// Planning Boards (Fabric.js freeform canvas - multiple per project)
+export const planningBoards = pgTable("planning_boards", {
   id: serial("id").primaryKey(),
-  projectId: integer("project_id").notNull().references(() => projects.id).unique(),
+  projectId: integer("project_id").notNull().references(() => projects.id),
+  name: text("name").notNull().default("Untitled Board"),
   canvasData: jsonb("canvas_data"),
+  linkedMilestoneId: integer("linked_milestone_id").references(() => milestones.id),
+  linkedChecklistItemId: integer("linked_checklist_item_id").references(() => checklistItems.id),
+  linkedCalendarEventId: integer("linked_calendar_event_id").references(() => calendarEvents.id),
   updatedAt: timestamp("updated_at").defaultNow(),
   updatedBy: text("updated_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 // Messages (Chat)
@@ -154,6 +159,7 @@ export const projectsRelations = relations(projects, ({ one, many }) => ({
   checklistItems: many(checklistItems),
   boardItems: many(boardItems),
   calendarEvents: many(calendarEvents),
+  planningBoards: many(planningBoards),
 }));
 
 export const calendarEventsRelations = relations(calendarEvents, ({ one }) => ({
@@ -212,6 +218,25 @@ export const tasksRelations = relations(tasks, ({ one }) => ({
   }),
 }));
 
+export const planningBoardsRelations = relations(planningBoards, ({ one }) => ({
+  project: one(projects, {
+    fields: [planningBoards.projectId],
+    references: [projects.id],
+  }),
+  linkedMilestone: one(milestones, {
+    fields: [planningBoards.linkedMilestoneId],
+    references: [milestones.id],
+  }),
+  linkedChecklistItem: one(checklistItems, {
+    fields: [planningBoards.linkedChecklistItemId],
+    references: [checklistItems.id],
+  }),
+  linkedCalendarEvent: one(calendarEvents, {
+    fields: [planningBoards.linkedCalendarEventId],
+    references: [calendarEvents.id],
+  }),
+}));
+
 export const messagesRelations = relations(messages, ({ one }) => ({
   project: one(projects, {
     fields: [messages.projectId],
@@ -233,7 +258,7 @@ export const insertTimeEntrySchema = createInsertSchema(timeEntries).omit({ id: 
 export const insertMessageSchema = createInsertSchema(messages).omit({ id: true, createdAt: true });
 export const insertChecklistItemSchema = createInsertSchema(checklistItems).omit({ id: true, createdAt: true });
 export const insertBoardItemSchema = createInsertSchema(boardItems).omit({ id: true, createdAt: true });
-export const insertMoodboardSchema = createInsertSchema(moodboards).omit({ id: true, updatedAt: true });
+export const insertPlanningBoardSchema = createInsertSchema(planningBoards).omit({ id: true, updatedAt: true, createdAt: true });
 export const insertCalendarEventSchema = createInsertSchema(calendarEvents).omit({ id: true, createdAt: true });
 
 // TYPES
@@ -257,6 +282,6 @@ export type BoardItem = typeof boardItems.$inferSelect;
 export type CalendarEvent = typeof calendarEvents.$inferSelect;
 export type InsertChecklistItem = z.infer<typeof insertChecklistItemSchema>;
 export type InsertBoardItem = z.infer<typeof insertBoardItemSchema>;
-export type Moodboard = typeof moodboards.$inferSelect;
-export type InsertMoodboard = z.infer<typeof insertMoodboardSchema>;
+export type PlanningBoard = typeof planningBoards.$inferSelect;
+export type InsertPlanningBoard = z.infer<typeof insertPlanningBoardSchema>;
 export type InsertCalendarEvent = z.infer<typeof insertCalendarEventSchema>;

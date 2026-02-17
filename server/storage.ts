@@ -1,10 +1,10 @@
 import { db } from "./db";
 import { 
-  users, projects, milestones, tasks, photos, documents, timeEntries, messages, checklistItems, boardItems, calendarEvents, moodboards,
+  users, projects, milestones, tasks, photos, documents, timeEntries, messages, checklistItems, boardItems, calendarEvents, planningBoards,
   type Project, type Milestone, type Task, type Photo, type Document, type TimeEntry, type Message,
-  type ChecklistItem, type BoardItem, type CalendarEvent, type Moodboard,
+  type ChecklistItem, type BoardItem, type CalendarEvent, type PlanningBoard,
   type InsertProject, type InsertMilestone, type InsertTask, type InsertPhoto, type InsertDocument, 
-  type InsertTimeEntry, type InsertMessage, type InsertChecklistItem, type InsertBoardItem, type InsertCalendarEvent, type InsertMoodboard
+  type InsertTimeEntry, type InsertMessage, type InsertChecklistItem, type InsertBoardItem, type InsertCalendarEvent, type InsertPlanningBoard
 } from "@shared/schema";
 import { type User } from "@shared/models/auth";
 import { eq, desc, and } from "drizzle-orm";
@@ -65,9 +65,13 @@ export interface IStorage {
   updateCalendarEvent(id: number, updates: Partial<InsertCalendarEvent>): Promise<CalendarEvent>;
   deleteCalendarEvent(id: number): Promise<void>;
 
-  // Moodboard Canvas
-  getMoodboard(projectId: number): Promise<Moodboard | undefined>;
-  saveMoodboard(projectId: number, canvasData: any, updatedBy: string): Promise<Moodboard>;
+  // Planning Boards
+  getPlanningBoards(projectId: number): Promise<PlanningBoard[]>;
+  getPlanningBoard(id: number): Promise<PlanningBoard | undefined>;
+  createPlanningBoard(board: InsertPlanningBoard): Promise<PlanningBoard>;
+  updatePlanningBoard(id: number, updates: Partial<InsertPlanningBoard>): Promise<PlanningBoard>;
+  deletePlanningBoard(id: number): Promise<void>;
+  savePlanningBoardCanvas(id: number, canvasData: any, updatedBy: string): Promise<PlanningBoard>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -226,24 +230,31 @@ export class DatabaseStorage implements IStorage {
     await db.delete(calendarEvents).where(eq(calendarEvents.id, id));
   }
 
-  // Moodboard Canvas
-  async getMoodboard(projectId: number): Promise<Moodboard | undefined> {
-    const [board] = await db.select().from(moodboards).where(eq(moodboards.projectId, projectId));
+  // Planning Boards
+  async getPlanningBoards(projectId: number): Promise<PlanningBoard[]> {
+    return db.select().from(planningBoards).where(eq(planningBoards.projectId, projectId)).orderBy(desc(planningBoards.createdAt));
+  }
+  async getPlanningBoard(id: number): Promise<PlanningBoard | undefined> {
+    const [board] = await db.select().from(planningBoards).where(eq(planningBoards.id, id));
     return board;
   }
-  async saveMoodboard(projectId: number, canvasData: any, updatedBy: string): Promise<Moodboard> {
-    const existing = await this.getMoodboard(projectId);
-    if (existing) {
-      const [updated] = await db.update(moodboards)
-        .set({ canvasData, updatedBy, updatedAt: new Date() })
-        .where(eq(moodboards.projectId, projectId))
-        .returning();
-      return updated;
-    }
-    const [created] = await db.insert(moodboards)
-      .values({ projectId, canvasData, updatedBy })
-      .returning();
+  async createPlanningBoard(board: InsertPlanningBoard): Promise<PlanningBoard> {
+    const [created] = await db.insert(planningBoards).values(board).returning();
     return created;
+  }
+  async updatePlanningBoard(id: number, updates: Partial<InsertPlanningBoard>): Promise<PlanningBoard> {
+    const [updated] = await db.update(planningBoards).set({ ...updates, updatedAt: new Date() }).where(eq(planningBoards.id, id)).returning();
+    return updated;
+  }
+  async deletePlanningBoard(id: number): Promise<void> {
+    await db.delete(planningBoards).where(eq(planningBoards.id, id));
+  }
+  async savePlanningBoardCanvas(id: number, canvasData: any, updatedBy: string): Promise<PlanningBoard> {
+    const [updated] = await db.update(planningBoards)
+      .set({ canvasData, updatedBy, updatedAt: new Date() })
+      .where(eq(planningBoards.id, id))
+      .returning();
+    return updated;
   }
 }
 

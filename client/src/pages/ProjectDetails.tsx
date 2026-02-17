@@ -9,7 +9,7 @@ import {
   useUsers, useUpdateProject,
 } from "@/hooks/use-projects";
 import { Navbar } from "@/components/layout/Navbar";
-import MoodBoard from "@/components/MoodBoard";
+import PlanningBoard from "@/components/PlanningBoard";
 import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, ExternalLink, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, CalendarDays, ChevronLeft, Upload, Download, User, X, Paperclip, ZoomIn, Palette } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -131,7 +131,7 @@ export default function ProjectDetails() {
               </TabsTrigger>
               <TabsTrigger value="board" data-testid="tab-board">
                 <Palette className="h-4 w-4 md:mr-2" />
-                <span className="hidden md:inline">Moodboard</span>
+                <span className="hidden md:inline">Planning Board</span>
               </TabsTrigger>
               <TabsTrigger value="calendar" data-testid="tab-calendar">
                 <CalendarDays className="h-4 w-4 md:mr-2" />
@@ -294,7 +294,7 @@ export default function ProjectDetails() {
           </TabsContent>
 
           <TabsContent value="board">
-            <MoodBoard projectId={projectId} />
+            <PlanningBoard projectId={projectId} />
           </TabsContent>
 
           <TabsContent value="chat">
