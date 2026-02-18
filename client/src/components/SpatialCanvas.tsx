@@ -1646,12 +1646,12 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       {boards.length > 0 && selectedBoardId && (
         <div className="flex flex-1 gap-0 min-h-0">
           {/* Left sidebar */}
-          <div className="w-16 shrink-0 border-r flex flex-col items-center py-3 gap-1 bg-muted/20" data-testid="canvas-sidebar">
+          <div className="w-16 shrink-0 border-r flex flex-col items-center py-2 gap-0.5 bg-muted/20 overflow-y-auto" data-testid="canvas-sidebar">
             {sidebarTools.map((t) => (
               <Tooltip key={t.type}>
                 <TooltipTrigger asChild>
                   <button
-                    className="w-12 h-12 flex flex-col items-center justify-center rounded-md text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors gap-0.5 cursor-grab active:cursor-grabbing"
+                    className="w-12 h-11 flex flex-col items-center justify-center rounded-md text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors gap-0.5 cursor-grab active:cursor-grabbing shrink-0"
                     draggable
                     onDragStart={(e) => {
                       e.dataTransfer.setData("tool-type", t.type);
@@ -1671,7 +1671,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
-                  className="w-12 h-12 flex flex-col items-center justify-center rounded-md text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors gap-0.5"
+                  className="w-12 h-11 flex flex-col items-center justify-center rounded-md text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors gap-0.5 shrink-0"
                   onClick={() => { if (editingId) handleDeleteElement(editingId); }}
                   data-testid="sidebar-tool-delete"
                 >
