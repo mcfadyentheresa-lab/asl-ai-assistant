@@ -791,19 +791,20 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           const centerX = (bb.minX + bb.maxX) / 2;
           const centerY = (bb.minY + bb.maxY) / 2;
           const maxZ = Math.max(0, ...Object.values(elements).map((el) => el.zIndex || 0));
+          const textWidth = Math.max(180, Math.min(text.trim().length * 12, 400));
           const apiUrl = buildUrl(api.canvasElements.create.path, { boardId: selectedBoardId });
           const res = await fetch(apiUrl, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             credentials: "include",
             body: JSON.stringify({
-              type: "note",
-              x: centerX - 100,
-              y: centerY - 40,
-              width: 220,
-              height: 80,
+              type: "section-header",
+              x: bb.minX,
+              y: bb.minY,
+              width: textWidth,
+              height: 40,
               zIndex: maxZ + 1,
-              content: { text: text.trim(), color: "#fffde7" },
+              content: { title: text.trim() },
             }),
           });
           const el = await res.json();
