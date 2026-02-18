@@ -20,7 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { usePlanningBoards, useCreatePlanningBoard, useDeletePlanningBoard, useUpdatePlanningBoard, useUploadImage } from "@/hooks/use-projects";
 import { useCanvasStore, debouncedSavePositions } from "@/stores/canvas-store";
 import { api, buildUrl } from "@shared/routes";
-import { recognizeAllShapes } from "@/lib/shape-recognition";
+import { recognizeAllShapes, recognizeShape } from "@/lib/shape-recognition";
 import type { CanvasElement, PlanningBoard as PlanningBoardType } from "@shared/schema";
 import { queryClient } from "@/lib/queryClient";
 
@@ -510,6 +510,8 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
 
   const drawPathsRef = useRef<any[]>([]);
   const isDrawingRef = useRef(false);
+  const holdSnapTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastMoveTimeRef = useRef(0);
 
   const redrawOverlayCanvas = useCallback(() => {
     const canvas = drawCanvasRef.current;
@@ -727,6 +729,22 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     if (drawingMode) redrawOverlayCanvas();
   }, [drawingMode, redrawOverlayCanvas]);
 
+  // Try to snap the last drawn path to a recognized shape
+  const trySnapLastPath = useCallback(() => {
+    const paths = drawPathsRef.current;
+    if (paths.length === 0) return;
+    const lastPath = paths[paths.length - 1];
+    if (!lastPath || !lastPath.points || lastPath.points.length < 3) return;
+    const recognized = recognizeShape(lastPath);
+    if (recognized) {
+      const snapped = { ...recognized, color: lastPath.color, strokeWidth: lastPath.strokeWidth };
+      const newPaths = [...paths.slice(0, -1), snapped];
+      drawPathsRef.current = newPaths;
+      setDrawingPaths(newPaths);
+      redrawOverlayCanvas();
+    }
+  }, [redrawOverlayCanvas]);
+
   // Attach native DOM event listeners for drawing - works reliably on mouse, touch, and stylus
   useEffect(() => {
     const canvas = drawCanvasRef.current;
@@ -740,7 +758,24 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       };
     };
 
+    const clearHoldTimer = () => {
+      if (holdSnapTimerRef.current) {
+        clearTimeout(holdSnapTimerRef.current);
+        holdSnapTimerRef.current = null;
+      }
+    };
+
+    const startHoldTimer = () => {
+      clearHoldTimer();
+      holdSnapTimerRef.current = setTimeout(() => {
+        if (isDrawingRef.current) {
+          trySnapLastPath();
+        }
+      }, 500);
+    };
+
     const handleDown = (clientX: number, clientY: number) => {
+      clearHoldTimer();
       const { x, y } = getBoard(clientX, clientY);
       if (drawTool === "eraser") {
         const newPaths = drawPathsRef.current.filter((p: any) =>
@@ -752,6 +787,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       } else {
         isDrawingRef.current = true;
         setIsDrawing(true);
+        lastMoveTimeRef.current = Date.now();
         const newPath = { points: [{ x, y }], color: drawColor, strokeWidth: drawStrokeWidth };
         drawPathsRef.current = [...drawPathsRef.current, newPath];
         setDrawingPaths([...drawPathsRef.current]);
@@ -765,14 +801,18 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       const last = paths[paths.length - 1];
       if (last) {
         last.points.push({ x, y });
+        lastMoveTimeRef.current = Date.now();
         redrawOverlayCanvas();
+        startHoldTimer();
       }
     };
 
     const handleUp = () => {
+      clearHoldTimer();
       if (isDrawingRef.current) {
         isDrawingRef.current = false;
         setIsDrawing(false);
+        trySnapLastPath();
         setDrawingPaths([...drawPathsRef.current]);
       }
     };
@@ -825,6 +865,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     canvas.addEventListener("touchcancel", onTouchEnd);
 
     return () => {
+      clearHoldTimer();
       canvas.removeEventListener("mousedown", onMouseDown);
       canvas.removeEventListener("mousemove", onMouseMove);
       canvas.removeEventListener("mouseup", onMouseUp);
@@ -834,7 +875,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       canvas.removeEventListener("touchend", onTouchEnd);
       canvas.removeEventListener("touchcancel", onTouchEnd);
     };
-  }, [drawingMode, drawTool, drawColor, drawStrokeWidth, pan, zoom, redrawOverlayCanvas]);
+  }, [drawingMode, drawTool, drawColor, drawStrokeWidth, pan, zoom, redrawOverlayCanvas, trySnapLastPath]);
 
   const selectedBoard = boards.find((b: PlanningBoardType) => b.id === selectedBoardId);
   const elementsList = Object.values(elements);
