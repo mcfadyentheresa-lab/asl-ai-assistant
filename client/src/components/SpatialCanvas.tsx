@@ -249,8 +249,21 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     setEditingId(elementId);
   };
 
-  const handleLongPressStart = (elementId: number) => (e: React.TouchEvent) => {
+  const handleElementTouchStart = (elementId: number) => (e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    if (!touch) return;
+    const el = elements[elementId];
+    if (!el) return;
+    e.stopPropagation();
+    const newZ = maxZ;
+    setMaxZ((z) => z + 1);
+    updateElement(elementId, { zIndex: newZ });
+    setDraggingId(elementId);
+    setEditingId(elementId);
+    dragStartRef.current = { x: touch.clientX, y: touch.clientY, elX: el.x, elY: el.y };
     longPressTimerRef.current = setTimeout(() => {
+      setDraggingId(null);
+      dragStartRef.current = null;
       openContextMenu(e, elementId);
     }, 500);
   };
@@ -260,6 +273,49 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
     }
+  };
+
+  // Touch-based canvas handlers for drag & pan on mobile
+  const handleCanvasTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      const touch = e.touches[0];
+      setIsPanning(true);
+      panStartRef.current = { x: touch.clientX, y: touch.clientY, px: pan.x, py: pan.y };
+    }
+  };
+
+  const handleCanvasTouchMove = (e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    if (!touch) return;
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    if (draggingId !== null && dragStartRef.current) {
+      e.preventDefault();
+      const dx = (touch.clientX - dragStartRef.current.x) / zoom;
+      const dy = (touch.clientY - dragStartRef.current.y) / zoom;
+      const newX = Math.round((dragStartRef.current.elX + dx) / GRID_SIZE) * GRID_SIZE;
+      const newY = Math.round((dragStartRef.current.elY + dy) / GRID_SIZE) * GRID_SIZE;
+      moveElement(draggingId, newX, newY);
+    } else if (isPanning && panStartRef.current && e.touches.length === 1) {
+      const dx = touch.clientX - panStartRef.current.x;
+      const dy = touch.clientY - panStartRef.current.y;
+      setPan({ x: panStartRef.current.px + dx, y: panStartRef.current.py + dy });
+    }
+  };
+
+  const handleCanvasTouchEnd = () => {
+    if (isPanning) {
+      setIsPanning(false);
+      panStartRef.current = null;
+    }
+    if (draggingId !== null && selectedBoardId) {
+      debouncedSavePositions(selectedBoardId);
+      setDraggingId(null);
+      dragStartRef.current = null;
+    }
+    handleLongPressEnd();
   };
 
   // Panning
@@ -385,6 +441,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     dragStartRef.current = { x: e.clientX, y: e.clientY, elX: el.x, elY: el.y };
   };
 
+
   // Template: Weekly planner
   const createWeeklyPlanner = async () => {
     if (!selectedBoardId) return;
@@ -452,7 +509,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           style={{ left: el.x, top: el.y, width: el.width, zIndex: el.zIndex }}
           onClick={handleClick}
           onContextMenu={(e) => openContextMenu(e, el.id)}
-          onTouchStart={handleLongPressStart(el.id)}
+          onTouchStart={handleElementTouchStart(el.id)}
           onTouchEnd={handleLongPressEnd}
           onTouchCancel={handleLongPressEnd}
           onMouseDown={(e) => startDrag(el.id, e)}
@@ -484,7 +541,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           style={{ left: el.x, top: el.y, width: el.width, minHeight: el.height, zIndex: el.zIndex }}
           onClick={handleClick}
           onContextMenu={(e) => openContextMenu(e, el.id)}
-          onTouchStart={handleLongPressStart(el.id)}
+          onTouchStart={handleElementTouchStart(el.id)}
           onTouchEnd={handleLongPressEnd}
           onTouchCancel={handleLongPressEnd}
           data-testid={`element-note-${el.id}`}
@@ -536,7 +593,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           style={{ left: el.x, top: el.y, width: el.width, minHeight: 80, zIndex: el.zIndex }}
           onClick={handleClick}
           onContextMenu={(e) => openContextMenu(e, el.id)}
-          onTouchStart={handleLongPressStart(el.id)}
+          onTouchStart={handleElementTouchStart(el.id)}
           onTouchEnd={handleLongPressEnd}
           onTouchCancel={handleLongPressEnd}
           data-testid={`element-todo-${el.id}`}
@@ -613,7 +670,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           style={{ left: el.x, top: el.y, width: el.width, minHeight: el.height, zIndex: el.zIndex }}
           onClick={handleClick}
           onContextMenu={(e) => openContextMenu(e, el.id)}
-          onTouchStart={handleLongPressStart(el.id)}
+          onTouchStart={handleElementTouchStart(el.id)}
           onTouchEnd={handleLongPressEnd}
           onTouchCancel={handleLongPressEnd}
           data-testid={`element-column-${el.id}`}
@@ -650,7 +707,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           style={{ left: el.x, top: el.y, width: el.width, zIndex: el.zIndex }}
           onClick={handleClick}
           onContextMenu={(e) => openContextMenu(e, el.id)}
-          onTouchStart={handleLongPressStart(el.id)}
+          onTouchStart={handleElementTouchStart(el.id)}
           onTouchEnd={handleLongPressEnd}
           onTouchCancel={handleLongPressEnd}
           data-testid={`element-color-swatch-${el.id}`}
@@ -705,7 +762,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           style={{ left: el.x, top: el.y, width: el.width, zIndex: el.zIndex }}
           onClick={handleClick}
           onContextMenu={(e) => openContextMenu(e, el.id)}
-          onTouchStart={handleLongPressStart(el.id)}
+          onTouchStart={handleElementTouchStart(el.id)}
           onTouchEnd={handleLongPressEnd}
           onTouchCancel={handleLongPressEnd}
           data-testid={`element-link-${el.id}`}
@@ -763,7 +820,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           style={{ left: el.x, top: el.y, width: el.width, zIndex: el.zIndex }}
           onClick={handleClick}
           onContextMenu={(e) => openContextMenu(e, el.id)}
-          onTouchStart={handleLongPressStart(el.id)}
+          onTouchStart={handleElementTouchStart(el.id)}
           onTouchEnd={handleLongPressEnd}
           onTouchCancel={handleLongPressEnd}
           data-testid={`element-image-${el.id}`}
@@ -846,7 +903,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           style={{ left: el.x, top: el.y, width: el.width, minHeight: el.height, zIndex: el.zIndex }}
           onClick={handleClick}
           onContextMenu={(e) => openContextMenu(e, el.id)}
-          onTouchStart={handleLongPressStart(el.id)}
+          onTouchStart={handleElementTouchStart(el.id)}
           onTouchEnd={handleLongPressEnd}
           onTouchCancel={handleLongPressEnd}
           data-testid={`element-board-link-${el.id}`}
@@ -900,7 +957,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
               <SelectValue placeholder="Select board" />
             </SelectTrigger>
             <SelectContent>
-              {boards.map((b) => (
+              {boards.map((b: PlanningBoardType) => (
                 <SelectItem key={b.id} value={String(b.id)} data-testid={`select-board-${b.id}`}>
                   {b.name}
                 </SelectItem>
@@ -1011,11 +1068,14 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           <div
             ref={containerRef}
             className="flex-1 relative overflow-hidden bg-background"
-            style={{ cursor: isPanning ? "grabbing" : spaceRef.current ? "grab" : "default" }}
+            style={{ cursor: isPanning ? "grabbing" : spaceRef.current ? "grab" : "default", touchAction: "none" }}
             onMouseDown={handleCanvasMouseDown}
             onMouseMove={handleCanvasMouseMove}
             onMouseUp={handleCanvasMouseUp}
             onMouseLeave={handleCanvasMouseUp}
+            onTouchStart={handleCanvasTouchStart}
+            onTouchMove={handleCanvasTouchMove}
+            onTouchEnd={handleCanvasTouchEnd}
             onWheel={handleWheel}
             onClick={() => { if (!draggingId) { setEditingId(null); setContextMenu(null); } }}
             onContextMenu={(e) => { e.preventDefault(); setContextMenu(null); }}
