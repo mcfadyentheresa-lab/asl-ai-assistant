@@ -752,11 +752,12 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           if (pt.y > bb.maxY) bb.maxY = pt.y;
         }
       }
-      const padding = 20;
+      const padding = 40;
       const w = bb.maxX - bb.minX + padding * 2;
       const h = bb.maxY - bb.minY + padding * 2;
-      tempCanvas.width = Math.max(200, Math.min(w * 2, 1200));
-      tempCanvas.height = Math.max(100, Math.min(h * 2, 800));
+      const renderScale = 3;
+      tempCanvas.width = Math.max(400, Math.min(w * renderScale, 1600));
+      tempCanvas.height = Math.max(200, Math.min(h * renderScale, 1000));
       const ctx = tempCanvas.getContext("2d");
       if (!ctx) return;
       ctx.fillStyle = "#ffffff";
@@ -768,8 +769,8 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       for (const path of paths) {
         if (!path.points || path.points.length < 2) continue;
         ctx.beginPath();
-        ctx.strokeStyle = path.color || "#1e3a2f";
-        ctx.lineWidth = path.strokeWidth || 3;
+        ctx.strokeStyle = "#000000";
+        ctx.lineWidth = Math.max(3, (path.strokeWidth || 3) * 1.5);
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
         ctx.moveTo(path.points[0].x, path.points[0].y);
@@ -828,7 +829,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     if (paths.length === 0) return;
     const lastPath = paths[paths.length - 1];
     if (!lastPath || !lastPath.points || lastPath.points.length < 3) return;
-    const recognized = recognizeShape(lastPath);
+    const recognized = recognizeShape(lastPath, paths.length);
     if (recognized) {
       const snapped = { ...recognized, color: lastPath.color, strokeWidth: lastPath.strokeWidth };
       const newPaths = [...paths.slice(0, -1), snapped];
@@ -918,7 +919,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           if (!isDrawingRef.current) {
             tryAutoTextConvert();
           }
-        }, 1500);
+        }, 2000);
       }
     };
 

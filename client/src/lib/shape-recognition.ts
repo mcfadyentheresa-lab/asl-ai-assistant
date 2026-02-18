@@ -257,15 +257,24 @@ export interface DrawPath {
   strokeWidth: number;
 }
 
-export function recognizeShape(path: DrawPath): (DrawPath & { shapeType?: string }) | null {
+export function recognizeShape(path: DrawPath, totalPathCount?: number): (DrawPath & { shapeType?: string }) | null {
   if (!path.points || path.points.length < 2) return null;
+
+  if (totalPathCount !== undefined && totalPathCount > 1) {
+    const bb = boundingBox(path.points);
+    const size = Math.max(bb.width, bb.height);
+    if (size < 60) return null;
+  }
+
+  const bb = boundingBox(path.points);
+  const size = Math.max(bb.width, bb.height);
 
   const detectors: (() => RecognizedShape | null)[] = [
     () => tryCircle(path.points),
     () => tryRectangle(path.points),
     () => tryTriangle(path.points),
-    () => tryLine(path.points),
-    () => tryArrow(path.points),
+    () => (size > 40 ? tryLine(path.points) : null),
+    () => (size > 40 ? tryArrow(path.points) : null),
   ];
 
   for (const detect of detectors) {
@@ -293,13 +302,11 @@ export function recognizeAllShapes(paths: DrawPath[]): DrawPath[] {
 export function looksLikeHandwriting(paths: DrawPath[]): boolean {
   if (paths.length === 0) return false;
   let unrecognizedCount = 0;
-  let totalPoints = 0;
   for (const path of paths) {
-    const shape = recognizeShape(path);
+    const shape = recognizeShape(path, paths.length);
     if (!shape) {
       unrecognizedCount++;
-      totalPoints += path.points.length;
     }
   }
-  return unrecognizedCount >= 1 && totalPoints > 5;
+  return unrecognizedCount >= 1;
 }
