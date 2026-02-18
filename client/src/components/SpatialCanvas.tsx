@@ -506,20 +506,30 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     }
   };
 
+  const drawPathsRef = useRef<any[]>([]);
+  const isDrawingRef = useRef(false);
+
   const redrawOverlayCanvas = useCallback(() => {
     const canvas = drawCanvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+    const parent = canvas.parentElement;
+    if (parent && (canvas.width !== parent.clientWidth || canvas.height !== parent.clientHeight)) {
+      canvas.width = parent.clientWidth;
+      canvas.height = parent.clientHeight;
+    }
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.save();
     ctx.translate(pan.x, pan.y);
     ctx.scale(zoom, zoom);
-    drawingPaths.forEach((path: any) => {
-      if (!path.points || path.points.length < 2) return;
+    const paths = drawPathsRef.current;
+    for (let p = 0; p < paths.length; p++) {
+      const path = paths[p];
+      if (!path.points || path.points.length < 2) continue;
       ctx.beginPath();
       ctx.strokeStyle = path.color || "#1e3a2f";
-      ctx.lineWidth = (path.strokeWidth || 3) / zoom;
+      ctx.lineWidth = path.strokeWidth || 3;
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
       ctx.moveTo(path.points[0].x, path.points[0].y);
@@ -527,9 +537,9 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
         ctx.lineTo(path.points[i].x, path.points[i].y);
       }
       ctx.stroke();
-    });
+    }
     ctx.restore();
-  }, [drawingPaths, pan, zoom]);
+  }, [pan, zoom]);
 
   // Panning
   const handleCanvasMouseDown = (e: React.MouseEvent) => {
@@ -1384,7 +1394,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                       e.dataTransfer.setData("tool-type", t.type);
                       e.dataTransfer.effectAllowed = "copy";
                     }}
-                    onClick={() => t.type === "image" ? setShowImagePopup(!showImagePopup) : t.type === "draw" ? (() => { setDrawingMode(true); setDrawTool("pen"); setDrawingPaths([]); setDrawUndoStack([]); setEditingId(null); })() : createElement(t.type)}
+                    onClick={() => t.type === "image" ? setShowImagePopup(!showImagePopup) : t.type === "draw" ? (() => { setDrawingMode(true); setDrawTool("pen"); setDrawingPaths([]); drawPathsRef.current = []; setDrawUndoStack([]); setEditingId(null); })() : createElement(t.type)}
                     data-testid={`sidebar-tool-${t.type}`}
                   >
                     <t.icon className="h-5 w-5" />
@@ -1472,7 +1482,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
               if (toolType === "image") {
                 triggerImageUpload();
               } else if (toolType === "draw") {
-                setDrawingMode(true); setDrawTool("pen"); setDrawingPaths([]); setDrawUndoStack([]); setEditingId(null);
+                setDrawingMode(true); setDrawTool("pen"); setDrawingPaths([]); drawPathsRef.current = []; setDrawUndoStack([]); setEditingId(null);
               } else {
                 createElement(toolType, canvasX, canvasY);
               }
@@ -1534,89 +1544,70 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                       if (parent && (ref.width !== parent.clientWidth || ref.height !== parent.clientHeight)) {
                         ref.width = parent.clientWidth;
                         ref.height = parent.clientHeight;
+                        drawPathsRef.current = drawingPaths;
                         redrawOverlayCanvas();
                       }
                     }
                   }}
                   className="absolute inset-0 z-[100]"
-                  style={{ cursor: drawTool === "eraser" ? "crosshair" : "crosshair" }}
-                  onMouseDown={(e) => {
+                  style={{ cursor: "crosshair" }}
+                  onPointerDown={(e) => {
                     e.stopPropagation();
                     e.preventDefault();
                     const canvas = drawCanvasRef.current;
                     if (!canvas) return;
+                    (e.target as HTMLElement).setPointerCapture(e.pointerId);
                     const rect = canvas.getBoundingClientRect();
-                    const screenX = e.clientX - rect.left;
-                    const screenY = e.clientY - rect.top;
-                    const boardX = (screenX - pan.x) / zoom;
-                    const boardY = (screenY - pan.y) / zoom;
+                    const boardX = (e.clientX - rect.left - pan.x) / zoom;
+                    const boardY = (e.clientY - rect.top - pan.y) / zoom;
                     if (drawTool === "eraser") {
-                      const newPaths = drawingPaths.filter((p: any) => {
+                      const newPaths = drawPathsRef.current.filter((p: any) => {
                         return !p.points.some((pt: any) => {
                           const dist = Math.sqrt((pt.x - boardX) ** 2 + (pt.y - boardY) ** 2);
                           return dist < 15 / zoom;
                         });
                       });
+                      drawPathsRef.current = newPaths;
                       setDrawingPaths(newPaths);
+                      redrawOverlayCanvas();
                     } else {
+                      isDrawingRef.current = true;
                       setIsDrawing(true);
-                      setDrawingPaths((prev) => [...prev, { points: [{ x: boardX, y: boardY }], color: drawColor, strokeWidth: drawStrokeWidth }]);
+                      const newPath = { points: [{ x: boardX, y: boardY }], color: drawColor, strokeWidth: drawStrokeWidth };
+                      drawPathsRef.current = [...drawPathsRef.current, newPath];
+                      setDrawingPaths([...drawPathsRef.current]);
                     }
                   }}
-                  onMouseMove={(e) => {
-                    if (!isDrawing || drawTool !== "pen") return;
+                  onPointerMove={(e) => {
+                    if (!isDrawingRef.current || drawTool !== "pen") return;
                     e.stopPropagation();
                     const canvas = drawCanvasRef.current;
                     if (!canvas) return;
                     const rect = canvas.getBoundingClientRect();
-                    const screenX = e.clientX - rect.left;
-                    const screenY = e.clientY - rect.top;
-                    const boardX = (screenX - pan.x) / zoom;
-                    const boardY = (screenY - pan.y) / zoom;
-                    setDrawingPaths((prev) => {
-                      const newPaths = [...prev];
-                      const last = { ...newPaths[newPaths.length - 1] };
-                      last.points = [...last.points, { x: boardX, y: boardY }];
-                      newPaths[newPaths.length - 1] = last;
-                      return newPaths;
-                    });
-                  }}
-                  onMouseUp={() => setIsDrawing(false)}
-                  onMouseLeave={() => setIsDrawing(false)}
-                  onTouchStart={(e) => {
-                    e.stopPropagation();
-                    const touch = e.touches[0];
-                    const canvas = drawCanvasRef.current;
-                    if (!canvas || !touch) return;
-                    const rect = canvas.getBoundingClientRect();
-                    const boardX = (touch.clientX - rect.left - pan.x) / zoom;
-                    const boardY = (touch.clientY - rect.top - pan.y) / zoom;
-                    if (drawTool === "eraser") {
-                      const newPaths = drawingPaths.filter((p: any) => !p.points.some((pt: any) => Math.sqrt((pt.x - boardX) ** 2 + (pt.y - boardY) ** 2) < 15 / zoom));
-                      setDrawingPaths(newPaths);
-                    } else {
-                      setIsDrawing(true);
-                      setDrawingPaths((prev) => [...prev, { points: [{ x: boardX, y: boardY }], color: drawColor, strokeWidth: drawStrokeWidth }]);
+                    const boardX = (e.clientX - rect.left - pan.x) / zoom;
+                    const boardY = (e.clientY - rect.top - pan.y) / zoom;
+                    const paths = drawPathsRef.current;
+                    const last = paths[paths.length - 1];
+                    if (last) {
+                      last.points.push({ x: boardX, y: boardY });
+                      redrawOverlayCanvas();
                     }
                   }}
-                  onTouchMove={(e) => {
-                    if (!isDrawing || drawTool !== "pen") return;
-                    e.stopPropagation();
-                    const touch = e.touches[0];
-                    const canvas = drawCanvasRef.current;
-                    if (!canvas || !touch) return;
-                    const rect = canvas.getBoundingClientRect();
-                    const boardX = (touch.clientX - rect.left - pan.x) / zoom;
-                    const boardY = (touch.clientY - rect.top - pan.y) / zoom;
-                    setDrawingPaths((prev) => {
-                      const newPaths = [...prev];
-                      const last = { ...newPaths[newPaths.length - 1] };
-                      last.points = [...last.points, { x: boardX, y: boardY }];
-                      newPaths[newPaths.length - 1] = last;
-                      return newPaths;
-                    });
+                  onPointerUp={(e) => {
+                    if (isDrawingRef.current) {
+                      isDrawingRef.current = false;
+                      setIsDrawing(false);
+                      setDrawingPaths([...drawPathsRef.current]);
+                    }
+                    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
                   }}
-                  onTouchEnd={() => setIsDrawing(false)}
+                  onPointerLeave={() => {
+                    if (isDrawingRef.current) {
+                      isDrawingRef.current = false;
+                      setIsDrawing(false);
+                      setDrawingPaths([...drawPathsRef.current]);
+                    }
+                  }}
                   data-testid="draw-overlay-canvas"
                 />
                 <div
@@ -1630,8 +1621,8 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                   <input type="color" value={drawColor} onChange={(e) => setDrawColor(e.target.value)} className="w-6 h-6 rounded cursor-pointer border border-border" data-testid="draw-tool-color" />
                   <button className="px-2 py-1 rounded text-xs font-mono text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" onClick={() => setDrawStrokeWidth((w) => w >= 10 ? 1 : w + 1)} data-testid="draw-tool-stroke">{drawStrokeWidth}px</button>
                   <div className="w-px h-5 bg-border" />
-                  <button className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30" disabled={drawingPaths.length === 0} onClick={() => { if (drawingPaths.length > 0) { setDrawUndoStack((s) => [...s, drawingPaths[drawingPaths.length - 1]]); setDrawingPaths((prev) => prev.slice(0, -1)); } }} data-testid="draw-tool-undo"><Undo2 className="h-4 w-4" /></button>
-                  <button className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30" disabled={drawUndoStack.length === 0} onClick={() => { if (drawUndoStack.length > 0) { const restored = drawUndoStack[drawUndoStack.length - 1]; setDrawUndoStack((s) => s.slice(0, -1)); setDrawingPaths((prev) => [...prev, restored]); } }} data-testid="draw-tool-redo"><Redo2 className="h-4 w-4" /></button>
+                  <button className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30" disabled={drawingPaths.length === 0} onClick={() => { if (drawingPaths.length > 0) { setDrawUndoStack((s) => [...s, drawingPaths[drawingPaths.length - 1]]); const next = drawingPaths.slice(0, -1); setDrawingPaths(next); drawPathsRef.current = next; redrawOverlayCanvas(); } }} data-testid="draw-tool-undo"><Undo2 className="h-4 w-4" /></button>
+                  <button className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30" disabled={drawUndoStack.length === 0} onClick={() => { if (drawUndoStack.length > 0) { const restored = drawUndoStack[drawUndoStack.length - 1]; setDrawUndoStack((s) => s.slice(0, -1)); const next = [...drawingPaths, restored]; setDrawingPaths(next); drawPathsRef.current = next; redrawOverlayCanvas(); } }} data-testid="draw-tool-redo"><Redo2 className="h-4 w-4" /></button>
                   <div className="w-px h-5 bg-border" />
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -1642,6 +1633,8 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                           setDrawUndoStack((s) => [...s, ...drawingPaths]);
                           const result = recognizeAllShapes(drawingPaths);
                           setDrawingPaths(result);
+                          drawPathsRef.current = result;
+                          redrawOverlayCanvas();
                           toast({ title: "Shape Recognition", description: "Shapes have been cleaned up" });
                         }}
                         data-testid="draw-tool-shapes"
@@ -1723,6 +1716,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                               }).then((r) => r.json());
                               addElement(created);
                               setDrawingPaths([]);
+                              drawPathsRef.current = [];
                               setDrawUndoStack([]);
                               setDrawingMode(false);
                               toast({ title: "Text Recognized", description: `Created note: "${data.text.trim().substring(0, 50)}..."` });
@@ -1744,7 +1738,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                     <TooltipContent side="top"><p>Convert handwriting to text</p></TooltipContent>
                   </Tooltip>
                   <div className="w-px h-5 bg-border" />
-                  <Button size="sm" variant="ghost" className="text-destructive text-xs" onClick={() => { setDrawingPaths([]); setDrawUndoStack([]); setDrawingMode(false); }} data-testid="draw-tool-discard"><X className="h-3.5 w-3.5 mr-1" />Discard</Button>
+                  <Button size="sm" variant="ghost" className="text-destructive text-xs" onClick={() => { setDrawingPaths([]); drawPathsRef.current = []; setDrawUndoStack([]); setDrawingMode(false); }} data-testid="draw-tool-discard"><X className="h-3.5 w-3.5 mr-1" />Discard</Button>
                   <Button size="sm" variant="default" className="text-xs" onClick={() => {
                     if (drawingPaths.length > 0 && selectedBoardId) {
                       const newZ = maxZ;
@@ -1761,6 +1755,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                         .catch(() => toast({ title: "Error", description: "Failed to save drawing", variant: "destructive" }));
                     }
                     setDrawingPaths([]);
+                    drawPathsRef.current = [];
                     setDrawUndoStack([]);
                     setDrawingMode(false);
                   }} data-testid="draw-tool-save"><Save className="h-3.5 w-3.5 mr-1" />Save</Button>
