@@ -720,6 +720,8 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     const isDragging = draggingId === el.id;
     const c = (el.content || {}) as any;
 
+    const parentCol = el.parentColumnId ? elements[el.parentColumnId] : null;
+    const effectiveZ = parentCol ? Math.max(el.zIndex, (parentCol.zIndex || 0) + 1) : el.zIndex;
     const cardBase = `absolute transition-shadow rounded select-none ${isSelected ? "ring-2 ring-primary/50 shadow-lg" : "shadow-sm"} ${isDragging ? "opacity-80 cursor-grabbing" : ""}`;
 
     const handleClick = (e: React.MouseEvent) => {
@@ -742,7 +744,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
         <div
           key={el.id}
           className="absolute select-none"
-          style={{ left: el.x, top: el.y, width: el.width, zIndex: el.zIndex }}
+          style={{ left: el.x, top: el.y, width: el.width, zIndex: effectiveZ }}
           onClick={handleClick}
           onContextMenu={(e) => openContextMenu(e, el.id)}
           onTouchStart={handleElementTouchStart(el.id)}
@@ -774,7 +776,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
         <div
           key={el.id}
           className={`${cardBase} bg-card border border-border cursor-grab`}
-          style={{ left: el.x, top: el.y, width: el.width, minHeight: el.height, zIndex: el.zIndex }}
+          style={{ left: el.x, top: el.y, width: el.width, minHeight: el.height, zIndex: effectiveZ }}
           onMouseDown={(e) => {
             const tag = (e.target as HTMLElement).tagName.toLowerCase();
             if (tag === "input" || tag === "textarea" || tag === "button" || (e.target as HTMLElement).closest("button")) return;
@@ -832,7 +834,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
         <div
           key={el.id}
           className={`${cardBase} bg-card border border-border cursor-grab`}
-          style={{ left: el.x, top: el.y, width: el.width, minHeight: 80, zIndex: el.zIndex }}
+          style={{ left: el.x, top: el.y, width: el.width, minHeight: 80, zIndex: effectiveZ }}
           onMouseDown={(e) => {
             const tag = (e.target as HTMLElement).tagName.toLowerCase();
             if (tag === "input" || tag === "textarea" || tag === "button" || (e.target as HTMLElement).closest("button")) return;
@@ -947,7 +949,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           key={el.id}
           className={`${cardBase} border border-dashed ${isDropTarget ? "border-primary/40" : "border-border/60"} ${!hasCustomBg && !isDropTarget ? "bg-muted/40" : ""} ${isDropTarget && !hasCustomBg ? "bg-primary/10" : ""} transition-colors`}
           style={{
-            left: el.x, top: el.y, width: el.width, minHeight: computedHeight, zIndex: el.zIndex,
+            left: el.x, top: el.y, width: el.width, minHeight: computedHeight, zIndex: effectiveZ,
             ...(hasCustomBg ? { backgroundColor: c.backgroundColor } : {}),
           }}
           onClick={handleClick}
@@ -1028,7 +1030,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
         <div
           key={el.id}
           className={`${cardBase} bg-card border border-border overflow-hidden cursor-grab`}
-          style={{ left: el.x, top: el.y, width: el.width, zIndex: el.zIndex }}
+          style={{ left: el.x, top: el.y, width: el.width, zIndex: effectiveZ }}
           onMouseDown={(e) => {
             const tag = (e.target as HTMLElement).tagName.toLowerCase();
             if (tag === "input" || tag === "button" || (e.target as HTMLElement).closest("button")) return;
@@ -1085,7 +1087,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
         <div
           key={el.id}
           className={`${cardBase} bg-card border border-border cursor-grab`}
-          style={{ left: el.x, top: el.y, width: el.width, zIndex: el.zIndex }}
+          style={{ left: el.x, top: el.y, width: el.width, zIndex: effectiveZ }}
           onMouseDown={(e) => {
             const tag = (e.target as HTMLElement).tagName.toLowerCase();
             if (tag === "input" || tag === "button" || (e.target as HTMLElement).closest("button")) return;
@@ -1147,7 +1149,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
         <div
           key={el.id}
           className={`${cardBase} bg-card border border-border overflow-hidden cursor-grab`}
-          style={{ left: el.x, top: el.y, width: el.width, zIndex: el.zIndex }}
+          style={{ left: el.x, top: el.y, width: el.width, zIndex: effectiveZ }}
           onMouseDown={(e) => {
             const tag = (e.target as HTMLElement).tagName.toLowerCase();
             if (tag === "input" || tag === "button" || (e.target as HTMLElement).closest("button")) return;
@@ -1231,7 +1233,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
         <div
           key={el.id}
           className={`${cardBase} bg-card border border-border cursor-grab`}
-          style={{ left: el.x, top: el.y, width: el.width, minHeight: el.height, zIndex: el.zIndex }}
+          style={{ left: el.x, top: el.y, width: el.width, minHeight: el.height, zIndex: effectiveZ }}
           onMouseDown={(e) => {
             const tag = (e.target as HTMLElement).tagName.toLowerCase();
             if (tag === "input" || tag === "button" || (e.target as HTMLElement).closest("button")) return;
@@ -1276,7 +1278,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
         <div
           key={el.id}
           className={`${cardBase} bg-card border border-border cursor-grab`}
-          style={{ left: el.x, top: el.y, width: el.width, minHeight: el.height, zIndex: el.zIndex }}
+          style={{ left: el.x, top: el.y, width: el.width, minHeight: el.height, zIndex: effectiveZ }}
           onMouseDown={(e) => {
             if (isSelected && drawTool !== "select") return;
             const tag = (e.target as HTMLElement).tagName.toLowerCase();
