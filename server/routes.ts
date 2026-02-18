@@ -475,6 +475,92 @@ export async function registerRoutes(
     }
   });
 
+  // Canvas Elements
+  app.get(api.canvasElements.list.path, isAuthenticated, async (req: any, res) => {
+    const boardId = Number(req.params.boardId);
+    const board = await checkBoardAccess(req, res, boardId);
+    if (!board) return;
+    const elements = await storage.getCanvasElements(boardId);
+    res.json(elements);
+  });
+
+  app.post(api.canvasElements.create.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const boardId = Number(req.params.boardId);
+      const board = await checkBoardAccess(req, res, boardId);
+      if (!board) return;
+      const userId = req.user.claims.sub;
+      const input = api.canvasElements.create.input.parse(req.body);
+      const element = await storage.createCanvasElement({ ...input, boardId, createdBy: userId });
+      res.status(201).json(element);
+    } catch (err: any) {
+      console.error("Canvas element create error:", err.message);
+      res.status(500).json({ message: "Failed to create canvas element" });
+    }
+  });
+
+  app.post(api.canvasElements.createBatch.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const boardId = Number(req.params.boardId);
+      const board = await checkBoardAccess(req, res, boardId);
+      if (!board) return;
+      const userId = req.user.claims.sub;
+      const input = api.canvasElements.createBatch.input.parse(req.body);
+      const elements = await storage.createCanvasElements(
+        input.elements.map((e: any) => ({ ...e, boardId, createdBy: userId }))
+      );
+      res.status(201).json(elements);
+    } catch (err: any) {
+      console.error("Canvas elements batch create error:", err.message);
+      res.status(500).json({ message: "Failed to create canvas elements" });
+    }
+  });
+
+  app.patch(api.canvasElements.update.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const id = Number(req.params.id);
+      const element = await storage.getCanvasElement(id);
+      if (!element) return res.status(404).json({ message: "Element not found" });
+      const board = await checkBoardAccess(req, res, element.boardId);
+      if (!board) return;
+      const input = api.canvasElements.update.input.parse(req.body);
+      const updated = await storage.updateCanvasElement(id, input);
+      res.json(updated);
+    } catch (err: any) {
+      console.error("Canvas element update error:", err.message);
+      res.status(500).json({ message: "Failed to update canvas element" });
+    }
+  });
+
+  app.patch(api.canvasElements.updatePositions.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const boardId = Number(req.params.boardId);
+      const board = await checkBoardAccess(req, res, boardId);
+      if (!board) return;
+      const input = api.canvasElements.updatePositions.input.parse(req.body);
+      await storage.updateCanvasElementPositions(boardId, input.updates);
+      res.json({ success: true });
+    } catch (err: any) {
+      console.error("Canvas element positions update error:", err.message);
+      res.status(500).json({ message: "Failed to update positions" });
+    }
+  });
+
+  app.delete(api.canvasElements.delete.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const id = Number(req.params.id);
+      const element = await storage.getCanvasElement(id);
+      if (!element) return res.status(404).json({ message: "Element not found" });
+      const board = await checkBoardAccess(req, res, element.boardId);
+      if (!board) return;
+      await storage.deleteCanvasElement(id);
+      res.json({ success: true });
+    } catch (err: any) {
+      console.error("Canvas element delete error:", err.message);
+      res.status(500).json({ message: "Failed to delete canvas element" });
+    }
+  });
+
   // Calendar Events
   app.get(api.calendar.list.path, isAuthenticated, async (req, res) => {
     const events = await storage.getCalendarEvents(Number(req.params.projectId));

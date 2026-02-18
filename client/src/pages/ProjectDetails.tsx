@@ -9,7 +9,7 @@ import {
   useUsers, useUpdateProject,
 } from "@/hooks/use-projects";
 import { Navbar } from "@/components/layout/Navbar";
-import PlanningBoard from "@/components/PlanningBoard";
+import SpatialCanvas from "@/components/SpatialCanvas";
 import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, ExternalLink, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, CalendarDays, ChevronLeft, Upload, Download, User, X, Paperclip, ZoomIn, Palette } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -294,7 +294,7 @@ export default function ProjectDetails() {
           </TabsContent>
 
           <TabsContent value="board">
-            <PlanningBoard projectId={projectId} />
+            <SpatialCanvas projectId={projectId} />
           </TabsContent>
 
           <TabsContent value="chat">

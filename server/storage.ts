@@ -1,10 +1,10 @@
 import { db } from "./db";
 import { 
-  users, projects, milestones, tasks, photos, documents, timeEntries, messages, checklistItems, boardItems, calendarEvents, planningBoards,
+  users, projects, milestones, tasks, photos, documents, timeEntries, messages, checklistItems, boardItems, calendarEvents, planningBoards, canvasElements,
   type Project, type Milestone, type Task, type Photo, type Document, type TimeEntry, type Message,
-  type ChecklistItem, type BoardItem, type CalendarEvent, type PlanningBoard,
+  type ChecklistItem, type BoardItem, type CalendarEvent, type PlanningBoard, type CanvasElement,
   type InsertProject, type InsertMilestone, type InsertTask, type InsertPhoto, type InsertDocument, 
-  type InsertTimeEntry, type InsertMessage, type InsertChecklistItem, type InsertBoardItem, type InsertCalendarEvent, type InsertPlanningBoard
+  type InsertTimeEntry, type InsertMessage, type InsertChecklistItem, type InsertBoardItem, type InsertCalendarEvent, type InsertPlanningBoard, type InsertCanvasElement
 } from "@shared/schema";
 import { type User } from "@shared/models/auth";
 import { eq, desc, and } from "drizzle-orm";
@@ -72,6 +72,15 @@ export interface IStorage {
   updatePlanningBoard(id: number, updates: Partial<InsertPlanningBoard>): Promise<PlanningBoard>;
   deletePlanningBoard(id: number): Promise<void>;
   savePlanningBoardCanvas(id: number, canvasData: any, updatedBy: string): Promise<PlanningBoard>;
+
+  // Canvas Elements
+  getCanvasElement(id: number): Promise<CanvasElement | undefined>;
+  getCanvasElements(boardId: number): Promise<CanvasElement[]>;
+  createCanvasElement(element: InsertCanvasElement): Promise<CanvasElement>;
+  createCanvasElements(elements: InsertCanvasElement[]): Promise<CanvasElement[]>;
+  updateCanvasElement(id: number, updates: Partial<InsertCanvasElement>): Promise<CanvasElement>;
+  updateCanvasElementPositions(boardId: number, updates: { id: number; x: number; y: number; width?: number; height?: number; zIndex?: number; parentColumnId?: number | null }[]): Promise<void>;
+  deleteCanvasElement(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -255,6 +264,40 @@ export class DatabaseStorage implements IStorage {
       .where(eq(planningBoards.id, id))
       .returning();
     return updated;
+  }
+
+  // Canvas Elements
+  async getCanvasElement(id: number): Promise<CanvasElement | undefined> {
+    const [el] = await db.select().from(canvasElements).where(eq(canvasElements.id, id));
+    return el;
+  }
+  async getCanvasElements(boardId: number): Promise<CanvasElement[]> {
+    return db.select().from(canvasElements).where(eq(canvasElements.boardId, boardId)).orderBy(canvasElements.zIndex);
+  }
+  async createCanvasElement(element: InsertCanvasElement): Promise<CanvasElement> {
+    const [created] = await db.insert(canvasElements).values(element).returning();
+    return created;
+  }
+  async createCanvasElements(elements: InsertCanvasElement[]): Promise<CanvasElement[]> {
+    if (elements.length === 0) return [];
+    return db.insert(canvasElements).values(elements).returning();
+  }
+  async updateCanvasElement(id: number, updates: Partial<InsertCanvasElement>): Promise<CanvasElement> {
+    const [updated] = await db.update(canvasElements).set({ ...updates, updatedAt: new Date() }).where(eq(canvasElements.id, id)).returning();
+    return updated;
+  }
+  async updateCanvasElementPositions(boardId: number, updates: { id: number; x: number; y: number; width?: number; height?: number; zIndex?: number; parentColumnId?: number | null }[]): Promise<void> {
+    for (const u of updates) {
+      const vals: any = { x: u.x, y: u.y, updatedAt: new Date() };
+      if (u.width !== undefined) vals.width = u.width;
+      if (u.height !== undefined) vals.height = u.height;
+      if (u.zIndex !== undefined) vals.zIndex = u.zIndex;
+      if (u.parentColumnId !== undefined) vals.parentColumnId = u.parentColumnId;
+      await db.update(canvasElements).set(vals).where(and(eq(canvasElements.id, u.id), eq(canvasElements.boardId, boardId)));
+    }
+  }
+  async deleteCanvasElement(id: number): Promise<void> {
+    await db.delete(canvasElements).where(eq(canvasElements.id, id));
   }
 }
 

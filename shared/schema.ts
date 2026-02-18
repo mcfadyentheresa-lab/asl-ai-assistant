@@ -107,6 +107,23 @@ export const calendarEvents = pgTable("calendar_events", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Canvas Elements (Milanote-style spatial canvas elements per board)
+export const canvasElements = pgTable("canvas_elements", {
+  id: serial("id").primaryKey(),
+  boardId: integer("board_id").notNull().references(() => planningBoards.id, { onDelete: "cascade" }),
+  type: text("type").notNull(), // note, todo, column, board_link, link, image, color_swatch, section_header
+  x: integer("x").notNull().default(0),
+  y: integer("y").notNull().default(0),
+  width: integer("width").notNull().default(240),
+  height: integer("height").notNull().default(160),
+  zIndex: integer("z_index").notNull().default(0),
+  parentColumnId: integer("parent_column_id"),
+  content: jsonb("content"), // type-specific data
+  createdBy: text("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Board Items (moodboard / workboard) - legacy individual items
 export const boardItems = pgTable("board_items", {
   id: serial("id").primaryKey(),
@@ -180,6 +197,17 @@ export const checklistItemsRelations = relations(checklistItems, ({ one }) => ({
   }),
   creator: one(users, {
     fields: [checklistItems.createdBy],
+    references: [users.id],
+  }),
+}));
+
+export const canvasElementsRelations = relations(canvasElements, ({ one }) => ({
+  board: one(planningBoards, {
+    fields: [canvasElements.boardId],
+    references: [planningBoards.id],
+  }),
+  creator: one(users, {
+    fields: [canvasElements.createdBy],
     references: [users.id],
   }),
 }));
@@ -258,6 +286,7 @@ export const insertTimeEntrySchema = createInsertSchema(timeEntries).omit({ id: 
 export const insertMessageSchema = createInsertSchema(messages).omit({ id: true, createdAt: true });
 export const insertChecklistItemSchema = createInsertSchema(checklistItems).omit({ id: true, createdAt: true });
 export const insertBoardItemSchema = createInsertSchema(boardItems).omit({ id: true, createdAt: true });
+export const insertCanvasElementSchema = createInsertSchema(canvasElements).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertPlanningBoardSchema = createInsertSchema(planningBoards).omit({ id: true, updatedAt: true, createdAt: true });
 export const insertCalendarEventSchema = createInsertSchema(calendarEvents).omit({ id: true, createdAt: true });
 
@@ -282,6 +311,8 @@ export type BoardItem = typeof boardItems.$inferSelect;
 export type CalendarEvent = typeof calendarEvents.$inferSelect;
 export type InsertChecklistItem = z.infer<typeof insertChecklistItemSchema>;
 export type InsertBoardItem = z.infer<typeof insertBoardItemSchema>;
+export type CanvasElement = typeof canvasElements.$inferSelect;
+export type InsertCanvasElement = z.infer<typeof insertCanvasElementSchema>;
 export type PlanningBoard = typeof planningBoards.$inferSelect;
 export type InsertPlanningBoard = z.infer<typeof insertPlanningBoardSchema>;
 export type InsertCalendarEvent = z.infer<typeof insertCalendarEventSchema>;

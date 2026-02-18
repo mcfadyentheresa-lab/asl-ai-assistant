@@ -2,8 +2,8 @@ import { z } from 'zod';
 import { 
   insertProjectSchema, insertMilestoneSchema, insertTaskSchema, 
   insertPhotoSchema, insertDocumentSchema, insertTimeEntrySchema, insertMessageSchema,
-  insertChecklistItemSchema, insertBoardItemSchema, insertCalendarEventSchema, insertPlanningBoardSchema,
-  projects, milestones, tasks, photos, documents, timeEntries, messages, users, checklistItems, boardItems, calendarEvents, planningBoards
+  insertChecklistItemSchema, insertBoardItemSchema, insertCalendarEventSchema, insertPlanningBoardSchema, insertCanvasElementSchema,
+  projects, milestones, tasks, photos, documents, timeEntries, messages, users, checklistItems, boardItems, calendarEvents, planningBoards, canvasElements
 } from './schema';
 
 export const errorSchemas = {
@@ -303,6 +303,66 @@ export const api = {
       input: z.object({ canvasData: z.any() }),
       responses: {
         200: z.custom<typeof planningBoards.$inferSelect>(),
+      },
+    },
+  },
+
+  // Canvas Elements
+  canvasElements: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/planning-boards/:boardId/elements' as const,
+      responses: {
+        200: z.array(z.custom<typeof canvasElements.$inferSelect>()),
+      },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/planning-boards/:boardId/elements' as const,
+      input: insertCanvasElementSchema.omit({ boardId: true }),
+      responses: {
+        201: z.custom<typeof canvasElements.$inferSelect>(),
+      },
+    },
+    createBatch: {
+      method: 'POST' as const,
+      path: '/api/planning-boards/:boardId/elements/batch' as const,
+      input: z.object({ elements: z.array(insertCanvasElementSchema.omit({ boardId: true })) }),
+      responses: {
+        201: z.array(z.custom<typeof canvasElements.$inferSelect>()),
+      },
+    },
+    update: {
+      method: 'PATCH' as const,
+      path: '/api/canvas-elements/:id' as const,
+      input: insertCanvasElementSchema.partial(),
+      responses: {
+        200: z.custom<typeof canvasElements.$inferSelect>(),
+      },
+    },
+    updatePositions: {
+      method: 'PATCH' as const,
+      path: '/api/planning-boards/:boardId/elements/positions' as const,
+      input: z.object({
+        updates: z.array(z.object({
+          id: z.number(),
+          x: z.number(),
+          y: z.number(),
+          width: z.number().optional(),
+          height: z.number().optional(),
+          zIndex: z.number().optional(),
+          parentColumnId: z.number().nullable().optional(),
+        })),
+      }),
+      responses: {
+        200: z.object({ success: z.boolean() }),
+      },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/canvas-elements/:id' as const,
+      responses: {
+        200: z.object({ success: z.boolean() }),
       },
     },
   },
