@@ -20,7 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { usePlanningBoards, useCreatePlanningBoard, useDeletePlanningBoard, useUpdatePlanningBoard, useUploadImage } from "@/hooks/use-projects";
 import { useCanvasStore, debouncedSavePositions } from "@/stores/canvas-store";
 import { api, buildUrl } from "@shared/routes";
-import { recognizeAllShapes, recognizeShape } from "@/lib/shape-recognition";
+import { recognizeAllShapes, recognizeShape, looksLikeHandwriting } from "@/lib/shape-recognition";
 import type { CanvasElement, PlanningBoard as PlanningBoardType } from "@shared/schema";
 import { queryClient } from "@/lib/queryClient";
 
@@ -512,6 +512,8 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   const isDrawingRef = useRef(false);
   const holdSnapTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastMoveTimeRef = useRef(0);
+  const handwritingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [autoTextConverting, setAutoTextConverting] = useState(false);
 
   const redrawOverlayCanvas = useCallback(() => {
     const canvas = drawCanvasRef.current;
@@ -729,6 +731,96 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     if (drawingMode) redrawOverlayCanvas();
   }, [drawingMode, redrawOverlayCanvas]);
 
+  const tryAutoTextConvert = useCallback(async () => {
+    const paths = drawPathsRef.current;
+    if (paths.length === 0 || !looksLikeHandwriting(paths)) return;
+    const hasUnrecognized = paths.some((p: any) => !recognizeShape(p));
+    if (!hasUnrecognized) return;
+
+    const canvas = drawCanvasRef.current;
+    if (!canvas) return;
+
+    setAutoTextConverting(true);
+    try {
+      const tempCanvas = document.createElement("canvas");
+      const bb = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+      for (const path of paths) {
+        for (const pt of path.points) {
+          if (pt.x < bb.minX) bb.minX = pt.x;
+          if (pt.y < bb.minY) bb.minY = pt.y;
+          if (pt.x > bb.maxX) bb.maxX = pt.x;
+          if (pt.y > bb.maxY) bb.maxY = pt.y;
+        }
+      }
+      const padding = 20;
+      const w = bb.maxX - bb.minX + padding * 2;
+      const h = bb.maxY - bb.minY + padding * 2;
+      tempCanvas.width = Math.max(200, Math.min(w * 2, 1200));
+      tempCanvas.height = Math.max(100, Math.min(h * 2, 800));
+      const ctx = tempCanvas.getContext("2d");
+      if (!ctx) return;
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+      const scale = Math.min(tempCanvas.width / w, tempCanvas.height / h);
+      ctx.translate(padding * scale, padding * scale);
+      ctx.scale(scale, scale);
+      ctx.translate(-bb.minX, -bb.minY);
+      for (const path of paths) {
+        if (!path.points || path.points.length < 2) continue;
+        ctx.beginPath();
+        ctx.strokeStyle = path.color || "#1e3a2f";
+        ctx.lineWidth = path.strokeWidth || 3;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.moveTo(path.points[0].x, path.points[0].y);
+        for (let i = 1; i < path.points.length; i++) {
+          ctx.lineTo(path.points[i].x, path.points[i].y);
+        }
+        ctx.stroke();
+      }
+      const imageData = tempCanvas.toDataURL("image/png");
+      const resp = await fetch("/api/ai/recognize-handwriting", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ imageData }),
+      });
+      if (resp.ok) {
+        const { text } = await resp.json();
+        if (text && text.trim().length > 0 && selectedBoardId) {
+          const centerX = (bb.minX + bb.maxX) / 2;
+          const centerY = (bb.minY + bb.maxY) / 2;
+          const maxZ = Math.max(0, ...Object.values(elements).map((el) => el.zIndex || 0));
+          const apiUrl = buildUrl(api.canvasElements.create.path, { boardId: selectedBoardId });
+          const res = await fetch(apiUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+              type: "note",
+              x: centerX - 100,
+              y: centerY - 40,
+              width: 220,
+              height: 80,
+              zIndex: maxZ + 1,
+              content: { text: text.trim(), color: "#fffde7" },
+            }),
+          });
+          const el = await res.json();
+          addElement(el);
+          drawPathsRef.current = [];
+          setDrawingPaths([]);
+          redrawOverlayCanvas();
+          toast({ title: "Text Recognized", description: `"${text.trim()}"` });
+        }
+      }
+    } catch (err) {
+      console.error("Auto text conversion error:", err);
+    } finally {
+      setAutoTextConverting(false);
+    }
+  }, [selectedBoardId, elements, addElement, redrawOverlayCanvas, toast]);
+
   // Try to snap the last drawn path to a recognized shape
   const trySnapLastPath = useCallback(() => {
     const paths = drawPathsRef.current;
@@ -776,6 +868,10 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
 
     const handleDown = (clientX: number, clientY: number) => {
       clearHoldTimer();
+      if (handwritingTimerRef.current) {
+        clearTimeout(handwritingTimerRef.current);
+        handwritingTimerRef.current = null;
+      }
       const { x, y } = getBoard(clientX, clientY);
       if (drawTool === "eraser") {
         const newPaths = drawPathsRef.current.filter((p: any) =>
@@ -814,6 +910,14 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
         setIsDrawing(false);
         trySnapLastPath();
         setDrawingPaths([...drawPathsRef.current]);
+        if (handwritingTimerRef.current) {
+          clearTimeout(handwritingTimerRef.current);
+        }
+        handwritingTimerRef.current = setTimeout(() => {
+          if (!isDrawingRef.current) {
+            tryAutoTextConvert();
+          }
+        }, 1500);
       }
     };
 
@@ -866,6 +970,9 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
 
     return () => {
       clearHoldTimer();
+      if (handwritingTimerRef.current) {
+        clearTimeout(handwritingTimerRef.current);
+      }
       canvas.removeEventListener("mousedown", onMouseDown);
       canvas.removeEventListener("mousemove", onMouseMove);
       canvas.removeEventListener("mouseup", onMouseUp);
@@ -875,7 +982,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       canvas.removeEventListener("touchend", onTouchEnd);
       canvas.removeEventListener("touchcancel", onTouchEnd);
     };
-  }, [drawingMode, drawTool, drawColor, drawStrokeWidth, pan, zoom, redrawOverlayCanvas, trySnapLastPath]);
+  }, [drawingMode, drawTool, drawColor, drawStrokeWidth, pan, zoom, redrawOverlayCanvas, trySnapLastPath, tryAutoTextConvert]);
 
   const selectedBoard = boards.find((b: PlanningBoardType) => b.id === selectedBoardId);
   const elementsList = Object.values(elements);
@@ -1707,6 +1814,12 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                   style={{ cursor: "crosshair", touchAction: "none" }}
                   data-testid="draw-overlay-canvas"
                 />
+                {autoTextConverting && (
+                  <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-[102] bg-card border border-border rounded-lg shadow-lg px-4 py-2 flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                    <span className="text-xs text-muted-foreground">Recognizing text...</span>
+                  </div>
+                )}
                 <div
                   className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[101] flex items-center gap-2 bg-card border border-border rounded-lg shadow-lg px-3 py-2"
                   onMouseDown={(e) => e.stopPropagation()}

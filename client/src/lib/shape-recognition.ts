@@ -36,27 +36,31 @@ function pathLength(pts: Point[]): number {
   return len;
 }
 
-function isClosedShape(pts: Point[], threshold = 0.15): boolean {
-  if (pts.length < 5) return false;
+function isClosedShape(pts: Point[], threshold = 0.25): boolean {
+  if (pts.length < 4) return false;
   const len = pathLength(pts);
+  if (len < 10) return false;
   const endDist = distance(pts[0], pts[pts.length - 1]);
   return endDist / len < threshold;
 }
 
 function tryCircle(pts: Point[]): RecognizedShape | null {
-  if (!isClosedShape(pts)) return null;
-  if (pts.length < 8) return null;
+  if (!isClosedShape(pts, 0.3)) return null;
+  if (pts.length < 6) return null;
 
   const c = centroid(pts);
   const distances = pts.map((p) => distance(p, c));
   const avgR = distances.reduce((s, d) => s + d, 0) / distances.length;
-  if (avgR < 10) return null;
+  if (avgR < 8) return null;
 
   const variance = distances.reduce((s, d) => s + (d - avgR) ** 2, 0) / distances.length;
   const stdDev = Math.sqrt(variance);
   const cv = stdDev / avgR;
 
-  if (cv < 0.15) {
+  const bb = boundingBox(pts);
+  const aspectRatio = Math.min(bb.width, bb.height) / Math.max(bb.width, bb.height);
+
+  if (cv < 0.25 && aspectRatio > 0.6) {
     const n = 36;
     const circlePoints: Point[] = [];
     for (let i = 0; i <= n; i++) {
@@ -72,17 +76,17 @@ function tryCircle(pts: Point[]): RecognizedShape | null {
 }
 
 function tryRectangle(pts: Point[]): RecognizedShape | null {
-  if (!isClosedShape(pts)) return null;
-  if (pts.length < 8) return null;
+  if (!isClosedShape(pts, 0.3)) return null;
+  if (pts.length < 6) return null;
 
   const bb = boundingBox(pts);
-  if (bb.width < 15 || bb.height < 15) return null;
+  if (bb.width < 10 || bb.height < 10) return null;
 
   const totalLen = pathLength(pts);
   const perimeterBB = 2 * (bb.width + bb.height);
   const lenRatio = totalLen / perimeterBB;
 
-  if (lenRatio < 0.8 || lenRatio > 1.3) return null;
+  if (lenRatio < 0.7 || lenRatio > 1.6) return null;
 
   let insideCount = 0;
   for (const p of pts) {
@@ -91,13 +95,12 @@ function tryRectangle(pts: Point[]): RecognizedShape | null {
     const dTop = Math.abs(p.y - bb.minY);
     const dBottom = Math.abs(p.y - bb.maxY);
     const minDist = Math.min(dLeft, dRight, dTop, dBottom);
-    const threshold = Math.max(bb.width, bb.height) * 0.15;
+    const threshold = Math.max(bb.width, bb.height) * 0.2;
     if (minDist < threshold) insideCount++;
   }
 
   const edgeRatio = insideCount / pts.length;
-  if (edgeRatio > 0.7) {
-    const m = 4;
+  if (edgeRatio > 0.55) {
     return {
       type: "rectangle",
       points: [
@@ -115,18 +118,18 @@ function tryRectangle(pts: Point[]): RecognizedShape | null {
 }
 
 function tryLine(pts: Point[]): RecognizedShape | null {
-  if (pts.length < 3) return null;
-  if (isClosedShape(pts, 0.1)) return null;
+  if (pts.length < 2) return null;
+  if (isClosedShape(pts, 0.2)) return null;
 
   const first = pts[0];
   const last = pts[pts.length - 1];
   const directDist = distance(first, last);
-  if (directDist < 15) return null;
+  if (directDist < 10) return null;
 
   const total = pathLength(pts);
   const straightness = directDist / total;
 
-  if (straightness > 0.9) {
+  if (straightness > 0.85) {
     return {
       type: "line",
       points: [first, last],
@@ -138,8 +141,8 @@ function tryLine(pts: Point[]): RecognizedShape | null {
 }
 
 function tryTriangle(pts: Point[]): RecognizedShape | null {
-  if (!isClosedShape(pts)) return null;
-  if (pts.length < 6) return null;
+  if (!isClosedShape(pts, 0.3)) return null;
+  if (pts.length < 5) return null;
 
   const corners = findCorners(pts, 3);
   if (corners.length !== 3) return null;
@@ -154,7 +157,7 @@ function tryTriangle(pts: Point[]): RecognizedShape | null {
   const totalLen = pathLength(pts);
   const ratio = totalLen / perimeter;
 
-  if (ratio > 0.7 && ratio < 1.4) {
+  if (ratio > 0.6 && ratio < 1.6) {
     return {
       type: "triangle",
       points: [...corners, corners[0]],
@@ -167,24 +170,24 @@ function tryTriangle(pts: Point[]): RecognizedShape | null {
 
 function tryArrow(pts: Point[]): RecognizedShape | null {
   if (pts.length < 5) return null;
-  if (isClosedShape(pts, 0.1)) return null;
+  if (isClosedShape(pts, 0.15)) return null;
 
   const first = pts[0];
   const last = pts[pts.length - 1];
   const directDist = distance(first, last);
   const total = pathLength(pts);
 
-  if (directDist < 20) return null;
+  if (directDist < 15) return null;
 
   const straightness = directDist / total;
-  if (straightness > 0.6 && straightness < 0.85) {
-    const midIdx = Math.floor(pts.length * 0.6);
+  if (straightness > 0.5 && straightness < 0.88) {
+    const midIdx = Math.floor(pts.length * 0.55);
     const mainDir = Math.atan2(last.y - first.y, last.x - first.x);
     const tipPoints = pts.slice(midIdx);
-    if (tipPoints.length > 3) {
+    if (tipPoints.length > 2) {
       const hasDeviation = tipPoints.some((p) => {
         const lineFromStart = Math.atan2(p.y - first.y, p.x - first.x);
-        return Math.abs(lineFromStart - mainDir) > 0.3;
+        return Math.abs(lineFromStart - mainDir) > 0.25;
       });
 
       if (hasDeviation) {
@@ -215,7 +218,7 @@ function findCorners(pts: Point[], targetCount: number): Point[] {
   if (n < targetCount * 2) return [];
 
   const angles: { idx: number; angle: number }[] = [];
-  const windowSize = Math.max(3, Math.floor(n / 10));
+  const windowSize = Math.max(2, Math.floor(n / 12));
 
   for (let i = windowSize; i < n - windowSize; i++) {
     const prev = pts[i - windowSize];
@@ -255,13 +258,13 @@ export interface DrawPath {
 }
 
 export function recognizeShape(path: DrawPath): (DrawPath & { shapeType?: string }) | null {
-  if (!path.points || path.points.length < 3) return null;
+  if (!path.points || path.points.length < 2) return null;
 
   const detectors: (() => RecognizedShape | null)[] = [
-    () => tryLine(path.points),
     () => tryCircle(path.points),
     () => tryRectangle(path.points),
     () => tryTriangle(path.points),
+    () => tryLine(path.points),
     () => tryArrow(path.points),
   ];
 
@@ -285,4 +288,18 @@ export function recognizeAllShapes(paths: DrawPath[]): DrawPath[] {
     const recognized = recognizeShape(path);
     return recognized || path;
   });
+}
+
+export function looksLikeHandwriting(paths: DrawPath[]): boolean {
+  if (paths.length === 0) return false;
+  let unrecognizedCount = 0;
+  let totalPoints = 0;
+  for (const path of paths) {
+    const shape = recognizeShape(path);
+    if (!shape) {
+      unrecognizedCount++;
+      totalPoints += path.points.length;
+    }
+  }
+  return unrecognizedCount >= 1 && totalPoints > 5;
 }
