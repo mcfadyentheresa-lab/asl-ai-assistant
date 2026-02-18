@@ -28,10 +28,11 @@ export function getSession() {
     tableName: "sessions",
   });
   return session({
+    name: "asc.sid",
     secret: process.env.SESSION_SECRET!,
     store: sessionStore,
-    resave: false,
-    saveUninitialized: false,
+    resave: true,
+    saveUninitialized: true,
     cookie: {
       httpOnly: true,
       secure: true,
@@ -105,16 +106,7 @@ export async function setupAuth(app: Express) {
 
   app.get("/api/login", (req, res, next) => {
     ensureStrategy(req.hostname);
-    const originalRedirect = res.redirect.bind(res);
-    (res as any).redirect = function(url: string) {
-      req.session.save((err) => {
-        if (err) {
-          console.error("Session save error before login redirect:", err);
-        }
-        console.log("Login: session saved with id:", req.sessionID, "data keys:", Object.keys(req.session));
-        originalRedirect(url);
-      });
-    };
+    console.log("Login: starting auth, session id:", req.sessionID);
     passport.authenticate(`replitauth:${req.hostname}`, {
       prompt: "login consent",
       scope: ["openid", "email", "profile", "offline_access"],
