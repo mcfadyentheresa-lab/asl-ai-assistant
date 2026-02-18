@@ -294,6 +294,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
 
   // Touch-based canvas handlers for drag & pan on mobile
   const handleCanvasTouchStart = (e: React.TouchEvent) => {
+    if (drawingMode) return;
     if (e.touches.length === 1) {
       const touch = e.touches[0];
       setIsPanning(true);
@@ -302,6 +303,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   };
 
   const handleCanvasTouchMove = (e: React.TouchEvent) => {
+    if (drawingMode) return;
     const touch = e.touches[0];
     if (!touch) return;
     if (longPressTimerRef.current) {
@@ -543,6 +545,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
 
   // Panning
   const handleCanvasMouseDown = (e: React.MouseEvent) => {
+    if (drawingMode) return;
     if (e.button === 1 || spaceRef.current) {
       e.preventDefault();
       setIsPanning(true);
@@ -551,6 +554,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   };
 
   const handleCanvasMouseMove = (e: React.MouseEvent) => {
+    if (drawingMode) return;
     if (isPanning && panStartRef.current) {
       const dx = e.clientX - panStartRef.current.x;
       const dy = e.clientY - panStartRef.current.y;
@@ -722,6 +726,115 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   useEffect(() => {
     if (drawingMode) redrawOverlayCanvas();
   }, [drawingMode, redrawOverlayCanvas]);
+
+  // Attach native DOM event listeners for drawing - works reliably on mouse, touch, and stylus
+  useEffect(() => {
+    const canvas = drawCanvasRef.current;
+    if (!canvas || !drawingMode) return;
+
+    const getBoard = (clientX: number, clientY: number) => {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: (clientX - rect.left - pan.x) / zoom,
+        y: (clientY - rect.top - pan.y) / zoom,
+      };
+    };
+
+    const handleDown = (clientX: number, clientY: number) => {
+      const { x, y } = getBoard(clientX, clientY);
+      if (drawTool === "eraser") {
+        const newPaths = drawPathsRef.current.filter((p: any) =>
+          !p.points.some((pt: any) => Math.sqrt((pt.x - x) ** 2 + (pt.y - y) ** 2) < 15 / zoom)
+        );
+        drawPathsRef.current = newPaths;
+        setDrawingPaths(newPaths);
+        redrawOverlayCanvas();
+      } else {
+        isDrawingRef.current = true;
+        setIsDrawing(true);
+        const newPath = { points: [{ x, y }], color: drawColor, strokeWidth: drawStrokeWidth };
+        drawPathsRef.current = [...drawPathsRef.current, newPath];
+        setDrawingPaths([...drawPathsRef.current]);
+      }
+    };
+
+    const handleMove = (clientX: number, clientY: number) => {
+      if (!isDrawingRef.current || drawTool !== "pen") return;
+      const { x, y } = getBoard(clientX, clientY);
+      const paths = drawPathsRef.current;
+      const last = paths[paths.length - 1];
+      if (last) {
+        last.points.push({ x, y });
+        redrawOverlayCanvas();
+      }
+    };
+
+    const handleUp = () => {
+      if (isDrawingRef.current) {
+        isDrawingRef.current = false;
+        setIsDrawing(false);
+        setDrawingPaths([...drawPathsRef.current]);
+      }
+    };
+
+    // Mouse events
+    const onMouseDown = (e: MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      handleDown(e.clientX, e.clientY);
+    };
+    const onMouseMove = (e: MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      handleMove(e.clientX, e.clientY);
+    };
+    const onMouseUp = (e: MouseEvent) => {
+      e.stopPropagation();
+      handleUp();
+    };
+
+    // Touch events
+    const onTouchStart = (e: TouchEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.touches.length === 1) {
+        const t = e.touches[0];
+        handleDown(t.clientX, t.clientY);
+      }
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.touches.length === 1) {
+        const t = e.touches[0];
+        handleMove(t.clientX, t.clientY);
+      }
+    };
+    const onTouchEnd = (e: TouchEvent) => {
+      e.stopPropagation();
+      handleUp();
+    };
+
+    canvas.addEventListener("mousedown", onMouseDown, { passive: false });
+    canvas.addEventListener("mousemove", onMouseMove, { passive: false });
+    canvas.addEventListener("mouseup", onMouseUp);
+    canvas.addEventListener("mouseleave", onMouseUp);
+    canvas.addEventListener("touchstart", onTouchStart, { passive: false });
+    canvas.addEventListener("touchmove", onTouchMove, { passive: false });
+    canvas.addEventListener("touchend", onTouchEnd);
+    canvas.addEventListener("touchcancel", onTouchEnd);
+
+    return () => {
+      canvas.removeEventListener("mousedown", onMouseDown);
+      canvas.removeEventListener("mousemove", onMouseMove);
+      canvas.removeEventListener("mouseup", onMouseUp);
+      canvas.removeEventListener("mouseleave", onMouseUp);
+      canvas.removeEventListener("touchstart", onTouchStart);
+      canvas.removeEventListener("touchmove", onTouchMove);
+      canvas.removeEventListener("touchend", onTouchEnd);
+      canvas.removeEventListener("touchcancel", onTouchEnd);
+    };
+  }, [drawingMode, drawTool, drawColor, drawStrokeWidth, pan, zoom, redrawOverlayCanvas]);
 
   const selectedBoard = boards.find((b: PlanningBoardType) => b.id === selectedBoardId);
   const elementsList = Object.values(elements);
@@ -1550,69 +1663,13 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                     }
                   }}
                   className="absolute inset-0 z-[100]"
-                  style={{ cursor: "crosshair" }}
-                  onPointerDown={(e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    const canvas = drawCanvasRef.current;
-                    if (!canvas) return;
-                    (e.target as HTMLElement).setPointerCapture(e.pointerId);
-                    const rect = canvas.getBoundingClientRect();
-                    const boardX = (e.clientX - rect.left - pan.x) / zoom;
-                    const boardY = (e.clientY - rect.top - pan.y) / zoom;
-                    if (drawTool === "eraser") {
-                      const newPaths = drawPathsRef.current.filter((p: any) => {
-                        return !p.points.some((pt: any) => {
-                          const dist = Math.sqrt((pt.x - boardX) ** 2 + (pt.y - boardY) ** 2);
-                          return dist < 15 / zoom;
-                        });
-                      });
-                      drawPathsRef.current = newPaths;
-                      setDrawingPaths(newPaths);
-                      redrawOverlayCanvas();
-                    } else {
-                      isDrawingRef.current = true;
-                      setIsDrawing(true);
-                      const newPath = { points: [{ x: boardX, y: boardY }], color: drawColor, strokeWidth: drawStrokeWidth };
-                      drawPathsRef.current = [...drawPathsRef.current, newPath];
-                      setDrawingPaths([...drawPathsRef.current]);
-                    }
-                  }}
-                  onPointerMove={(e) => {
-                    if (!isDrawingRef.current || drawTool !== "pen") return;
-                    e.stopPropagation();
-                    const canvas = drawCanvasRef.current;
-                    if (!canvas) return;
-                    const rect = canvas.getBoundingClientRect();
-                    const boardX = (e.clientX - rect.left - pan.x) / zoom;
-                    const boardY = (e.clientY - rect.top - pan.y) / zoom;
-                    const paths = drawPathsRef.current;
-                    const last = paths[paths.length - 1];
-                    if (last) {
-                      last.points.push({ x: boardX, y: boardY });
-                      redrawOverlayCanvas();
-                    }
-                  }}
-                  onPointerUp={(e) => {
-                    if (isDrawingRef.current) {
-                      isDrawingRef.current = false;
-                      setIsDrawing(false);
-                      setDrawingPaths([...drawPathsRef.current]);
-                    }
-                    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
-                  }}
-                  onPointerLeave={() => {
-                    if (isDrawingRef.current) {
-                      isDrawingRef.current = false;
-                      setIsDrawing(false);
-                      setDrawingPaths([...drawPathsRef.current]);
-                    }
-                  }}
+                  style={{ cursor: "crosshair", touchAction: "none" }}
                   data-testid="draw-overlay-canvas"
                 />
                 <div
                   className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[101] flex items-center gap-2 bg-card border border-border rounded-lg shadow-lg px-3 py-2"
                   onMouseDown={(e) => e.stopPropagation()}
+                  onTouchStart={(e) => e.stopPropagation()}
                   data-testid="draw-overlay-toolbar"
                 >
                   <button className={`p-1.5 rounded transition-colors ${drawTool === "pen" ? "bg-primary/20 text-primary" : "text-muted-foreground hover:text-foreground"}`} onClick={() => setDrawTool("pen")} data-testid="draw-tool-pen"><PenTool className="h-4 w-4" /></button>
