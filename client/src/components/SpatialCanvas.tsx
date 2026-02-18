@@ -357,7 +357,27 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       }
     });
     if (foundColumn !== el.parentColumnId) {
-      updateElement(elementId, { parentColumnId: foundColumn });
+      if (foundColumn !== null) {
+        const col = elements[foundColumn];
+        const padding = 12;
+        const headerHeight = 50;
+        const fitWidth = col.width - padding * 2;
+        const siblings = Object.values(elements).filter(
+          (e) => e.parentColumnId === foundColumn && e.id !== elementId
+        );
+        const stackY = siblings.reduce((acc, sib) => {
+          const sibBottom = sib.y + (sib.height || 60);
+          return Math.max(acc, sibBottom);
+        }, col.y + headerHeight);
+        updateElement(elementId, {
+          parentColumnId: foundColumn,
+          width: fitWidth,
+          x: col.x + padding,
+          y: stackY + 8,
+        });
+      } else {
+        updateElement(elementId, { parentColumnId: foundColumn });
+      }
     }
   };
 
@@ -728,11 +748,15 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     if (el.type === "column") {
       const childEls = elementsList.filter((e) => e.parentColumnId === el.id);
       const isDropTarget = draggingId !== null && draggingId !== el.id && elements[draggingId]?.type !== "column";
+      const childrenBottom = childEls.reduce((acc, child) => {
+        return Math.max(acc, (child.y - el.y) + (child.height || 60) + 12);
+      }, 0);
+      const computedHeight = Math.max(el.height || 300, childrenBottom);
       return (
         <div
           key={el.id}
           className={`${cardBase} border border-dashed ${isDropTarget ? "bg-primary/10 border-primary/40" : "bg-muted/40 border-border/60"} transition-colors`}
-          style={{ left: el.x, top: el.y, width: el.width, minHeight: el.height, zIndex: el.zIndex }}
+          style={{ left: el.x, top: el.y, width: el.width, minHeight: computedHeight, zIndex: el.zIndex }}
           onClick={handleClick}
           onContextMenu={(e) => openContextMenu(e, el.id)}
           onTouchStart={handleElementTouchStart(el.id)}
@@ -881,8 +905,13 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       return (
         <div
           key={el.id}
-          className={`${cardBase} bg-card border border-border overflow-hidden`}
+          className={`${cardBase} bg-card border border-border overflow-hidden cursor-grab`}
           style={{ left: el.x, top: el.y, width: el.width, zIndex: el.zIndex }}
+          onMouseDown={(e) => {
+            const tag = (e.target as HTMLElement).tagName.toLowerCase();
+            if (tag === "input" || tag === "button" || (e.target as HTMLElement).closest("button")) return;
+            startDrag(el.id, e);
+          }}
           onClick={handleClick}
           onContextMenu={(e) => openContextMenu(e, el.id)}
           onTouchStart={handleElementTouchStart(el.id)}
@@ -890,16 +919,12 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           onTouchCancel={handleLongPressEnd}
           data-testid={`element-image-${el.id}`}
         >
-          {dragHandle}
           {c.url ? (
-            <div className="cursor-grab" onMouseDown={(e) => startDrag(el.id, e)}>
-              <img src={c.url} alt={c.caption || ""} className="w-full h-auto max-h-[300px] object-cover" />
-            </div>
+            <img src={c.url} alt={c.caption || ""} className="w-full h-auto max-h-[300px] object-cover pointer-events-none select-none" draggable={false} />
           ) : (
             <div
               className="h-[120px] bg-muted flex flex-col items-center justify-center gap-2 cursor-pointer"
               onClick={(e) => { e.stopPropagation(); triggerImageUpload(el.id); }}
-              onMouseDown={(e) => { if (e.button !== 0) startDrag(el.id, e); }}
               data-testid={`image-upload-area-${el.id}`}
             >
               {isUploading && uploadTargetId === el.id ? (
