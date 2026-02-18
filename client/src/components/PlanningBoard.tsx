@@ -59,6 +59,9 @@ import {
   LayoutPanelLeft,
   X,
   Palette,
+  Maximize,
+  Hand,
+  Move,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -130,6 +133,10 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
   const [showNewBoardDialog, setShowNewBoardDialog] = useState(false);
   const [showImageUrlDialog, setShowImageUrlDialog] = useState(false);
   const [imageUrl, setImageUrl] = useState("");
+  const [isPanning, setIsPanning] = useState(false);
+  const isPanningRef = useRef(false);
+  const lastPanPoint = useRef<{ x: number; y: number } | null>(null);
+  const spaceHeld = useRef(false);
   const [showCardDialog, setShowCardDialog] = useState(false);
   const [cardTitle, setCardTitle] = useState("New Column");
   const [cardItems, setCardItems] = useState<CardContentItem[]>([]);
@@ -240,6 +247,86 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
         autoSaveRef.current();
       });
 
+      canvas.on("mouse:down", (opt) => {
+        const evt = opt.e as MouseEvent;
+        if ((evt.button === 1 || spaceHeld.current) && !canvas.isDrawingMode) {
+          isPanningRef.current = true;
+          setIsPanning(true);
+          lastPanPoint.current = { x: evt.clientX, y: evt.clientY };
+          canvas.selection = false;
+          canvas.discardActiveObject();
+          canvas.renderAll();
+          evt.preventDefault();
+          evt.stopPropagation();
+        }
+      });
+
+      canvas.on("mouse:move", (opt) => {
+        if (!isPanningRef.current || !lastPanPoint.current) return;
+        const evt = opt.e as MouseEvent;
+        const vpt = canvas.viewportTransform!;
+        vpt[4] += evt.clientX - lastPanPoint.current.x;
+        vpt[5] += evt.clientY - lastPanPoint.current.y;
+        lastPanPoint.current = { x: evt.clientX, y: evt.clientY };
+        canvas.setViewportTransform(vpt);
+        canvas.renderAll();
+      });
+
+      canvas.on("mouse:up", () => {
+        if (isPanningRef.current) {
+          isPanningRef.current = false;
+          setIsPanning(false);
+          lastPanPoint.current = null;
+          canvas.selection = true;
+        }
+      });
+
+      const canvasEl = canvas.getSelectionElement();
+      const handleWheel = (e: WheelEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.ctrlKey || e.metaKey) {
+          const delta = -e.deltaY / 300;
+          let newZoom = canvas.getZoom() + delta;
+          newZoom = Math.max(0.1, Math.min(5, newZoom));
+          const point = canvas.getScenePoint(e);
+          canvas.zoomToPoint(point, newZoom);
+          setZoom(newZoom);
+        } else {
+          const vpt = canvas.viewportTransform!;
+          vpt[4] -= e.deltaX;
+          vpt[5] -= e.deltaY;
+          canvas.setViewportTransform(vpt);
+        }
+        canvas.renderAll();
+      };
+      canvasEl.addEventListener("wheel", handleWheel, { passive: false });
+
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.code === "Space" && !e.repeat && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) {
+          e.preventDefault();
+          spaceHeld.current = true;
+        }
+      };
+      const handleKeyUp = (e: KeyboardEvent) => {
+        if (e.code === "Space") {
+          spaceHeld.current = false;
+          if (isPanningRef.current) {
+            isPanningRef.current = false;
+            setIsPanning(false);
+            lastPanPoint.current = null;
+            canvas.selection = true;
+          }
+        }
+      };
+      window.addEventListener("keydown", handleKeyDown);
+      window.addEventListener("keyup", handleKeyUp);
+
+      (canvas as any).__wheelHandler = handleWheel;
+      (canvas as any).__keyDownHandler = handleKeyDown;
+      (canvas as any).__keyUpHandler = handleKeyUp;
+      (canvas as any).__canvasEl = canvasEl;
+
       const initialState = JSON.stringify(canvas.toJSON());
       undoStack.current = [initialState];
     };
@@ -264,6 +351,12 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
       resizeObserver?.disconnect();
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
       if (fabricRef.current) {
+        const c = fabricRef.current as any;
+        if (c.__canvasEl && c.__wheelHandler) {
+          c.__canvasEl.removeEventListener("wheel", c.__wheelHandler);
+        }
+        if (c.__keyDownHandler) window.removeEventListener("keydown", c.__keyDownHandler);
+        if (c.__keyUpHandler) window.removeEventListener("keyup", c.__keyUpHandler);
         fabricRef.current.dispose();
         fabricRef.current = null;
       }
@@ -355,6 +448,7 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
     const prev = undoStack.current[undoStack.current.length - 1];
     isLoadingCanvas.current = true;
     canvas.loadFromJSON(JSON.parse(prev)).then(() => {
+      rehydrateGroups(canvas);
       canvas.renderAll();
       isLoadingCanvas.current = false;
       setCanUndo(undoStack.current.length > 1);
@@ -371,6 +465,7 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
     undoStack.current.push(next);
     isLoadingCanvas.current = true;
     canvas.loadFromJSON(JSON.parse(next)).then(() => {
+      rehydrateGroups(canvas);
       canvas.renderAll();
       isLoadingCanvas.current = false;
       setCanUndo(true);
@@ -432,20 +527,102 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
     const canvas = fabricRef.current;
     if (!canvas) return;
     let newZoom = zoom + delta;
-    newZoom = Math.max(0.25, Math.min(3, newZoom));
-    canvas.setZoom(newZoom);
+    newZoom = Math.max(0.1, Math.min(5, newZoom));
+    const center = new fabric.Point(canvas.getWidth() / 2, canvas.getHeight() / 2);
+    canvas.zoomToPoint(center, newZoom);
     setZoom(newZoom);
     canvas.renderAll();
+  };
+
+  const fitToScreen = () => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    const objects = canvas.getObjects();
+    if (objects.length === 0) {
+      canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
+      setZoom(1);
+      canvas.renderAll();
+      return;
+    }
+
+    const bound = {
+      left: Infinity, top: Infinity, right: -Infinity, bottom: -Infinity,
+    };
+    objects.forEach((obj) => {
+      const br = obj.getBoundingRect();
+      bound.left = Math.min(bound.left, br.left);
+      bound.top = Math.min(bound.top, br.top);
+      bound.right = Math.max(bound.right, br.left + br.width);
+      bound.bottom = Math.max(bound.bottom, br.top + br.height);
+    });
+
+    const contentW = bound.right - bound.left;
+    const contentH = bound.bottom - bound.top;
+    if (contentW <= 0 || contentH <= 0) return;
+
+    const PAD = 60;
+    const canvasW = canvas.getWidth();
+    const canvasH = canvas.getHeight();
+    const scaleX = (canvasW - PAD * 2) / contentW;
+    const scaleY = (canvasH - PAD * 2) / contentH;
+    let newZoom = Math.min(scaleX, scaleY, 2);
+    newZoom = Math.max(0.1, newZoom);
+
+    canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
+    canvas.renderAll();
+
+    const updatedBound = {
+      left: Infinity, top: Infinity, right: -Infinity, bottom: -Infinity,
+    };
+    objects.forEach((obj) => {
+      const br = obj.getBoundingRect();
+      updatedBound.left = Math.min(updatedBound.left, br.left);
+      updatedBound.top = Math.min(updatedBound.top, br.top);
+      updatedBound.right = Math.max(updatedBound.right, br.left + br.width);
+      updatedBound.bottom = Math.max(updatedBound.bottom, br.top + br.height);
+    });
+
+    const cx = (updatedBound.left + updatedBound.right) / 2;
+    const cy = (updatedBound.top + updatedBound.bottom) / 2;
+
+    const center = new fabric.Point(cx, cy);
+    canvas.zoomToPoint(center, newZoom);
+
+    const vpt = canvas.viewportTransform!;
+    vpt[4] += canvasW / 2 - cx * newZoom;
+    vpt[5] += canvasH / 2 - cy * newZoom;
+    canvas.setViewportTransform(vpt);
+
+    setZoom(newZoom);
+    canvas.renderAll();
+  };
+
+  const resetView = () => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
+    setZoom(1);
+    canvas.renderAll();
+  };
+
+  const getViewportCenter = () => {
+    const canvas = fabricRef.current;
+    if (!canvas) return { x: 200, y: 200 };
+    const vpt = canvas.viewportTransform!;
+    const z = canvas.getZoom();
+    return {
+      x: (canvas.getWidth() / 2 - vpt[4]) / z,
+      y: (canvas.getHeight() / 2 - vpt[5]) / z,
+    };
   };
 
   const addText = () => {
     const canvas = fabricRef.current;
     if (!canvas) return;
-    const w = canvas.getWidth();
-    const h = canvas.getHeight();
+    const c = getViewportCenter();
     const text = new fabric.IText("Type here", {
-      left: Math.max(50, w / 2 - 50),
-      top: Math.max(50, h / 2 - 15),
+      left: c.x - 50,
+      top: c.y - 15,
       fontFamily: "DM Sans, sans-serif",
       fontSize: 20,
       fill: "#1a1a1a",
@@ -459,9 +636,10 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
   const addRect = () => {
     const canvas = fabricRef.current;
     if (!canvas) return;
+    const c = getViewportCenter();
     const rect = new fabric.Rect({
-      left: canvas.getWidth() / 2 - 50,
-      top: canvas.getHeight() / 2 - 50,
+      left: c.x - 50,
+      top: c.y - 50,
       width: 100,
       height: 100,
       fill: "transparent",
@@ -478,9 +656,10 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
   const addCircle = () => {
     const canvas = fabricRef.current;
     if (!canvas) return;
+    const c = getViewportCenter();
     const circle = new fabric.Circle({
-      left: canvas.getWidth() / 2 - 40,
-      top: canvas.getHeight() / 2 - 40,
+      left: c.x - 40,
+      top: c.y - 40,
       radius: 40,
       fill: "transparent",
       stroke: brushColor,
@@ -494,9 +673,10 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
   const addSticky = () => {
     const canvas = fabricRef.current;
     if (!canvas) return;
+    const c = getViewportCenter();
     const textbox = new fabric.Textbox("Type your note here...", {
-      left: canvas.getWidth() / 2 - 90,
-      top: canvas.getHeight() / 2 - 70,
+      left: c.x - 90,
+      top: c.y - 70,
       width: 180,
       fontFamily: "DM Sans, sans-serif",
       fontSize: 14,
@@ -696,9 +876,14 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
 
       const allObjects = [bg, titleText, countText, ...contentObjects];
 
+      const vpt = canvas.viewportTransform!;
+      const z = canvas.getZoom();
+      const vcx = (canvas.getWidth() / 2 - vpt[4]) / z;
+      const vcy = (canvas.getHeight() / 2 - vpt[5]) / z;
+
       const group = new fabric.Group(allObjects, {
-        left: left ?? canvas.getWidth() / 2 - CARD_WIDTH / 2,
-        top: top ?? Math.max(20, canvas.getHeight() / 2 - totalHeight / 2),
+        left: left ?? vcx - CARD_WIDTH / 2,
+        top: top ?? Math.max(20, vcy - totalHeight / 2),
         subTargetCheck: true,
         interactive: true,
       });
@@ -1185,10 +1370,16 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
         <Separator orientation="vertical" className="h-6 mx-1" />
 
         {toolBtn("zoomOut", <ZoomOut className="h-4 w-4" />, "Zoom Out", () => handleZoom(-0.1), false)}
-        <span className="text-xs text-muted-foreground min-w-[3rem] text-center" data-testid="text-zoom-level">
+        <button
+          className="text-xs text-muted-foreground min-w-[3rem] text-center hover:text-foreground transition-colors cursor-pointer"
+          onClick={resetView}
+          title="Reset to 100%"
+          data-testid="button-reset-zoom"
+        >
           {Math.round(zoom * 100)}%
-        </span>
+        </button>
         {toolBtn("zoomIn", <ZoomIn className="h-4 w-4" />, "Zoom In", () => handleZoom(0.1), false)}
+        {toolBtn("fitScreen", <Maximize className="h-4 w-4" />, "Fit to Screen", fitToScreen, false)}
 
         <Separator orientation="vertical" className="h-6 mx-1" />
 
@@ -1231,7 +1422,7 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
       <div
         ref={containerRef}
         className={`flex-1 border rounded-md overflow-hidden bg-muted/30 ${boards.length === 0 ? "hidden" : ""} ${(!selectedBoardId || isLoadingBoard) && boards.length > 0 ? "invisible" : ""}`}
-        style={{ cursor: tool === "draw" ? "crosshair" : tool === "eraser" ? "cell" : "default" }}
+        style={{ cursor: isPanning || spaceHeld.current ? "grabbing" : tool === "draw" ? "crosshair" : tool === "eraser" ? "cell" : "default" }}
         data-testid="planning-board-canvas-container"
       >
         <canvas ref={canvasRef} data-testid="planning-board-canvas" />
@@ -1240,7 +1431,7 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
       {boards.length > 0 && (
         <div className={`flex items-center justify-between mt-2 px-1 ${(!selectedBoardId || isLoadingData) ? "invisible" : ""}`}>
           <p className="text-[10px] text-muted-foreground">
-            Tip: Double-click to edit text. Use cards to create Milanote-style columns with text, colors & images. {hasUnsaved && "(Auto-saving...)"}
+            Scroll to pan, Ctrl+scroll to zoom, hold Space to drag. Click % to reset view. {hasUnsaved && "(Auto-saving...)"}
           </p>
           <p className="text-[10px] text-muted-foreground" data-testid="text-save-status">
             {isSaving ? "Saving..." : hasUnsaved ? "Unsaved changes" : "All changes saved"}
