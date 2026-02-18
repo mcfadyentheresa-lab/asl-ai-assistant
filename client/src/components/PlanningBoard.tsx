@@ -271,6 +271,22 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
     };
   }, []);
 
+  const rehydrateGroups = (canvas: fabric.Canvas) => {
+    canvas.getObjects().forEach((obj) => {
+      if (obj instanceof fabric.Group) {
+        obj.set({ subTargetCheck: true, interactive: true });
+        (obj as fabric.Group).getObjects().forEach((child) => {
+          if (child instanceof fabric.Rect) {
+            child.set({ selectable: false, evented: false });
+          }
+          if (child instanceof fabric.Textbox) {
+            child.set({ editable: true, selectable: true, evented: true });
+          }
+        });
+      }
+    });
+  };
+
   useEffect(() => {
     const canvas = fabricRef.current;
     if (!canvas || !canvasReady) return;
@@ -281,6 +297,7 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
 
     if (boardData?.canvasData) {
       canvas.loadFromJSON(boardData.canvasData).then(() => {
+        rehydrateGroups(canvas);
         canvas.renderAll();
         const state = JSON.stringify(canvas.toJSON());
         undoStack.current = [state];
@@ -658,6 +675,12 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
       }
 
       const totalHeight = yPos + CARD_PAD - ITEM_GAP;
+      contentObjects.forEach((obj) => {
+        if (obj instanceof fabric.Rect) {
+          obj.set({ selectable: false, evented: false });
+        }
+      });
+
       const bg = new fabric.Rect({
         left: 0,
         top: 0,
@@ -666,6 +689,8 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
         fill: "#f3f4f6",
         rx: 8,
         ry: 8,
+        selectable: false,
+        evented: false,
         shadow: new fabric.Shadow({ color: "rgba(0,0,0,0.1)", blur: 12, offsetX: 2, offsetY: 4 }),
       });
 
