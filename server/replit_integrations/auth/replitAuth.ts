@@ -30,8 +30,8 @@ export function getSession() {
   return session({
     secret: process.env.SESSION_SECRET!,
     store: sessionStore,
-    resave: true,
-    saveUninitialized: true,
+    resave: false,
+    saveUninitialized: false,
     cookie: {
       httpOnly: true,
       secure: true,
@@ -62,7 +62,7 @@ async function upsertUser(claims: any) {
 }
 
 export async function setupAuth(app: Express) {
-  app.set("trust proxy", 1);
+  app.set("trust proxy", true);
   app.use(getSession());
   app.use(passport.initialize());
   app.use(passport.session());
@@ -105,19 +105,24 @@ export async function setupAuth(app: Express) {
 
   app.get("/api/login", (req, res, next) => {
     ensureStrategy(req.hostname);
-    const authenticator = passport.authenticate(`replitauth:${req.hostname}`, {
+    const originalRedirect = res.redirect.bind(res);
+    (res as any).redirect = function(url: string) {
+      req.session.save((err) => {
+        if (err) {
+          console.error("Session save error before login redirect:", err);
+        }
+        console.log("Login: session saved with id:", req.sessionID, "data keys:", Object.keys(req.session));
+        originalRedirect(url);
+      });
+    };
+    passport.authenticate(`replitauth:${req.hostname}`, {
       prompt: "login consent",
       scope: ["openid", "email", "profile", "offline_access"],
-    });
-    req.session.save((err) => {
-      if (err) {
-        console.error("Session save error before login redirect:", err);
-      }
-      authenticator(req, res, next);
-    });
+    })(req, res, next);
   });
 
   app.get("/api/callback", (req, res, next) => {
+    console.log("Callback: session id:", req.sessionID, "data keys:", Object.keys(req.session));
     ensureStrategy(req.hostname);
     passport.authenticate(`replitauth:${req.hostname}`, (err: any, user: any, info: any) => {
       if (err) {
