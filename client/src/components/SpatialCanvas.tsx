@@ -12,10 +12,10 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   StickyNote, Type, ImagePlus, Square, Columns3, LayoutGrid, Link2, Palette, Trash2, Plus,
   ZoomIn, ZoomOut, Maximize, Loader2, MoreVertical, Edit3, Download, CheckSquare, GripVertical,
-  X, ChevronDown, ExternalLink, Pencil,
+  X, ChevronDown, ExternalLink, Pencil, Upload, Copy, ArrowUpFromLine,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { usePlanningBoards, useCreatePlanningBoard, useDeletePlanningBoard, useUpdatePlanningBoard } from "@/hooks/use-projects";
+import { usePlanningBoards, useCreatePlanningBoard, useDeletePlanningBoard, useUpdatePlanningBoard, useUploadImage } from "@/hooks/use-projects";
 import { useCanvasStore, debouncedSavePositions } from "@/stores/canvas-store";
 import { api, buildUrl } from "@shared/routes";
 import type { CanvasElement, PlanningBoard as PlanningBoardType } from "@shared/schema";
@@ -60,6 +60,12 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [maxZ, setMaxZ] = useState(1);
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadTargetId, setUploadTargetId] = useState<number | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; elementId: number } | null>(null);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const elements = useCanvasStore((s) => s.elements);
   const loading = useCanvasStore((s) => s.loading);
   const { setElements, addElement, updateElement, removeElement, moveElement, setLoading, setBoardId } = useCanvasStore.getState();
@@ -68,6 +74,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   const { mutateAsync: createBoard } = useCreatePlanningBoard();
   const { mutateAsync: updateBoard } = useUpdatePlanningBoard();
   const { mutateAsync: deleteBoard } = useDeletePlanningBoard();
+  const { mutateAsync: uploadImage } = useUploadImage();
 
   useEffect(() => {
     if (boards.length > 0 && !selectedBoardId) {
@@ -106,14 +113,14 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
 
   const handleRename = async () => {
     if (!selectedBoardId || !renameName.trim()) return;
-    await updateBoard({ id: selectedBoardId, data: { name: renameName.trim() } });
+    await updateBoard({ id: selectedBoardId, name: renameName.trim() });
     setShowRenameDialog(false);
     queryClient.invalidateQueries({ queryKey: [api.planningBoards.list.path, projectId] });
   };
 
   const handleDeleteBoard = async () => {
     if (!selectedBoardId) return;
-    await deleteBoard(selectedBoardId);
+    await deleteBoard({ id: selectedBoardId, projectId });
     setShowDeleteConfirm(false);
     setSelectedBoardId(null);
     queryClient.invalidateQueries({ queryKey: [api.planningBoards.list.path, projectId] });
@@ -162,6 +169,97 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
         body: JSON.stringify({ content }),
       });
     } catch {}
+  };
+
+  const handleFileUpload = async (file: File, targetElementId?: number) => {
+    if (!selectedBoardId) return;
+    setIsUploading(true);
+    try {
+      const result = await uploadImage(file);
+      if (targetElementId) {
+        const el = elements[targetElementId];
+        if (el) {
+          const c = (el.content || {}) as any;
+          handleUpdateContent(targetElementId, { ...c, url: result.url });
+        }
+      } else {
+        const newZ = maxZ;
+        setMaxZ((z: number) => z + 1);
+        const centerX = Math.round((-pan.x + (containerRef.current?.clientWidth || 800) / 2) / zoom - 120);
+        const centerY = Math.round((-pan.y + (containerRef.current?.clientHeight || 600) / 2) / zoom - 100);
+        const url = buildUrl(api.canvasElements.create.path, { boardId: selectedBoardId });
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ type: "image", x: centerX, y: centerY, width: 240, height: 200, zIndex: newZ, content: { url: result.url, caption: "" } }),
+        });
+        const el = await res.json();
+        addElement(el);
+      }
+      toast({ title: "Image uploaded" });
+    } catch {
+      toast({ title: "Upload failed", description: "Could not upload image", variant: "destructive" });
+    } finally {
+      setIsUploading(false);
+      setUploadTargetId(null);
+    }
+  };
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) handleFileUpload(file, uploadTargetId || undefined);
+    e.target.value = "";
+  };
+
+  const triggerImageUpload = (targetId?: number) => {
+    setUploadTargetId(targetId || null);
+    fileInputRef.current?.click();
+  };
+
+  const handleDuplicateElement = async (id: number) => {
+    if (!selectedBoardId) return;
+    const el = elements[id];
+    if (!el) return;
+    const newZ = maxZ;
+    setMaxZ((z: number) => z + 1);
+    try {
+      const url = buildUrl(api.canvasElements.create.path, { boardId: selectedBoardId });
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ type: el.type, x: el.x + 30, y: el.y + 30, width: el.width, height: el.height, zIndex: newZ, content: el.content }),
+      });
+      const newEl = await res.json();
+      addElement(newEl);
+      setEditingId(newEl.id);
+      toast({ title: "Element duplicated" });
+    } catch {
+      toast({ title: "Error", description: "Failed to duplicate element", variant: "destructive" });
+    }
+  };
+
+  const openContextMenu = (e: React.MouseEvent | React.TouchEvent, elementId: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const clientX = "clientX" in e ? e.clientX : e.touches?.[0]?.clientX || 0;
+    const clientY = "clientY" in e ? e.clientY : e.touches?.[0]?.clientY || 0;
+    setContextMenu({ x: clientX, y: clientY, elementId });
+    setEditingId(elementId);
+  };
+
+  const handleLongPressStart = (elementId: number) => (e: React.TouchEvent) => {
+    longPressTimerRef.current = setTimeout(() => {
+      openContextMenu(e, elementId);
+    }, 500);
+  };
+
+  const handleLongPressEnd = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
   };
 
   // Panning
@@ -320,7 +418,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     }
   };
 
-  const selectedBoard = boards.find((b) => b.id === selectedBoardId);
+  const selectedBoard = boards.find((b: PlanningBoardType) => b.id === selectedBoardId);
   const elementsList = Object.values(elements);
 
   // Card renderers
@@ -353,6 +451,10 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           className="absolute select-none"
           style={{ left: el.x, top: el.y, width: el.width, zIndex: el.zIndex }}
           onClick={handleClick}
+          onContextMenu={(e) => openContextMenu(e, el.id)}
+          onTouchStart={handleLongPressStart(el.id)}
+          onTouchEnd={handleLongPressEnd}
+          onTouchCancel={handleLongPressEnd}
           onMouseDown={(e) => startDrag(el.id, e)}
           data-testid={`element-section-header-${el.id}`}
         >
@@ -381,6 +483,10 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           className={`${cardBase} bg-card border border-border`}
           style={{ left: el.x, top: el.y, width: el.width, minHeight: el.height, zIndex: el.zIndex }}
           onClick={handleClick}
+          onContextMenu={(e) => openContextMenu(e, el.id)}
+          onTouchStart={handleLongPressStart(el.id)}
+          onTouchEnd={handleLongPressEnd}
+          onTouchCancel={handleLongPressEnd}
           data-testid={`element-note-${el.id}`}
         >
           {dragHandle}
@@ -429,6 +535,10 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           className={`${cardBase} bg-card border border-border`}
           style={{ left: el.x, top: el.y, width: el.width, minHeight: 80, zIndex: el.zIndex }}
           onClick={handleClick}
+          onContextMenu={(e) => openContextMenu(e, el.id)}
+          onTouchStart={handleLongPressStart(el.id)}
+          onTouchEnd={handleLongPressEnd}
+          onTouchCancel={handleLongPressEnd}
           data-testid={`element-todo-${el.id}`}
         >
           {dragHandle}
@@ -502,6 +612,10 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           className={`${cardBase} bg-muted/40 border border-dashed border-border/60`}
           style={{ left: el.x, top: el.y, width: el.width, minHeight: el.height, zIndex: el.zIndex }}
           onClick={handleClick}
+          onContextMenu={(e) => openContextMenu(e, el.id)}
+          onTouchStart={handleLongPressStart(el.id)}
+          onTouchEnd={handleLongPressEnd}
+          onTouchCancel={handleLongPressEnd}
           data-testid={`element-column-${el.id}`}
         >
           <div className="p-3 cursor-grab" onMouseDown={(e) => startDrag(el.id, e)}>
@@ -535,6 +649,10 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           className={`${cardBase} bg-card border border-border overflow-hidden`}
           style={{ left: el.x, top: el.y, width: el.width, zIndex: el.zIndex }}
           onClick={handleClick}
+          onContextMenu={(e) => openContextMenu(e, el.id)}
+          onTouchStart={handleLongPressStart(el.id)}
+          onTouchEnd={handleLongPressEnd}
+          onTouchCancel={handleLongPressEnd}
           data-testid={`element-color-swatch-${el.id}`}
         >
           {dragHandle}
@@ -586,6 +704,10 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           className={`${cardBase} bg-card border border-border`}
           style={{ left: el.x, top: el.y, width: el.width, zIndex: el.zIndex }}
           onClick={handleClick}
+          onContextMenu={(e) => openContextMenu(e, el.id)}
+          onTouchStart={handleLongPressStart(el.id)}
+          onTouchEnd={handleLongPressEnd}
+          onTouchCancel={handleLongPressEnd}
           data-testid={`element-link-${el.id}`}
         >
           {dragHandle}
@@ -640,6 +762,10 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           className={`${cardBase} bg-card border border-border overflow-hidden`}
           style={{ left: el.x, top: el.y, width: el.width, zIndex: el.zIndex }}
           onClick={handleClick}
+          onContextMenu={(e) => openContextMenu(e, el.id)}
+          onTouchStart={handleLongPressStart(el.id)}
+          onTouchEnd={handleLongPressEnd}
+          onTouchCancel={handleLongPressEnd}
           data-testid={`element-image-${el.id}`}
         >
           {dragHandle}
@@ -648,20 +774,44 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
               <img src={c.url} alt={c.caption || ""} className="w-full h-auto max-h-[300px] object-cover" />
             </div>
           ) : (
-            <div className="h-[120px] bg-muted flex items-center justify-center cursor-grab" onMouseDown={(e) => startDrag(el.id, e)}>
-              <ImagePlus className="h-8 w-8 text-muted-foreground/40" />
+            <div
+              className="h-[120px] bg-muted flex flex-col items-center justify-center gap-2 cursor-pointer"
+              onClick={(e) => { e.stopPropagation(); triggerImageUpload(el.id); }}
+              onMouseDown={(e) => { if (e.button !== 0) startDrag(el.id, e); }}
+              data-testid={`image-upload-area-${el.id}`}
+            >
+              {isUploading && uploadTargetId === el.id ? (
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              ) : (
+                <>
+                  <Upload className="h-6 w-6 text-muted-foreground/50" />
+                  <span className="text-[10px] text-muted-foreground/60">Click to upload image</span>
+                </>
+              )}
             </div>
           )}
           <div className="p-3">
             {isSelected ? (
               <div className="space-y-2">
-                <input
-                  className="w-full bg-transparent border-none text-xs outline-none"
-                  defaultValue={c.url}
-                  placeholder="Image URL..."
-                  onBlur={(e) => handleUpdateContent(el.id, { ...c, url: e.target.value })}
-                  data-testid={`input-image-url-${el.id}`}
-                />
+                <div className="flex gap-1.5">
+                  <input
+                    className="flex-1 bg-transparent border-none text-xs outline-none"
+                    defaultValue={c.url}
+                    placeholder="Image URL..."
+                    onBlur={(e) => handleUpdateContent(el.id, { ...c, url: e.target.value })}
+                    data-testid={`input-image-url-${el.id}`}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-xs shrink-0"
+                    onClick={(e) => { e.stopPropagation(); triggerImageUpload(el.id); }}
+                    disabled={isUploading}
+                    data-testid={`button-upload-image-${el.id}`}
+                  >
+                    {isUploading && uploadTargetId === el.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
+                  </Button>
+                </div>
                 <input
                   className="w-full bg-transparent border-none text-xs text-muted-foreground outline-none"
                   defaultValue={c.caption}
@@ -676,6 +826,9 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           </div>
           {isSelected && (
             <div className="absolute -top-8 right-0 flex gap-1">
+              <Button size="icon" variant="ghost" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); triggerImageUpload(el.id); }} disabled={isUploading} data-testid={`button-replace-image-${el.id}`}>
+                <Upload className="h-3 w-3" />
+              </Button>
               <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleDeleteElement(el.id)} data-testid={`button-delete-${el.id}`}>
                 <Trash2 className="h-3 w-3" />
               </Button>
@@ -692,6 +845,10 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           className={`${cardBase} bg-card border border-border`}
           style={{ left: el.x, top: el.y, width: el.width, minHeight: el.height, zIndex: el.zIndex }}
           onClick={handleClick}
+          onContextMenu={(e) => openContextMenu(e, el.id)}
+          onTouchStart={handleLongPressStart(el.id)}
+          onTouchEnd={handleLongPressEnd}
+          onTouchCancel={handleLongPressEnd}
           data-testid={`element-board-link-${el.id}`}
         >
           <div className="p-3 flex flex-col items-center justify-center h-full cursor-grab gap-1.5" onMouseDown={(e) => startDrag(el.id, e)}>
@@ -824,7 +981,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                 <TooltipTrigger asChild>
                   <button
                     className="w-12 h-12 flex flex-col items-center justify-center rounded-md text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors gap-0.5"
-                    onClick={() => createElement(t.type)}
+                    onClick={() => t.type === "image" ? triggerImageUpload() : createElement(t.type)}
                     data-testid={`sidebar-tool-${t.type}`}
                   >
                     <t.icon className="h-5 w-5" />
@@ -860,7 +1017,8 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             onMouseUp={handleCanvasMouseUp}
             onMouseLeave={handleCanvasMouseUp}
             onWheel={handleWheel}
-            onClick={() => { if (!draggingId) setEditingId(null); }}
+            onClick={() => { if (!draggingId) { setEditingId(null); setContextMenu(null); } }}
+            onContextMenu={(e) => { e.preventDefault(); setContextMenu(null); }}
             data-testid="spatial-canvas-viewport"
           >
             {/* Dot grid background */}
@@ -904,6 +1062,60 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           </p>
           <p className="text-[10px] text-muted-foreground">{elementsList.length} element{elementsList.length !== 1 ? "s" : ""}</p>
         </div>
+      )}
+
+      {/* Hidden file input for image uploads */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleFileInputChange}
+        data-testid="hidden-file-input"
+      />
+
+      {/* Context menu overlay */}
+      {contextMenu && (
+        <>
+          <div className="fixed inset-0 z-[9998]" onClick={() => setContextMenu(null)} onContextMenu={(e) => { e.preventDefault(); setContextMenu(null); }} />
+          <div
+            className="fixed z-[9999] bg-card border border-border rounded-md shadow-lg py-1 min-w-[160px]"
+            style={{ left: contextMenu.x, top: contextMenu.y }}
+            data-testid="context-menu"
+          >
+            <button
+              className="w-full px-3 py-1.5 text-left text-sm flex items-center gap-2 hover:bg-muted transition-colors"
+              onClick={() => { handleDuplicateElement(contextMenu.elementId); setContextMenu(null); }}
+              data-testid="context-menu-duplicate"
+            >
+              <Copy className="h-3.5 w-3.5" /> Duplicate
+            </button>
+            {elements[contextMenu.elementId]?.type === "image" && (
+              <button
+                className="w-full px-3 py-1.5 text-left text-sm flex items-center gap-2 hover:bg-muted transition-colors"
+                onClick={() => { triggerImageUpload(contextMenu.elementId); setContextMenu(null); }}
+                data-testid="context-menu-upload-image"
+              >
+                <Upload className="h-3.5 w-3.5" /> Upload Image
+              </button>
+            )}
+            <button
+              className="w-full px-3 py-1.5 text-left text-sm flex items-center gap-2 hover:bg-muted transition-colors"
+              onClick={() => { setEditingId(contextMenu.elementId); setContextMenu(null); }}
+              data-testid="context-menu-edit"
+            >
+              <Edit3 className="h-3.5 w-3.5" /> Edit
+            </button>
+            <div className="border-t border-border my-1" />
+            <button
+              className="w-full px-3 py-1.5 text-left text-sm flex items-center gap-2 text-destructive hover:bg-muted transition-colors"
+              onClick={() => { handleDeleteElement(contextMenu.elementId); setContextMenu(null); }}
+              data-testid="context-menu-delete"
+            >
+              <Trash2 className="h-3.5 w-3.5" /> Delete
+            </button>
+          </div>
+        </>
       )}
 
       {/* Dialogs */}
