@@ -5,6 +5,7 @@ import { z } from "zod";
 import { users } from "./models/auth";
 
 export * from "./models/auth";
+export * from "./models/chat";
 
 // Projects
 export const projects = pgTable("projects", {
