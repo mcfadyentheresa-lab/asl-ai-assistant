@@ -13,6 +13,8 @@ import {
   StickyNote, Type, ImagePlus, Square, Columns3, LayoutGrid, Link2, Palette, Trash2, Plus,
   ZoomIn, ZoomOut, Maximize, Loader2, MoreVertical, Edit3, Download, CheckSquare, GripVertical,
   X, ChevronDown, ExternalLink, Pencil, Upload, Copy, ArrowUpFromLine,
+  Bold, Italic, Strikethrough, Underline, List, ListOrdered, Code, Link as LinkIcon,
+  MousePointer, Eraser, Undo2, Redo2, Save, PenTool,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { usePlanningBoards, useCreatePlanningBoard, useDeletePlanningBoard, useUpdatePlanningBoard, useUploadImage } from "@/hooks/use-projects";
@@ -36,6 +38,7 @@ const ELEMENT_DEFAULTS: Record<string, { width: number; height: number; content:
   image: { width: 240, height: 200, content: { url: "", caption: "" } },
   color_swatch: { width: 220, height: 220, content: { color: "#1e3a2f", name: "Forest Green", hex: "#1E3A2F" } },
   section_header: { width: 600, height: 40, content: { title: "Section Title" } },
+  draw: { width: 400, height: 300, content: { paths: [], color: "#000000", strokeWidth: 2 } },
 };
 
 export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
@@ -65,6 +68,17 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; elementId: number } | null>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [showImagePopup, setShowImagePopup] = useState(false);
+  const [imageUrlInput, setImageUrlInput] = useState("");
+  const noteTextareaRefs = useRef<Record<string, HTMLTextAreaElement | HTMLInputElement | null>>({});
+  const [focusedTodoItem, setFocusedTodoItem] = useState<{ elementId: number; itemIdx: number } | null>(null);
+  const [drawTool, setDrawTool] = useState<"pen" | "select" | "eraser">("pen");
+  const [drawColor, setDrawColor] = useState("#000000");
+  const [drawStrokeWidth, setDrawStrokeWidth] = useState(2);
+  const [drawingPaths, setDrawingPaths] = useState<any[]>([]);
+  const [drawUndoStack, setDrawUndoStack] = useState<any[]>([]);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const drawCanvasRefs = useRef<Record<number, HTMLCanvasElement | null>>({});
 
   const elements = useCanvasStore((s) => s.elements);
   const loading = useCanvasStore((s) => s.loading);
@@ -381,6 +395,133 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     }
   };
 
+  const formatText = (text: string, start: number, end: number, format: string): { newText: string; cursor: number } => {
+    const selected = text.substring(start, end);
+    let newText = text;
+    let cursor = end;
+    if (format === "bold") {
+      newText = text.substring(0, start) + `**${selected || "text"}**` + text.substring(end);
+      cursor = start + (selected ? selected.length + 4 : 6);
+    } else if (format === "italic") {
+      newText = text.substring(0, start) + `*${selected || "text"}*` + text.substring(end);
+      cursor = start + (selected ? selected.length + 2 : 5);
+    } else if (format === "strikethrough") {
+      newText = text.substring(0, start) + `~~${selected || "text"}~~` + text.substring(end);
+      cursor = start + (selected ? selected.length + 4 : 6);
+    } else if (format === "underline") {
+      newText = text.substring(0, start) + `__${selected || "text"}__` + text.substring(end);
+      cursor = start + (selected ? selected.length + 4 : 6);
+    } else if (format === "bullet") {
+      const lineStart = text.lastIndexOf("\n", start - 1) + 1;
+      newText = text.substring(0, lineStart) + "\u2022 " + text.substring(lineStart);
+      cursor = end + 2;
+    } else if (format === "numbered") {
+      const lineStart = text.lastIndexOf("\n", start - 1) + 1;
+      newText = text.substring(0, lineStart) + "1. " + text.substring(lineStart);
+      cursor = end + 3;
+    } else if (format === "code") {
+      newText = text.substring(0, start) + "`" + (selected || "code") + "`" + text.substring(end);
+      cursor = start + (selected ? selected.length + 2 : 5);
+    } else if (format === "link") {
+      newText = text.substring(0, start) + `[${selected || "text"}](url)` + text.substring(end);
+      cursor = start + (selected ? selected.length + 7 : 11);
+    }
+    return { newText, cursor };
+  };
+
+  const applyFormat = (elementId: number, format: string) => {
+    const el = elements[elementId];
+    if (!el) return;
+    const cont = (el.content || {}) as any;
+
+    if (el.type === "todo" && focusedTodoItem && focusedTodoItem.elementId === elementId) {
+      const refKey = `${elementId}-todo-${focusedTodoItem.itemIdx}`;
+      const input = noteTextareaRefs.current[refKey];
+      if (!input) return;
+      const start = input.selectionStart || 0;
+      const end = input.selectionEnd || 0;
+      const { newText, cursor } = formatText(input.value, start, end, format);
+      input.value = newText;
+      input.setSelectionRange(cursor, cursor);
+      input.focus();
+      const newItems = [...(cont.items || [])];
+      newItems[focusedTodoItem.itemIdx] = { ...newItems[focusedTodoItem.itemIdx], text: newText };
+      handleUpdateContent(elementId, { ...cont, items: newItems });
+    } else {
+      const refKey = `${elementId}-note`;
+      const ta = noteTextareaRefs.current[refKey];
+      if (!ta) return;
+      const start = ta.selectionStart || 0;
+      const end = ta.selectionEnd || 0;
+      const { newText, cursor } = formatText(ta.value, start, end, format);
+      ta.value = newText;
+      ta.setSelectionRange(cursor, cursor);
+      ta.focus();
+      handleUpdateContent(elementId, { ...cont, text: newText });
+    }
+  };
+
+  const renderFormattingToolbar = (elementId: number) => (
+    <div
+      className="absolute -top-9 left-0 flex items-center gap-0.5 bg-card border border-border rounded-md shadow-md px-1 py-0.5 z-20"
+      onMouseDown={(e) => e.stopPropagation()}
+      data-testid={`formatting-toolbar-${elementId}`}
+    >
+      <button className="p-1 rounded hover:bg-muted transition-colors" onClick={() => applyFormat(elementId, "bold")} data-testid={`format-bold-${elementId}`}><Bold className="h-3.5 w-3.5" /></button>
+      <button className="p-1 rounded hover:bg-muted transition-colors" onClick={() => applyFormat(elementId, "italic")} data-testid={`format-italic-${elementId}`}><Italic className="h-3.5 w-3.5" /></button>
+      <button className="p-1 rounded hover:bg-muted transition-colors" onClick={() => applyFormat(elementId, "strikethrough")} data-testid={`format-strikethrough-${elementId}`}><Strikethrough className="h-3.5 w-3.5" /></button>
+      <button className="p-1 rounded hover:bg-muted transition-colors" onClick={() => applyFormat(elementId, "underline")} data-testid={`format-underline-${elementId}`}><Underline className="h-3.5 w-3.5" /></button>
+      <div className="w-px h-4 bg-border mx-0.5" />
+      <button className="p-1 rounded hover:bg-muted transition-colors" onClick={() => applyFormat(elementId, "bullet")} data-testid={`format-bullet-${elementId}`}><List className="h-3.5 w-3.5" /></button>
+      <button className="p-1 rounded hover:bg-muted transition-colors" onClick={() => applyFormat(elementId, "numbered")} data-testid={`format-numbered-${elementId}`}><ListOrdered className="h-3.5 w-3.5" /></button>
+      <div className="w-px h-4 bg-border mx-0.5" />
+      <button className="p-1 rounded hover:bg-muted transition-colors" onClick={() => applyFormat(elementId, "code")} data-testid={`format-code-${elementId}`}><Code className="h-3.5 w-3.5" /></button>
+      <button className="p-1 rounded hover:bg-muted transition-colors" onClick={() => applyFormat(elementId, "link")} data-testid={`format-link-${elementId}`}><LinkIcon className="h-3.5 w-3.5" /></button>
+    </div>
+  );
+
+  const handleAddImageByUrl = async (url: string) => {
+    if (!selectedBoardId || !url.trim()) return;
+    const newZ = maxZ;
+    setMaxZ((z: number) => z + 1);
+    const centerX = Math.round((-pan.x + (containerRef.current?.clientWidth || 800) / 2) / zoom - 120);
+    const centerY = Math.round((-pan.y + (containerRef.current?.clientHeight || 600) / 2) / zoom - 100);
+    try {
+      const apiUrl = buildUrl(api.canvasElements.create.path, { boardId: selectedBoardId });
+      const res = await fetch(apiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ type: "image", x: centerX, y: centerY, width: 240, height: 200, zIndex: newZ, content: { url: url.trim(), caption: "" } }),
+      });
+      const el = await res.json();
+      addElement(el);
+      setShowImagePopup(false);
+      setImageUrlInput("");
+    } catch {
+      toast({ title: "Error", description: "Failed to add image", variant: "destructive" });
+    }
+  };
+
+  const redrawCanvas = useCallback((canvasEl: HTMLCanvasElement, paths: any[]) => {
+    const ctx = canvasEl.getContext("2d");
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+    paths.forEach((path: any) => {
+      if (!path.points || path.points.length < 2) return;
+      ctx.beginPath();
+      ctx.strokeStyle = path.color || "#000000";
+      ctx.lineWidth = path.strokeWidth || 2;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.moveTo(path.points[0].x, path.points[0].y);
+      for (let i = 1; i < path.points.length; i++) {
+        ctx.lineTo(path.points[i].x, path.points[i].y);
+      }
+      ctx.stroke();
+    });
+  }, []);
+
   // Panning
   const handleCanvasMouseDown = (e: React.MouseEvent) => {
     if (e.button === 1 || spaceRef.current) {
@@ -559,6 +700,17 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     }
   };
 
+  useEffect(() => {
+    if (editingId !== null) {
+      const el = elements[editingId];
+      if (el?.type === "draw") {
+        const content = (el.content || {}) as any;
+        setDrawingPaths(content.paths || []);
+        setDrawUndoStack([]);
+      }
+    }
+  }, [editingId]);
+
   const selectedBoard = boards.find((b: PlanningBoardType) => b.id === selectedBoardId);
   const elementsList = Object.values(elements);
 
@@ -621,8 +773,13 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       return (
         <div
           key={el.id}
-          className={`${cardBase} bg-card border border-border`}
+          className={`${cardBase} bg-card border border-border cursor-grab`}
           style={{ left: el.x, top: el.y, width: el.width, minHeight: el.height, zIndex: el.zIndex }}
+          onMouseDown={(e) => {
+            const tag = (e.target as HTMLElement).tagName.toLowerCase();
+            if (tag === "input" || tag === "textarea" || tag === "button" || (e.target as HTMLElement).closest("button")) return;
+            startDrag(el.id, e);
+          }}
           onClick={handleClick}
           onContextMenu={(e) => openContextMenu(e, el.id)}
           onTouchStart={handleElementTouchStart(el.id)}
@@ -630,7 +787,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           onTouchCancel={handleLongPressEnd}
           data-testid={`element-note-${el.id}`}
         >
-          {dragHandle}
+          {isSelected && renderFormattingToolbar(el.id)}
           <div className="p-3.5">
             {isSelected ? (
               <div className="space-y-2">
@@ -642,6 +799,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                   data-testid={`input-note-title-${el.id}`}
                 />
                 <textarea
+                  ref={(ref) => { noteTextareaRefs.current[`${el.id}-note`] = ref; }}
                   className="w-full bg-transparent border-none text-sm resize-none outline-none min-h-[60px] placeholder:text-muted-foreground/50"
                   defaultValue={c.text}
                   placeholder="Type your note..."
@@ -650,10 +808,10 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                 />
               </div>
             ) : (
-              <div className="cursor-grab" onMouseDown={(e) => startDrag(el.id, e)}>
+              <>
                 {c.title && <div className="text-sm font-semibold mb-1">{c.title}</div>}
                 <div className="text-sm text-muted-foreground whitespace-pre-wrap">{c.text || "Type your note here..."}</div>
-              </div>
+              </>
             )}
           </div>
           {isSelected && (
@@ -673,8 +831,13 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       return (
         <div
           key={el.id}
-          className={`${cardBase} bg-card border border-border`}
+          className={`${cardBase} bg-card border border-border cursor-grab`}
           style={{ left: el.x, top: el.y, width: el.width, minHeight: 80, zIndex: el.zIndex }}
+          onMouseDown={(e) => {
+            const tag = (e.target as HTMLElement).tagName.toLowerCase();
+            if (tag === "input" || tag === "textarea" || tag === "button" || (e.target as HTMLElement).closest("button")) return;
+            startDrag(el.id, e);
+          }}
           onClick={handleClick}
           onContextMenu={(e) => openContextMenu(e, el.id)}
           onTouchStart={handleElementTouchStart(el.id)}
@@ -682,11 +845,21 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           onTouchCancel={handleLongPressEnd}
           data-testid={`element-todo-${el.id}`}
         >
-          {dragHandle}
+          {isSelected && renderFormattingToolbar(el.id)}
           <div className="p-3.5">
-            <div className="flex items-center justify-between mb-2 cursor-grab" onMouseDown={(e) => startDrag(el.id, e)}>
-              <span className="text-sm font-semibold">{c.title || "To-do"}</span>
-              <span className="text-[10px] text-muted-foreground">{checked}/{items.length}</span>
+            <div className="flex items-center justify-between mb-2 gap-1">
+              {isSelected ? (
+                <input
+                  className="flex-1 bg-transparent border-none text-sm font-semibold outline-none"
+                  defaultValue={c.title}
+                  placeholder="To-do title"
+                  onBlur={(e) => handleUpdateContent(el.id, { ...c, title: e.target.value })}
+                  data-testid={`input-todo-title-${el.id}`}
+                />
+              ) : (
+                <span className="text-sm font-semibold">{c.title || "To-do"}</span>
+              )}
+              <span className="text-[10px] text-muted-foreground shrink-0">{checked}/{items.length}</span>
             </div>
             <div className="space-y-1.5">
               {items.map((item: any, idx: number) => (
@@ -704,8 +877,10 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                   />
                   {isSelected ? (
                     <input
+                      ref={(ref) => { if (ref) noteTextareaRefs.current[`${el.id}-todo-${idx}`] = ref; }}
                       className="flex-1 bg-transparent border-none text-xs outline-none"
                       defaultValue={item.text}
+                      onFocus={() => setFocusedTodoItem({ elementId: el.id, itemIdx: idx })}
                       onBlur={(e) => {
                         const newItems = [...items];
                         newItems[idx] = { ...newItems[idx], text: e.target.value };
@@ -752,11 +927,29 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
         return Math.max(acc, (child.y - el.y) + (child.height || 60) + 12);
       }, 0);
       const computedHeight = Math.max(el.height || 300, childrenBottom);
+      const hasCustomBg = !!c.backgroundColor;
+      const isDraggedSwatch = isDropTarget && draggingId !== null && elements[draggingId]?.type === "color_swatch";
+      const presetColors = ["#ffffff", "#d4d4d4", "#fecdd3", "#e9d5ff", "#bfdbfe", "#bbf7d0", "#fef08a", "#fed7aa"];
+
+      const swatchDropY = (() => {
+        if (!isDraggedSwatch) return 0;
+        const padding = 12;
+        const headerHeight = 50;
+        const siblings = childEls;
+        return siblings.reduce((acc, sib) => {
+          const sibBottom = (sib.y - el.y) + (sib.height || 60);
+          return Math.max(acc, sibBottom);
+        }, headerHeight) + 8;
+      })();
+
       return (
         <div
           key={el.id}
-          className={`${cardBase} border border-dashed ${isDropTarget ? "bg-primary/10 border-primary/40" : "bg-muted/40 border-border/60"} transition-colors`}
-          style={{ left: el.x, top: el.y, width: el.width, minHeight: computedHeight, zIndex: el.zIndex }}
+          className={`${cardBase} border border-dashed ${isDropTarget ? "border-primary/40" : "border-border/60"} ${!hasCustomBg && !isDropTarget ? "bg-muted/40" : ""} ${isDropTarget && !hasCustomBg ? "bg-primary/10" : ""} transition-colors`}
+          style={{
+            left: el.x, top: el.y, width: el.width, minHeight: computedHeight, zIndex: el.zIndex,
+            ...(hasCustomBg ? { backgroundColor: c.backgroundColor } : {}),
+          }}
           onClick={handleClick}
           onContextMenu={(e) => openContextMenu(e, el.id)}
           onTouchStart={handleElementTouchStart(el.id)}
@@ -777,12 +970,54 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             )}
             <div className="text-[10px] text-muted-foreground text-center">{childEls.length} card{childEls.length !== 1 ? "s" : ""}</div>
           </div>
+          {isDraggedSwatch && (
+            <div
+              className="absolute border-2 border-dashed border-foreground rounded"
+              style={{
+                left: 12,
+                top: swatchDropY,
+                width: el.width - 24,
+                height: 60,
+                pointerEvents: "none",
+              }}
+              data-testid={`swatch-drop-preview-${el.id}`}
+            />
+          )}
           {isSelected && (
-            <div className="absolute -top-8 right-0 flex gap-1">
-              <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleDeleteElement(el.id)} data-testid={`button-delete-${el.id}`}>
-                <Trash2 className="h-3 w-3" />
-              </Button>
-            </div>
+            <>
+              <div className="absolute -top-8 right-0 flex gap-1">
+                <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleDeleteElement(el.id)} data-testid={`button-delete-${el.id}`}>
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              </div>
+              <div className="absolute -bottom-10 left-0 right-0 flex items-center justify-center gap-1 bg-card border border-border rounded-md shadow-md px-2 py-1 z-20" onMouseDown={(e) => e.stopPropagation()} data-testid={`color-picker-${el.id}`}>
+                {presetColors.map((color) => (
+                  <button
+                    key={color}
+                    className={`w-5 h-5 rounded-full border ${c.backgroundColor === color ? "ring-2 ring-primary ring-offset-1" : "border-border"}`}
+                    style={{ backgroundColor: color }}
+                    onClick={(e) => { e.stopPropagation(); handleUpdateContent(el.id, { ...c, backgroundColor: color }); }}
+                    data-testid={`color-preset-${el.id}-${color.replace("#", "")}`}
+                  />
+                ))}
+                <input
+                  type="color"
+                  className="w-5 h-5 rounded cursor-pointer border border-border"
+                  value={c.backgroundColor || "#ffffff"}
+                  onChange={(e) => handleUpdateContent(el.id, { ...c, backgroundColor: e.target.value })}
+                  data-testid={`color-custom-${el.id}`}
+                />
+                {c.backgroundColor && (
+                  <button
+                    className="text-[9px] text-muted-foreground hover:text-foreground ml-1"
+                    onClick={(e) => { e.stopPropagation(); const { backgroundColor, ...rest } = c; handleUpdateContent(el.id, rest); }}
+                    data-testid={`color-reset-${el.id}`}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
+            </>
           )}
         </div>
       );
@@ -792,8 +1027,13 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       return (
         <div
           key={el.id}
-          className={`${cardBase} bg-card border border-border overflow-hidden`}
+          className={`${cardBase} bg-card border border-border overflow-hidden cursor-grab`}
           style={{ left: el.x, top: el.y, width: el.width, zIndex: el.zIndex }}
+          onMouseDown={(e) => {
+            const tag = (e.target as HTMLElement).tagName.toLowerCase();
+            if (tag === "input" || tag === "button" || (e.target as HTMLElement).closest("button")) return;
+            startDrag(el.id, e);
+          }}
           onClick={handleClick}
           onContextMenu={(e) => openContextMenu(e, el.id)}
           onTouchStart={handleElementTouchStart(el.id)}
@@ -801,11 +1041,8 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           onTouchCancel={handleLongPressEnd}
           data-testid={`element-color-swatch-${el.id}`}
         >
-          {dragHandle}
-          <div className="cursor-grab" onMouseDown={(e) => startDrag(el.id, e)}>
-            <div className="h-[140px] relative" style={{ backgroundColor: c.color || "#1e3a2f" }}>
-              <span className="absolute bottom-2 left-3 text-xs text-white/80 font-mono">{(c.hex || c.color || "#1E3A2F").toUpperCase()}</span>
-            </div>
+          <div className="h-[140px] relative pointer-events-none select-none" style={{ backgroundColor: c.color || "#1e3a2f" }}>
+            <span className="absolute bottom-2 left-3 text-xs text-white/80 font-mono">{(c.hex || c.color || "#1E3A2F").toUpperCase()}</span>
           </div>
           <div className="p-3">
             {isSelected ? (
@@ -847,8 +1084,13 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       return (
         <div
           key={el.id}
-          className={`${cardBase} bg-card border border-border`}
+          className={`${cardBase} bg-card border border-border cursor-grab`}
           style={{ left: el.x, top: el.y, width: el.width, zIndex: el.zIndex }}
+          onMouseDown={(e) => {
+            const tag = (e.target as HTMLElement).tagName.toLowerCase();
+            if (tag === "input" || tag === "button" || (e.target as HTMLElement).closest("button")) return;
+            startDrag(el.id, e);
+          }}
           onClick={handleClick}
           onContextMenu={(e) => openContextMenu(e, el.id)}
           onTouchStart={handleElementTouchStart(el.id)}
@@ -856,7 +1098,6 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           onTouchCancel={handleLongPressEnd}
           data-testid={`element-link-${el.id}`}
         >
-          {dragHandle}
           <div className="p-3.5">
             {isSelected ? (
               <div className="space-y-2">
@@ -876,13 +1117,13 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                 />
               </div>
             ) : (
-              <div className="cursor-grab" onMouseDown={(e) => startDrag(el.id, e)}>
+              <>
                 <div className="flex items-center gap-2">
                   <ExternalLink className="h-3.5 w-3.5 text-primary shrink-0" />
                   <span className="text-sm font-medium truncate">{c.title || c.url || "Link"}</span>
                 </div>
                 {c.url && <div className="text-[10px] text-primary truncate mt-1">{c.url}</div>}
-              </div>
+              </>
             )}
           </div>
           {isSelected && (
@@ -989,8 +1230,13 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       return (
         <div
           key={el.id}
-          className={`${cardBase} bg-card border border-border`}
+          className={`${cardBase} bg-card border border-border cursor-grab`}
           style={{ left: el.x, top: el.y, width: el.width, minHeight: el.height, zIndex: el.zIndex }}
+          onMouseDown={(e) => {
+            const tag = (e.target as HTMLElement).tagName.toLowerCase();
+            if (tag === "input" || tag === "button" || (e.target as HTMLElement).closest("button")) return;
+            startDrag(el.id, e);
+          }}
           onClick={handleClick}
           onContextMenu={(e) => openContextMenu(e, el.id)}
           onTouchStart={handleElementTouchStart(el.id)}
@@ -998,7 +1244,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           onTouchCancel={handleLongPressEnd}
           data-testid={`element-board-link-${el.id}`}
         >
-          <div className="p-3 flex flex-col items-center justify-center h-full cursor-grab gap-1.5" onMouseDown={(e) => startDrag(el.id, e)}>
+          <div className="p-3 flex flex-col items-center justify-center h-full gap-1.5">
             <LayoutGrid className="h-6 w-6 text-primary/60" />
             {isSelected ? (
               <input
@@ -1023,6 +1269,157 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       );
     }
 
+    if (el.type === "draw") {
+      const paths = c.paths || [];
+      const currentPaths = isSelected ? drawingPaths : paths;
+      return (
+        <div
+          key={el.id}
+          className={`${cardBase} bg-card border border-border cursor-grab`}
+          style={{ left: el.x, top: el.y, width: el.width, minHeight: el.height, zIndex: el.zIndex }}
+          onMouseDown={(e) => {
+            if (isSelected && drawTool !== "select") return;
+            const tag = (e.target as HTMLElement).tagName.toLowerCase();
+            if (tag === "canvas" || tag === "input" || tag === "button" || (e.target as HTMLElement).closest("button")) return;
+            startDrag(el.id, e);
+          }}
+          onClick={handleClick}
+          onContextMenu={(e) => openContextMenu(e, el.id)}
+          onTouchStart={(e) => {
+            if (isSelected && drawTool !== "select") { e.stopPropagation(); return; }
+            handleElementTouchStart(el.id)(e);
+          }}
+          onTouchEnd={handleLongPressEnd}
+          onTouchCancel={handleLongPressEnd}
+          data-testid={`element-draw-${el.id}`}
+        >
+          <canvas
+            ref={(ref) => {
+              drawCanvasRefs.current[el.id] = ref;
+              if (ref && ref.width !== el.width && ref.height !== (el.height - 40)) {
+                ref.width = el.width;
+                ref.height = el.height - 40;
+                redrawCanvas(ref, currentPaths);
+              }
+            }}
+            width={el.width}
+            height={el.height - 40}
+            className="bg-white cursor-crosshair"
+            style={{ display: "block" }}
+            onMouseDown={(e) => {
+              if (!isSelected || drawTool === "select") return;
+              e.stopPropagation();
+              e.preventDefault();
+              const canvas = drawCanvasRefs.current[el.id];
+              if (!canvas) return;
+              const rect = canvas.getBoundingClientRect();
+              const scaleX = canvas.width / rect.width;
+              const scaleY = canvas.height / rect.height;
+              const x = (e.clientX - rect.left) * scaleX;
+              const y = (e.clientY - rect.top) * scaleY;
+              if (drawTool === "eraser") {
+                const newPaths = drawingPaths.filter((p: any) => {
+                  return !p.points.some((pt: any) => Math.abs(pt.x - x) < 10 && Math.abs(pt.y - y) < 10);
+                });
+                setDrawingPaths(newPaths);
+                redrawCanvas(canvas, newPaths);
+              } else {
+                setIsDrawing(true);
+                setDrawingPaths((prev) => [...prev, { points: [{ x, y }], color: drawColor, strokeWidth: drawStrokeWidth }]);
+              }
+            }}
+            onMouseMove={(e) => {
+              if (!isDrawing || !isSelected || drawTool !== "pen") return;
+              e.stopPropagation();
+              const canvas = drawCanvasRefs.current[el.id];
+              if (!canvas) return;
+              const rect = canvas.getBoundingClientRect();
+              const scaleX = canvas.width / rect.width;
+              const scaleY = canvas.height / rect.height;
+              const x = (e.clientX - rect.left) * scaleX;
+              const y = (e.clientY - rect.top) * scaleY;
+              setDrawingPaths((prev) => {
+                const newPaths = [...prev];
+                const last = { ...newPaths[newPaths.length - 1] };
+                last.points = [...last.points, { x, y }];
+                newPaths[newPaths.length - 1] = last;
+                redrawCanvas(canvas, newPaths);
+                return newPaths;
+              });
+            }}
+            onMouseUp={() => { setIsDrawing(false); }}
+            onMouseLeave={() => { setIsDrawing(false); }}
+            onTouchStart={(e) => {
+              if (!isSelected || drawTool === "select") return;
+              e.stopPropagation();
+              const touch = e.touches[0];
+              const canvas = drawCanvasRefs.current[el.id];
+              if (!canvas || !touch) return;
+              const rect = canvas.getBoundingClientRect();
+              const scaleX = canvas.width / rect.width;
+              const scaleY = canvas.height / rect.height;
+              const x = (touch.clientX - rect.left) * scaleX;
+              const y = (touch.clientY - rect.top) * scaleY;
+              setIsDrawing(true);
+              setDrawingPaths((prev) => [...prev, { points: [{ x, y }], color: drawColor, strokeWidth: drawStrokeWidth }]);
+            }}
+            onTouchMove={(e) => {
+              if (!isDrawing || !isSelected || drawTool !== "pen") return;
+              e.stopPropagation();
+              const touch = e.touches[0];
+              const canvas = drawCanvasRefs.current[el.id];
+              if (!canvas || !touch) return;
+              const rect = canvas.getBoundingClientRect();
+              const scaleX = canvas.width / rect.width;
+              const scaleY = canvas.height / rect.height;
+              const x = (touch.clientX - rect.left) * scaleX;
+              const y = (touch.clientY - rect.top) * scaleY;
+              setDrawingPaths((prev) => {
+                const newPaths = [...prev];
+                const last = { ...newPaths[newPaths.length - 1] };
+                last.points = [...last.points, { x, y }];
+                newPaths[newPaths.length - 1] = last;
+                redrawCanvas(canvas, newPaths);
+                return newPaths;
+              });
+            }}
+            onTouchEnd={() => { setIsDrawing(false); }}
+            data-testid={`draw-canvas-${el.id}`}
+          />
+          <div className="p-2 text-[10px] text-muted-foreground text-center border-t border-border">
+            {paths.length} path{paths.length !== 1 ? "s" : ""}
+          </div>
+          {isSelected && (
+            <>
+              <div className="absolute -top-8 right-0 flex gap-1">
+                <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleDeleteElement(el.id)} data-testid={`button-delete-${el.id}`}>
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              </div>
+              <div
+                className="absolute -bottom-10 left-0 right-0 flex items-center justify-center gap-1 bg-card border border-border rounded-md shadow-md px-2 py-1 z-20"
+                onMouseDown={(e) => e.stopPropagation()}
+                data-testid={`draw-toolbar-${el.id}`}
+              >
+                <button className={`p-1 rounded transition-colors ${drawTool === "pen" ? "bg-primary/20" : "hover:bg-muted"}`} onClick={() => setDrawTool("pen")} data-testid={`draw-pen-${el.id}`}><PenTool className="h-3.5 w-3.5" /></button>
+                <button className={`p-1 rounded transition-colors ${drawTool === "select" ? "bg-primary/20" : "hover:bg-muted"}`} onClick={() => setDrawTool("select")} data-testid={`draw-select-${el.id}`}><MousePointer className="h-3.5 w-3.5" /></button>
+                <button className={`p-1 rounded transition-colors ${drawTool === "eraser" ? "bg-primary/20" : "hover:bg-muted"}`} onClick={() => setDrawTool("eraser")} data-testid={`draw-eraser-${el.id}`}><Eraser className="h-3.5 w-3.5" /></button>
+                <div className="w-px h-4 bg-border mx-0.5" />
+                <input type="color" value={drawColor} onChange={(e) => setDrawColor(e.target.value)} className="w-5 h-5 rounded cursor-pointer border border-border" data-testid={`draw-color-${el.id}`} />
+                <button className="p-1 rounded hover:bg-muted transition-colors text-[9px] font-mono" onClick={() => setDrawStrokeWidth((w) => w >= 8 ? 1 : w + 1)} data-testid={`draw-stroke-${el.id}`}>{drawStrokeWidth}px</button>
+                <div className="w-px h-4 bg-border mx-0.5" />
+                <button className="p-1 rounded hover:bg-muted transition-colors" onClick={() => { if (drawingPaths.length > 0) { setDrawUndoStack((s) => [...s, drawingPaths[drawingPaths.length - 1]]); const newPaths = drawingPaths.slice(0, -1); setDrawingPaths(newPaths); const canvas = drawCanvasRefs.current[el.id]; if (canvas) redrawCanvas(canvas, newPaths); } }} data-testid={`draw-undo-${el.id}`}><Undo2 className="h-3.5 w-3.5" /></button>
+                <button className="p-1 rounded hover:bg-muted transition-colors" onClick={() => { if (drawUndoStack.length > 0) { const restored = drawUndoStack[drawUndoStack.length - 1]; setDrawUndoStack((s) => s.slice(0, -1)); const newPaths = [...drawingPaths, restored]; setDrawingPaths(newPaths); const canvas = drawCanvasRefs.current[el.id]; if (canvas) redrawCanvas(canvas, newPaths); } }} data-testid={`draw-redo-${el.id}`}><Redo2 className="h-3.5 w-3.5" /></button>
+                <div className="w-px h-4 bg-border mx-0.5" />
+                <button className="p-1 rounded hover:bg-muted transition-colors text-destructive" onClick={() => { setDrawingPaths(paths); setDrawUndoStack([]); const canvas = drawCanvasRefs.current[el.id]; if (canvas) redrawCanvas(canvas, paths); }} data-testid={`draw-discard-${el.id}`}><X className="h-3.5 w-3.5" /></button>
+                <button className="p-1 rounded hover:bg-muted transition-colors text-primary" onClick={() => { handleUpdateContent(el.id, { ...c, paths: drawingPaths }); setDrawUndoStack([]); }} data-testid={`draw-save-${el.id}`}><Save className="h-3.5 w-3.5" /></button>
+              </div>
+            </>
+          )}
+        </div>
+      );
+    }
+
     return null;
   };
 
@@ -1035,6 +1432,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     { type: "image", icon: ImagePlus, label: "Image" },
     { type: "color_swatch", icon: Palette, label: "Color" },
     { type: "section_header", icon: Type, label: "Header" },
+    { type: "draw", icon: Pencil, label: "Draw" },
   ];
 
   return (
@@ -1133,7 +1531,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                       e.dataTransfer.setData("tool-type", t.type);
                       e.dataTransfer.effectAllowed = "copy";
                     }}
-                    onClick={() => t.type === "image" ? triggerImageUpload() : createElement(t.type)}
+                    onClick={() => t.type === "image" ? setShowImagePopup(!showImagePopup) : createElement(t.type)}
                     data-testid={`sidebar-tool-${t.type}`}
                   >
                     <t.icon className="h-5 w-5" />
@@ -1158,6 +1556,42 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
               <TooltipContent side="right" className="text-xs">Delete Selected</TooltipContent>
             </Tooltip>
           </div>
+
+          {showImagePopup && (
+            <div className="absolute left-[72px] top-1/3 z-50 bg-card border border-border rounded-md shadow-lg w-64" data-testid="image-popup-panel">
+              <div className="flex items-center justify-between p-3 border-b border-border">
+                <span className="text-sm font-semibold">Add Image</span>
+                <button className="p-0.5 rounded hover:bg-muted transition-colors" onClick={() => setShowImagePopup(false)} data-testid="image-popup-close"><X className="h-4 w-4" /></button>
+              </div>
+              <div className="p-3 space-y-3">
+                <div>
+                  <div className="text-xs font-medium text-muted-foreground mb-1.5">Upload</div>
+                  <div
+                    className="border-2 border-dashed border-border rounded-md p-4 flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-muted/30 transition-colors"
+                    onClick={() => { triggerImageUpload(); setShowImagePopup(false); }}
+                    data-testid="image-popup-upload-area"
+                  >
+                    <Upload className="h-6 w-6 text-muted-foreground/50" />
+                    <span className="text-xs text-muted-foreground">Click to upload from device</span>
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs font-medium text-muted-foreground mb-1.5">URL</div>
+                  <div className="flex gap-1.5">
+                    <input
+                      className="flex-1 bg-transparent border border-border rounded-md px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-primary"
+                      placeholder="Paste image URL..."
+                      value={imageUrlInput}
+                      onChange={(e) => setImageUrlInput(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") handleAddImageByUrl(imageUrlInput); }}
+                      data-testid="image-popup-url-input"
+                    />
+                    <Button size="sm" className="h-7 px-2 text-xs" onClick={() => handleAddImageByUrl(imageUrlInput)} data-testid="image-popup-url-add">Add</Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Canvas area */}
           <div
