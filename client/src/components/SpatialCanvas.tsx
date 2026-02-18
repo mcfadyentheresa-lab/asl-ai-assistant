@@ -14,7 +14,7 @@ import {
   ZoomIn, ZoomOut, Maximize, Loader2, MoreVertical, Edit3, Download, CheckSquare, GripVertical,
   X, ChevronDown, ExternalLink, Pencil, Upload, Copy, ArrowUpFromLine,
   Bold, Italic, Strikethrough, Underline, List, ListOrdered, Code, Link as LinkIcon,
-  MousePointer, Eraser, Undo2, Redo2, Save, PenTool,
+  Eraser, Undo2, Redo2, Save, PenTool,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { usePlanningBoards, useCreatePlanningBoard, useDeletePlanningBoard, useUpdatePlanningBoard, useUploadImage } from "@/hooks/use-projects";
@@ -72,13 +72,14 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   const [imageUrlInput, setImageUrlInput] = useState("");
   const noteTextareaRefs = useRef<Record<string, HTMLTextAreaElement | HTMLInputElement | null>>({});
   const [focusedTodoItem, setFocusedTodoItem] = useState<{ elementId: number; itemIdx: number } | null>(null);
-  const [drawTool, setDrawTool] = useState<"pen" | "select" | "eraser">("pen");
-  const [drawColor, setDrawColor] = useState("#000000");
-  const [drawStrokeWidth, setDrawStrokeWidth] = useState(2);
+  const [drawingMode, setDrawingMode] = useState(false);
+  const [drawTool, setDrawTool] = useState<"pen" | "eraser">("pen");
+  const [drawColor, setDrawColor] = useState("#1e3a2f");
+  const [drawStrokeWidth, setDrawStrokeWidth] = useState(3);
   const [drawingPaths, setDrawingPaths] = useState<any[]>([]);
   const [drawUndoStack, setDrawUndoStack] = useState<any[]>([]);
   const [isDrawing, setIsDrawing] = useState(false);
-  const drawCanvasRefs = useRef<Record<number, HTMLCanvasElement | null>>({});
+  const drawCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const elements = useCanvasStore((s) => s.elements);
   const loading = useCanvasStore((s) => s.loading);
@@ -503,15 +504,20 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     }
   };
 
-  const redrawCanvas = useCallback((canvasEl: HTMLCanvasElement, paths: any[]) => {
-    const ctx = canvasEl.getContext("2d");
+  const redrawOverlayCanvas = useCallback(() => {
+    const canvas = drawCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
-    paths.forEach((path: any) => {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.save();
+    ctx.translate(pan.x, pan.y);
+    ctx.scale(zoom, zoom);
+    drawingPaths.forEach((path: any) => {
       if (!path.points || path.points.length < 2) return;
       ctx.beginPath();
-      ctx.strokeStyle = path.color || "#000000";
-      ctx.lineWidth = path.strokeWidth || 2;
+      ctx.strokeStyle = path.color || "#1e3a2f";
+      ctx.lineWidth = (path.strokeWidth || 3) / zoom;
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
       ctx.moveTo(path.points[0].x, path.points[0].y);
@@ -520,7 +526,8 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       }
       ctx.stroke();
     });
-  }, []);
+    ctx.restore();
+  }, [drawingPaths, pan, zoom]);
 
   // Panning
   const handleCanvasMouseDown = (e: React.MouseEvent) => {
@@ -701,15 +708,8 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   };
 
   useEffect(() => {
-    if (editingId !== null) {
-      const el = elements[editingId];
-      if (el?.type === "draw") {
-        const content = (el.content || {}) as any;
-        setDrawingPaths(content.paths || []);
-        setDrawUndoStack([]);
-      }
-    }
-  }, [editingId]);
+    if (drawingMode) redrawOverlayCanvas();
+  }, [drawingMode, redrawOverlayCanvas]);
 
   const selectedBoard = boards.find((b: PlanningBoardType) => b.id === selectedBoardId);
   const elementsList = Object.values(elements);
@@ -1271,157 +1271,6 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       );
     }
 
-    if (el.type === "draw") {
-      const paths = c.paths || [];
-      const currentPaths = isSelected ? drawingPaths : paths;
-      return (
-        <div
-          key={el.id}
-          className={`${cardBase} bg-card border border-border cursor-grab`}
-          style={{ left: el.x, top: el.y, width: el.width, minHeight: el.height, zIndex: effectiveZ }}
-          onMouseDown={(e) => {
-            if (isSelected && drawTool !== "select") return;
-            const tag = (e.target as HTMLElement).tagName.toLowerCase();
-            if (tag === "canvas" || tag === "input" || tag === "button" || (e.target as HTMLElement).closest("button")) return;
-            startDrag(el.id, e);
-          }}
-          onClick={handleClick}
-          onContextMenu={(e) => openContextMenu(e, el.id)}
-          onTouchStart={(e) => {
-            if (isSelected && drawTool !== "select") { e.stopPropagation(); return; }
-            handleElementTouchStart(el.id)(e);
-          }}
-          onTouchEnd={handleLongPressEnd}
-          onTouchCancel={handleLongPressEnd}
-          data-testid={`element-draw-${el.id}`}
-        >
-          <canvas
-            ref={(ref) => {
-              drawCanvasRefs.current[el.id] = ref;
-              if (ref && ref.width !== el.width && ref.height !== (el.height - 40)) {
-                ref.width = el.width;
-                ref.height = el.height - 40;
-                redrawCanvas(ref, currentPaths);
-              }
-            }}
-            width={el.width}
-            height={el.height - 40}
-            className="bg-white cursor-crosshair"
-            style={{ display: "block" }}
-            onMouseDown={(e) => {
-              if (!isSelected || drawTool === "select") return;
-              e.stopPropagation();
-              e.preventDefault();
-              const canvas = drawCanvasRefs.current[el.id];
-              if (!canvas) return;
-              const rect = canvas.getBoundingClientRect();
-              const scaleX = canvas.width / rect.width;
-              const scaleY = canvas.height / rect.height;
-              const x = (e.clientX - rect.left) * scaleX;
-              const y = (e.clientY - rect.top) * scaleY;
-              if (drawTool === "eraser") {
-                const newPaths = drawingPaths.filter((p: any) => {
-                  return !p.points.some((pt: any) => Math.abs(pt.x - x) < 10 && Math.abs(pt.y - y) < 10);
-                });
-                setDrawingPaths(newPaths);
-                redrawCanvas(canvas, newPaths);
-              } else {
-                setIsDrawing(true);
-                setDrawingPaths((prev) => [...prev, { points: [{ x, y }], color: drawColor, strokeWidth: drawStrokeWidth }]);
-              }
-            }}
-            onMouseMove={(e) => {
-              if (!isDrawing || !isSelected || drawTool !== "pen") return;
-              e.stopPropagation();
-              const canvas = drawCanvasRefs.current[el.id];
-              if (!canvas) return;
-              const rect = canvas.getBoundingClientRect();
-              const scaleX = canvas.width / rect.width;
-              const scaleY = canvas.height / rect.height;
-              const x = (e.clientX - rect.left) * scaleX;
-              const y = (e.clientY - rect.top) * scaleY;
-              setDrawingPaths((prev) => {
-                const newPaths = [...prev];
-                const last = { ...newPaths[newPaths.length - 1] };
-                last.points = [...last.points, { x, y }];
-                newPaths[newPaths.length - 1] = last;
-                redrawCanvas(canvas, newPaths);
-                return newPaths;
-              });
-            }}
-            onMouseUp={() => { setIsDrawing(false); }}
-            onMouseLeave={() => { setIsDrawing(false); }}
-            onTouchStart={(e) => {
-              if (!isSelected || drawTool === "select") return;
-              e.stopPropagation();
-              const touch = e.touches[0];
-              const canvas = drawCanvasRefs.current[el.id];
-              if (!canvas || !touch) return;
-              const rect = canvas.getBoundingClientRect();
-              const scaleX = canvas.width / rect.width;
-              const scaleY = canvas.height / rect.height;
-              const x = (touch.clientX - rect.left) * scaleX;
-              const y = (touch.clientY - rect.top) * scaleY;
-              setIsDrawing(true);
-              setDrawingPaths((prev) => [...prev, { points: [{ x, y }], color: drawColor, strokeWidth: drawStrokeWidth }]);
-            }}
-            onTouchMove={(e) => {
-              if (!isDrawing || !isSelected || drawTool !== "pen") return;
-              e.stopPropagation();
-              const touch = e.touches[0];
-              const canvas = drawCanvasRefs.current[el.id];
-              if (!canvas || !touch) return;
-              const rect = canvas.getBoundingClientRect();
-              const scaleX = canvas.width / rect.width;
-              const scaleY = canvas.height / rect.height;
-              const x = (touch.clientX - rect.left) * scaleX;
-              const y = (touch.clientY - rect.top) * scaleY;
-              setDrawingPaths((prev) => {
-                const newPaths = [...prev];
-                const last = { ...newPaths[newPaths.length - 1] };
-                last.points = [...last.points, { x, y }];
-                newPaths[newPaths.length - 1] = last;
-                redrawCanvas(canvas, newPaths);
-                return newPaths;
-              });
-            }}
-            onTouchEnd={() => { setIsDrawing(false); }}
-            data-testid={`draw-canvas-${el.id}`}
-          />
-          <div className="p-2 text-[10px] text-muted-foreground text-center border-t border-border">
-            {paths.length} path{paths.length !== 1 ? "s" : ""}
-          </div>
-          {isSelected && (
-            <>
-              <div className="absolute -top-8 right-0 flex gap-1">
-                <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleDeleteElement(el.id)} data-testid={`button-delete-${el.id}`}>
-                  <Trash2 className="h-3 w-3" />
-                </Button>
-              </div>
-              <div
-                className="absolute -bottom-10 left-0 right-0 flex items-center justify-center gap-1 bg-card border border-border rounded-md shadow-md px-2 py-1 z-20"
-                onMouseDown={(e) => e.stopPropagation()}
-                data-testid={`draw-toolbar-${el.id}`}
-              >
-                <button className={`p-1 rounded transition-colors ${drawTool === "pen" ? "bg-primary/20" : "hover:bg-muted"}`} onClick={() => setDrawTool("pen")} data-testid={`draw-pen-${el.id}`}><PenTool className="h-3.5 w-3.5" /></button>
-                <button className={`p-1 rounded transition-colors ${drawTool === "select" ? "bg-primary/20" : "hover:bg-muted"}`} onClick={() => setDrawTool("select")} data-testid={`draw-select-${el.id}`}><MousePointer className="h-3.5 w-3.5" /></button>
-                <button className={`p-1 rounded transition-colors ${drawTool === "eraser" ? "bg-primary/20" : "hover:bg-muted"}`} onClick={() => setDrawTool("eraser")} data-testid={`draw-eraser-${el.id}`}><Eraser className="h-3.5 w-3.5" /></button>
-                <div className="w-px h-4 bg-border mx-0.5" />
-                <input type="color" value={drawColor} onChange={(e) => setDrawColor(e.target.value)} className="w-5 h-5 rounded cursor-pointer border border-border" data-testid={`draw-color-${el.id}`} />
-                <button className="p-1 rounded hover:bg-muted transition-colors text-[9px] font-mono" onClick={() => setDrawStrokeWidth((w) => w >= 8 ? 1 : w + 1)} data-testid={`draw-stroke-${el.id}`}>{drawStrokeWidth}px</button>
-                <div className="w-px h-4 bg-border mx-0.5" />
-                <button className="p-1 rounded hover:bg-muted transition-colors" onClick={() => { if (drawingPaths.length > 0) { setDrawUndoStack((s) => [...s, drawingPaths[drawingPaths.length - 1]]); const newPaths = drawingPaths.slice(0, -1); setDrawingPaths(newPaths); const canvas = drawCanvasRefs.current[el.id]; if (canvas) redrawCanvas(canvas, newPaths); } }} data-testid={`draw-undo-${el.id}`}><Undo2 className="h-3.5 w-3.5" /></button>
-                <button className="p-1 rounded hover:bg-muted transition-colors" onClick={() => { if (drawUndoStack.length > 0) { const restored = drawUndoStack[drawUndoStack.length - 1]; setDrawUndoStack((s) => s.slice(0, -1)); const newPaths = [...drawingPaths, restored]; setDrawingPaths(newPaths); const canvas = drawCanvasRefs.current[el.id]; if (canvas) redrawCanvas(canvas, newPaths); } }} data-testid={`draw-redo-${el.id}`}><Redo2 className="h-3.5 w-3.5" /></button>
-                <div className="w-px h-4 bg-border mx-0.5" />
-                <button className="p-1 rounded hover:bg-muted transition-colors text-destructive" onClick={() => { setDrawingPaths(paths); setDrawUndoStack([]); const canvas = drawCanvasRefs.current[el.id]; if (canvas) redrawCanvas(canvas, paths); }} data-testid={`draw-discard-${el.id}`}><X className="h-3.5 w-3.5" /></button>
-                <button className="p-1 rounded hover:bg-muted transition-colors text-primary" onClick={() => { handleUpdateContent(el.id, { ...c, paths: drawingPaths }); setDrawUndoStack([]); }} data-testid={`draw-save-${el.id}`}><Save className="h-3.5 w-3.5" /></button>
-              </div>
-            </>
-          )}
-        </div>
-      );
-    }
-
     return null;
   };
 
@@ -1533,7 +1382,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                       e.dataTransfer.setData("tool-type", t.type);
                       e.dataTransfer.effectAllowed = "copy";
                     }}
-                    onClick={() => t.type === "image" ? setShowImagePopup(!showImagePopup) : createElement(t.type)}
+                    onClick={() => t.type === "image" ? setShowImagePopup(!showImagePopup) : t.type === "draw" ? (() => { setDrawingMode(true); setDrawTool("pen"); setDrawingPaths([]); setDrawUndoStack([]); setEditingId(null); })() : createElement(t.type)}
                     data-testid={`sidebar-tool-${t.type}`}
                   >
                     <t.icon className="h-5 w-5" />
@@ -1620,6 +1469,8 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
               const canvasY = Math.round(((e.clientY - rect.top - pan.y) / zoom) / GRID_SIZE) * GRID_SIZE;
               if (toolType === "image") {
                 triggerImageUpload();
+              } else if (toolType === "draw") {
+                setDrawingMode(true); setDrawTool("pen"); setDrawingPaths([]); setDrawUndoStack([]); setEditingId(null);
               } else {
                 createElement(toolType, canvasX, canvasY);
               }
@@ -1654,7 +1505,155 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
               data-testid="spatial-canvas-transform"
             >
               {elementsList.map(renderElement)}
+              {/* Saved draw element paths rendered as SVG */}
+              {elementsList.filter((el) => el.type === "draw").map((el) => {
+                const paths = ((el.content || {}) as any).paths || [];
+                if (paths.length === 0) return null;
+                return (
+                  <svg key={`draw-svg-${el.id}`} className="absolute pointer-events-none" style={{ left: 0, top: 0, width: 99999, height: 99999, overflow: "visible" }}>
+                    {paths.map((path: any, pi: number) => {
+                      if (!path.points || path.points.length < 2) return null;
+                      const d = path.points.map((pt: any, i: number) => `${i === 0 ? "M" : "L"}${pt.x},${pt.y}`).join(" ");
+                      return <path key={pi} d={d} stroke={path.color || "#1e3a2f"} strokeWidth={path.strokeWidth || 3} fill="none" strokeLinecap="round" strokeLinejoin="round" />;
+                    })}
+                  </svg>
+                );
+              })}
             </div>
+
+            {/* Full-board drawing overlay */}
+            {drawingMode && (
+              <>
+                <canvas
+                  ref={(ref) => {
+                    drawCanvasRef.current = ref;
+                    if (ref) {
+                      const parent = ref.parentElement;
+                      if (parent && (ref.width !== parent.clientWidth || ref.height !== parent.clientHeight)) {
+                        ref.width = parent.clientWidth;
+                        ref.height = parent.clientHeight;
+                        redrawOverlayCanvas();
+                      }
+                    }
+                  }}
+                  className="absolute inset-0 z-[100]"
+                  style={{ cursor: drawTool === "eraser" ? "crosshair" : "crosshair" }}
+                  onMouseDown={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    const canvas = drawCanvasRef.current;
+                    if (!canvas) return;
+                    const rect = canvas.getBoundingClientRect();
+                    const screenX = e.clientX - rect.left;
+                    const screenY = e.clientY - rect.top;
+                    const boardX = (screenX - pan.x) / zoom;
+                    const boardY = (screenY - pan.y) / zoom;
+                    if (drawTool === "eraser") {
+                      const newPaths = drawingPaths.filter((p: any) => {
+                        return !p.points.some((pt: any) => {
+                          const dist = Math.sqrt((pt.x - boardX) ** 2 + (pt.y - boardY) ** 2);
+                          return dist < 15 / zoom;
+                        });
+                      });
+                      setDrawingPaths(newPaths);
+                    } else {
+                      setIsDrawing(true);
+                      setDrawingPaths((prev) => [...prev, { points: [{ x: boardX, y: boardY }], color: drawColor, strokeWidth: drawStrokeWidth }]);
+                    }
+                  }}
+                  onMouseMove={(e) => {
+                    if (!isDrawing || drawTool !== "pen") return;
+                    e.stopPropagation();
+                    const canvas = drawCanvasRef.current;
+                    if (!canvas) return;
+                    const rect = canvas.getBoundingClientRect();
+                    const screenX = e.clientX - rect.left;
+                    const screenY = e.clientY - rect.top;
+                    const boardX = (screenX - pan.x) / zoom;
+                    const boardY = (screenY - pan.y) / zoom;
+                    setDrawingPaths((prev) => {
+                      const newPaths = [...prev];
+                      const last = { ...newPaths[newPaths.length - 1] };
+                      last.points = [...last.points, { x: boardX, y: boardY }];
+                      newPaths[newPaths.length - 1] = last;
+                      return newPaths;
+                    });
+                  }}
+                  onMouseUp={() => setIsDrawing(false)}
+                  onMouseLeave={() => setIsDrawing(false)}
+                  onTouchStart={(e) => {
+                    e.stopPropagation();
+                    const touch = e.touches[0];
+                    const canvas = drawCanvasRef.current;
+                    if (!canvas || !touch) return;
+                    const rect = canvas.getBoundingClientRect();
+                    const boardX = (touch.clientX - rect.left - pan.x) / zoom;
+                    const boardY = (touch.clientY - rect.top - pan.y) / zoom;
+                    if (drawTool === "eraser") {
+                      const newPaths = drawingPaths.filter((p: any) => !p.points.some((pt: any) => Math.sqrt((pt.x - boardX) ** 2 + (pt.y - boardY) ** 2) < 15 / zoom));
+                      setDrawingPaths(newPaths);
+                    } else {
+                      setIsDrawing(true);
+                      setDrawingPaths((prev) => [...prev, { points: [{ x: boardX, y: boardY }], color: drawColor, strokeWidth: drawStrokeWidth }]);
+                    }
+                  }}
+                  onTouchMove={(e) => {
+                    if (!isDrawing || drawTool !== "pen") return;
+                    e.stopPropagation();
+                    const touch = e.touches[0];
+                    const canvas = drawCanvasRef.current;
+                    if (!canvas || !touch) return;
+                    const rect = canvas.getBoundingClientRect();
+                    const boardX = (touch.clientX - rect.left - pan.x) / zoom;
+                    const boardY = (touch.clientY - rect.top - pan.y) / zoom;
+                    setDrawingPaths((prev) => {
+                      const newPaths = [...prev];
+                      const last = { ...newPaths[newPaths.length - 1] };
+                      last.points = [...last.points, { x: boardX, y: boardY }];
+                      newPaths[newPaths.length - 1] = last;
+                      return newPaths;
+                    });
+                  }}
+                  onTouchEnd={() => setIsDrawing(false)}
+                  data-testid="draw-overlay-canvas"
+                />
+                <div
+                  className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[101] flex items-center gap-2 bg-card border border-border rounded-lg shadow-lg px-3 py-2"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  data-testid="draw-overlay-toolbar"
+                >
+                  <button className={`p-1.5 rounded transition-colors ${drawTool === "pen" ? "bg-primary/20 text-primary" : "text-muted-foreground hover:text-foreground"}`} onClick={() => setDrawTool("pen")} data-testid="draw-tool-pen"><PenTool className="h-4 w-4" /></button>
+                  <button className={`p-1.5 rounded transition-colors ${drawTool === "eraser" ? "bg-primary/20 text-primary" : "text-muted-foreground hover:text-foreground"}`} onClick={() => setDrawTool("eraser")} data-testid="draw-tool-eraser"><Eraser className="h-4 w-4" /></button>
+                  <div className="w-px h-5 bg-border" />
+                  <input type="color" value={drawColor} onChange={(e) => setDrawColor(e.target.value)} className="w-6 h-6 rounded cursor-pointer border border-border" data-testid="draw-tool-color" />
+                  <button className="px-2 py-1 rounded text-xs font-mono text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" onClick={() => setDrawStrokeWidth((w) => w >= 10 ? 1 : w + 1)} data-testid="draw-tool-stroke">{drawStrokeWidth}px</button>
+                  <div className="w-px h-5 bg-border" />
+                  <button className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30" disabled={drawingPaths.length === 0} onClick={() => { if (drawingPaths.length > 0) { setDrawUndoStack((s) => [...s, drawingPaths[drawingPaths.length - 1]]); setDrawingPaths((prev) => prev.slice(0, -1)); } }} data-testid="draw-tool-undo"><Undo2 className="h-4 w-4" /></button>
+                  <button className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30" disabled={drawUndoStack.length === 0} onClick={() => { if (drawUndoStack.length > 0) { const restored = drawUndoStack[drawUndoStack.length - 1]; setDrawUndoStack((s) => s.slice(0, -1)); setDrawingPaths((prev) => [...prev, restored]); } }} data-testid="draw-tool-redo"><Redo2 className="h-4 w-4" /></button>
+                  <div className="w-px h-5 bg-border" />
+                  <Button size="sm" variant="ghost" className="text-destructive text-xs" onClick={() => { setDrawingPaths([]); setDrawUndoStack([]); setDrawingMode(false); }} data-testid="draw-tool-discard"><X className="h-3.5 w-3.5 mr-1" />Discard</Button>
+                  <Button size="sm" variant="default" className="text-xs" onClick={() => {
+                    if (drawingPaths.length > 0 && selectedBoardId) {
+                      const newZ = maxZ;
+                      setMaxZ(newZ + 1);
+                      const url = buildUrl(api.canvasElements.create.path, { boardId: selectedBoardId });
+                      fetch(url, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        credentials: "include",
+                        body: JSON.stringify({ type: "draw", x: 0, y: 0, width: 1, height: 1, zIndex: newZ, content: { paths: drawingPaths } }),
+                      })
+                        .then((r) => r.json())
+                        .then((created: CanvasElement) => { addElement(created); toast({ title: "Drawing saved" }); })
+                        .catch(() => toast({ title: "Error", description: "Failed to save drawing", variant: "destructive" }));
+                    }
+                    setDrawingPaths([]);
+                    setDrawUndoStack([]);
+                    setDrawingMode(false);
+                  }} data-testid="draw-tool-save"><Save className="h-3.5 w-3.5 mr-1" />Save</Button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
