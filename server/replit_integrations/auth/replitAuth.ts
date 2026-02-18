@@ -30,11 +30,12 @@ export function getSession() {
   return session({
     secret: process.env.SESSION_SECRET!,
     store: sessionStore,
-    resave: false,
-    saveUninitialized: false,
+    resave: true,
+    saveUninitialized: true,
     cookie: {
       httpOnly: true,
       secure: true,
+      sameSite: "lax" as const,
       maxAge: sessionTtl,
     },
   });
@@ -104,17 +105,41 @@ export async function setupAuth(app: Express) {
 
   app.get("/api/login", (req, res, next) => {
     ensureStrategy(req.hostname);
-    passport.authenticate(`replitauth:${req.hostname}`, {
+    const authenticator = passport.authenticate(`replitauth:${req.hostname}`, {
       prompt: "login consent",
       scope: ["openid", "email", "profile", "offline_access"],
-    })(req, res, next);
+    });
+    req.session.save((err) => {
+      if (err) {
+        console.error("Session save error before login redirect:", err);
+      }
+      authenticator(req, res, next);
+    });
   });
 
   app.get("/api/callback", (req, res, next) => {
     ensureStrategy(req.hostname);
-    passport.authenticate(`replitauth:${req.hostname}`, {
-      successReturnToOrRedirect: "/",
-      failureRedirect: "/api/login",
+    passport.authenticate(`replitauth:${req.hostname}`, (err: any, user: any, info: any) => {
+      if (err) {
+        console.error("Auth callback error:", err);
+        return res.redirect("/");
+      }
+      if (!user) {
+        console.error("Auth callback: no user returned. Info:", info);
+        return res.redirect("/");
+      }
+      req.logIn(user, (loginErr) => {
+        if (loginErr) {
+          console.error("Auth callback login error:", loginErr);
+          return res.redirect("/");
+        }
+        req.session.save((saveErr) => {
+          if (saveErr) {
+            console.error("Session save error after login:", saveErr);
+          }
+          return res.redirect("/");
+        });
+      });
     })(req, res, next);
   });
 
