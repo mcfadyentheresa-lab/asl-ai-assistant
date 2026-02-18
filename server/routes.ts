@@ -608,6 +608,54 @@ export async function registerRoutes(
     res.json({ url: `/api/projects/${project.id}/reports/mock-report.pdf` });
   });
 
+  // Handwriting-to-text recognition using AI Vision
+  app.post("/api/ai/recognize-handwriting", isAuthenticated, async (req: any, res) => {
+    try {
+      const { imageData } = req.body;
+      if (!imageData) {
+        return res.status(400).json({ error: "imageData (base64 PNG) is required" });
+      }
+
+      const OpenAI = (await import("openai")).default;
+      const client = new OpenAI({
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+      });
+
+      const response = await client.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content: "You are a handwriting recognition assistant. Analyze the drawn content on the canvas and extract any handwritten text. Return ONLY the recognized text, nothing else. If you cannot identify any text, return an empty string. Do not add explanations or commentary."
+          },
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: "Please read and transcribe any handwritten text in this drawing. Return only the text content."
+              },
+              {
+                type: "image_url",
+                image_url: {
+                  url: imageData.startsWith("data:") ? imageData : `data:image/png;base64,${imageData}`,
+                },
+              },
+            ],
+          },
+        ],
+        max_tokens: 500,
+      });
+
+      const text = response.choices[0]?.message?.content?.trim() || "";
+      res.json({ text });
+    } catch (error: any) {
+      console.error("Handwriting recognition error:", error);
+      res.status(500).json({ error: "Failed to recognize handwriting" });
+    }
+  });
+
   // Initialize seed data
   await seedDatabase();
 

@@ -14,12 +14,13 @@ import {
   ZoomIn, ZoomOut, Maximize, Loader2, MoreVertical, Edit3, Download, CheckSquare, GripVertical,
   X, ChevronDown, ExternalLink, Pencil, Upload, Copy, ArrowUpFromLine,
   Bold, Italic, Strikethrough, Underline, List, ListOrdered, Code, Link as LinkIcon,
-  Eraser, Undo2, Redo2, Save, PenTool,
+  Eraser, Undo2, Redo2, Save, PenTool, Sparkles, TypeIcon, Shapes,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { usePlanningBoards, useCreatePlanningBoard, useDeletePlanningBoard, useUpdatePlanningBoard, useUploadImage } from "@/hooks/use-projects";
 import { useCanvasStore, debouncedSavePositions } from "@/stores/canvas-store";
 import { api, buildUrl } from "@shared/routes";
+import { recognizeAllShapes } from "@/lib/shape-recognition";
 import type { CanvasElement, PlanningBoard as PlanningBoardType } from "@shared/schema";
 import { queryClient } from "@/lib/queryClient";
 
@@ -80,6 +81,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   const [drawUndoStack, setDrawUndoStack] = useState<any[]>([]);
   const [isDrawing, setIsDrawing] = useState(false);
   const drawCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [aiProcessing, setAiProcessing] = useState(false);
 
   const elements = useCanvasStore((s) => s.elements);
   const loading = useCanvasStore((s) => s.loading);
@@ -1630,6 +1632,117 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                   <div className="w-px h-5 bg-border" />
                   <button className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30" disabled={drawingPaths.length === 0} onClick={() => { if (drawingPaths.length > 0) { setDrawUndoStack((s) => [...s, drawingPaths[drawingPaths.length - 1]]); setDrawingPaths((prev) => prev.slice(0, -1)); } }} data-testid="draw-tool-undo"><Undo2 className="h-4 w-4" /></button>
                   <button className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30" disabled={drawUndoStack.length === 0} onClick={() => { if (drawUndoStack.length > 0) { const restored = drawUndoStack[drawUndoStack.length - 1]; setDrawUndoStack((s) => s.slice(0, -1)); setDrawingPaths((prev) => [...prev, restored]); } }} data-testid="draw-tool-redo"><Redo2 className="h-4 w-4" /></button>
+                  <div className="w-px h-5 bg-border" />
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30"
+                        disabled={drawingPaths.length === 0 || aiProcessing}
+                        onClick={() => {
+                          setDrawUndoStack((s) => [...s, ...drawingPaths]);
+                          const result = recognizeAllShapes(drawingPaths);
+                          setDrawingPaths(result);
+                          toast({ title: "Shape Recognition", description: "Shapes have been cleaned up" });
+                        }}
+                        data-testid="draw-tool-shapes"
+                      >
+                        <Shapes className="h-4 w-4" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top"><p>Snap to shapes</p></TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30"
+                        disabled={drawingPaths.length === 0 || aiProcessing}
+                        onClick={async () => {
+                          const canvas = drawCanvasRef.current;
+                          if (!canvas) return;
+                          setAiProcessing(true);
+                          try {
+                            const tempCanvas = document.createElement("canvas");
+                            tempCanvas.width = canvas.width;
+                            tempCanvas.height = canvas.height;
+                            const tempCtx = tempCanvas.getContext("2d");
+                            if (!tempCtx) return;
+                            tempCtx.fillStyle = "#ffffff";
+                            tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+                            tempCtx.translate(pan.x, pan.y);
+                            tempCtx.scale(zoom, zoom);
+                            drawingPaths.forEach((path: any) => {
+                              if (!path.points || path.points.length < 2) return;
+                              tempCtx.beginPath();
+                              tempCtx.strokeStyle = path.color || "#000000";
+                              tempCtx.lineWidth = (path.strokeWidth || 3) / zoom;
+                              tempCtx.lineCap = "round";
+                              tempCtx.lineJoin = "round";
+                              tempCtx.moveTo(path.points[0].x, path.points[0].y);
+                              for (let i = 1; i < path.points.length; i++) {
+                                tempCtx.lineTo(path.points[i].x, path.points[i].y);
+                              }
+                              tempCtx.stroke();
+                            });
+                            const imageData = tempCanvas.toDataURL("image/png");
+                            const resp = await fetch("/api/ai/recognize-handwriting", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              credentials: "include",
+                              body: JSON.stringify({ imageData }),
+                            });
+                            if (!resp.ok) throw new Error("Server error");
+                            const data = await resp.json();
+                            if (data.text && data.text.trim() && selectedBoardId) {
+                              const bb = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+                              drawingPaths.forEach((path: any) => {
+                                path.points?.forEach((pt: any) => {
+                                  if (pt.x < bb.minX) bb.minX = pt.x;
+                                  if (pt.y < bb.minY) bb.minY = pt.y;
+                                  if (pt.x > bb.maxX) bb.maxX = pt.x;
+                                  if (pt.y > bb.maxY) bb.maxY = pt.y;
+                                });
+                              });
+                              const noteX = isFinite(bb.minX) ? bb.minX : 100;
+                              const noteY = isFinite(bb.minY) ? bb.minY - 20 : 100;
+                              const newZ = maxZ;
+                              setMaxZ(newZ + 1);
+                              const url = buildUrl(api.canvasElements.create.path, { boardId: selectedBoardId });
+                              const created = await fetch(url, {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                credentials: "include",
+                                body: JSON.stringify({
+                                  type: "note",
+                                  x: noteX,
+                                  y: noteY,
+                                  width: Math.max(240, bb.maxX - bb.minX + 40),
+                                  height: Math.max(100, bb.maxY - bb.minY + 40),
+                                  zIndex: newZ,
+                                  content: { title: "", text: data.text.trim() },
+                                }),
+                              }).then((r) => r.json());
+                              addElement(created);
+                              setDrawingPaths([]);
+                              setDrawUndoStack([]);
+                              setDrawingMode(false);
+                              toast({ title: "Text Recognized", description: `Created note: "${data.text.trim().substring(0, 50)}..."` });
+                            } else {
+                              toast({ title: "No Text Found", description: "Could not identify any handwriting in the drawing", variant: "destructive" });
+                            }
+                          } catch (err) {
+                            console.error("Handwriting recognition failed:", err);
+                            toast({ title: "Error", description: "Failed to recognize handwriting", variant: "destructive" });
+                          } finally {
+                            setAiProcessing(false);
+                          }
+                        }}
+                        data-testid="draw-tool-handwriting"
+                      >
+                        {aiProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <TypeIcon className="h-4 w-4" />}
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top"><p>Convert handwriting to text</p></TooltipContent>
+                  </Tooltip>
                   <div className="w-px h-5 bg-border" />
                   <Button size="sm" variant="ghost" className="text-destructive text-xs" onClick={() => { setDrawingPaths([]); setDrawUndoStack([]); setDrawingMode(false); }} data-testid="draw-tool-discard"><X className="h-3.5 w-3.5 mr-1" />Discard</Button>
                   <Button size="sm" variant="default" className="text-xs" onClick={() => {
