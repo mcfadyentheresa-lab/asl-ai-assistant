@@ -52,6 +52,7 @@ export default function ProjectDetails() {
   const { mutate: updateProject } = useUpdateProject();
   const { toast } = useToast();
 
+  const [activeTab, setActiveTab] = useState("overview");
   const assignedClient = users?.find((u) => u.id === project?.clientId);
 
   if (loadingProject) {
@@ -81,10 +82,10 @@ export default function ProjectDetails() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-20">
+    <div className={`min-h-screen bg-background ${activeTab === "board" ? "h-screen overflow-hidden" : "pb-20"}`}>
       <Navbar />
 
-      <div className="relative h-56 md:h-72 w-full overflow-hidden" data-testid="project-hero">
+      <div className={`relative w-full overflow-hidden ${activeTab === "board" ? "h-32" : "h-56 md:h-72"}`} data-testid="project-hero">
         {project.thumbnailUrl ? (
           <img
             src={project.thumbnailUrl}
@@ -117,8 +118,8 @@ export default function ProjectDetails() {
         </div>
       </div>
 
-      <main className="container px-6 md:px-10 mt-8">
-        <Tabs defaultValue="overview" className="space-y-8">
+      <main className={`container px-6 md:px-10 ${activeTab === "board" ? "mt-2 flex flex-col" : "mt-8"}`} style={activeTab === "board" ? { height: "calc(100vh - 14rem)" } : undefined}>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className={activeTab === "board" ? "space-y-2 flex flex-col flex-1 min-h-0" : "space-y-8"}>
           <div className="overflow-x-auto -mx-6 px-6 md:mx-0 md:px-0">
             <TabsList className="w-max md:w-auto" data-testid="tabs-list">
               <TabsTrigger value="overview" data-testid="tab-overview">
@@ -293,7 +294,7 @@ export default function ProjectDetails() {
             <ChecklistTab projectId={projectId} />
           </TabsContent>
 
-          <TabsContent value="board">
+          <TabsContent value="board" className="flex-1 min-h-0">
             <SpatialCanvas projectId={projectId} />
           </TabsContent>
 

@@ -295,9 +295,21 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       e.preventDefault();
       const dx = (touch.clientX - dragStartRef.current.x) / zoom;
       const dy = (touch.clientY - dragStartRef.current.y) / zoom;
-      const newX = Math.round((dragStartRef.current.elX + dx) / GRID_SIZE) * GRID_SIZE;
-      const newY = Math.round((dragStartRef.current.elY + dy) / GRID_SIZE) * GRID_SIZE;
+      const newX = dragStartRef.current.elX + dx;
+      const newY = dragStartRef.current.elY + dy;
+      const draggedEl = elements[draggingId];
+      const prevX = draggedEl?.x ?? newX;
+      const prevY = draggedEl?.y ?? newY;
       moveElement(draggingId, newX, newY);
+      if (draggedEl?.type === "column") {
+        const childDx = newX - prevX;
+        const childDy = newY - prevY;
+        Object.values(elements).forEach((child) => {
+          if (child.parentColumnId === draggingId) {
+            moveElement(child.id, child.x + childDx, child.y + childDy);
+          }
+        });
+      }
     } else if (isPanning && panStartRef.current && e.touches.length === 1) {
       const dx = touch.clientX - panStartRef.current.x;
       const dy = touch.clientY - panStartRef.current.y;
@@ -311,11 +323,42 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       panStartRef.current = null;
     }
     if (draggingId !== null && selectedBoardId) {
+      const el = elements[draggingId];
+      if (el) {
+        const snappedX = Math.round(el.x / GRID_SIZE) * GRID_SIZE;
+        const snappedY = Math.round(el.y / GRID_SIZE) * GRID_SIZE;
+        moveElement(draggingId, snappedX, snappedY);
+        if (el.type !== "column") {
+          assignToColumn(draggingId);
+        }
+      }
       debouncedSavePositions(selectedBoardId);
       setDraggingId(null);
       dragStartRef.current = null;
     }
     handleLongPressEnd();
+  };
+
+  const assignToColumn = (elementId: number) => {
+    const el = elements[elementId];
+    if (!el || el.type === "column" || el.type === "section_header") return;
+    const cx = el.x + (el.width / 2);
+    const cy = el.y + ((el.height || 60) / 2);
+    let foundColumn: number | null = null;
+    Object.values(elements).forEach((col) => {
+      if (col.type !== "column" || col.id === elementId) return;
+      if (
+        cx >= col.x &&
+        cx <= col.x + col.width &&
+        cy >= col.y &&
+        cy <= col.y + (col.height || 300)
+      ) {
+        foundColumn = col.id;
+      }
+    });
+    if (foundColumn !== el.parentColumnId) {
+      updateElement(elementId, { parentColumnId: foundColumn });
+    }
   };
 
   // Panning
@@ -336,9 +379,21 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     if (draggingId !== null && dragStartRef.current) {
       const dx = (e.clientX - dragStartRef.current.x) / zoom;
       const dy = (e.clientY - dragStartRef.current.y) / zoom;
-      const newX = Math.round((dragStartRef.current.elX + dx) / GRID_SIZE) * GRID_SIZE;
-      const newY = Math.round((dragStartRef.current.elY + dy) / GRID_SIZE) * GRID_SIZE;
+      const newX = dragStartRef.current.elX + dx;
+      const newY = dragStartRef.current.elY + dy;
+      const draggedEl = elements[draggingId];
+      const prevX = draggedEl?.x ?? newX;
+      const prevY = draggedEl?.y ?? newY;
       moveElement(draggingId, newX, newY);
+      if (draggedEl?.type === "column") {
+        const childDx = newX - prevX;
+        const childDy = newY - prevY;
+        Object.values(elements).forEach((child) => {
+          if (child.parentColumnId === draggingId) {
+            moveElement(child.id, child.x + childDx, child.y + childDy);
+          }
+        });
+      }
     }
   };
 
@@ -348,6 +403,15 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       panStartRef.current = null;
     }
     if (draggingId !== null && selectedBoardId) {
+      const el = elements[draggingId];
+      if (el) {
+        const snappedX = Math.round(el.x / GRID_SIZE) * GRID_SIZE;
+        const snappedY = Math.round(el.y / GRID_SIZE) * GRID_SIZE;
+        moveElement(draggingId, snappedX, snappedY);
+        if (el.type !== "column") {
+          assignToColumn(draggingId);
+        }
+      }
       debouncedSavePositions(selectedBoardId);
       setDraggingId(null);
       dragStartRef.current = null;
@@ -663,10 +727,11 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
 
     if (el.type === "column") {
       const childEls = elementsList.filter((e) => e.parentColumnId === el.id);
+      const isDropTarget = draggingId !== null && draggingId !== el.id && elements[draggingId]?.type !== "column";
       return (
         <div
           key={el.id}
-          className={`${cardBase} bg-muted/40 border border-dashed border-border/60`}
+          className={`${cardBase} border border-dashed ${isDropTarget ? "bg-primary/10 border-primary/40" : "bg-muted/40 border-border/60"} transition-colors`}
           style={{ left: el.x, top: el.y, width: el.width, minHeight: el.height, zIndex: el.zIndex }}
           onClick={handleClick}
           onContextMenu={(e) => openContextMenu(e, el.id)}
@@ -948,9 +1013,9 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   ];
 
   return (
-    <div className="flex flex-col h-full" data-testid="spatial-canvas-root">
+    <div className="flex flex-col h-full overflow-hidden" data-testid="spatial-canvas-root">
       {/* Board selector bar */}
-      <div className="flex items-center gap-2 mb-2 flex-wrap">
+      <div className="flex items-center gap-2 mb-2 flex-wrap shrink-0">
         {!isLoadingBoards && boards.length > 0 && (
           <Select value={String(selectedBoardId || "")} onValueChange={(v) => setSelectedBoardId(Number(v))}>
             <SelectTrigger className="w-[200px]" data-testid="select-board-trigger">
@@ -1037,7 +1102,12 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
               <Tooltip key={t.type}>
                 <TooltipTrigger asChild>
                   <button
-                    className="w-12 h-12 flex flex-col items-center justify-center rounded-md text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors gap-0.5"
+                    className="w-12 h-12 flex flex-col items-center justify-center rounded-md text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors gap-0.5 cursor-grab active:cursor-grabbing"
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("tool-type", t.type);
+                      e.dataTransfer.effectAllowed = "copy";
+                    }}
                     onClick={() => t.type === "image" ? triggerImageUpload() : createElement(t.type)}
                     data-testid={`sidebar-tool-${t.type}`}
                   >
@@ -1079,6 +1149,20 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             onWheel={handleWheel}
             onClick={() => { if (!draggingId) { setEditingId(null); setContextMenu(null); } }}
             onContextMenu={(e) => { e.preventDefault(); setContextMenu(null); }}
+            onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; }}
+            onDrop={(e) => {
+              e.preventDefault();
+              const toolType = e.dataTransfer.getData("tool-type");
+              if (!toolType || !containerRef.current) return;
+              const rect = containerRef.current.getBoundingClientRect();
+              const canvasX = Math.round(((e.clientX - rect.left - pan.x) / zoom) / GRID_SIZE) * GRID_SIZE;
+              const canvasY = Math.round(((e.clientY - rect.top - pan.y) / zoom) / GRID_SIZE) * GRID_SIZE;
+              if (toolType === "image") {
+                triggerImageUpload();
+              } else {
+                createElement(toolType, canvasX, canvasY);
+              }
+            }}
             data-testid="spatial-canvas-viewport"
           >
             {/* Dot grid background */}
