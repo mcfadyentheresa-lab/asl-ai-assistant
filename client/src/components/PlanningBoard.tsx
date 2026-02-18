@@ -31,6 +31,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import { Label } from "@/components/ui/label";
 import {
   MousePointer2,
   Pencil,
@@ -55,6 +56,9 @@ import {
   Download,
   Edit3,
   Link2,
+  LayoutPanelLeft,
+  X,
+  Palette,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -72,6 +76,15 @@ import {
 import type { PlanningBoard as PlanningBoardType } from "@shared/schema";
 
 type ToolMode = "select" | "draw" | "eraser" | "text" | "rect" | "circle" | "sticky";
+
+interface CardContentItem {
+  type: "text" | "color" | "image";
+  text?: string;
+  color?: string;
+  colorName?: string;
+  imageUrl?: string;
+  imageCaption?: string;
+}
 
 const DRAW_COLORS = [
   "#1a1a1a", "#ffffff", "#ef4444", "#f97316", "#eab308",
@@ -117,6 +130,15 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
   const [showNewBoardDialog, setShowNewBoardDialog] = useState(false);
   const [showImageUrlDialog, setShowImageUrlDialog] = useState(false);
   const [imageUrl, setImageUrl] = useState("");
+  const [showCardDialog, setShowCardDialog] = useState(false);
+  const [cardTitle, setCardTitle] = useState("New Column");
+  const [cardItems, setCardItems] = useState<CardContentItem[]>([]);
+  const [cardItemText, setCardItemText] = useState("");
+  const [cardItemColor, setCardItemColor] = useState("#EE96E7");
+  const [cardItemColorName, setCardItemColorName] = useState("");
+  const [cardItemImageUrl, setCardItemImageUrl] = useState("");
+  const [cardItemImageCaption, setCardItemImageCaption] = useState("");
+  const [cardAddMode, setCardAddMode] = useState<"text" | "color" | "image" | null>(null);
 
   const { data: boards = [], isLoading: isLoadingBoards } = usePlanningBoards(projectId);
   const { data: boardData, isLoading: isLoadingBoard } = usePlanningBoard(selectedBoardId);
@@ -473,6 +495,240 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
     setTool("select");
   };
 
+  const buildCardGroup = (
+    canvas: fabric.Canvas,
+    title: string,
+    items: CardContentItem[],
+    left?: number,
+    top?: number,
+  ): Promise<fabric.Group> => {
+    return new Promise(async (resolve) => {
+      const CARD_WIDTH = 260;
+      const CARD_PAD = 16;
+      const INNER_W = CARD_WIDTH - CARD_PAD * 2;
+      const ITEM_GAP = 12;
+
+      const titleText = new fabric.Textbox(title, {
+        fontFamily: "'Playfair Display', Georgia, serif",
+        fontSize: 18,
+        fontWeight: "bold",
+        fill: "#1a1a1a",
+        width: INNER_W,
+        left: CARD_PAD,
+        top: CARD_PAD,
+        editable: true,
+      });
+
+      const countText = new fabric.Text(`${items.length} card${items.length !== 1 ? "s" : ""}`, {
+        fontFamily: "DM Sans, sans-serif",
+        fontSize: 12,
+        fill: "#9ca3af",
+        left: CARD_PAD,
+        top: CARD_PAD + titleText.calcTextHeight() + 4,
+      });
+
+      let yPos = CARD_PAD + titleText.calcTextHeight() + 4 + countText.calcTextHeight() + ITEM_GAP;
+      const contentObjects: fabric.FabricObject[] = [];
+
+      for (const item of items) {
+        if (item.type === "text") {
+          const itemBg = new fabric.Rect({
+            left: CARD_PAD,
+            top: yPos,
+            width: INNER_W,
+            height: 0,
+            fill: "#ffffff",
+            rx: 6,
+            ry: 6,
+            stroke: "#e5e7eb",
+            strokeWidth: 1,
+          });
+          const itemText = new fabric.Textbox(item.text || "Note", {
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 14,
+            fill: "#374151",
+            width: INNER_W - 20,
+            left: CARD_PAD + 10,
+            top: yPos + 12,
+            editable: true,
+          });
+          const textH = itemText.calcTextHeight();
+          itemBg.set({ height: textH + 24 });
+          contentObjects.push(itemBg, itemText);
+          yPos += textH + 24 + ITEM_GAP;
+        } else if (item.type === "color") {
+          const swatchBg = new fabric.Rect({
+            left: CARD_PAD,
+            top: yPos,
+            width: INNER_W,
+            height: 0,
+            fill: "#ffffff",
+            rx: 6,
+            ry: 6,
+            stroke: "#e5e7eb",
+            strokeWidth: 1,
+          });
+          const swatch = new fabric.Rect({
+            left: CARD_PAD + 10,
+            top: yPos + 10,
+            width: INNER_W - 20,
+            height: 120,
+            fill: item.color || "#EE96E7",
+            rx: 4,
+            ry: 4,
+          });
+          const hexLabel = new fabric.Text(item.color?.toUpperCase() || "#EE96E7", {
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 12,
+            fill: "#ffffff",
+            left: CARD_PAD + 18,
+            top: yPos + 18,
+          });
+          const nameLabel = new fabric.Textbox(item.colorName || "Color", {
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 13,
+            fill: "#374151",
+            width: INNER_W - 20,
+            left: CARD_PAD + 10,
+            top: yPos + 10 + 120 + 8,
+            editable: true,
+          });
+          const nameH = nameLabel.calcTextHeight();
+          swatchBg.set({ height: 120 + nameH + 28 });
+          contentObjects.push(swatchBg, swatch, hexLabel, nameLabel);
+          yPos += 120 + nameH + 28 + ITEM_GAP;
+        } else if (item.type === "image" && item.imageUrl) {
+          const imgCardBg = new fabric.Rect({
+            left: CARD_PAD,
+            top: yPos,
+            width: INNER_W,
+            height: 180,
+            fill: "#ffffff",
+            rx: 6,
+            ry: 6,
+            stroke: "#e5e7eb",
+            strokeWidth: 1,
+          });
+          contentObjects.push(imgCardBg);
+
+          try {
+            const imgEl = await new Promise<HTMLImageElement>((res, rej) => {
+              const el = new Image();
+              el.crossOrigin = "anonymous";
+              el.onload = () => res(el);
+              el.onerror = () => rej(new Error("Failed to load image"));
+              el.src = item.imageUrl!;
+            });
+            const maxImgW = INNER_W - 20;
+            const maxImgH = 120;
+            const scale = Math.min(maxImgW / imgEl.width, maxImgH / imgEl.height, 1);
+            const fabricImg = new fabric.FabricImage(imgEl, {
+              left: CARD_PAD + 10,
+              top: yPos + 10,
+              scaleX: scale,
+              scaleY: scale,
+            });
+            const captionText = new fabric.Textbox(item.imageCaption || "", {
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 12,
+              fill: "#6b7280",
+              width: INNER_W - 20,
+              left: CARD_PAD + 10,
+              top: yPos + 10 + imgEl.height * scale + 8,
+              editable: true,
+            });
+            const captionH = item.imageCaption ? captionText.calcTextHeight() : 0;
+            imgCardBg.set({ height: 10 + imgEl.height * scale + 8 + captionH + 10 });
+            contentObjects.push(fabricImg);
+            if (item.imageCaption) contentObjects.push(captionText);
+            yPos += 10 + imgEl.height * scale + 8 + captionH + 10 + ITEM_GAP;
+          } catch {
+            const errText = new fabric.Text("(Image failed to load)", {
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 12,
+              fill: "#9ca3af",
+              left: CARD_PAD + 10,
+              top: yPos + 10,
+            });
+            imgCardBg.set({ height: 40 });
+            contentObjects.push(errText);
+            yPos += 40 + ITEM_GAP;
+          }
+        }
+      }
+
+      const totalHeight = yPos + CARD_PAD - ITEM_GAP;
+      const bg = new fabric.Rect({
+        left: 0,
+        top: 0,
+        width: CARD_WIDTH,
+        height: Math.max(totalHeight, 80),
+        fill: "#f3f4f6",
+        rx: 8,
+        ry: 8,
+        shadow: new fabric.Shadow({ color: "rgba(0,0,0,0.1)", blur: 12, offsetX: 2, offsetY: 4 }),
+      });
+
+      const allObjects = [bg, titleText, countText, ...contentObjects];
+
+      const group = new fabric.Group(allObjects, {
+        left: left ?? canvas.getWidth() / 2 - CARD_WIDTH / 2,
+        top: top ?? Math.max(20, canvas.getHeight() / 2 - totalHeight / 2),
+        subTargetCheck: true,
+        interactive: true,
+      });
+
+      resolve(group);
+    });
+  };
+
+  const openCardDialog = () => {
+    setCardTitle("New Column");
+    setCardItems([]);
+    setCardAddMode(null);
+    setCardItemText("");
+    setCardItemColor("#EE96E7");
+    setCardItemColorName("");
+    setCardItemImageUrl("");
+    setCardItemImageCaption("");
+    setShowCardDialog(true);
+  };
+
+  const addCardItem = () => {
+    if (cardAddMode === "text" && cardItemText.trim()) {
+      setCardItems([...cardItems, { type: "text", text: cardItemText.trim() }]);
+      setCardItemText("");
+    } else if (cardAddMode === "color") {
+      setCardItems([...cardItems, { type: "color", color: cardItemColor, colorName: cardItemColorName || "Unnamed Color" }]);
+      setCardItemColor("#EE96E7");
+      setCardItemColorName("");
+    } else if (cardAddMode === "image" && cardItemImageUrl.trim()) {
+      setCardItems([...cardItems, { type: "image", imageUrl: cardItemImageUrl.trim(), imageCaption: cardItemImageCaption.trim() }]);
+      setCardItemImageUrl("");
+      setCardItemImageCaption("");
+    }
+    setCardAddMode(null);
+  };
+
+  const removeCardItem = (idx: number) => {
+    setCardItems(cardItems.filter((_, i) => i !== idx));
+  };
+
+  const handleCreateCard = async () => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    try {
+      const group = await buildCardGroup(canvas, cardTitle || "New Column", cardItems);
+      canvas.add(group);
+      canvas.setActiveObject(group);
+      canvas.renderAll();
+      setShowCardDialog(false);
+      setTool("select");
+    } catch {
+      toast({ title: "Error", description: "Failed to create card.", variant: "destructive" });
+    }
+  };
+
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const canvas = fabricRef.current;
     const file = e.target.files?.[0];
@@ -793,6 +1049,7 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
 
         {toolBtn("text", <Type className="h-4 w-4" />, "Add Text", addText, false)}
         {toolBtn("sticky", <StickyNote className="h-4 w-4" />, "Sticky Note", addSticky, false)}
+        {toolBtn("card", <LayoutPanelLeft className="h-4 w-4" />, "Add Card / Column", openCardDialog, false)}
         {toolBtn("rect", <Square className="h-4 w-4" />, "Rectangle", addRect, false)}
         {toolBtn("circle", <Circle className="h-4 w-4" />, "Circle", addCircle, false)}
 
@@ -958,7 +1215,7 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
       {boards.length > 0 && (
         <div className={`flex items-center justify-between mt-2 px-1 ${(!selectedBoardId || isLoadingData) ? "invisible" : ""}`}>
           <p className="text-[10px] text-muted-foreground">
-            Tip: Double-click sticky notes to edit text. Use the image button to upload or paste a URL. {hasUnsaved && "(Auto-saving...)"}
+            Tip: Double-click to edit text. Use cards to create Milanote-style columns with text, colors & images. {hasUnsaved && "(Auto-saving...)"}
           </p>
           <p className="text-[10px] text-muted-foreground" data-testid="text-save-status">
             {isSaving ? "Saving..." : hasUnsaved ? "Unsaved changes" : "All changes saved"}
@@ -1099,6 +1356,164 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowImageUrlDialog(false)}>Cancel</Button>
             <Button onClick={handleAddImageFromUrl} disabled={!imageUrl.trim()} data-testid="button-confirm-image-url">Add Image</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showCardDialog} onOpenChange={setShowCardDialog}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Create Card / Column</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label className="text-sm font-medium">Column Title</Label>
+              <Input
+                placeholder="New Column"
+                value={cardTitle}
+                onChange={(e) => setCardTitle(e.target.value)}
+                data-testid="input-card-title"
+              />
+            </div>
+
+            {cardItems.length > 0 && (
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Content ({cardItems.length} card{cardItems.length !== 1 ? "s" : ""})</Label>
+                {cardItems.map((item, i) => (
+                  <div key={i} className="flex items-center gap-2 bg-muted p-2 rounded-md">
+                    {item.type === "text" && (
+                      <div className="flex-1 text-sm truncate"><Type className="h-3 w-3 inline mr-1" />{item.text}</div>
+                    )}
+                    {item.type === "color" && (
+                      <div className="flex items-center gap-2 flex-1">
+                        <div className="h-5 w-5 rounded" style={{ backgroundColor: item.color }} />
+                        <span className="text-sm truncate">{item.color} - {item.colorName}</span>
+                      </div>
+                    )}
+                    {item.type === "image" && (
+                      <div className="flex-1 text-sm truncate"><ImagePlus className="h-3 w-3 inline mr-1" />{item.imageCaption || item.imageUrl}</div>
+                    )}
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => removeCardItem(i)}
+                      data-testid={`button-remove-card-item-${i}`}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {cardAddMode === null && (
+              <div>
+                <Label className="text-sm font-medium mb-2 block">Add Content</Label>
+                <div className="flex gap-2 flex-wrap">
+                  <Button variant="outline" size="sm" onClick={() => setCardAddMode("text")} data-testid="button-add-text-item">
+                    <Type className="h-3.5 w-3.5 mr-1.5" /> Text Block
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setCardAddMode("color")} data-testid="button-add-color-item">
+                    <Palette className="h-3.5 w-3.5 mr-1.5" /> Color Swatch
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setCardAddMode("image")} data-testid="button-add-image-item">
+                    <ImagePlus className="h-3.5 w-3.5 mr-1.5" /> Image
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {cardAddMode === "text" && (
+              <div className="space-y-2 bg-muted/50 p-3 rounded-md border">
+                <Label className="text-sm font-medium">Text Block</Label>
+                <Input
+                  placeholder="Type your note text..."
+                  value={cardItemText}
+                  onChange={(e) => setCardItemText(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") addCardItem(); }}
+                  autoFocus
+                  data-testid="input-card-item-text"
+                />
+                <div className="flex gap-2 justify-end">
+                  <Button variant="ghost" size="sm" onClick={() => setCardAddMode(null)}>Cancel</Button>
+                  <Button size="sm" onClick={addCardItem} disabled={!cardItemText.trim()} data-testid="button-confirm-card-item">Add</Button>
+                </div>
+              </div>
+            )}
+
+            {cardAddMode === "color" && (
+              <div className="space-y-2 bg-muted/50 p-3 rounded-md border">
+                <Label className="text-sm font-medium">Color Swatch</Label>
+                <div className="flex gap-2 items-end">
+                  <div className="flex-1">
+                    <Label className="text-xs text-muted-foreground">Color</Label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={cardItemColor}
+                        onChange={(e) => setCardItemColor(e.target.value)}
+                        className="h-9 w-12 rounded border cursor-pointer"
+                        data-testid="input-card-item-color"
+                      />
+                      <Input
+                        value={cardItemColor}
+                        onChange={(e) => setCardItemColor(e.target.value)}
+                        className="font-mono text-sm"
+                        placeholder="#EE96E7"
+                        data-testid="input-card-item-color-hex"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Name</Label>
+                  <Input
+                    placeholder="Lavender Magenta"
+                    value={cardItemColorName}
+                    onChange={(e) => setCardItemColorName(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") addCardItem(); }}
+                    data-testid="input-card-item-color-name"
+                  />
+                </div>
+                <div className="flex gap-2 justify-end">
+                  <Button variant="ghost" size="sm" onClick={() => setCardAddMode(null)}>Cancel</Button>
+                  <Button size="sm" onClick={addCardItem} data-testid="button-confirm-card-item">Add</Button>
+                </div>
+              </div>
+            )}
+
+            {cardAddMode === "image" && (
+              <div className="space-y-2 bg-muted/50 p-3 rounded-md border">
+                <Label className="text-sm font-medium">Image</Label>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Image URL</Label>
+                  <Input
+                    placeholder="https://example.com/image.jpg"
+                    value={cardItemImageUrl}
+                    onChange={(e) => setCardItemImageUrl(e.target.value)}
+                    data-testid="input-card-item-image-url"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Caption (optional)</Label>
+                  <Input
+                    placeholder="Image description..."
+                    value={cardItemImageCaption}
+                    onChange={(e) => setCardItemImageCaption(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") addCardItem(); }}
+                    data-testid="input-card-item-image-caption"
+                  />
+                </div>
+                <div className="flex gap-2 justify-end">
+                  <Button variant="ghost" size="sm" onClick={() => setCardAddMode(null)}>Cancel</Button>
+                  <Button size="sm" onClick={addCardItem} disabled={!cardItemImageUrl.trim()} data-testid="button-confirm-card-item">Add</Button>
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCardDialog(false)} data-testid="button-cancel-card">Cancel</Button>
+            <Button onClick={handleCreateCard} data-testid="button-confirm-card">Create Card</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
