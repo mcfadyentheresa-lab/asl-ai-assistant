@@ -22,7 +22,7 @@ import {
   CalendarDays, Milestone, ListChecks,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { usePlanningBoards, useCreatePlanningBoard, useDeletePlanningBoard, useUpdatePlanningBoard, useUploadImage, useUsers, useProjects, useMilestones, useChecklistItems, useCalendarEvents, useUpdateCalendarEvent, useDeleteCalendarEvent } from "@/hooks/use-projects";
+import { usePlanningBoards, useCreatePlanningBoard, useDeletePlanningBoard, useUpdatePlanningBoard, useUploadImage, useUsers, useProjects, useMilestones, useChecklistItems, useCalendarEvents, useUpdateCalendarEvent, useDeleteCalendarEvent, useCreateCalendarEvent, useCreateMilestone, useCreateChecklistItem } from "@/hooks/use-projects";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -69,6 +69,14 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   const [editingEventTitle, setEditingEventTitle] = useState<string | null>(null);
   const { mutateAsync: updateCalendarEvent } = useUpdateCalendarEvent();
   const { mutateAsync: deleteCalendarEvent } = useDeleteCalendarEvent();
+  const { mutateAsync: createCalendarEvent } = useCreateCalendarEvent();
+  const { mutateAsync: createMilestone } = useCreateMilestone();
+  const { mutateAsync: createChecklistItem } = useCreateChecklistItem();
+  const [linkCreateMode, setLinkCreateMode] = useState<{ milestone: boolean; checklist: boolean; calendar: boolean }>({ milestone: false, checklist: false, calendar: false });
+  const [newMilestoneTitle, setNewMilestoneTitle] = useState("");
+  const [newChecklistTitle, setNewChecklistTitle] = useState("");
+  const [newCalendarTitle, setNewCalendarTitle] = useState("");
+  const [newCalendarDate, setNewCalendarDate] = useState("");
   const [renameName, setRenameName] = useState("");
   const [newBoardName, setNewBoardName] = useState("");
 
@@ -179,6 +187,52 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'planning-boards'] });
     } catch {
       toast({ title: "Error", description: "Failed to update link.", variant: "destructive" });
+    }
+  };
+
+  const handleCreateAndLinkMilestone = async () => {
+    if (!selectedBoardId || !newMilestoneTitle.trim()) return;
+    try {
+      const result = await createMilestone({ projectId, title: newMilestoneTitle.trim() });
+      await updateBoard({ id: selectedBoardId, linkedMilestoneId: result.id } as any);
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'planning-boards'] });
+      queryClient.invalidateQueries({ queryKey: [buildUrl(api.milestones.list.path, { projectId }), projectId] });
+      setNewMilestoneTitle("");
+      setLinkCreateMode(m => ({ ...m, milestone: false }));
+      toast({ title: "Milestone created and linked" });
+    } catch {
+      toast({ title: "Error", description: "Failed to create milestone.", variant: "destructive" });
+    }
+  };
+
+  const handleCreateAndLinkChecklist = async () => {
+    if (!selectedBoardId || !newChecklistTitle.trim()) return;
+    try {
+      const result = await createChecklistItem({ projectId, title: newChecklistTitle.trim() });
+      await updateBoard({ id: selectedBoardId, linkedChecklistItemId: result.id } as any);
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'planning-boards'] });
+      queryClient.invalidateQueries({ queryKey: [api.checklist.list.path, projectId] });
+      setNewChecklistTitle("");
+      setLinkCreateMode(m => ({ ...m, checklist: false }));
+      toast({ title: "Checklist item created and linked" });
+    } catch {
+      toast({ title: "Error", description: "Failed to create checklist item.", variant: "destructive" });
+    }
+  };
+
+  const handleCreateAndLinkCalendar = async () => {
+    if (!selectedBoardId || !newCalendarTitle.trim() || !newCalendarDate) return;
+    try {
+      const result = await createCalendarEvent({ projectId, title: newCalendarTitle.trim(), date: newCalendarDate, type: "event" });
+      await updateBoard({ id: selectedBoardId, linkedCalendarEventId: result.id } as any);
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'planning-boards'] });
+      queryClient.invalidateQueries({ queryKey: [api.calendar.list.path, projectId] });
+      setNewCalendarTitle("");
+      setNewCalendarDate("");
+      setLinkCreateMode(m => ({ ...m, calendar: false }));
+      toast({ title: "Calendar event created and linked" });
+    } catch {
+      toast({ title: "Error", description: "Failed to create calendar event.", variant: "destructive" });
     }
   };
 
@@ -1756,7 +1810,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
               <DropdownMenuItem onClick={() => { setRenameName(selectedBoard?.name || ""); setShowRenameDialog(true); }} data-testid="menu-rename-board">
                 <Edit3 className="h-4 w-4 mr-2" /> Rename
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setShowLinkDialog(true)} data-testid="menu-link-board">
+              <DropdownMenuItem onClick={() => { setLinkCreateMode({ milestone: false, checklist: false, calendar: false }); setShowLinkDialog(true); }} data-testid="menu-link-board">
                 <Link2 className="h-4 w-4 mr-2" /> Link to...
               </DropdownMenuItem>
               <DropdownMenuItem onClick={createWeeklyPlanner} data-testid="menu-weekly-template">
@@ -2411,55 +2465,155 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             <Separator />
 
             <div>
-              <label className="text-sm font-medium mb-1 block">Milestone</label>
-              <Select
-                value={selectedBoard?.linkedMilestoneId?.toString() || "none"}
-                onValueChange={(v) => handleLinkUpdate("linkedMilestoneId", v === "none" ? null : Number(v))}
-              >
-                <SelectTrigger data-testid="select-link-milestone">
-                  <SelectValue placeholder="None" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
-                  {milestones.map((m: any) => (
-                    <SelectItem key={m.id} value={m.id.toString()}>{m.title}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-sm font-medium">Milestone</label>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs gap-1"
+                  onClick={() => setLinkCreateMode(m => ({ ...m, milestone: !m.milestone }))}
+                  data-testid="button-toggle-create-milestone"
+                >
+                  {linkCreateMode.milestone ? "Select Existing" : <><Plus className="h-3 w-3" /> Create New</>}
+                </Button>
+              </div>
+              {linkCreateMode.milestone ? (
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Milestone title..."
+                    value={newMilestoneTitle}
+                    onChange={(e) => setNewMilestoneTitle(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleCreateAndLinkMilestone()}
+                    data-testid="input-new-milestone-title"
+                  />
+                  <Button
+                    size="sm"
+                    onClick={handleCreateAndLinkMilestone}
+                    disabled={!newMilestoneTitle.trim()}
+                    data-testid="button-create-link-milestone"
+                  >
+                    Create
+                  </Button>
+                </div>
+              ) : (
+                <Select
+                  value={selectedBoard?.linkedMilestoneId?.toString() || "none"}
+                  onValueChange={(v) => handleLinkUpdate("linkedMilestoneId", v === "none" ? null : Number(v))}
+                >
+                  <SelectTrigger data-testid="select-link-milestone">
+                    <SelectValue placeholder="None" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {milestones.map((m: any) => (
+                      <SelectItem key={m.id} value={m.id.toString()}>{m.title}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
             <div>
-              <label className="text-sm font-medium mb-1 block">Checklist Item</label>
-              <Select
-                value={selectedBoard?.linkedChecklistItemId?.toString() || "none"}
-                onValueChange={(v) => handleLinkUpdate("linkedChecklistItemId", v === "none" ? null : Number(v))}
-              >
-                <SelectTrigger data-testid="select-link-checklist">
-                  <SelectValue placeholder="None" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
-                  {checklistItems.map((c: any) => (
-                    <SelectItem key={c.id} value={c.id.toString()}>{c.title}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-sm font-medium">Checklist Item</label>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs gap-1"
+                  onClick={() => setLinkCreateMode(m => ({ ...m, checklist: !m.checklist }))}
+                  data-testid="button-toggle-create-checklist"
+                >
+                  {linkCreateMode.checklist ? "Select Existing" : <><Plus className="h-3 w-3" /> Create New</>}
+                </Button>
+              </div>
+              {linkCreateMode.checklist ? (
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Checklist item title..."
+                    value={newChecklistTitle}
+                    onChange={(e) => setNewChecklistTitle(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleCreateAndLinkChecklist()}
+                    data-testid="input-new-checklist-title"
+                  />
+                  <Button
+                    size="sm"
+                    onClick={handleCreateAndLinkChecklist}
+                    disabled={!newChecklistTitle.trim()}
+                    data-testid="button-create-link-checklist"
+                  >
+                    Create
+                  </Button>
+                </div>
+              ) : (
+                <Select
+                  value={selectedBoard?.linkedChecklistItemId?.toString() || "none"}
+                  onValueChange={(v) => handleLinkUpdate("linkedChecklistItemId", v === "none" ? null : Number(v))}
+                >
+                  <SelectTrigger data-testid="select-link-checklist">
+                    <SelectValue placeholder="None" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {checklistItems.map((c: any) => (
+                      <SelectItem key={c.id} value={c.id.toString()}>{c.title}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
             <div>
-              <label className="text-sm font-medium mb-1 block">Calendar Event</label>
-              <Select
-                value={selectedBoard?.linkedCalendarEventId?.toString() || "none"}
-                onValueChange={(v) => handleLinkUpdate("linkedCalendarEventId", v === "none" ? null : Number(v))}
-              >
-                <SelectTrigger data-testid="select-link-event">
-                  <SelectValue placeholder="None" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
-                  {calendarEvents.map((e: any) => (
-                    <SelectItem key={e.id} value={e.id.toString()}>{e.title}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-sm font-medium">Calendar Event</label>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs gap-1"
+                  onClick={() => setLinkCreateMode(m => ({ ...m, calendar: !m.calendar }))}
+                  data-testid="button-toggle-create-calendar"
+                >
+                  {linkCreateMode.calendar ? "Select Existing" : <><Plus className="h-3 w-3" /> Create New</>}
+                </Button>
+              </div>
+              {linkCreateMode.calendar ? (
+                <div className="space-y-2">
+                  <Input
+                    placeholder="Event title..."
+                    value={newCalendarTitle}
+                    onChange={(e) => setNewCalendarTitle(e.target.value)}
+                    data-testid="input-new-calendar-title"
+                  />
+                  <div className="flex gap-2">
+                    <Input
+                      type="date"
+                      value={newCalendarDate}
+                      onChange={(e) => setNewCalendarDate(e.target.value)}
+                      data-testid="input-new-calendar-date"
+                    />
+                    <Button
+                      size="sm"
+                      onClick={handleCreateAndLinkCalendar}
+                      disabled={!newCalendarTitle.trim() || !newCalendarDate}
+                      data-testid="button-create-link-calendar"
+                    >
+                      Create
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <Select
+                  value={selectedBoard?.linkedCalendarEventId?.toString() || "none"}
+                  onValueChange={(v) => handleLinkUpdate("linkedCalendarEventId", v === "none" ? null : Number(v))}
+                >
+                  <SelectTrigger data-testid="select-link-event">
+                    <SelectValue placeholder="None" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {calendarEvents.map((e: any) => (
+                      <SelectItem key={e.id} value={e.id.toString()}>{e.title}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
           </div>
           <DialogFooter>
