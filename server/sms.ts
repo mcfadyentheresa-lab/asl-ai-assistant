@@ -197,20 +197,28 @@ export async function notifyTeamCustom(
   projectName: string,
   message: string,
   projectClientId: string | null,
-  sentByUserId: string
-): Promise<{ sent: number; failed: number }> {
-  const recipients = await getProjectParticipants(projectClientId, sentByUserId);
+  sentByUserId: string,
+  recipientIds?: string[]
+): Promise<{ sent: number; failed: number; recipientNames: string[] }> {
+  let recipients = await getProjectParticipants(projectClientId, sentByUserId);
+  if (recipientIds && recipientIds.length > 0) {
+    recipients = recipients.filter((u) => recipientIds.includes(u.id));
+  }
   const body = `Aster & Spruce — "${projectName}": ${message}`;
   let sent = 0;
   let failed = 0;
+  const recipientNames: string[] = [];
   const results = await Promise.allSettled(
-    recipients.map((u) => sendSms(u.phone!, body))
+    recipients.map((u) => {
+      recipientNames.push(`${u.firstName || ""} ${u.lastName || ""}`.trim() || u.id);
+      return sendSms(u.phone!, body);
+    })
   );
   for (const r of results) {
     if (r.status === "fulfilled" && r.value) sent++;
     else failed++;
   }
-  return { sent, failed };
+  return { sent, failed, recipientNames };
 }
 
 export async function sendTestSms(toPhone: string): Promise<boolean> {

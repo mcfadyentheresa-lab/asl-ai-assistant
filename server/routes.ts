@@ -812,7 +812,7 @@ export async function registerRoutes(
       if (!requester || (requester.role !== "admin" && requester.role !== "crew")) {
         return res.status(403).json({ message: "Only admins and crew can send team notifications" });
       }
-      const { message } = req.body;
+      const { message, recipientIds } = req.body;
       if (!message || typeof message !== "string" || message.trim().length === 0) {
         return res.status(400).json({ message: "Message is required" });
       }
@@ -826,7 +826,8 @@ export async function registerRoutes(
         project.name,
         message.trim(),
         project.clientId,
-        userId
+        userId,
+        Array.isArray(recipientIds) ? recipientIds : undefined
       );
 
       await storage.createActivityLog({

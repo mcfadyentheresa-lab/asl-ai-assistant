@@ -52,12 +52,13 @@ export function useSendTestSms() {
 }
 
 export function useNotifyTeam() {
+  const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ projectId, message }: { projectId: number; message: string }) => {
+    mutationFn: async ({ projectId, message, recipientIds }: { projectId: number; message: string; recipientIds?: string[] }) => {
       const res = await fetch(`/api/projects/${projectId}/notify`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message }),
+        body: JSON.stringify({ message, recipientIds }),
         credentials: "include",
       });
       if (!res.ok) {
@@ -65,6 +66,9 @@ export function useNotifyTeam() {
         throw new Error(data.message || "Failed to send notification");
       }
       return res.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', variables.projectId, 'activity'] });
     },
   });
 }
