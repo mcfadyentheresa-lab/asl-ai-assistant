@@ -637,6 +637,26 @@ export function useDeleteCalendarEvent() {
   });
 }
 
+export function useUploadCalendarEventImage() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ eventId, file, projectId }: { eventId: number; file: File; projectId: number }) => {
+      const formData = new FormData();
+      formData.append("image", file);
+      const res = await fetch(`/api/calendar/${eventId}/image`, {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to upload image");
+      return res.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: [api.calendar.list.path, variables.projectId] });
+    },
+  });
+}
+
 // --- Photos ---
 export function usePhotos(projectId: number) {
   return useQuery<import("@shared/schema").Photo[]>({

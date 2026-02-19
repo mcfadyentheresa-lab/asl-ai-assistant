@@ -4,7 +4,7 @@ import {
   useProject, useMilestones, useTasks, useMessages, useSendMessage,
   useChecklistItems, useCreateChecklistItem, useUpdateChecklistItem, useDeleteChecklistItem,
   useBoardItems, useCreateBoardItem, useDeleteBoardItem,
-  useCalendarEvents, useCreateCalendarEvent, useUpdateCalendarEvent, useDeleteCalendarEvent,
+  useCalendarEvents, useCreateCalendarEvent, useUpdateCalendarEvent, useDeleteCalendarEvent, useUploadCalendarEventImage,
   useDocuments, useUploadDocument, useDeleteDocument,
   usePhotos, useCreatePhoto, useDeletePhoto, useUploadImage,
   useUsers, useUpdateProject, usePlanningBoards, useUpdateUserPhone, useSendTestSms, useNotifyTeam,
@@ -2095,15 +2095,20 @@ function CalendarTab({ projectId }: { projectId: number }) {
   const { mutate: createEvent, isPending: isCreating } = useCreateCalendarEvent();
   const { mutate: updateEvent } = useUpdateCalendarEvent();
   const { mutate: deleteEvent } = useDeleteCalendarEvent();
+  const { mutate: uploadEventImage } = useUploadCalendarEventImage();
   const { mutate: notifyTeam, isPending: sendingNotification } = useNotifyTeam();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [eventForm, setEventForm] = useState({ title: "", description: "", type: "event" });
+  const [eventImageFile, setEventImageFile] = useState<File | null>(null);
+  const [eventImagePreview, setEventImagePreview] = useState<string | null>(null);
+  const [expandedImage, setExpandedImage] = useState<string | null>(null);
   const [draggedEventId, setDraggedEventId] = useState<number | null>(null);
   const [moveEvent, setMoveEvent] = useState<{ id: number; title: string } | null>(null);
   const [moveDate, setMoveDate] = useState("");
   const canNotify = user?.role === "admin" || user?.role === "crew";
+  const eventImageInputRef = useRef<HTMLInputElement>(null);
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
@@ -2120,6 +2125,21 @@ function CalendarTab({ projectId }: { projectId: number }) {
 
   const selectedDateEvents = selectedDate ? getEventsForDate(selectedDate) : [];
 
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setEventImageFile(file);
+    const reader = new FileReader();
+    reader.onload = () => setEventImagePreview(reader.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const clearEventImage = () => {
+    setEventImageFile(null);
+    setEventImagePreview(null);
+    if (eventImageInputRef.current) eventImageInputRef.current.value = "";
+  };
+
   const handleAddEvent = (e: React.FormEvent) => {
     e.preventDefault();
     if (!eventForm.title.trim() || !selectedDate) return;
@@ -2132,10 +2152,25 @@ function CalendarTab({ projectId }: { projectId: number }) {
         type: eventForm.type,
       },
       {
-        onSuccess: () => {
-          toast({ title: "Added", description: "Event added to calendar." });
+        onSuccess: (created: any) => {
+          if (eventImageFile && created?.id) {
+            uploadEventImage(
+              { eventId: created.id, file: eventImageFile, projectId },
+              {
+                onSuccess: () => {
+                  toast({ title: "Added", description: "Event added with image." });
+                },
+                onError: () => {
+                  toast({ title: "Added", description: "Event added, but image upload failed." });
+                },
+              }
+            );
+          } else {
+            toast({ title: "Added", description: "Event added to calendar." });
+          }
           setAddDialogOpen(false);
           setEventForm({ title: "", description: "", type: "event" });
+          clearEventImage();
         },
         onError: (err) => toast({ title: "Error", description: err.message, variant: "destructive" }),
       }
@@ -2283,9 +2318,26 @@ function CalendarTab({ projectId }: { projectId: number }) {
               selectedDateEvents.map((ev) => (
                 <div
                   key={ev.id}
-                  className="flex items-start justify-between gap-3 p-3 rounded-md bg-muted"
+                  className="rounded-md bg-muted overflow-hidden"
                   data-testid={`calendar-event-${ev.id}`}
                 >
+                  {ev.imageUrl && (
+                    <div
+                      className="relative w-full h-40 cursor-pointer"
+                      onClick={() => setExpandedImage(ev.imageUrl)}
+                      data-testid={`event-image-${ev.id}`}
+                    >
+                      <img
+                        src={ev.imageUrl}
+                        alt={ev.title}
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-black/0 hover:bg-black/10 transition-colors flex items-center justify-center">
+                        <ZoomIn className="h-5 w-5 text-white opacity-0 hover:opacity-100 drop-shadow-md" style={{ visibility: "hidden" }} />
+                      </div>
+                    </div>
+                  )}
+                  <div className="flex items-start justify-between gap-3 p-3">
                   <div className="flex items-start gap-3 min-w-0">
                     <div
                       className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0"
@@ -2352,6 +2404,7 @@ function CalendarTab({ projectId }: { projectId: number }) {
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
+                  </div>
                 </div>
               ))
             ) : (
@@ -2372,7 +2425,7 @@ function CalendarTab({ projectId }: { projectId: number }) {
         </Card>
       )}
 
-      <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+      <Dialog open={addDialogOpen} onOpenChange={(open) => { setAddDialogOpen(open); if (!open) clearEventImage(); }}>
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
             <DialogTitle className="font-serif text-xl" data-testid="text-add-event-title">
@@ -2427,8 +2480,45 @@ function CalendarTab({ projectId }: { projectId: number }) {
                 data-testid="input-event-date"
               />
             </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Image (optional)</label>
+              <input
+                ref={eventImageInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleImageSelect}
+                className="hidden"
+                data-testid="input-event-image-file"
+              />
+              {eventImagePreview ? (
+                <div className="relative rounded-md overflow-hidden">
+                  <img src={eventImagePreview} alt="Preview" className="w-full h-32 object-cover rounded-md" />
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="absolute top-1 right-1 bg-black/50 text-white"
+                    onClick={clearEventImage}
+                    data-testid="button-remove-event-image"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => eventImageInputRef.current?.click()}
+                  data-testid="button-attach-event-image"
+                >
+                  <ImageIcon className="mr-2 h-4 w-4" />
+                  Attach Image
+                </Button>
+              )}
+            </div>
             <div className="flex justify-end gap-2 pt-2">
-              <Button type="button" variant="outline" onClick={() => setAddDialogOpen(false)} data-testid="button-cancel-event">
+              <Button type="button" variant="outline" onClick={() => { setAddDialogOpen(false); clearEventImage(); }} data-testid="button-cancel-event">
                 Cancel
               </Button>
               <Button type="submit" disabled={isCreating || !eventForm.title.trim() || !selectedDate} data-testid="button-save-event">
@@ -2489,6 +2579,18 @@ function CalendarTab({ projectId }: { projectId: number }) {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={expandedImage !== null} onOpenChange={(open) => { if (!open) setExpandedImage(null); }}>
+        <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Event Image</DialogTitle>
+            <DialogDescription>Full size event image</DialogDescription>
+          </DialogHeader>
+          {expandedImage && (
+            <img src={expandedImage} alt="Event" className="w-full max-h-[80vh] object-contain" data-testid="img-expanded-event" />
+          )}
         </DialogContent>
       </Dialog>
     </div>

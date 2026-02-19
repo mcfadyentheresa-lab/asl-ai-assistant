@@ -846,6 +846,27 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/calendar/:id/image", isAuthenticated, (req: any, res) => {
+    imageUpload.single("image")(req, res, async (err: any) => {
+      if (err) {
+        const message = err instanceof multer.MulterError
+          ? (err.code === "LIMIT_FILE_SIZE" ? "File too large (max 10MB)" : err.message)
+          : err.message || "Upload failed";
+        return res.status(400).json({ message });
+      }
+      if (!req.file) return res.status(400).json({ message: "No image file provided" });
+      const url = `/uploads/${req.file.filename}`;
+      try {
+        const event = await storage.updateCalendarEvent(Number(req.params.id), { imageUrl: url });
+        if (!event) return res.status(404).json({ message: "Calendar event not found" });
+        res.json(event);
+      } catch (error) {
+        console.error("Error uploading calendar event image:", error);
+        res.status(500).json({ message: "Failed to upload image" });
+      }
+    });
+  });
+
   app.delete("/api/calendar/:id", isAuthenticated, async (req, res) => {
     await storage.deleteCalendarEvent(Number(req.params.id));
     res.json({ success: true });
