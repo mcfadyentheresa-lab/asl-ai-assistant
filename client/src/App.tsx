@@ -11,6 +11,7 @@ import LandingPage from "@/pages/LandingPage";
 import Dashboard from "@/pages/Dashboard";
 import ProjectDetails from "@/pages/ProjectDetails";
 import Profile from "@/pages/Profile";
+import ColorPortfolio from "@/pages/ColorPortfolio";
 import NotFound from "@/pages/not-found";
 
 function PresenceTracker() {
@@ -43,6 +44,7 @@ function Router() {
       <Route path="/" component={Dashboard} />
       <Route path="/profile" component={Profile} />
       <Route path="/project/:id" component={ProjectDetails} />
+      <Route path="/colors" component={ColorPortfolio} />
       <Route component={NotFound} />
     </Switch>
   );

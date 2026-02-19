@@ -280,6 +280,19 @@ export const messagesRelations = relations(messages, ({ one }) => ({
   }),
 }));
 
+// Paint Colors
+export const paintColors = pgTable("paint_colors", {
+  id: serial("id").primaryKey(),
+  brand: text("brand").notNull(),
+  name: text("name").notNull(),
+  code: text("code").notNull(),
+  hex: text("hex").notNull(),
+  colorFamily: text("color_family").notNull(),
+  collection: text("collection"),
+  lrv: integer("lrv"),
+  isPopular: boolean("is_popular").default(false),
+});
+
 // Activity Log
 export const activityLog = pgTable("activity_log", {
   id: serial("id").primaryKey(),
@@ -313,6 +326,7 @@ export const insertCanvasElementSchema = createInsertSchema(canvasElements).omit
 export const insertPlanningBoardSchema = createInsertSchema(planningBoards).omit({ id: true, updatedAt: true, createdAt: true });
 export const insertCalendarEventSchema = createInsertSchema(calendarEvents).omit({ id: true, createdAt: true });
 export const insertActivityLogSchema = createInsertSchema(activityLog).omit({ id: true, createdAt: true });
+export const insertPaintColorSchema = createInsertSchema(paintColors).omit({ id: true });
 
 // TYPES
 export type Project = typeof projects.$inferSelect;
@@ -342,3 +356,5 @@ export type InsertPlanningBoard = z.infer<typeof insertPlanningBoardSchema>;
 export type InsertCalendarEvent = z.infer<typeof insertCalendarEventSchema>;
 export type ActivityLog = typeof activityLog.$inferSelect;
 export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;
+export type PaintColor = typeof paintColors.$inferSelect;
+export type InsertPaintColor = z.infer<typeof insertPaintColorSchema>;

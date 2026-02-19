@@ -166,3 +166,23 @@ Path aliases are configured:
 
 ### Future Enhancement
 - Calendar-based deadline reminders (scheduled job to notify users before upcoming deadlines) still pending
+
+## Paint Color Portfolio
+
+### Database (`paint_colors` table)
+- Fields: id, brand, name, code, hex, colorFamily, collection, lrv (Light Reflectance Value), isPopular
+- Schema supports multiple brands (currently seeded: Benjamin Moore with 290 curated colors)
+- Colors organized into 12 families: White, Neutral, Gray, Blue, Green, Brown, Yellow, Orange, Red, Pink, Purple, Black
+
+### API Endpoints
+- `GET /api/paint-colors` — List/search colors with optional query params: brand, colorFamily, search, popular
+- `GET /api/paint-colors/families` — Get list of available color families
+- `GET /api/paint-colors/:id` — Get single color by ID
+
+### Frontend
+- **Color Portfolio page** (`client/src/pages/ColorPortfolio.tsx`): Browse, search, filter by family, toggle popular colors, responsive grid with detailed color dialog
+- **Planning Board integration**: `BmColorPicker` component in `SpatialCanvas.tsx` lets users pick a Benjamin Moore color directly when editing a color swatch element on the planning board
+- Navigation: Accessible from user menu dropdown in Navbar
+
+### Seeding
+- `server/seed-paint-colors.ts` — Seeds 290 curated Benjamin Moore colors on server startup if table is empty

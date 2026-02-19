@@ -1,13 +1,13 @@
 import { db } from "./db";
 import { 
-  users, projects, milestones, tasks, photos, documents, timeEntries, messages, checklistItems, boardItems, calendarEvents, planningBoards, canvasElements, activityLog, activityViews,
+  users, projects, milestones, tasks, photos, documents, timeEntries, messages, checklistItems, boardItems, calendarEvents, planningBoards, canvasElements, activityLog, activityViews, paintColors,
   type Project, type Milestone, type Task, type Photo, type Document, type TimeEntry, type Message,
-  type ChecklistItem, type BoardItem, type CalendarEvent, type PlanningBoard, type CanvasElement, type ActivityLog,
+  type ChecklistItem, type BoardItem, type CalendarEvent, type PlanningBoard, type CanvasElement, type ActivityLog, type PaintColor,
   type InsertProject, type InsertMilestone, type InsertTask, type InsertPhoto, type InsertDocument, 
   type InsertTimeEntry, type InsertMessage, type InsertChecklistItem, type InsertBoardItem, type InsertCalendarEvent, type InsertPlanningBoard, type InsertCanvasElement, type InsertActivityLog
 } from "@shared/schema";
 import { type User } from "@shared/models/auth";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, ilike, or } from "drizzle-orm";
 
 export interface IStorage {
   // Projects
@@ -81,6 +81,11 @@ export interface IStorage {
   markActivityViewed(activityId: number, userId: string): Promise<void>;
   cleanupOldActivity(daysOld: number): Promise<number>;
   deleteActivityByTypeAndTitle(projectId: number, type: string, titlePattern: string): Promise<number>;
+
+  // Paint Colors
+  getPaintColors(filters?: { brand?: string; colorFamily?: string; search?: string; popular?: boolean }): Promise<PaintColor[]>;
+  getPaintColor(id: number): Promise<PaintColor | undefined>;
+  getPaintColorFamilies(brand?: string): Promise<string[]>;
 
   // Canvas Elements
   getCanvasElement(id: number): Promise<CanvasElement | undefined>;
@@ -318,6 +323,37 @@ export class DatabaseStorage implements IStorage {
   async deleteActivityByTypeAndTitle(projectId: number, type: string, titlePattern: string): Promise<number> {
     const deleted = await db.delete(activityLog).where(and(eq(activityLog.projectId, projectId), eq(activityLog.type, type), eq(activityLog.title, titlePattern))).returning({ id: activityLog.id });
     return deleted.length;
+  }
+
+  // Paint Colors
+  async getPaintColors(filters?: { brand?: string; colorFamily?: string; search?: string; popular?: boolean }): Promise<PaintColor[]> {
+    const conditions = [];
+    if (filters?.brand) conditions.push(eq(paintColors.brand, filters.brand));
+    if (filters?.colorFamily) conditions.push(eq(paintColors.colorFamily, filters.colorFamily));
+    if (filters?.popular) conditions.push(eq(paintColors.isPopular, true));
+    if (filters?.search) {
+      conditions.push(
+        or(
+          ilike(paintColors.name, `%${filters.search}%`),
+          ilike(paintColors.code, `%${filters.search}%`)
+        )!
+      );
+    }
+    if (conditions.length > 0) {
+      return db.select().from(paintColors).where(and(...conditions)).orderBy(paintColors.name);
+    }
+    return db.select().from(paintColors).orderBy(paintColors.name);
+  }
+  async getPaintColor(id: number): Promise<PaintColor | undefined> {
+    const [color] = await db.select().from(paintColors).where(eq(paintColors.id, id));
+    return color;
+  }
+  async getPaintColorFamilies(brand?: string): Promise<string[]> {
+    const query = brand
+      ? db.selectDistinct({ colorFamily: paintColors.colorFamily }).from(paintColors).where(eq(paintColors.brand, brand))
+      : db.selectDistinct({ colorFamily: paintColors.colorFamily }).from(paintColors);
+    const results = await query.orderBy(paintColors.colorFamily);
+    return results.map(r => r.colorFamily);
   }
 
   // Canvas Elements

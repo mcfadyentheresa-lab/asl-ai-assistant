@@ -1082,6 +1082,30 @@ export async function registerRoutes(
     res.json({ ok: true });
   });
 
+  // ── Paint Colors ──
+  app.get("/api/paint-colors", isAuthenticated, async (req, res) => {
+    const { brand, colorFamily, search, popular } = req.query;
+    const filters: { brand?: string; colorFamily?: string; search?: string; popular?: boolean } = {};
+    if (typeof brand === "string") filters.brand = brand;
+    if (typeof colorFamily === "string") filters.colorFamily = colorFamily;
+    if (typeof search === "string" && search.trim()) filters.search = search.trim();
+    if (popular === "true") filters.popular = true;
+    const colors = await storage.getPaintColors(filters);
+    res.json(colors);
+  });
+
+  app.get("/api/paint-colors/families", isAuthenticated, async (req, res) => {
+    const brand = typeof req.query.brand === "string" ? req.query.brand : undefined;
+    const families = await storage.getPaintColorFamilies(brand);
+    res.json(families);
+  });
+
+  app.get("/api/paint-colors/:id", isAuthenticated, async (req, res) => {
+    const color = await storage.getPaintColor(Number(req.params.id));
+    if (!color) return res.status(404).json({ error: "Color not found" });
+    res.json(color);
+  });
+
   // Initialize seed data
   await seedDatabase();
 

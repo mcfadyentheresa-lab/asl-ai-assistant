@@ -31,8 +31,101 @@ import { useBoardRealtime } from "@/hooks/use-board-realtime";
 import { useAuth } from "@/hooks/use-auth";
 import { api, buildUrl } from "@shared/routes";
 import { recognizeAllShapes, recognizeShape, looksLikeHandwriting } from "@/lib/shape-recognition";
-import type { CanvasElement, PlanningBoard as PlanningBoardType } from "@shared/schema";
+import type { CanvasElement, PlanningBoard as PlanningBoardType, PaintColor } from "@shared/schema";
 import { queryClient } from "@/lib/queryClient";
+import { useQuery } from "@tanstack/react-query";
+
+function BmColorPicker({ onSelect }: { onSelect: (color: PaintColor) => void }) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [family, setFamily] = useState<string | null>(null);
+  const brand = "Benjamin Moore";
+
+  const queryUrl = `/api/paint-colors?brand=${encodeURIComponent(brand)}`;
+
+  const { data: allColors, isLoading } = useQuery<PaintColor[]>({
+    queryKey: [queryUrl],
+    enabled: open,
+  });
+
+  const filteredColors = (allColors ?? []).filter((c) => {
+    if (family && c.colorFamily !== family) return false;
+    if (search.trim()) {
+      const s = search.trim().toLowerCase();
+      return c.name.toLowerCase().includes(s) || (c.code?.toLowerCase().includes(s) ?? false);
+    }
+    return true;
+  });
+
+  const families = ["White", "Neutral", "Gray", "Blue", "Green", "Brown", "Yellow", "Orange", "Red", "Pink", "Purple", "Black"];
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="sm" className="w-full gap-1.5 text-xs" data-testid="button-pick-bm-color">
+          <Palette className="w-3 h-3" />
+          Benjamin Moore
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-72 p-2" align="start" side="bottom">
+        <div className="space-y-2">
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search colors..."
+            className="h-7 text-xs"
+            data-testid="input-bm-search"
+          />
+          <div className="flex flex-wrap gap-1">
+            {families.map((f) => (
+              <button
+                key={f}
+                onClick={() => setFamily(family === f ? null : f)}
+                className={`text-[10px] px-1.5 py-0.5 rounded-md border transition-colors ${family === f ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover-elevate"}`}
+                data-testid={`bm-family-${f.toLowerCase()}`}
+              >
+                {f}
+              </button>
+            ))}
+          </div>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-4">
+              <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+            </div>
+          ) : filteredColors.length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-4">No colors found</p>
+          ) : (
+            <>
+              <div className="grid grid-cols-6 gap-1 max-h-40 overflow-y-auto pr-1">
+                {filteredColors.slice(0, 60).map((pc) => (
+                  <Tooltip key={pc.id}>
+                    <TooltipTrigger asChild>
+                      <button
+                        className="w-full aspect-square rounded-sm border border-border/40 hover-elevate"
+                        style={{ backgroundColor: pc.hex }}
+                        onClick={() => { onSelect(pc); setOpen(false); }}
+                        data-testid={`bm-color-${pc.id}`}
+                      />
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="text-xs">
+                      <p className="font-medium">{pc.name}</p>
+                      <p className="text-muted-foreground">{pc.code}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                ))}
+              </div>
+              {filteredColors.length > 60 && (
+                <p className="text-[10px] text-muted-foreground text-center">
+                  Showing 60 of {filteredColors.length} — refine search for more
+                </p>
+              )}
+            </>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 interface SpatialCanvasProps {
   projectId: number;
@@ -1604,9 +1697,15 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                     data-testid={`input-swatch-hex-${el.id}`}
                   />
                 </div>
+                <BmColorPicker
+                  onSelect={(pc) => handleUpdateContent(el.id, { ...c, color: pc.hex, hex: pc.hex, name: pc.name, brand: pc.brand, code: pc.code })}
+                />
               </div>
             ) : (
-              <div className="text-sm font-medium">{c.name || "Color"}</div>
+              <div>
+                <div className="text-sm font-medium">{c.name || "Color"}</div>
+                {c.code && <div className="text-[10px] text-muted-foreground">{c.code}</div>}
+              </div>
             )}
           </div>
           {isSelected && (
