@@ -27,6 +27,8 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useCanvasStore, debouncedSavePositions } from "@/stores/canvas-store";
+import { useBoardRealtime } from "@/hooks/use-board-realtime";
+import { useAuth } from "@/hooks/use-auth";
 import { api, buildUrl } from "@shared/routes";
 import { recognizeAllShapes, recognizeShape, looksLikeHandwriting } from "@/lib/shape-recognition";
 import type { CanvasElement, PlanningBoard as PlanningBoardType } from "@shared/schema";
@@ -52,6 +54,7 @@ const ELEMENT_DEFAULTS: Record<string, { width: number; height: number; content:
 
 export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   const { toast } = useToast();
+  const { user } = useAuth();
   const containerRef = useRef<HTMLDivElement>(null);
 
   const [selectedBoardId, setSelectedBoardId] = useState<number | null>(null);
@@ -110,6 +113,17 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   const loading = useCanvasStore((s) => s.loading);
   const { setElements, addElement, updateElement, removeElement, moveElement, setLoading, setBoardId, pushUndo, popUndo } = useCanvasStore.getState();
   const undoStack = useCanvasStore((s) => s.undoStack);
+
+  const {
+    collaborators,
+    cursors,
+    sendElementAdd,
+    sendElementUpdate,
+    sendElementRemove,
+    sendElementMove,
+    sendPositionsUpdate,
+    sendCursorMove,
+  } = useBoardRealtime(selectedBoardId, user);
 
   const { data: boards = [], isLoading: isLoadingBoards } = usePlanningBoards(projectId);
   const { mutateAsync: createBoard } = useCreatePlanningBoard();
@@ -272,6 +286,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       });
       const el = await res.json();
       addElement(el);
+      sendElementAdd(el);
       pushUndo({ type: "create", elementId: el.id });
     } catch {
       toast({ title: "Error", description: "Failed to create element", variant: "destructive" });
@@ -282,6 +297,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     const el = elements[id];
     if (el) pushUndo({ type: "delete", element: { ...el } });
     removeElement(id);
+    sendElementRemove(id);
     setEditingId(null);
     try {
       const url = buildUrl(api.canvasElements.delete.path, { id });
@@ -293,6 +309,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     const prev = elements[id];
     if (prev) pushUndo({ type: "update", elementId: id, prevUpdates: { content: prev.content } });
     updateElement(id, { content });
+    sendElementUpdate(id, { content });
     try {
       const url = buildUrl(api.canvasElements.update.path, { id });
       await fetch(url, {
@@ -338,6 +355,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           });
           const restored = await res.json();
           addElement(restored);
+          sendElementAdd(restored);
         } catch {}
         break;
       }
@@ -402,6 +420,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
         });
         const el = await res.json();
         addElement(el);
+        sendElementAdd(el);
       }
       toast({ title: "Image uploaded" });
     } catch {
@@ -439,6 +458,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       });
       const newEl = await res.json();
       addElement(newEl);
+      sendElementAdd(newEl);
       setEditingId(newEl.id);
       toast({ title: "Element duplicated" });
     } catch {
@@ -540,6 +560,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           pushUndo({ type: "move", elementId: draggingId, prevX: startPos.elX, prevY: startPos.elY });
         }
         moveElement(draggingId, snappedX, snappedY);
+        sendElementMove(draggingId, snappedX, snappedY);
         if (el.type !== "column") {
           assignToColumn(draggingId);
         }
@@ -694,6 +715,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       });
       const el = await res.json();
       addElement(el);
+      sendElementAdd(el);
       setShowImagePopup(false);
       setImageUrlInput("");
     } catch {
@@ -793,6 +815,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           pushUndo({ type: "move", elementId: draggingId, prevX: startPos.elX, prevY: startPos.elY });
         }
         moveElement(draggingId, snappedX, snappedY);
+        sendElementMove(draggingId, snappedX, snappedY);
         if (el.type !== "column") {
           assignToColumn(draggingId);
         }
@@ -915,7 +938,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
         body: JSON.stringify({ elements: elems }),
       });
       const created = await res.json();
-      created.forEach((el: CanvasElement) => addElement(el));
+      created.forEach((el: CanvasElement) => { addElement(el); sendElementAdd(el); });
       setMaxZ(Math.max(...created.map((e: CanvasElement) => e.zIndex)) + 1);
       fitToScreen();
       toast({ title: "Weekly Planner created" });
@@ -1028,6 +1051,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           });
           const el = await res.json();
           addElement(el);
+          sendElementAdd(el);
           drawPathsRef.current = [];
           setDrawingPaths([]);
           redrawOverlayCanvas();
@@ -1936,6 +1960,31 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             </TooltipTrigger>
             <TooltipContent side="bottom" className="text-xs">Fit to Screen</TooltipContent>
           </Tooltip>
+
+          {collaborators.length > 0 && (
+            <div className="flex items-center gap-1.5 ml-2 pl-2 border-l" data-testid="board-collaborators">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+              </span>
+              <div className="flex -space-x-2">
+                {collaborators.map((c) => (
+                  <Tooltip key={c.userId}>
+                    <TooltipTrigger asChild>
+                      <Avatar className="h-6 w-6 border-2 border-background" data-testid={`collaborator-avatar-${c.userId}`}>
+                        <AvatarImage src={c.profileImageUrl || undefined} />
+                        <AvatarFallback className="text-[9px]">
+                          {(c.firstName?.[0] || "").toUpperCase()}{(c.lastName?.[0] || "").toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="text-xs">{c.firstName} {c.lastName} is editing</TooltipContent>
+                  </Tooltip>
+                ))}
+              </div>
+              <span className="text-xs text-muted-foreground">{collaborators.length} live</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -2233,6 +2282,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                                 }),
                               }).then((r) => r.json());
                               addElement(created);
+                              sendElementAdd(created);
                               setDrawingPaths([]);
                               drawPathsRef.current = [];
                               setDrawUndoStack([]);
@@ -2269,7 +2319,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                         body: JSON.stringify({ type: "draw", x: 0, y: 0, width: 1, height: 1, zIndex: newZ, content: { paths: drawingPaths } }),
                       })
                         .then((r) => r.json())
-                        .then((created: CanvasElement) => { addElement(created); toast({ title: "Drawing saved" }); })
+                        .then((created: CanvasElement) => { addElement(created); sendElementAdd(created); toast({ title: "Drawing saved" }); })
                         .catch(() => toast({ title: "Error", description: "Failed to save drawing", variant: "destructive" }));
                     }
                     setDrawingPaths([]);
