@@ -110,11 +110,33 @@ Path aliases are configured:
 - `SESSION_SECRET` — Secret for session encryption
 - `REPL_ID` — Replit deployment identifier (set automatically in Replit)
 - `ISSUER_URL` — OpenID Connect issuer (defaults to Replit's OIDC)
+- `TWILIO_ACCOUNT_SID` — Twilio account identifier
+- `TWILIO_AUTH_TOKEN` — Twilio authentication token
+- `TWILIO_PHONE_NUMBER` — Twilio sender phone number (+14474274045)
 
-## Pending Integrations
+## Twilio SMS Notifications
 
-### Twilio SMS (Not Yet Set Up)
-- User wants SMS text notifications for all roles (admin, crew, clients) instead of/alongside email
-- Phone number field has been added to the users table and is editable by admins in the Project Access card
-- When ready: Set up Twilio connector, add `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `TWILIO_PHONE_NUMBER` secrets
+### Implementation (`server/sms.ts`)
+- Twilio SDK sends SMS notifications for key project events
+- Secrets configured: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`
+- Phone numbers stored in `users.phone` column, editable by admins in Project Access card
+- Notifications fire asynchronously (non-blocking) after the API response is sent
+- Recipients are determined by role: admins and crew always receive notifications; clients only for their assigned projects
+- The sender of an action is excluded from receiving that notification
+
+### SMS Notification Triggers
+- **New message** — All project participants (except sender) notified
+- **Task created** (with assignee) — Assigned user notified
+- **Task status changed** — All project participants notified
+- **Milestone created** — All project participants notified
+- **Photo uploaded** — All project participants (except uploader) notified
+- **Document uploaded** — All project participants (except uploader) notified
+
+### Admin Features
+- **Test SMS** button in Project Access card sends a test message to the admin's phone
+- Test endpoint: `POST /api/sms/test` (admin-only)
+
+### A2P 10DLC Registration
+- Twilio number (+14474274045) should be registered for A2P 10DLC to reduce spam flagging
+- Register at Twilio Console > Messaging > Compliance
 - Clients (Island, Hangar) prefer text messages over email

@@ -6,7 +6,7 @@ import {
   useCalendarEvents, useCreateCalendarEvent, useUpdateCalendarEvent, useDeleteCalendarEvent,
   useDocuments, useUploadDocument, useDeleteDocument,
   usePhotos, useCreatePhoto, useDeletePhoto, useUploadImage,
-  useUsers, useUpdateProject, usePlanningBoards, useUpdateUserPhone,
+  useUsers, useUpdateProject, usePlanningBoards, useUpdateUserPhone, useSendTestSms,
 } from "@/hooks/use-projects";
 import { Navbar } from "@/components/layout/Navbar";
 import SpatialCanvas from "@/components/SpatialCanvas";
@@ -51,6 +51,7 @@ export default function ProjectDetails() {
   const { data: users } = useUsers();
   const { mutate: updateProject } = useUpdateProject();
   const { mutate: updatePhone } = useUpdateUserPhone();
+  const { mutate: sendTestSms, isPending: sendingTestSms } = useSendTestSms();
   const { toast } = useToast();
 
   const [activeTab, setActiveTab] = useState("overview");
@@ -397,6 +398,32 @@ export default function ProjectDetails() {
                             )}
                           </div>
                         </div>
+                        {userRole === "admin" && (
+                          <div className="pt-2 border-t">
+                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">SMS Notifications</p>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={sendingTestSms}
+                              data-testid="button-send-test-sms"
+                              onClick={() => {
+                                const adminUser = users?.find((u: any) => u.id === user?.id);
+                                const phone = adminUser?.phone;
+                                if (!phone) {
+                                  toast({ title: "No phone number", description: "Add your phone number first to receive a test SMS", variant: "destructive" });
+                                  return;
+                                }
+                                sendTestSms(phone, {
+                                  onSuccess: () => toast({ title: "Test SMS sent", description: `Sent to ${phone}` }),
+                                  onError: (err: any) => toast({ title: "SMS failed", description: err.message, variant: "destructive" }),
+                                });
+                              }}
+                            >
+                              {sendingTestSms ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Phone className="h-3 w-3 mr-1" />}
+                              Send Test SMS
+                            </Button>
+                          </div>
+                        )}
                       </CardContent>
                     </Card>
                   );

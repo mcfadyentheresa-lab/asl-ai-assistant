@@ -10,6 +10,16 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { randomUUID } from "crypto";
+import {
+  notifyNewMessage,
+  notifyTaskAssigned,
+  notifyTaskStatusChange,
+  notifyProjectUpdate,
+  notifyMilestoneCreated,
+  notifyPhotoUploaded,
+  notifyDocumentUploaded,
+  sendTestSms,
+} from "./sms";
 
 const uploadDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadDir)) {
@@ -222,15 +232,30 @@ export async function registerRoutes(
     res.json(tasks);
   });
 
-  app.post(api.tasks.create.path, isAuthenticated, async (req, res) => {
+  app.post(api.tasks.create.path, isAuthenticated, async (req: any, res) => {
     const input = api.tasks.create.input.parse(req.body);
-    const task = await storage.createTask({ ...input, projectId: Number(req.params.projectId) });
+    const projectId = Number(req.params.projectId);
+    const task = await storage.createTask({ ...input, projectId });
     res.status(201).json(task);
+
+    const project = await storage.getProject(projectId);
+    if (project && input.assignedTo) {
+      notifyTaskAssigned(project.name, input.title, input.assignedTo).catch(() => {});
+    }
   });
 
-  app.put(api.tasks.update.path, isAuthenticated, async (req, res) => {
-    const task = await storage.updateTask(Number(req.params.id), req.body);
+  app.put(api.tasks.update.path, isAuthenticated, async (req: any, res) => {
+    const taskId = Number(req.params.id);
+    const task = await storage.updateTask(taskId, req.body);
     res.json(task);
+
+    if (req.body.status && task.projectId) {
+      const project = await storage.getProject(task.projectId);
+      if (project) {
+        const userId = req.user.claims.sub;
+        notifyTaskStatusChange(project.name, task.title, task.status || "updated", project.clientId, userId).catch(() => {});
+      }
+    }
   });
 
   // Milestones
@@ -241,8 +266,14 @@ export async function registerRoutes(
 
   app.post(api.milestones.create.path, isAuthenticated, async (req, res) => {
     const input = api.milestones.create.input.parse(req.body);
-    const milestone = await storage.createMilestone({ ...input, projectId: Number(req.params.projectId) });
+    const projectId = Number(req.params.projectId);
+    const milestone = await storage.createMilestone({ ...input, projectId });
     res.status(201).json(milestone);
+
+    const project = await storage.getProject(projectId);
+    if (project) {
+      notifyMilestoneCreated(project.name, input.title, project.clientId).catch(() => {});
+    }
   });
 
   // Photos
@@ -251,10 +282,17 @@ export async function registerRoutes(
     res.json(photos);
   });
 
-  app.post(api.photos.create.path, isAuthenticated, async (req, res) => {
+  app.post(api.photos.create.path, isAuthenticated, async (req: any, res) => {
     const input = api.photos.create.input.parse(req.body);
-    const photo = await storage.createPhoto({ ...input, projectId: Number(req.params.projectId) });
+    const projectId = Number(req.params.projectId);
+    const photo = await storage.createPhoto({ ...input, projectId });
     res.status(201).json(photo);
+
+    const userId = req.user.claims.sub;
+    const project = await storage.getProject(projectId);
+    if (project) {
+      notifyPhotoUploaded(project.name, project.clientId, userId).catch(() => {});
+    }
   });
 
   app.delete("/api/photos/:id", isAuthenticated, async (req, res) => {
@@ -287,13 +325,20 @@ export async function registerRoutes(
       const title = req.body.title || req.file.originalname;
       const type = req.body.type || "other";
       try {
+        const projectId = Number(req.params.projectId);
         const doc = await storage.createDocument({
           title,
           url,
           type,
-          projectId: Number(req.params.projectId),
+          projectId,
         });
         res.status(201).json(doc);
+
+        const userId = req.user.claims.sub;
+        const project = await storage.getProject(projectId);
+        if (project) {
+          notifyDocumentUploaded(project.name, title, project.clientId, userId).catch(() => {});
+        }
       } catch (error) {
         res.status(500).json({ message: "Failed to save document" });
       }
@@ -318,12 +363,20 @@ export async function registerRoutes(
   app.post(api.messages.create.path, isAuthenticated, async (req, res) => {
     const input = api.messages.create.input.parse(req.body);
     const user = req.user as any;
+    const userId = user.claims.sub;
     const message = await storage.createMessage({ 
       ...input, 
       projectId: Number(req.params.projectId),
-      senderId: user.claims.sub 
+      senderId: userId 
     });
     res.status(201).json(message);
+
+    const project = await storage.getProject(Number(req.params.projectId));
+    if (project) {
+      const sender = await authStorage.getUser(userId);
+      const senderName = sender ? `${sender.firstName || ""} ${sender.lastName || ""}`.trim() || "Someone" : "Someone";
+      notifyNewMessage(project.id, project.name, senderName, input.content, userId, project.clientId).catch(() => {});
+    }
   });
 
   // Time Entries
@@ -672,6 +725,29 @@ export async function registerRoutes(
     } catch (error: any) {
       console.error("Handwriting recognition error:", error);
       res.status(500).json({ error: "Failed to recognize handwriting" });
+    }
+  });
+
+  app.post("/api/sms/test", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const requester = await authStorage.getUser(userId);
+      if (requester?.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can send test SMS" });
+      }
+      const { phone } = req.body;
+      if (!phone) {
+        return res.status(400).json({ message: "Phone number required" });
+      }
+      const success = await sendTestSms(phone);
+      if (success) {
+        res.json({ message: "Test SMS sent successfully" });
+      } else {
+        res.status(500).json({ message: "Failed to send test SMS. Check Twilio configuration." });
+      }
+    } catch (error: any) {
+      console.error("Test SMS error:", error);
+      res.status(500).json({ message: error.message || "Failed to send test SMS" });
     }
   });
 

@@ -33,6 +33,24 @@ export function useUpdateUserPhone() {
   });
 }
 
+export function useSendTestSms() {
+  return useMutation({
+    mutationFn: async (phone: string) => {
+      const res = await fetch("/api/sms/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone }),
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || "Failed to send test SMS");
+      }
+      return res.json();
+    },
+  });
+}
+
 // --- Projects ---
 export function useProjects() {
   return useQuery({
