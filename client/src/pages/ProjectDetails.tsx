@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Separator } from "@/components/ui/separator";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -79,14 +80,25 @@ export default function ProjectDetails() {
 
   const userRole = user?.role || "client";
 
+  const [seenLocally, setSeenLocally] = useState<Set<number>>(new Set());
+
   useEffect(() => {
     if (activeTab !== "overview" || !activityLog || !user?.id) return;
     const unviewed = activityLog.filter((e: any) =>
       e.userId !== user.id && !e.views?.some((v: any) => v.userId === user.id)
     );
-    for (const entry of unviewed) {
-      fetch(`/api/activity/${entry.id}/view`, { method: "POST", credentials: "include" }).catch(() => {});
-    }
+    if (unviewed.length === 0) return;
+    const timer = setTimeout(() => {
+      for (const entry of unviewed) {
+        fetch(`/api/activity/${entry.id}/view`, { method: "POST", credentials: "include" }).catch(() => {});
+      }
+      setSeenLocally((prev) => {
+        const next = new Set(prev);
+        unviewed.forEach((e: any) => next.add(e.id));
+        return next;
+      });
+    }, 3000);
+    return () => clearTimeout(timer);
   }, [activeTab, activityLog, user?.id]);
 
   const isClientInvitedToBoard = userRole === "client" && Array.isArray(planningBoards) &&
@@ -547,92 +559,167 @@ export default function ProjectDetails() {
                   );
                 })()}
 
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="font-serif text-lg" data-testid="text-activity-heading">
-                      Recent Activity
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {activityLog?.slice(0, 8).map((entry: any) => {
-                        const typeStyles: Record<string, { dot: string; tab: string | null; label: string }> = {
-                          milestone_created: { dot: "bg-blue-500", tab: "checklist", label: "View Checklist" },
-                          photo_uploaded: { dot: "bg-emerald-500", tab: "photos", label: "View Photos" },
-                          document_uploaded: { dot: "bg-amber-500", tab: "docs", label: "View Documents" },
-                          notification_sent: { dot: "bg-purple-500", tab: null, label: "" },
-                          message_sent: { dot: "bg-sky-500", tab: "chat", label: "View Chat" },
-                          calendar_event_created: { dot: "bg-rose-500", tab: "calendar", label: "View Calendar" },
-                          task_created: { dot: "bg-teal-500", tab: "checklist", label: "View Checklist" },
-                        };
-                        const style = typeStyles[entry.type] || { dot: "bg-muted-foreground", tab: null, label: "" };
-                        const timeAgo = entry.createdAt ? formatDistanceToNow(new Date(entry.createdAt), { addSuffix: true }) : "";
-                        const isClickable = !!style.tab;
-                        const viewedByUsers = (entry.views || []).map((v: any) => {
-                          const u = users?.find((usr: any) => usr.id === v.userId);
-                          return u ? `${u.firstName || ""} ${u.lastName || ""}`.trim() || u.email : null;
-                        }).filter(Boolean) as string[];
-                        const isCreator = entry.userId === user?.id;
-                        return (
-                          <div
-                            key={entry.id}
-                            className={`flex items-start gap-3 text-sm pb-3 border-b last:border-0 last:pb-0 rounded-sm ${isClickable ? "cursor-pointer hover-elevate p-1.5 -m-1.5" : ""}`}
-                            data-testid={`activity-${entry.id}`}
-                            onClick={isClickable ? () => setActiveTab(style.tab!) : undefined}
-                            role={isClickable ? "button" : undefined}
-                            tabIndex={isClickable ? 0 : undefined}
-                          >
-                            <div className={`mt-1 h-2 w-2 rounded-full flex-shrink-0 ${style.dot}`} />
-                            <div className="min-w-0 flex-1">
-                              <p className="font-medium text-foreground">{entry.title}</p>
-                              {entry.description && (
-                                <p className="text-muted-foreground text-xs truncate">{entry.description}</p>
-                              )}
-                              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                                <span className="text-muted-foreground text-xs">{timeAgo}</span>
-                                {isClickable && (
-                                  <span className="text-xs text-primary/70">{style.label}</span>
-                                )}
-                              </div>
-                              {viewedByUsers.length > 0 && (
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <div className="flex items-center gap-1 mt-1 cursor-default" data-testid={`activity-views-${entry.id}`}>
-                                      <Eye className="h-3 w-3 text-muted-foreground" />
-                                      <span className="text-muted-foreground text-xs">
-                                        Seen by {viewedByUsers.length}
-                                      </span>
+                {(() => {
+                  const missedEntries = activityLog?.filter((e: any) =>
+                    e.userId !== user?.id && !e.views?.some((v: any) => v.userId === user?.id) && !seenLocally.has(e.id)
+                  ) || [];
+                  const seenEntries = activityLog?.filter((e: any) =>
+                    e.userId === user?.id || e.views?.some((v: any) => v.userId === user?.id) || seenLocally.has(e.id)
+                  ) || [];
+                  return (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="font-serif text-lg flex items-center gap-2 flex-wrap" data-testid="text-activity-heading">
+                          Recent Activity
+                          {missedEntries.length > 0 && (
+                            <Badge variant="destructive" className="text-[10px]" data-testid="badge-missed-count">
+                              {missedEntries.length} new
+                            </Badge>
+                          )}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-4">
+                          {missedEntries.length > 0 && (
+                            <>
+                              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider" data-testid="text-missed-label">Missed while you were away</p>
+                              {missedEntries.slice(0, 10).map((entry: any) => {
+                                const typeStyles: Record<string, { dot: string; tab: string | null; label: string }> = {
+                                  milestone_created: { dot: "bg-blue-500", tab: "checklist", label: "View Checklist" },
+                                  photo_uploaded: { dot: "bg-emerald-500", tab: "photos", label: "View Photos" },
+                                  document_uploaded: { dot: "bg-amber-500", tab: "docs", label: "View Documents" },
+                                  notification_sent: { dot: "bg-purple-500", tab: null, label: "" },
+                                  message_sent: { dot: "bg-sky-500", tab: "chat", label: "View Chat" },
+                                  calendar_event_created: { dot: "bg-rose-500", tab: "calendar", label: "View Calendar" },
+                                  task_created: { dot: "bg-teal-500", tab: "checklist", label: "View Checklist" },
+                                };
+                                const style = typeStyles[entry.type] || { dot: "bg-muted-foreground", tab: null, label: "" };
+                                const timeAgo = entry.createdAt ? formatDistanceToNow(new Date(entry.createdAt), { addSuffix: true }) : "";
+                                const isClickable = !!style.tab;
+                                return (
+                                  <div
+                                    key={entry.id}
+                                    className={`flex items-start gap-3 text-sm pb-3 border-b last:border-0 last:pb-0 rounded-sm bg-primary/5 p-2 -mx-2 ${isClickable ? "cursor-pointer hover-elevate" : ""}`}
+                                    data-testid={`activity-missed-${entry.id}`}
+                                    onClick={isClickable ? () => setActiveTab(style.tab!) : undefined}
+                                    role={isClickable ? "button" : undefined}
+                                    tabIndex={isClickable ? 0 : undefined}
+                                  >
+                                    <div className="relative mt-1 flex-shrink-0">
+                                      <div className={`h-2 w-2 rounded-full ${style.dot}`} />
+                                      <span className="absolute -top-1 -right-1 h-1.5 w-1.5 rounded-full bg-destructive" />
                                     </div>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="bottom" align="start">
-                                    <p className="text-xs font-medium">Seen by:</p>
-                                    {viewedByUsers.map((name, i) => (
-                                      <p key={i} className="text-xs">{name}</p>
-                                    ))}
-                                  </TooltipContent>
-                                </Tooltip>
+                                    <div className="min-w-0 flex-1">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <p className="font-medium text-foreground">{entry.title}</p>
+                                        <Badge variant="outline" className="text-[9px] py-0 px-1 border-destructive/40 text-destructive" data-testid={`badge-new-${entry.id}`}>NEW</Badge>
+                                      </div>
+                                      {entry.description && (
+                                        <p className="text-muted-foreground text-xs truncate">{entry.description}</p>
+                                      )}
+                                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                                        <span className="text-muted-foreground text-xs">{timeAgo}</span>
+                                        {isClickable && (
+                                          <span className="text-xs text-primary/70">{style.label}</span>
+                                        )}
+                                      </div>
+                                    </div>
+                                    {isClickable && <ChevronRight className="h-3.5 w-3.5 mt-1 text-muted-foreground flex-shrink-0" />}
+                                  </div>
+                                );
+                              })}
+                              {seenEntries.length > 0 && (
+                                <Separator className="my-2" />
                               )}
-                              {viewedByUsers.length === 0 && (
-                                <div className="flex items-center gap-1 mt-1" data-testid={`activity-unseen-${entry.id}`}>
-                                  <EyeOff className="h-3 w-3 text-muted-foreground/40" />
-                                  <span className="text-xs text-muted-foreground/50">
-                                    {isCreator ? "Not yet seen by others" : "Not yet seen"}
-                                  </span>
-                                </div>
+                            </>
+                          )}
+                          {seenEntries.length > 0 && (
+                            <>
+                              {missedEntries.length > 0 && (
+                                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider" data-testid="text-earlier-label">Earlier</p>
                               )}
-                            </div>
-                            {isClickable && <ChevronRight className="h-3.5 w-3.5 mt-1 text-muted-foreground flex-shrink-0" />}
-                          </div>
-                        );
-                      })}
-                      {(!activityLog || activityLog.length === 0) && (
-                        <p className="text-muted-foreground text-sm" data-testid="text-no-activity">
-                          No recent activity.
-                        </p>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
+                              {seenEntries.slice(0, 8).map((entry: any) => {
+                                const typeStyles: Record<string, { dot: string; tab: string | null; label: string }> = {
+                                  milestone_created: { dot: "bg-blue-500", tab: "checklist", label: "View Checklist" },
+                                  photo_uploaded: { dot: "bg-emerald-500", tab: "photos", label: "View Photos" },
+                                  document_uploaded: { dot: "bg-amber-500", tab: "docs", label: "View Documents" },
+                                  notification_sent: { dot: "bg-purple-500", tab: null, label: "" },
+                                  message_sent: { dot: "bg-sky-500", tab: "chat", label: "View Chat" },
+                                  calendar_event_created: { dot: "bg-rose-500", tab: "calendar", label: "View Calendar" },
+                                  task_created: { dot: "bg-teal-500", tab: "checklist", label: "View Checklist" },
+                                };
+                                const style = typeStyles[entry.type] || { dot: "bg-muted-foreground", tab: null, label: "" };
+                                const timeAgo = entry.createdAt ? formatDistanceToNow(new Date(entry.createdAt), { addSuffix: true }) : "";
+                                const isClickable = !!style.tab;
+                                const viewedByUsers = (entry.views || []).map((v: any) => {
+                                  const u = users?.find((usr: any) => usr.id === v.userId);
+                                  return u ? `${u.firstName || ""} ${u.lastName || ""}`.trim() || u.email : null;
+                                }).filter(Boolean) as string[];
+                                const isCreator = entry.userId === user?.id;
+                                return (
+                                  <div
+                                    key={entry.id}
+                                    className={`flex items-start gap-3 text-sm pb-3 border-b last:border-0 last:pb-0 rounded-sm ${isClickable ? "cursor-pointer hover-elevate p-1.5 -m-1.5" : ""}`}
+                                    data-testid={`activity-${entry.id}`}
+                                    onClick={isClickable ? () => setActiveTab(style.tab!) : undefined}
+                                    role={isClickable ? "button" : undefined}
+                                    tabIndex={isClickable ? 0 : undefined}
+                                  >
+                                    <div className={`mt-1 h-2 w-2 rounded-full flex-shrink-0 ${style.dot}`} />
+                                    <div className="min-w-0 flex-1">
+                                      <p className="font-medium text-foreground">{entry.title}</p>
+                                      {entry.description && (
+                                        <p className="text-muted-foreground text-xs truncate">{entry.description}</p>
+                                      )}
+                                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                                        <span className="text-muted-foreground text-xs">{timeAgo}</span>
+                                        {isClickable && (
+                                          <span className="text-xs text-primary/70">{style.label}</span>
+                                        )}
+                                      </div>
+                                      {viewedByUsers.length > 0 && (
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <div className="flex items-center gap-1 mt-1 cursor-default" data-testid={`activity-views-${entry.id}`}>
+                                              <Eye className="h-3 w-3 text-muted-foreground" />
+                                              <span className="text-muted-foreground text-xs">
+                                                Seen by {viewedByUsers.length}
+                                              </span>
+                                            </div>
+                                          </TooltipTrigger>
+                                          <TooltipContent side="bottom" align="start">
+                                            <p className="text-xs font-medium">Seen by:</p>
+                                            {viewedByUsers.map((name, i) => (
+                                              <p key={i} className="text-xs">{name}</p>
+                                            ))}
+                                          </TooltipContent>
+                                        </Tooltip>
+                                      )}
+                                      {viewedByUsers.length === 0 && (
+                                        <div className="flex items-center gap-1 mt-1" data-testid={`activity-unseen-${entry.id}`}>
+                                          <EyeOff className="h-3 w-3 text-muted-foreground/40" />
+                                          <span className="text-xs text-muted-foreground/50">
+                                            {isCreator ? "Not yet seen by others" : "Not yet seen"}
+                                          </span>
+                                        </div>
+                                      )}
+                                    </div>
+                                    {isClickable && <ChevronRight className="h-3.5 w-3.5 mt-1 text-muted-foreground flex-shrink-0" />}
+                                  </div>
+                                );
+                              })}
+                            </>
+                          )}
+                          {(!activityLog || activityLog.length === 0) && (
+                            <p className="text-muted-foreground text-sm" data-testid="text-no-activity">
+                              No recent activity.
+                            </p>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })()}
               </div>
             </div>
           </TabsContent>
