@@ -1827,10 +1827,10 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   return (
     <div className="flex flex-col h-full overflow-hidden" data-testid="spatial-canvas-root">
       {/* Board selector bar */}
-      <div className="flex items-center gap-1.5 mb-1 flex-wrap shrink-0">
+      <div className="flex items-center gap-1.5 mb-1 flex-wrap landscape:flex-nowrap landscape:overflow-x-auto landscape:mb-0 shrink-0">
         {!isLoadingBoards && boards.length > 0 && (
           <Select value={String(selectedBoardId || "")} onValueChange={(v) => setSelectedBoardId(Number(v))}>
-            <SelectTrigger className="w-[200px]" data-testid="select-board-trigger">
+            <SelectTrigger className="w-[200px] landscape:w-[140px]" data-testid="select-board-trigger">
               <SelectValue placeholder="Select board" />
             </SelectTrigger>
             <SelectContent>
@@ -1843,7 +1843,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           </Select>
         )}
         <Button variant="outline" size="sm" onClick={() => { setNewBoardName(""); setShowNewBoardDialog(true); }} data-testid="button-new-board">
-          <Plus className="h-3.5 w-3.5 mr-1" /> New Board
+          <Plus className="h-3.5 w-3.5 landscape:mr-0 mr-1" /> <span className="landscape:hidden">New Board</span>
         </Button>
         {selectedBoardId && (
           <DropdownMenu>
@@ -1869,7 +1869,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           </DropdownMenu>
         )}
         {(selectedBoard?.linkedUserIds?.length ?? 0) > 0 && (
-          <div className="flex items-center gap-1" data-testid="badges-linked-people">
+          <div className="flex items-center gap-1 landscape:hidden" data-testid="badges-linked-people">
             <div className="flex -space-x-1.5">
               {selectedBoard!.linkedUserIds!.slice(0, 4).map((uid: string) => {
                 const user = allUsers.find((u: any) => u.id === uid);
@@ -1889,7 +1889,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           </div>
         )}
         {(selectedBoard?.linkedProjectIds?.length ?? 0) > 0 && (
-          <div className="flex items-center gap-1 flex-wrap" data-testid="badges-linked-projects">
+          <div className="flex items-center gap-1 flex-wrap landscape:hidden" data-testid="badges-linked-projects">
             {selectedBoard!.linkedProjectIds!.map((pid: number) => {
               const proj = allProjects.find((p: any) => p.id === pid);
               return proj ? (
@@ -1900,6 +1900,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             })}
           </div>
         )}
+        <div className="flex items-center gap-1.5 landscape:hidden">
         {selectedBoard?.linkedCalendarEventId && (() => {
           const ev = calendarEvents.find((e: any) => e.id === selectedBoard.linkedCalendarEventId);
           return ev ? (
@@ -1942,6 +1943,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             </Badge>
           ) : null;
         })()}
+        </div>
         <div className="flex-1" />
         <div className="flex items-center gap-1">
           <Tooltip>
