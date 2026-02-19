@@ -2306,125 +2306,129 @@ function CalendarTab({ projectId }: { projectId: number }) {
         })}
       </div>
 
-      {selectedDate && (
-        <Card data-testid="selected-date-panel">
-          <CardHeader className="pb-3">
-            <CardTitle className="font-serif text-lg flex items-center gap-2" data-testid="text-selected-date">
+      <Dialog open={selectedDate !== null} onOpenChange={(open) => { if (!open) setSelectedDate(null); }}>
+        <DialogContent className="sm:max-w-[500px] max-h-[85vh] flex flex-col" data-testid="selected-date-panel">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-xl flex items-center gap-2" data-testid="text-selected-date">
               <CalendarIcon className="h-5 w-5 text-muted-foreground" />
-              {format(selectedDate, "EEEE, MMMM d, yyyy")}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {selectedDateEvents.length > 0 ? (
-              selectedDateEvents.map((ev) => (
-                <div
-                  key={ev.id}
-                  className="rounded-md bg-muted overflow-hidden"
-                  data-testid={`calendar-event-${ev.id}`}
-                >
-                  {ev.imageUrl && (
-                    <div
-                      className="relative w-full h-40 cursor-pointer"
-                      onClick={() => setExpandedImage(ev.imageUrl)}
-                      data-testid={`event-image-${ev.id}`}
-                    >
-                      <img
-                        src={ev.imageUrl}
-                        alt={ev.title}
-                        className="w-full h-full object-cover"
-                      />
-                      <div className="absolute inset-0 bg-black/0 hover:bg-black/10 transition-colors flex items-center justify-center">
-                        <ZoomIn className="h-5 w-5 text-white opacity-0 hover:opacity-100 drop-shadow-md" style={{ visibility: "hidden" }} />
+              {selectedDate && format(selectedDate, "EEEE, MMMM d, yyyy")}
+            </DialogTitle>
+            <DialogDescription>
+              {selectedDateEvents.length > 0
+                ? `${selectedDateEvents.length} event${selectedDateEvents.length > 1 ? "s" : ""} on this date`
+                : "No events on this date"}
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="flex-1 -mx-6 px-6">
+            <div className="space-y-3 pb-4">
+              {selectedDateEvents.length > 0 ? (
+                selectedDateEvents.map((ev) => (
+                  <div
+                    key={ev.id}
+                    className="rounded-md bg-muted overflow-hidden"
+                    data-testid={`calendar-event-${ev.id}`}
+                  >
+                    {ev.imageUrl && (
+                      <div
+                        className="relative w-full cursor-pointer"
+                        onClick={() => setExpandedImage(ev.imageUrl)}
+                        data-testid={`event-image-${ev.id}`}
+                      >
+                        <img
+                          src={ev.imageUrl}
+                          alt={ev.title}
+                          className="w-full max-h-48 object-contain bg-black/5"
+                        />
+                      </div>
+                    )}
+                    <div className="flex items-start justify-between gap-3 p-3">
+                      <div className="flex items-start gap-3 min-w-0">
+                        <div
+                          className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0"
+                          style={{ backgroundColor: eventTypeColors[ev.type || "event"] || eventTypeColors.event }}
+                        />
+                        <div className="min-w-0">
+                          <p className="font-medium text-sm text-foreground" data-testid={`text-event-title-${ev.id}`}>
+                            {ev.title}
+                          </p>
+                          {ev.description && (
+                            <p className="text-xs text-muted-foreground mt-0.5" data-testid={`text-event-desc-${ev.id}`}>
+                              {ev.description}
+                            </p>
+                          )}
+                          <Badge variant="outline" className="mt-1 text-[10px] no-default-hover-elevate" data-testid={`badge-event-type-${ev.id}`}>
+                            {ev.type || "event"}
+                          </Badge>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        {canNotify && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                disabled={sendingNotification}
+                                onClick={() => {
+                                  const eventDate = ev.date ? format(parseISO(ev.date), "MMM d") : "";
+                                  const msg = `Reminder: ${ev.title}${eventDate ? ` on ${eventDate}` : ""}${ev.description ? ` — ${ev.description}` : ""}`;
+                                  notifyTeam(
+                                    { projectId, message: msg.slice(0, 300) },
+                                    {
+                                      onSuccess: (data: any) => toast({ title: "Team notified", description: data.message }),
+                                      onError: (err: any) => toast({ title: "Failed to notify", description: err.message, variant: "destructive" }),
+                                    }
+                                  );
+                                }}
+                                data-testid={`button-notify-event-${ev.id}`}
+                              >
+                                {sendingNotification ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bell className="h-4 w-4" />}
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Notify team about this event</TooltipContent>
+                          </Tooltip>
+                        )}
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => {
+                            setMoveEvent({ id: ev.id, title: ev.title });
+                            setMoveDate("");
+                          }}
+                          data-testid={`button-move-event-${ev.id}`}
+                        >
+                          <CalendarDays className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => handleDeleteEvent(ev.id)}
+                          data-testid={`button-delete-event-${ev.id}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
-                  )}
-                  <div className="flex items-start justify-between gap-3 p-3">
-                  <div className="flex items-start gap-3 min-w-0">
-                    <div
-                      className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0"
-                      style={{ backgroundColor: eventTypeColors[ev.type || "event"] || eventTypeColors.event }}
-                    />
-                    <div className="min-w-0">
-                      <p className="font-medium text-sm text-foreground" data-testid={`text-event-title-${ev.id}`}>
-                        {ev.title}
-                      </p>
-                      {ev.description && (
-                        <p className="text-xs text-muted-foreground mt-0.5" data-testid={`text-event-desc-${ev.id}`}>
-                          {ev.description}
-                        </p>
-                      )}
-                      <Badge variant="outline" className="mt-1 text-[10px] no-default-hover-elevate" data-testid={`badge-event-type-${ev.id}`}>
-                        {ev.type || "event"}
-                      </Badge>
-                    </div>
                   </div>
-                  <div className="flex items-center gap-1">
-                    {canNotify && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            disabled={sendingNotification}
-                            onClick={() => {
-                              const eventDate = ev.date ? format(parseISO(ev.date), "MMM d") : "";
-                              const msg = `Reminder: ${ev.title}${eventDate ? ` on ${eventDate}` : ""}${ev.description ? ` — ${ev.description}` : ""}`;
-                              notifyTeam(
-                                { projectId, message: msg.slice(0, 300) },
-                                {
-                                  onSuccess: (data: any) => toast({ title: "Team notified", description: data.message }),
-                                  onError: (err: any) => toast({ title: "Failed to notify", description: err.message, variant: "destructive" }),
-                                }
-                              );
-                            }}
-                            data-testid={`button-notify-event-${ev.id}`}
-                          >
-                            {sendingNotification ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bell className="h-4 w-4" />}
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Notify team about this event</TooltipContent>
-                      </Tooltip>
-                    )}
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => {
-                        setMoveEvent({ id: ev.id, title: ev.title });
-                        setMoveDate("");
-                      }}
-                      data-testid={`button-move-event-${ev.id}`}
-                    >
-                      <CalendarDays className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => handleDeleteEvent(ev.id)}
-                      data-testid={`button-delete-event-${ev.id}`}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <p className="text-sm text-muted-foreground text-center py-4" data-testid="text-no-events">
-                No events on this date.
-              </p>
-            )}
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => setAddDialogOpen(true)}
-              data-testid="button-add-event-for-date"
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Add Event for {format(selectedDate, "MMM d")}
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-4" data-testid="text-no-events">
+                  No events on this date.
+                </p>
+              )}
+            </div>
+          </ScrollArea>
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => setAddDialogOpen(true)}
+            data-testid="button-add-event-for-date"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add Event for {selectedDate && format(selectedDate, "MMM d")}
+          </Button>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={addDialogOpen} onOpenChange={(open) => { setAddDialogOpen(open); if (!open) clearEventImage(); }}>
         <DialogContent className="sm:max-w-[400px]">
