@@ -1,6 +1,6 @@
 import { db } from "./db";
 import { 
-  users, projects, milestones, tasks, photos, documents, timeEntries, messages, checklistItems, boardItems, calendarEvents, planningBoards, canvasElements, activityLog,
+  users, projects, milestones, tasks, photos, documents, timeEntries, messages, checklistItems, boardItems, calendarEvents, planningBoards, canvasElements, activityLog, activityViews,
   type Project, type Milestone, type Task, type Photo, type Document, type TimeEntry, type Message,
   type ChecklistItem, type BoardItem, type CalendarEvent, type PlanningBoard, type CanvasElement, type ActivityLog,
   type InsertProject, type InsertMilestone, type InsertTask, type InsertPhoto, type InsertDocument, 
@@ -76,6 +76,8 @@ export interface IStorage {
   // Activity Log
   getActivityLog(projectId: number, limit?: number): Promise<ActivityLog[]>;
   createActivityLog(entry: InsertActivityLog): Promise<ActivityLog>;
+  getActivityViews(activityIds: number[]): Promise<{ activityId: number; userId: string; viewedAt: Date | null }[]>;
+  markActivityViewed(activityId: number, userId: string): Promise<void>;
 
   // Canvas Elements
   getCanvasElement(id: number): Promise<CanvasElement | undefined>;
@@ -282,6 +284,23 @@ export class DatabaseStorage implements IStorage {
   async createActivityLog(entry: InsertActivityLog): Promise<ActivityLog> {
     const [created] = await db.insert(activityLog).values(entry).returning();
     return created;
+  }
+  async getActivityViews(activityIds: number[]): Promise<{ activityId: number; userId: string; viewedAt: Date | null }[]> {
+    if (activityIds.length === 0) return [];
+    const { inArray } = await import("drizzle-orm");
+    return db.select({
+      activityId: activityViews.activityId,
+      userId: activityViews.userId,
+      viewedAt: activityViews.viewedAt,
+    }).from(activityViews).where(inArray(activityViews.activityId, activityIds));
+  }
+  async markActivityViewed(activityId: number, userId: string): Promise<void> {
+    const existing = await db.select().from(activityViews)
+      .where(and(eq(activityViews.activityId, activityId), eq(activityViews.userId, userId)))
+      .limit(1);
+    if (existing.length === 0) {
+      await db.insert(activityViews).values({ activityId, userId });
+    }
   }
 
   // Canvas Elements

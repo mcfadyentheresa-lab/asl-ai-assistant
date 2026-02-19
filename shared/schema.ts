@@ -290,6 +290,14 @@ export const activityLog = pgTable("activity_log", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Activity Views (tracks who has seen each activity)
+export const activityViews = pgTable("activity_views", {
+  id: serial("id").primaryKey(),
+  activityId: integer("activity_id").notNull().references(() => activityLog.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull().references(() => users.id),
+  viewedAt: timestamp("viewed_at").defaultNow(),
+}, (table) => []);
+
 // SCHEMAS
 export const insertProjectSchema = createInsertSchema(projects).omit({ id: true, createdAt: true });
 export const insertMilestoneSchema = createInsertSchema(milestones).omit({ id: true });

@@ -846,9 +846,27 @@ export async function registerRoutes(
   });
 
   // Activity Log
-  app.get("/api/projects/:projectId/activity", isAuthenticated, async (req, res) => {
+  app.get("/api/projects/:projectId/activity", isAuthenticated, async (req: any, res) => {
     const entries = await storage.getActivityLog(Number(req.params.projectId), 30);
-    res.json(entries);
+    const activityIds = entries.map((e) => e.id);
+    const views = await storage.getActivityViews(activityIds);
+    const viewsByActivity: Record<number, { userId: string; viewedAt: string | null }[]> = {};
+    for (const v of views) {
+      if (!viewsByActivity[v.activityId]) viewsByActivity[v.activityId] = [];
+      viewsByActivity[v.activityId].push({ userId: v.userId, viewedAt: v.viewedAt?.toISOString() || null });
+    }
+    const enriched = entries.map((e) => ({
+      ...e,
+      views: viewsByActivity[e.id] || [],
+    }));
+    res.json(enriched);
+  });
+
+  app.post("/api/activity/:activityId/view", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const activityId = Number(req.params.activityId);
+    await storage.markActivityViewed(activityId, userId);
+    res.json({ ok: true });
   });
 
   // Initialize seed data

@@ -12,7 +12,7 @@ import {
 import { useOnlineUsers, isUserOnline } from "@/hooks/use-presence";
 import { Navbar } from "@/components/layout/Navbar";
 import SpatialCanvas from "@/components/SpatialCanvas";
-import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, ExternalLink, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, CalendarDays, ChevronLeft, Upload, Download, User, X, Paperclip, ZoomIn, Palette, Shield, Users, Phone, Check, Bell } from "lucide-react";
+import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, ExternalLink, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, CalendarDays, ChevronLeft, Upload, Download, User, X, Paperclip, ZoomIn, Palette, Shield, Users, Phone, Check, Bell, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -38,7 +38,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths, isSameDay, isSameMonth, parseISO, formatDistanceToNow } from "date-fns";
@@ -70,6 +70,16 @@ export default function ProjectDetails() {
   const assignedClient = users?.find((u) => u.id === project?.clientId);
 
   const userRole = user?.role || "client";
+
+  useEffect(() => {
+    if (activeTab !== "overview" || !activityLog || !user?.id) return;
+    const unviewed = activityLog.filter((e: any) =>
+      e.userId !== user.id && !e.views?.some((v: any) => v.userId === user.id)
+    );
+    for (const entry of unviewed) {
+      fetch(`/api/activity/${entry.id}/view`, { method: "POST", credentials: "include" }).catch(() => {});
+    }
+  }, [activeTab, activityLog, user?.id]);
 
   const isClientInvitedToBoard = userRole === "client" && Array.isArray(planningBoards) &&
     planningBoards.some((b: any) => (b.linkedUserIds || []).includes(user?.id));
@@ -574,6 +584,11 @@ export default function ProjectDetails() {
                         const style = typeStyles[entry.type] || { dot: "bg-muted-foreground", tab: null, label: "" };
                         const timeAgo = entry.createdAt ? formatDistanceToNow(new Date(entry.createdAt), { addSuffix: true }) : "";
                         const isClickable = !!style.tab;
+                        const viewedByUsers = (entry.views || []).map((v: any) => {
+                          const u = users?.find((usr: any) => usr.id === v.userId);
+                          return u ? `${u.firstName || ""} ${u.lastName || ""}`.trim() || u.email : null;
+                        }).filter(Boolean) as string[];
+                        const isCreator = entry.userId === user?.id;
                         return (
                           <div
                             key={entry.id}
@@ -589,12 +604,35 @@ export default function ProjectDetails() {
                               {entry.description && (
                                 <p className="text-muted-foreground text-xs truncate">{entry.description}</p>
                               )}
-                              <div className="flex items-center gap-2 mt-0.5">
+                              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                                 <span className="text-muted-foreground text-xs">{timeAgo}</span>
                                 {isClickable && (
                                   <span className="text-xs text-primary/70">{style.label}</span>
                                 )}
                               </div>
+                              {viewedByUsers.length > 0 && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <div className="flex items-center gap-1 mt-1 cursor-default" data-testid={`activity-views-${entry.id}`}>
+                                      <Eye className="h-3 w-3 text-muted-foreground" />
+                                      <span className="text-muted-foreground text-xs">
+                                        Seen by {viewedByUsers.length}
+                                      </span>
+                                    </div>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="bottom" align="start">
+                                    <p className="text-xs font-medium">Seen by:</p>
+                                    {viewedByUsers.map((name, i) => (
+                                      <p key={i} className="text-xs">{name}</p>
+                                    ))}
+                                  </TooltipContent>
+                                </Tooltip>
+                              )}
+                              {viewedByUsers.length === 0 && !isCreator && (
+                                <div className="flex items-center gap-1 mt-1" data-testid={`activity-unseen-${entry.id}`}>
+                                  <span className="text-xs text-muted-foreground/50">Not yet seen</span>
+                                </div>
+                              )}
                             </div>
                             {isClickable && <ChevronRight className="h-3.5 w-3.5 mt-1 text-muted-foreground flex-shrink-0" />}
                           </div>
