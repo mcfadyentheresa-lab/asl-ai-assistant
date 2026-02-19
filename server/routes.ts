@@ -20,6 +20,7 @@ import {
   notifyDocumentUploaded,
   notifyCalendarEventCreated,
   notifyCalendarEventChanged,
+  notifyTeamCustom,
   sendTestSms,
 } from "./sms";
 import { heartbeat, getOnlineUsers, setVisibility, getVisibility } from "./presence";
@@ -802,6 +803,36 @@ export async function registerRoutes(
     } catch (error: any) {
       console.error("Test SMS error:", error);
       res.status(500).json({ message: error.message || "Failed to send test SMS" });
+    }
+  });
+
+  app.post("/api/projects/:projectId/notify", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const requester = await authStorage.getUser(userId);
+      if (!requester || (requester.role !== "admin" && requester.role !== "crew")) {
+        return res.status(403).json({ message: "Only admins and crew can send team notifications" });
+      }
+      const { message } = req.body;
+      if (!message || typeof message !== "string" || message.trim().length === 0) {
+        return res.status(400).json({ message: "Message is required" });
+      }
+      if (message.length > 300) {
+        return res.status(400).json({ message: "Message must be 300 characters or less" });
+      }
+      const project = await storage.getProject(Number(req.params.projectId));
+      if (!project) return res.status(404).json({ message: "Project not found" });
+
+      const result = await notifyTeamCustom(
+        project.name,
+        message.trim(),
+        project.clientId,
+        userId
+      );
+      res.json({ message: `Notification sent to ${result.sent} team member(s)`, ...result });
+    } catch (error: any) {
+      console.error("Notify team error:", error);
+      res.status(500).json({ message: error.message || "Failed to send notification" });
     }
   });
 

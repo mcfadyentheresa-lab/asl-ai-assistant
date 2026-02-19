@@ -193,6 +193,26 @@ export async function notifyCalendarEventChanged(
   );
 }
 
+export async function notifyTeamCustom(
+  projectName: string,
+  message: string,
+  projectClientId: string | null,
+  sentByUserId: string
+): Promise<{ sent: number; failed: number }> {
+  const recipients = await getProjectParticipants(projectClientId, sentByUserId);
+  const body = `Aster & Spruce — "${projectName}": ${message}`;
+  let sent = 0;
+  let failed = 0;
+  const results = await Promise.allSettled(
+    recipients.map((u) => sendSms(u.phone!, body))
+  );
+  for (const r of results) {
+    if (r.status === "fulfilled" && r.value) sent++;
+    else failed++;
+  }
+  return { sent, failed };
+}
+
 export async function sendTestSms(toPhone: string): Promise<boolean> {
   return sendSms(
     toPhone,

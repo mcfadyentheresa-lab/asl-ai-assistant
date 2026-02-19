@@ -6,7 +6,7 @@ import {
   useCalendarEvents, useCreateCalendarEvent, useUpdateCalendarEvent, useDeleteCalendarEvent,
   useDocuments, useUploadDocument, useDeleteDocument,
   usePhotos, useCreatePhoto, useDeletePhoto, useUploadImage,
-  useUsers, useUpdateProject, usePlanningBoards, useUpdateUserPhone, useSendTestSms,
+  useUsers, useUpdateProject, usePlanningBoards, useUpdateUserPhone, useSendTestSms, useNotifyTeam,
 } from "@/hooks/use-projects";
 import { useOnlineUsers, isUserOnline } from "@/hooks/use-presence";
 import { Navbar } from "@/components/layout/Navbar";
@@ -53,12 +53,15 @@ export default function ProjectDetails() {
   const { mutate: updateProject } = useUpdateProject();
   const { mutate: updatePhone } = useUpdateUserPhone();
   const { mutate: sendTestSms, isPending: sendingTestSms } = useSendTestSms();
+  const { mutate: notifyTeam, isPending: sendingNotification } = useNotifyTeam();
   const { data: onlineUsers } = useOnlineUsers();
   const { toast } = useToast();
 
   const [activeTab, setActiveTab] = useState("overview");
   const [editingPhoneUserId, setEditingPhoneUserId] = useState<string | null>(null);
   const [phoneInput, setPhoneInput] = useState("");
+  const [showNotifyForm, setShowNotifyForm] = useState(false);
+  const [notifyMessage, setNotifyMessage] = useState("");
   const { data: planningBoards } = usePlanningBoards(projectId);
   const assignedClient = users?.find((u) => u.id === project?.clientId);
 
@@ -408,30 +411,88 @@ export default function ProjectDetails() {
                             )}
                           </div>
                         </div>
-                        {userRole === "admin" && (
-                          <div className="pt-2 border-t">
+                        {(userRole === "admin" || userRole === "crew") && (
+                          <div className="pt-2 border-t space-y-2">
                             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">SMS Notifications</p>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              disabled={sendingTestSms}
-                              data-testid="button-send-test-sms"
-                              onClick={() => {
-                                const adminUser = users?.find((u: any) => u.id === user?.id);
-                                const phone = adminUser?.phone;
-                                if (!phone) {
-                                  toast({ title: "No phone number", description: "Add your phone number first to receive a test SMS", variant: "destructive" });
-                                  return;
-                                }
-                                sendTestSms(phone, {
-                                  onSuccess: () => toast({ title: "Test SMS sent", description: `Sent to ${phone}` }),
-                                  onError: (err: any) => toast({ title: "SMS failed", description: err.message, variant: "destructive" }),
-                                });
-                              }}
-                            >
-                              {sendingTestSms ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Phone className="h-3 w-3 mr-1" />}
-                              Send Test SMS
-                            </Button>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                data-testid="button-notify-team"
+                                onClick={() => setShowNotifyForm(!showNotifyForm)}
+                              >
+                                <Send className="h-3 w-3 mr-1" />
+                                Notify Team
+                              </Button>
+                              {userRole === "admin" && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={sendingTestSms}
+                                  data-testid="button-send-test-sms"
+                                  onClick={() => {
+                                    const adminUser = users?.find((u: any) => u.id === user?.id);
+                                    const phone = adminUser?.phone;
+                                    if (!phone) {
+                                      toast({ title: "No phone number", description: "Add your phone number first to receive a test SMS", variant: "destructive" });
+                                      return;
+                                    }
+                                    sendTestSms(phone, {
+                                      onSuccess: () => toast({ title: "Test SMS sent", description: `Sent to ${phone}` }),
+                                      onError: (err: any) => toast({ title: "SMS failed", description: err.message, variant: "destructive" }),
+                                    });
+                                  }}
+                                >
+                                  {sendingTestSms ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Phone className="h-3 w-3 mr-1" />}
+                                  Test SMS
+                                </Button>
+                              )}
+                            </div>
+                            {showNotifyForm && (
+                              <div className="space-y-2" data-testid="notify-team-form">
+                                <Textarea
+                                  value={notifyMessage}
+                                  onChange={(e) => setNotifyMessage(e.target.value.slice(0, 300))}
+                                  placeholder="Type a message to send to the team via SMS..."
+                                  className="text-sm min-h-[60px]"
+                                  data-testid="input-notify-message"
+                                />
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-xs text-muted-foreground">{notifyMessage.length}/300</span>
+                                  <div className="flex items-center gap-2">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => { setShowNotifyForm(false); setNotifyMessage(""); }}
+                                      data-testid="button-cancel-notify"
+                                    >
+                                      Cancel
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      disabled={sendingNotification || !notifyMessage.trim()}
+                                      data-testid="button-send-notify"
+                                      onClick={() => {
+                                        notifyTeam(
+                                          { projectId, message: notifyMessage.trim() },
+                                          {
+                                            onSuccess: (data: any) => {
+                                              toast({ title: "Notification sent", description: data.message });
+                                              setNotifyMessage("");
+                                              setShowNotifyForm(false);
+                                            },
+                                            onError: (err: any) => toast({ title: "Failed to notify", description: err.message, variant: "destructive" }),
+                                          }
+                                        );
+                                      }}
+                                    >
+                                      {sendingNotification ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Send className="h-3 w-3 mr-1" />}
+                                      Send
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         )}
                       </CardContent>

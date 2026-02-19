@@ -51,6 +51,24 @@ export function useSendTestSms() {
   });
 }
 
+export function useNotifyTeam() {
+  return useMutation({
+    mutationFn: async ({ projectId, message }: { projectId: number; message: string }) => {
+      const res = await fetch(`/api/projects/${projectId}/notify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message }),
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || "Failed to send notification");
+      }
+      return res.json();
+    },
+  });
+}
+
 // --- Projects ---
 export function useProjects() {
   return useQuery({
