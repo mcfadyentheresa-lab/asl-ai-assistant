@@ -12,7 +12,7 @@ import {
 import { useOnlineUsers, isUserOnline } from "@/hooks/use-presence";
 import { Navbar } from "@/components/layout/Navbar";
 import SpatialCanvas from "@/components/SpatialCanvas";
-import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, ExternalLink, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, CalendarDays, ChevronLeft, Upload, Download, User, X, Paperclip, ZoomIn, Palette, Shield, Users, Phone, Check, Bell, Eye } from "lucide-react";
+import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, ExternalLink, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, CalendarDays, ChevronLeft, Upload, Download, User, X, Paperclip, ZoomIn, Palette, Shield, Users, Phone, Check, Bell, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -628,9 +628,12 @@ export default function ProjectDetails() {
                                   </TooltipContent>
                                 </Tooltip>
                               )}
-                              {viewedByUsers.length === 0 && !isCreator && (
+                              {viewedByUsers.length === 0 && (
                                 <div className="flex items-center gap-1 mt-1" data-testid={`activity-unseen-${entry.id}`}>
-                                  <span className="text-xs text-muted-foreground/50">Not yet seen</span>
+                                  <EyeOff className="h-3 w-3 text-muted-foreground/40" />
+                                  <span className="text-xs text-muted-foreground/50">
+                                    {isCreator ? "Not yet seen by others" : "Not yet seen"}
+                                  </span>
                                 </div>
                               )}
                             </div>
