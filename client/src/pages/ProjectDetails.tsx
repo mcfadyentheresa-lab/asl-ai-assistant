@@ -11,9 +11,10 @@ import {
 import { useOnlineUsers, isUserOnline } from "@/hooks/use-presence";
 import { Navbar } from "@/components/layout/Navbar";
 import SpatialCanvas from "@/components/SpatialCanvas";
-import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, ExternalLink, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, CalendarDays, ChevronLeft, Upload, Download, User, X, Paperclip, ZoomIn, Palette, Shield, Users, Phone, Check } from "lucide-react";
+import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, ExternalLink, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, CalendarDays, ChevronLeft, Upload, Download, User, X, Paperclip, ZoomIn, Palette, Shield, Users, Phone, Check, Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -1720,10 +1721,12 @@ const eventTypeColors: Record<string, string> = {
 
 function CalendarTab({ projectId }: { projectId: number }) {
   const { toast } = useToast();
+  const { user } = useAuth();
   const { data: events, isLoading } = useCalendarEvents(projectId);
   const { mutate: createEvent, isPending: isCreating } = useCreateCalendarEvent();
   const { mutate: updateEvent } = useUpdateCalendarEvent();
   const { mutate: deleteEvent } = useDeleteCalendarEvent();
+  const { mutate: notifyTeam, isPending: sendingNotification } = useNotifyTeam();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -1731,6 +1734,7 @@ function CalendarTab({ projectId }: { projectId: number }) {
   const [draggedEventId, setDraggedEventId] = useState<number | null>(null);
   const [moveEvent, setMoveEvent] = useState<{ id: number; title: string } | null>(null);
   const [moveDate, setMoveDate] = useState("");
+  const canNotify = user?.role === "admin" || user?.role === "crew";
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
@@ -1933,6 +1937,32 @@ function CalendarTab({ projectId }: { projectId: number }) {
                     </div>
                   </div>
                   <div className="flex items-center gap-1">
+                    {canNotify && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            disabled={sendingNotification}
+                            onClick={() => {
+                              const eventDate = ev.date ? format(parseISO(ev.date), "MMM d") : "";
+                              const msg = `Reminder: ${ev.title}${eventDate ? ` on ${eventDate}` : ""}${ev.description ? ` — ${ev.description}` : ""}`;
+                              notifyTeam(
+                                { projectId, message: msg.slice(0, 300) },
+                                {
+                                  onSuccess: (data: any) => toast({ title: "Team notified", description: data.message }),
+                                  onError: (err: any) => toast({ title: "Failed to notify", description: err.message, variant: "destructive" }),
+                                }
+                              );
+                            }}
+                            data-testid={`button-notify-event-${ev.id}`}
+                          >
+                            {sendingNotification ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bell className="h-4 w-4" />}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Notify team about this event</TooltipContent>
+                      </Tooltip>
+                    )}
                     <Button
                       size="icon"
                       variant="ghost"
