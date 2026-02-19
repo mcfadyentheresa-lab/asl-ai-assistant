@@ -2315,7 +2315,7 @@ function CalendarTab({ projectId }: { projectId: number }) {
             </DialogTitle>
             <DialogDescription>
               {selectedDateEvents.length > 0
-                ? <><span className="font-semibold text-foreground">{selectedDateEvents.length}</span>{` event${selectedDateEvents.length > 1 ? "s" : ""} on this date`}</>
+                ? <span className="inline-flex items-center gap-1.5"><span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary text-primary-foreground text-xs font-bold">{selectedDateEvents.length}</span>{`event${selectedDateEvents.length > 1 ? "s" : ""} on this date`}</span>
                 : "No events on this date"}
             </DialogDescription>
           </DialogHeader>
