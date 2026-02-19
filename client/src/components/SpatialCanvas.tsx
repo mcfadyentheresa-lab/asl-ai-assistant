@@ -117,6 +117,8 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   const {
     collaborators,
     cursors,
+    activeEdits,
+    getCollaboratorColor,
     sendElementAdd,
     sendElementUpdate,
     sendElementRemove,
@@ -775,8 +777,22 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     }
   };
 
+  const lastCursorSentRef = useRef(0);
+
   const handleCanvasMouseMove = (e: React.MouseEvent) => {
     if (drawingMode) return;
+
+    if (containerRef.current) {
+      const now = Date.now();
+      if (now - lastCursorSentRef.current > 50) {
+        lastCursorSentRef.current = now;
+        const rect = containerRef.current.getBoundingClientRect();
+        const canvasX = (e.clientX - rect.left - pan.x) / zoom;
+        const canvasY = (e.clientY - rect.top - pan.y) / zoom;
+        sendCursorMove(canvasX, canvasY);
+      }
+    }
+
     if (isPanning && panStartRef.current) {
       const dx = e.clientX - panStartRef.current.x;
       const dy = e.clientY - panStartRef.current.y;
@@ -1240,10 +1256,11 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     const isSelected = editingId === el.id;
     const isDragging = draggingId === el.id;
     const c = (el.content || {}) as any;
+    const activeEdit = activeEdits[el.id];
 
     const parentCol = el.parentColumnId ? elements[el.parentColumnId] : null;
     const effectiveZ = parentCol ? Math.max(el.zIndex, (parentCol.zIndex || 0) + 1) : el.zIndex;
-    const cardBase = `absolute transition-shadow rounded select-none ${isSelected ? "ring-2 ring-primary/50 shadow-lg" : "shadow-sm"} ${isDragging ? "opacity-80 cursor-grabbing" : ""}`;
+    const cardBase = `absolute transition-shadow rounded select-none ${isSelected && !activeEdit ? "ring-2 ring-primary/50 shadow-lg" : "shadow-sm"} ${isDragging ? "opacity-80 cursor-grabbing" : ""}`;
 
     const handleClick = (e: React.MouseEvent) => {
       e.stopPropagation();
@@ -1971,19 +1988,25 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
               </span>
               <div className="flex -space-x-2">
-                {collaborators.map((c) => (
-                  <Tooltip key={c.userId}>
-                    <TooltipTrigger asChild>
-                      <Avatar className="h-6 w-6 border-2 border-background" data-testid={`collaborator-avatar-${c.userId}`}>
-                        <AvatarImage src={c.profileImageUrl || undefined} />
-                        <AvatarFallback className="text-[9px]">
-                          {(c.firstName?.[0] || "").toUpperCase()}{(c.lastName?.[0] || "").toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" className="text-xs">{c.firstName} {c.lastName} is editing</TooltipContent>
-                  </Tooltip>
-                ))}
+                {collaborators.map((c) => {
+                  const avatarColor = getCollaboratorColor(c.userId);
+                  return (
+                    <Tooltip key={c.userId}>
+                      <TooltipTrigger asChild>
+                        <Avatar className="h-6 w-6 border-2" style={{ borderColor: avatarColor }} data-testid={`collaborator-avatar-${c.userId}`}>
+                          <AvatarImage src={c.profileImageUrl || undefined} />
+                          <AvatarFallback className="text-[9px]" style={{ backgroundColor: avatarColor, color: "white" }}>
+                            {(c.firstName?.[0] || "").toUpperCase()}{(c.lastName?.[0] || "").toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="text-xs">
+                        <span className="inline-block w-2 h-2 rounded-full mr-1" style={{ backgroundColor: avatarColor }} />
+                        {c.firstName} {c.lastName} is editing
+                      </TooltipContent>
+                    </Tooltip>
+                  );
+                })}
               </div>
               <span className="text-xs text-muted-foreground">{collaborators.length} live</span>
             </div>
@@ -2137,6 +2160,61 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
               data-testid="spatial-canvas-transform"
             >
               {elementsList.map(renderElement)}
+
+              {/* Active edit indicators — colored rings showing who is editing each element */}
+              {Object.values(activeEdits).map((edit) => {
+                const el = elements[edit.elementId];
+                if (!el) return null;
+                return (
+                  <div
+                    key={`edit-indicator-${edit.elementId}`}
+                    className="absolute pointer-events-none rounded"
+                    style={{
+                      left: el.x - 3,
+                      top: el.y - 3,
+                      width: (el.width || 240) + 6,
+                      height: (el.height || 140) + 6,
+                      border: `2px solid ${edit.color}`,
+                      zIndex: 99998,
+                      transition: "opacity 0.3s ease",
+                    }}
+                    data-testid={`edit-indicator-${edit.elementId}`}
+                  >
+                    <div
+                      className="absolute -top-5 left-0 flex items-center gap-1 px-1.5 py-0.5 rounded-t text-[10px] font-medium text-white whitespace-nowrap"
+                      style={{ backgroundColor: edit.color }}
+                    >
+                      {edit.firstName} {edit.lastName?.[0]}.
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Live cursors from collaborators */}
+              {Object.values(cursors).map((c) => (
+                <div
+                  key={`cursor-${c.userId}`}
+                  className="absolute pointer-events-none"
+                  style={{
+                    left: c.x,
+                    top: c.y,
+                    zIndex: 99999,
+                    transition: "left 0.1s linear, top 0.1s linear",
+                  }}
+                  data-testid={`live-cursor-${c.userId}`}
+                >
+                  <svg width="16" height="20" viewBox="0 0 16 20" fill="none" style={{ filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.3))" }}>
+                    <path d="M0 0L16 12L8 12L4 20L0 0Z" fill={c.color} />
+                  </svg>
+                  <div
+                    className="absolute left-4 top-3 px-1.5 py-0.5 rounded text-[10px] font-medium text-white whitespace-nowrap"
+                    style={{ backgroundColor: c.color }}
+                  >
+                    {c.firstName}
+                  </div>
+                </div>
+              ))}
+
               {/* Saved draw element paths rendered as SVG */}
               {elementsList.filter((el) => el.type === "draw").map((el) => {
                 const paths = ((el.content || {}) as any).paths || [];

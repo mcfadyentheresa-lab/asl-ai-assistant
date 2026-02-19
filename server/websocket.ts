@@ -51,11 +51,11 @@ function broadcastPresence(boardId: number) {
   });
 }
 
-function broadcastToOthers(boardId: number, sourceUserId: string, message: string) {
+function broadcastToOthers(boardId: number, sourceWs: WebSocket, message: string) {
   const room = rooms.get(boardId);
   if (!room) return;
-  Array.from(room.clients.entries()).forEach(([ws, client]) => {
-    if (client.userId !== sourceUserId && ws.readyState === WebSocket.OPEN) {
+  Array.from(room.clients.entries()).forEach(([ws]) => {
+    if (ws !== sourceWs && ws.readyState === WebSocket.OPEN) {
       ws.send(message);
     }
   });
@@ -116,8 +116,13 @@ export function setupWebSocket(server: Server) {
             if (currentBoardId === null || !clientInfo) return;
             broadcastToOthers(
               currentBoardId,
-              clientInfo.userId,
-              JSON.stringify({ ...msg, sourceUserId: clientInfo.userId })
+              ws,
+              JSON.stringify({
+                ...msg,
+                sourceUserId: clientInfo.userId,
+                sourceFirstName: clientInfo.firstName,
+                sourceLastName: clientInfo.lastName,
+              })
             );
             break;
           }
@@ -126,7 +131,7 @@ export function setupWebSocket(server: Server) {
             if (currentBoardId === null || !clientInfo) return;
             broadcastToOthers(
               currentBoardId,
-              clientInfo.userId,
+              ws,
               JSON.stringify({
                 type: "cursor:move",
                 userId: clientInfo.userId,

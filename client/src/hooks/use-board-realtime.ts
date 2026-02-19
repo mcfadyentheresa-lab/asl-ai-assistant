@@ -16,6 +16,34 @@ interface CursorPosition {
   lastName: string;
   x: number;
   y: number;
+  color: string;
+}
+
+export interface ActiveEdit {
+  elementId: number;
+  userId: string;
+  firstName: string;
+  lastName: string;
+  color: string;
+  expiresAt: number;
+}
+
+const COLLABORATOR_COLORS = [
+  "#ef4444",
+  "#3b82f6",
+  "#f59e0b",
+  "#10b981",
+  "#8b5cf6",
+  "#ec4899",
+  "#06b6d4",
+  "#f97316",
+];
+
+function getUserColor(userId: string, colorMap: Map<string, string>): string {
+  if (colorMap.has(userId)) return colorMap.get(userId)!;
+  const color = COLLABORATOR_COLORS[colorMap.size % COLLABORATOR_COLORS.length];
+  colorMap.set(userId, color);
+  return color;
 }
 
 export function useBoardRealtime(
@@ -25,8 +53,44 @@ export function useBoardRealtime(
   const wsRef = useRef<WebSocket | null>(null);
   const [collaborators, setCollaborators] = useState<BoardUser[]>([]);
   const [cursors, setCursors] = useState<Record<string, CursorPosition>>({});
+  const [activeEdits, setActiveEdits] = useState<Record<number, ActiveEdit>>({});
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isConnectedRef = useRef(false);
+  const colorMapRef = useRef<Map<string, string>>(new Map());
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      setActiveEdits((prev) => {
+        const next: Record<number, ActiveEdit> = {};
+        let changed = false;
+        for (const [key, edit] of Object.entries(prev)) {
+          if (edit.expiresAt > now) {
+            next[Number(key)] = edit;
+          } else {
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
+      });
+    }, 500);
+    return () => clearInterval(interval);
+  }, []);
+
+  const trackEdit = useCallback((elementId: number, userId: string, firstName: string, lastName: string) => {
+    const color = getUserColor(userId, colorMapRef.current);
+    setActiveEdits((prev) => ({
+      ...prev,
+      [elementId]: {
+        elementId,
+        userId,
+        firstName,
+        lastName,
+        color,
+        expiresAt: Date.now() + 3000,
+      },
+    }));
+  }, []);
 
   const connect = useCallback(() => {
     if (!boardId || !user) return;
@@ -53,23 +117,29 @@ export function useBoardRealtime(
       try {
         const msg = JSON.parse(event.data);
         const store = useCanvasStore.getState();
+        const srcName = msg.sourceFirstName || "";
+        const srcLast = msg.sourceLastName || "";
+        const srcId = msg.sourceUserId || "";
 
         switch (msg.type) {
-          case "presence:update":
-            setCollaborators(
-              (msg.users as BoardUser[]).filter((u) => u.userId !== user.id)
-            );
+          case "presence:update": {
+            const otherUsers = (msg.users as BoardUser[]).filter((u) => u.userId !== user.id);
+            otherUsers.forEach((u) => getUserColor(u.userId, colorMapRef.current));
+            setCollaborators(otherUsers);
             break;
+          }
 
           case "element:add":
             if (msg.element) {
               store.addElement(msg.element as CanvasElement);
+              if (srcId) trackEdit(msg.element.id, srcId, srcName, srcLast);
             }
             break;
 
           case "element:update":
             if (msg.elementId && msg.updates) {
               store.updateElement(msg.elementId, msg.updates);
+              if (srcId) trackEdit(msg.elementId, srcId, srcName, srcLast);
             }
             break;
 
@@ -82,6 +152,7 @@ export function useBoardRealtime(
           case "element:move":
             if (msg.elementId != null && msg.x != null && msg.y != null) {
               store.moveElement(msg.elementId, msg.x, msg.y);
+              if (srcId) trackEdit(msg.elementId, srcId, srcName, srcLast);
             }
             break;
 
@@ -98,12 +169,14 @@ export function useBoardRealtime(
                     zIndex: u.zIndex,
                     parentColumnId: u.parentColumnId,
                   });
+                  if (srcId) trackEdit(u.id, srcId, srcName, srcLast);
                 }
               });
             }
             break;
 
-          case "cursor:move":
+          case "cursor:move": {
+            const cursorColor = getUserColor(msg.userId, colorMapRef.current);
             setCursors((prev) => ({
               ...prev,
               [msg.userId]: {
@@ -112,9 +185,11 @@ export function useBoardRealtime(
                 lastName: msg.lastName,
                 x: msg.x,
                 y: msg.y,
+                color: cursorColor,
               },
             }));
             break;
+          }
         }
       } catch (_err) {
         // ignore parse errors
@@ -126,6 +201,7 @@ export function useBoardRealtime(
       wsRef.current = null;
       setCollaborators([]);
       setCursors({});
+      setActiveEdits({});
       if (boardId) {
         reconnectTimeoutRef.current = setTimeout(connect, 2000);
       }
@@ -134,7 +210,7 @@ export function useBoardRealtime(
     ws.onerror = () => {
       ws.close();
     };
-  }, [boardId, user]);
+  }, [boardId, user, trackEdit]);
 
   useEffect(() => {
     connect();
@@ -152,6 +228,7 @@ export function useBoardRealtime(
       isConnectedRef.current = false;
       setCollaborators([]);
       setCursors({});
+      setActiveEdits({});
     };
   }, [connect]);
 
@@ -191,9 +268,15 @@ export function useBoardRealtime(
     }
   }, []);
 
+  const getCollaboratorColor = useCallback((userId: string) => {
+    return getUserColor(userId, colorMapRef.current);
+  }, []);
+
   return {
     collaborators,
     cursors,
+    activeEdits,
+    getCollaboratorColor,
     sendElementAdd,
     sendElementUpdate,
     sendElementRemove,
