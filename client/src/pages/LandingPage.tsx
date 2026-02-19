@@ -31,7 +31,7 @@ export default function LandingPage() {
             className="bg-white/10 backdrop-blur-md text-white border-white/20"
             data-testid="button-login"
           >
-            Client Login
+            Team Login
           </Button>
         </nav>
 
@@ -58,7 +58,7 @@ export default function LandingPage() {
                   size="lg"
                   data-testid="button-portal"
                 >
-                  Access Client Portal
+                  Access Your Portal
                   <ArrowRight className="ml-2" />
                 </Button>
               </div>
