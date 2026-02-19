@@ -13,7 +13,7 @@ import {
 import { useOnlineUsers, isUserOnline } from "@/hooks/use-presence";
 import { Navbar } from "@/components/layout/Navbar";
 import SpatialCanvas from "@/components/SpatialCanvas";
-import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, ExternalLink, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, CalendarDays, ChevronLeft, Upload, Download, User, X, Paperclip, ZoomIn, Palette, Shield, Users, Phone, Check, Bell, Eye, EyeOff } from "lucide-react";
+import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, ExternalLink, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, CalendarDays, ChevronLeft, Upload, Download, User, X, Paperclip, ZoomIn, Palette, Shield, Users, Phone, Check, Bell, Eye, EyeOff, Archive, ArchiveRestore } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -302,7 +302,7 @@ export default function ProjectDetails() {
                   const allClients = [...clients, ...boardInvitedClients];
 
                   const renderUserRow = (u: any, badge?: string) => (
-                    <div key={u.id} className="space-y-1" data-testid={`access-user-${u.id}`}>
+                    <div key={u.id} className={`space-y-1 ${u.archivedAt ? "opacity-50" : ""}`} data-testid={`access-user-${u.id}`}>
                       <div className="flex items-center gap-2">
                         <div className="relative flex-shrink-0">
                           <Avatar className="h-6 w-6">
@@ -310,7 +310,7 @@ export default function ProjectDetails() {
                               {(u.firstName?.[0] || "").toUpperCase()}{(u.lastName?.[0] || "").toUpperCase()}
                             </AvatarFallback>
                           </Avatar>
-                          {isUserOnline(onlineUsers, u.id) && (
+                          {!u.archivedAt && isUserOnline(onlineUsers, u.id) && (
                             <span
                               className="absolute -bottom-0.5 -right-0.5 block h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-background"
                               data-testid={`indicator-online-${u.id}`}
@@ -318,7 +318,10 @@ export default function ProjectDetails() {
                           )}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <span className="text-sm truncate block">{u.firstName} {u.lastName}</span>
+                          <span className="text-sm truncate block">
+                            {u.firstName} {u.lastName}
+                            {u.archivedAt && <Badge variant="outline" className="ml-1 text-[9px] no-default-hover-elevate no-default-active-elevate">Archived</Badge>}
+                          </span>
                           <div className="flex items-center gap-1">
                             {u.phone ? (
                               <span className="text-xs text-muted-foreground flex items-center gap-1" data-testid={`text-phone-${u.id}`}>
@@ -735,16 +738,48 @@ export default function ProjectDetails() {
               </div>
             ) : (
               <div className="flex justify-between gap-2 pt-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-destructive"
-                  onClick={() => setConfirmDeleteUser(true)}
-                  data-testid="button-delete-user"
-                >
-                  <Trash2 className="h-4 w-4 mr-1" />
-                  Remove
-                </Button>
+                <div className="flex gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-destructive"
+                    onClick={() => setConfirmDeleteUser(true)}
+                    data-testid="button-delete-user"
+                  >
+                    <Trash2 className="h-4 w-4 mr-1" />
+                    Remove
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    data-testid="button-archive-user"
+                    onClick={async () => {
+                      if (!editingUser) return;
+                      const isArchived = !!editingUser.archivedAt;
+                      try {
+                        const res = await fetch(`/api/users/${editingUser.id}/${isArchived ? "unarchive" : "archive"}`, {
+                          method: "POST",
+                          credentials: "include",
+                        });
+                        if (!res.ok) {
+                          const data = await res.json();
+                          throw new Error(data.message || "Failed");
+                        }
+                        toast({ title: isArchived ? "User restored" : "User archived" });
+                        setEditingUser(null);
+                        queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+                      } catch (err: any) {
+                        toast({ title: "Error", description: err.message, variant: "destructive" });
+                      }
+                    }}
+                  >
+                    {editingUser?.archivedAt ? (
+                      <><ArchiveRestore className="h-4 w-4 mr-1" />Restore</>
+                    ) : (
+                      <><Archive className="h-4 w-4 mr-1" />Archive</>
+                    )}
+                  </Button>
+                </div>
                 <div className="flex gap-2">
                   <Button variant="ghost" onClick={() => setEditingUser(null)} data-testid="button-cancel-edit-user">Cancel</Button>
                   <Button

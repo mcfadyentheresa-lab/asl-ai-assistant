@@ -257,6 +257,41 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/users/:id/archive", isAuthenticated, async (req: any, res) => {
+    try {
+      const requesterId = req.user.claims.sub;
+      const requester = await authStorage.getUser(requesterId);
+      if (requester?.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can archive users" });
+      }
+      if (req.params.id === requesterId) {
+        return res.status(400).json({ message: "You cannot archive your own account" });
+      }
+      const user = await authStorage.archiveUser(req.params.id);
+      if (!user) return res.status(404).json({ message: "User not found" });
+      res.json(user);
+    } catch (error) {
+      console.error("Error archiving user:", error);
+      res.status(500).json({ message: "Failed to archive user" });
+    }
+  });
+
+  app.post("/api/users/:id/unarchive", isAuthenticated, async (req: any, res) => {
+    try {
+      const requesterId = req.user.claims.sub;
+      const requester = await authStorage.getUser(requesterId);
+      if (requester?.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can unarchive users" });
+      }
+      const user = await authStorage.unarchiveUser(req.params.id);
+      if (!user) return res.status(404).json({ message: "User not found" });
+      res.json(user);
+    } catch (error) {
+      console.error("Error unarchiving user:", error);
+      res.status(500).json({ message: "Failed to unarchive user" });
+    }
+  });
+
   // Projects
   app.get(api.projects.list.path, isAuthenticated, async (req, res) => {
     const user = req.user as any;
