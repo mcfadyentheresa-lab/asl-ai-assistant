@@ -686,12 +686,13 @@ export async function registerRoutes(
     try {
       const board = await checkBoardAccess(req, res, Number(req.params.id));
       if (!board) return;
-      const input = api.planningBoards.update.input.parse(req.body);
+      const { notifyUsers, ...fields } = req.body;
+      const input = api.planningBoards.update.input.parse(fields);
       const previousLinkedUsers = (board.linkedUserIds || []) as string[];
       const updated = await storage.updatePlanningBoard(board.id, input);
       res.json(updated);
 
-      if (input.linkedUserIds) {
+      if (notifyUsers && input.linkedUserIds) {
         const newUserIds = (input.linkedUserIds as string[]).filter(
           (uid) => !previousLinkedUsers.includes(uid)
         );

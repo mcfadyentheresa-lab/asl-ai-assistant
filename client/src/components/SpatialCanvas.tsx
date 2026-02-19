@@ -19,7 +19,7 @@ import {
   X, ChevronDown, ExternalLink, Pencil, Upload, Copy, ArrowUpFromLine,
   Bold, Italic, Strikethrough, Underline, List, ListOrdered, Code, Link as LinkIcon,
   Eraser, Undo2, Redo2, Save, PenTool, Sparkles, TypeIcon, Shapes,
-  CalendarDays, Milestone, ListChecks,
+  CalendarDays, Milestone, ListChecks, Bell, BellOff,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { usePlanningBoards, useCreatePlanningBoard, useDeletePlanningBoard, useUpdatePlanningBoard, useUploadImage, useUsers, useProjects, useMilestones, useChecklistItems, useCalendarEvents, useUpdateCalendarEvent, useDeleteCalendarEvent, useCreateCalendarEvent, useCreateMilestone, useCreateChecklistItem } from "@/hooks/use-projects";
@@ -65,6 +65,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showNewBoardDialog, setShowNewBoardDialog] = useState(false);
   const [showLinkDialog, setShowLinkDialog] = useState(false);
+  const [notifyOnLink, setNotifyOnLink] = useState(true);
   const [linkDetailSheet, setLinkDetailSheet] = useState<{ type: "calendar" | "milestone" | "checklist"; id: number } | null>(null);
   const [editingEventTitle, setEditingEventTitle] = useState<string | null>(null);
   const { mutateAsync: updateCalendarEvent } = useUpdateCalendarEvent();
@@ -180,10 +181,10 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     queryClient.invalidateQueries({ queryKey: [api.calendar.list.path] });
   };
 
-  const handleLinkUpdate = async (field: string, value: any) => {
+  const handleLinkUpdate = async (field: string, value: any, extraFields?: Record<string, any>) => {
     if (!selectedBoardId) return;
     try {
-      await updateBoard({ id: selectedBoardId, [field]: value } as any);
+      await updateBoard({ id: selectedBoardId, [field]: value, ...extraFields } as any);
       queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'planning-boards'] });
     } catch {
       toast({ title: "Error", description: "Failed to update link.", variant: "destructive" });
@@ -238,10 +239,11 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
 
   const toggleLinkedUser = (userId: string) => {
     const current = selectedBoard?.linkedUserIds || [];
-    const next = current.includes(userId)
-      ? current.filter((id: string) => id !== userId)
-      : [...current, userId];
-    handleLinkUpdate("linkedUserIds", next);
+    const isAdding = !current.includes(userId);
+    const next = isAdding
+      ? [...current, userId]
+      : current.filter((id: string) => id !== userId);
+    handleLinkUpdate("linkedUserIds", next, isAdding && notifyOnLink ? { notifyUsers: true } : undefined);
   };
 
   const toggleLinkedProject = (pid: number) => {
@@ -2401,7 +2403,17 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium mb-2 block">People</label>
+              <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+                <label className="text-sm font-medium">People</label>
+                <label className="flex items-center gap-1.5 cursor-pointer" data-testid="toggle-notify-on-link">
+                  <Checkbox
+                    checked={notifyOnLink}
+                    onCheckedChange={(v) => setNotifyOnLink(!!v)}
+                  />
+                  {notifyOnLink ? <Bell className="h-3.5 w-3.5 text-muted-foreground" /> : <BellOff className="h-3.5 w-3.5 text-muted-foreground" />}
+                  <span className="text-xs text-muted-foreground">Alert via text</span>
+                </label>
+              </div>
               <div className="space-y-1 max-h-40 overflow-y-auto rounded border p-2" data-testid="link-people-list">
                 {allUsers.length === 0 && (
                   <p className="text-xs text-muted-foreground">No team members found</p>
