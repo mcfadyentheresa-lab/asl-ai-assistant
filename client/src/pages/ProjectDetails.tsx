@@ -7,6 +7,7 @@ import {
   useDocuments, useUploadDocument, useDeleteDocument,
   usePhotos, useCreatePhoto, useDeletePhoto, useUploadImage,
   useUsers, useUpdateProject, usePlanningBoards, useUpdateUserPhone, useSendTestSms, useNotifyTeam,
+  useActivityLog,
 } from "@/hooks/use-projects";
 import { useOnlineUsers, isUserOnline } from "@/hooks/use-presence";
 import { Navbar } from "@/components/layout/Navbar";
@@ -40,7 +41,7 @@ import {
 import { useState, useRef } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths, isSameDay, isSameMonth, parseISO } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths, isSameDay, isSameMonth, parseISO, formatDistanceToNow } from "date-fns";
 import type { ChecklistItem, BoardItem, CalendarEvent } from "@shared/schema";
 
 export default function ProjectDetails() {
@@ -49,6 +50,7 @@ export default function ProjectDetails() {
   const { data: project, isLoading: loadingProject } = useProject(projectId);
   const { data: milestones } = useMilestones(projectId);
   const { data: tasks } = useTasks(projectId);
+  const { data: activityLog } = useActivityLog(projectId);
   const { user } = useAuth();
   const { data: users } = useUsers();
   const { mutate: updateProject } = useUpdateProject();
@@ -509,28 +511,38 @@ export default function ProjectDetails() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
-                      {tasks?.slice(0, 5).map((task) => (
-                        <div
-                          key={task.id}
-                          className="flex items-start gap-3 text-sm pb-3 border-b last:border-0 last:pb-0"
-                          data-testid={`task-${task.id}`}
-                        >
+                      {activityLog?.slice(0, 8).map((entry: any) => {
+                        const typeIcons: Record<string, string> = {
+                          milestone_created: "bg-blue-500",
+                          photo_uploaded: "bg-emerald-500",
+                          document_uploaded: "bg-amber-500",
+                          notification_sent: "bg-purple-500",
+                          message_sent: "bg-sky-500",
+                          calendar_event_created: "bg-rose-500",
+                          task_created: "bg-teal-500",
+                        };
+                        const dotColor = typeIcons[entry.type] || "bg-muted-foreground";
+                        const timeAgo = entry.createdAt ? formatDistanceToNow(new Date(entry.createdAt), { addSuffix: true }) : "";
+                        return (
                           <div
-                            className={`mt-1 h-2 w-2 rounded-full flex-shrink-0 ${
-                              task.status === "done" ? "bg-green-600 dark:bg-green-400" : "bg-amber-500 dark:bg-amber-400"
-                            }`}
-                          />
-                          <div>
-                            <p className="font-medium text-foreground">{task.title}</p>
-                            <p className="text-muted-foreground text-xs">
-                              Status: {task.status}
-                            </p>
+                            key={entry.id}
+                            className="flex items-start gap-3 text-sm pb-3 border-b last:border-0 last:pb-0"
+                            data-testid={`activity-${entry.id}`}
+                          >
+                            <div className={`mt-1 h-2 w-2 rounded-full flex-shrink-0 ${dotColor}`} />
+                            <div className="min-w-0 flex-1">
+                              <p className="font-medium text-foreground">{entry.title}</p>
+                              {entry.description && (
+                                <p className="text-muted-foreground text-xs truncate">{entry.description}</p>
+                              )}
+                              <p className="text-muted-foreground text-xs mt-0.5">{timeAgo}</p>
+                            </div>
                           </div>
-                        </div>
-                      ))}
-                      {!tasks?.length && (
-                        <p className="text-muted-foreground text-sm" data-testid="text-no-tasks">
-                          No tasks tracked yet.
+                        );
+                      })}
+                      {(!activityLog || activityLog.length === 0) && (
+                        <p className="text-muted-foreground text-sm" data-testid="text-no-activity">
+                          No recent activity.
                         </p>
                       )}
                     </div>

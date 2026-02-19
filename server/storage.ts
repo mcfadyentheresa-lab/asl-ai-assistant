@@ -1,10 +1,10 @@
 import { db } from "./db";
 import { 
-  users, projects, milestones, tasks, photos, documents, timeEntries, messages, checklistItems, boardItems, calendarEvents, planningBoards, canvasElements,
+  users, projects, milestones, tasks, photos, documents, timeEntries, messages, checklistItems, boardItems, calendarEvents, planningBoards, canvasElements, activityLog,
   type Project, type Milestone, type Task, type Photo, type Document, type TimeEntry, type Message,
-  type ChecklistItem, type BoardItem, type CalendarEvent, type PlanningBoard, type CanvasElement,
+  type ChecklistItem, type BoardItem, type CalendarEvent, type PlanningBoard, type CanvasElement, type ActivityLog,
   type InsertProject, type InsertMilestone, type InsertTask, type InsertPhoto, type InsertDocument, 
-  type InsertTimeEntry, type InsertMessage, type InsertChecklistItem, type InsertBoardItem, type InsertCalendarEvent, type InsertPlanningBoard, type InsertCanvasElement
+  type InsertTimeEntry, type InsertMessage, type InsertChecklistItem, type InsertBoardItem, type InsertCalendarEvent, type InsertPlanningBoard, type InsertCanvasElement, type InsertActivityLog
 } from "@shared/schema";
 import { type User } from "@shared/models/auth";
 import { eq, desc, and } from "drizzle-orm";
@@ -72,6 +72,10 @@ export interface IStorage {
   updatePlanningBoard(id: number, updates: Partial<InsertPlanningBoard>): Promise<PlanningBoard>;
   deletePlanningBoard(id: number): Promise<void>;
   savePlanningBoardCanvas(id: number, canvasData: any, updatedBy: string): Promise<PlanningBoard>;
+
+  // Activity Log
+  getActivityLog(projectId: number, limit?: number): Promise<ActivityLog[]>;
+  createActivityLog(entry: InsertActivityLog): Promise<ActivityLog>;
 
   // Canvas Elements
   getCanvasElement(id: number): Promise<CanvasElement | undefined>;
@@ -269,6 +273,15 @@ export class DatabaseStorage implements IStorage {
       .where(eq(planningBoards.id, id))
       .returning();
     return updated;
+  }
+
+  // Activity Log
+  async getActivityLog(projectId: number, limit = 20): Promise<ActivityLog[]> {
+    return db.select().from(activityLog).where(eq(activityLog.projectId, projectId)).orderBy(desc(activityLog.createdAt)).limit(limit);
+  }
+  async createActivityLog(entry: InsertActivityLog): Promise<ActivityLog> {
+    const [created] = await db.insert(activityLog).values(entry).returning();
+    return created;
   }
 
   // Canvas Elements

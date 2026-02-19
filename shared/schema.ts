@@ -279,6 +279,17 @@ export const messagesRelations = relations(messages, ({ one }) => ({
   }),
 }));
 
+// Activity Log
+export const activityLog = pgTable("activity_log", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => projects.id),
+  userId: text("user_id").references(() => users.id),
+  type: text("type").notNull(), // notification_sent, task_created, task_completed, photo_uploaded, document_uploaded, message_sent, milestone_created, calendar_event_created
+  title: text("title").notNull(),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // SCHEMAS
 export const insertProjectSchema = createInsertSchema(projects).omit({ id: true, createdAt: true });
 export const insertMilestoneSchema = createInsertSchema(milestones).omit({ id: true });
@@ -292,6 +303,7 @@ export const insertBoardItemSchema = createInsertSchema(boardItems).omit({ id: t
 export const insertCanvasElementSchema = createInsertSchema(canvasElements).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertPlanningBoardSchema = createInsertSchema(planningBoards).omit({ id: true, updatedAt: true, createdAt: true });
 export const insertCalendarEventSchema = createInsertSchema(calendarEvents).omit({ id: true, createdAt: true });
+export const insertActivityLogSchema = createInsertSchema(activityLog).omit({ id: true, createdAt: true });
 
 // TYPES
 export type Project = typeof projects.$inferSelect;
@@ -319,3 +331,5 @@ export type InsertCanvasElement = z.infer<typeof insertCanvasElementSchema>;
 export type PlanningBoard = typeof planningBoards.$inferSelect;
 export type InsertPlanningBoard = z.infer<typeof insertPlanningBoardSchema>;
 export type InsertCalendarEvent = z.infer<typeof insertCalendarEventSchema>;
+export type ActivityLog = typeof activityLog.$inferSelect;
+export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;

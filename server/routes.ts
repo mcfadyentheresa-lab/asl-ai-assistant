@@ -277,6 +277,7 @@ export async function registerRoutes(
     const project = await storage.getProject(projectId);
     if (project) {
       notifyMilestoneCreated(project.name, input.title, project.clientId).catch(() => {});
+      storage.createActivityLog({ projectId, userId: (req as any).user?.claims?.sub, type: "milestone_created", title: `Milestone added: ${input.title}` }).catch(() => {});
     }
   });
 
@@ -296,6 +297,7 @@ export async function registerRoutes(
     const project = await storage.getProject(projectId);
     if (project) {
       notifyPhotoUploaded(project.name, project.clientId, userId).catch(() => {});
+      storage.createActivityLog({ projectId, userId, type: "photo_uploaded", title: "Photo uploaded", description: input.caption || undefined }).catch(() => {});
     }
   });
 
@@ -342,6 +344,7 @@ export async function registerRoutes(
         const project = await storage.getProject(projectId);
         if (project) {
           notifyDocumentUploaded(project.name, title, project.clientId, userId).catch(() => {});
+          storage.createActivityLog({ projectId, userId, type: "document_uploaded", title: `Document uploaded: ${title}` }).catch(() => {});
         }
       } catch (error) {
         res.status(500).json({ message: "Failed to save document" });
@@ -380,6 +383,7 @@ export async function registerRoutes(
       const sender = await authStorage.getUser(userId);
       const senderName = sender ? `${sender.firstName || ""} ${sender.lastName || ""}`.trim() || "Someone" : "Someone";
       notifyNewMessage(project.id, project.name, senderName, input.content, userId, project.clientId).catch(() => {});
+      storage.createActivityLog({ projectId: project.id, userId, type: "message_sent", title: `Message from ${senderName}`, description: input.content.slice(0, 100) }).catch(() => {});
     }
   });
 
@@ -655,13 +659,8 @@ export async function registerRoutes(
 
     const project = await storage.getProject(projectId);
     if (project) {
-      notifyCalendarEventCreated(
-        project.name,
-        input.title,
-        input.date || "TBD",
-        project.clientId,
-        userId
-      ).catch(() => {});
+      notifyCalendarEventCreated(project.name, input.title, input.date || "TBD", project.clientId, userId).catch(() => {});
+      storage.createActivityLog({ projectId, userId, type: "calendar_event_created", title: `Event added: ${input.title}`, description: input.date || undefined }).catch(() => {});
     }
   });
 
@@ -829,11 +828,26 @@ export async function registerRoutes(
         project.clientId,
         userId
       );
+
+      await storage.createActivityLog({
+        projectId: Number(req.params.projectId),
+        userId,
+        type: "notification_sent",
+        title: "Team notification sent",
+        description: message.trim(),
+      });
+
       res.json({ message: `Notification sent to ${result.sent} team member(s)`, ...result });
     } catch (error: any) {
       console.error("Notify team error:", error);
       res.status(500).json({ message: error.message || "Failed to send notification" });
     }
+  });
+
+  // Activity Log
+  app.get("/api/projects/:projectId/activity", isAuthenticated, async (req, res) => {
+    const entries = await storage.getActivityLog(Number(req.params.projectId), 30);
+    res.json(entries);
   });
 
   // Initialize seed data

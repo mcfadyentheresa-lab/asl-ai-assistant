@@ -546,6 +546,18 @@ export function useSavePlanningBoardCanvas() {
   });
 }
 
+// --- Activity Log ---
+export function useActivityLog(projectId: number) {
+  return useQuery({
+    queryKey: ['/api/projects', projectId, 'activity'],
+    queryFn: async () => {
+      const res = await fetch(`/api/projects/${projectId}/activity`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch activity log");
+      return res.json();
+    },
+  });
+}
+
 // --- Calendar Events ---
 export function useCalendarEvents(projectId: number) {
   return useQuery({
