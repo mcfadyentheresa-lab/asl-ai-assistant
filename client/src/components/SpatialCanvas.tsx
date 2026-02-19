@@ -6,7 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -15,6 +16,7 @@ import {
   X, ChevronDown, ExternalLink, Pencil, Upload, Copy, ArrowUpFromLine,
   Bold, Italic, Strikethrough, Underline, List, ListOrdered, Code, Link as LinkIcon,
   Eraser, Undo2, Redo2, Save, PenTool, Sparkles, TypeIcon, Shapes,
+  CalendarDays, Milestone, ListChecks,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { usePlanningBoards, useCreatePlanningBoard, useDeletePlanningBoard, useUpdatePlanningBoard, useUploadImage, useUsers, useProjects, useMilestones, useChecklistItems, useCalendarEvents } from "@/hooks/use-projects";
@@ -60,6 +62,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showNewBoardDialog, setShowNewBoardDialog] = useState(false);
   const [showLinkDialog, setShowLinkDialog] = useState(false);
+  const [linkDetailSheet, setLinkDetailSheet] = useState<{ type: "calendar" | "milestone" | "checklist"; id: number } | null>(null);
   const [renameName, setRenameName] = useState("");
   const [newBoardName, setNewBoardName] = useState("");
 
@@ -1695,6 +1698,48 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             })}
           </div>
         )}
+        {selectedBoard?.linkedCalendarEventId && (() => {
+          const ev = calendarEvents.find((e: any) => e.id === selectedBoard.linkedCalendarEventId);
+          return ev ? (
+            <Badge
+              variant="outline"
+              className="text-[10px] cursor-pointer gap-1"
+              onClick={() => setLinkDetailSheet({ type: "calendar", id: ev.id })}
+              data-testid="badge-linked-calendar"
+            >
+              <CalendarDays className="h-3 w-3" />
+              {ev.title}
+            </Badge>
+          ) : null;
+        })()}
+        {selectedBoard?.linkedMilestoneId && (() => {
+          const ms = milestones.find((m: any) => m.id === selectedBoard.linkedMilestoneId);
+          return ms ? (
+            <Badge
+              variant="outline"
+              className="text-[10px] cursor-pointer gap-1"
+              onClick={() => setLinkDetailSheet({ type: "milestone", id: ms.id })}
+              data-testid="badge-linked-milestone"
+            >
+              <Milestone className="h-3 w-3" />
+              {ms.title}
+            </Badge>
+          ) : null;
+        })()}
+        {selectedBoard?.linkedChecklistItemId && (() => {
+          const cl = checklistItems.find((c: any) => c.id === selectedBoard.linkedChecklistItemId);
+          return cl ? (
+            <Badge
+              variant="outline"
+              className="text-[10px] cursor-pointer gap-1"
+              onClick={() => setLinkDetailSheet({ type: "checklist", id: cl.id })}
+              data-testid="badge-linked-checklist"
+            >
+              <ListChecks className="h-3 w-3" />
+              {cl.title}
+            </Badge>
+          ) : null;
+        })()}
         <div className="flex-1" />
         <div className="flex items-center gap-1">
           <Tooltip>
@@ -2297,6 +2342,116 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Sheet open={!!linkDetailSheet} onOpenChange={(open) => { if (!open) setLinkDetailSheet(null); }}>
+        <SheetContent className="sm:max-w-md" data-testid="sheet-link-detail">
+          <SheetHeader>
+            <SheetTitle className="font-serif flex items-center gap-2">
+              {linkDetailSheet?.type === "calendar" && <CalendarDays className="h-5 w-5 text-muted-foreground" />}
+              {linkDetailSheet?.type === "milestone" && <Milestone className="h-5 w-5 text-muted-foreground" />}
+              {linkDetailSheet?.type === "checklist" && <ListChecks className="h-5 w-5 text-muted-foreground" />}
+              {linkDetailSheet?.type === "calendar" ? "Calendar Event" : linkDetailSheet?.type === "milestone" ? "Milestone" : "Checklist Item"}
+            </SheetTitle>
+            <SheetDescription>Linked item details</SheetDescription>
+          </SheetHeader>
+          <div className="mt-6 space-y-4">
+            {linkDetailSheet?.type === "calendar" && (() => {
+              const ev = calendarEvents.find((e: any) => e.id === linkDetailSheet.id);
+              if (!ev) return <p className="text-sm text-muted-foreground">Event not found</p>;
+              return (
+                <div className="space-y-4" data-testid="detail-calendar-event">
+                  <div>
+                    <label className="text-xs text-muted-foreground">Title</label>
+                    <p className="text-sm font-medium" data-testid="detail-event-title">{ev.title}</p>
+                  </div>
+                  {ev.description && (
+                    <div>
+                      <label className="text-xs text-muted-foreground">Description</label>
+                      <p className="text-sm" data-testid="detail-event-description">{ev.description}</p>
+                    </div>
+                  )}
+                  <div className="flex gap-6">
+                    <div>
+                      <label className="text-xs text-muted-foreground">Date</label>
+                      <p className="text-sm font-medium" data-testid="detail-event-date">{ev.date}</p>
+                    </div>
+                    {ev.endDate && (
+                      <div>
+                        <label className="text-xs text-muted-foreground">End Date</label>
+                        <p className="text-sm font-medium" data-testid="detail-event-end-date">{ev.endDate}</p>
+                      </div>
+                    )}
+                  </div>
+                  {ev.type && (
+                    <div>
+                      <label className="text-xs text-muted-foreground">Type</label>
+                      <Badge variant="outline" className="mt-1" data-testid="detail-event-type">{ev.type}</Badge>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+            {linkDetailSheet?.type === "milestone" && (() => {
+              const ms = milestones.find((m: any) => m.id === linkDetailSheet.id);
+              if (!ms) return <p className="text-sm text-muted-foreground">Milestone not found</p>;
+              return (
+                <div className="space-y-4" data-testid="detail-milestone">
+                  <div>
+                    <label className="text-xs text-muted-foreground">Title</label>
+                    <p className="text-sm font-medium" data-testid="detail-milestone-title">{ms.title}</p>
+                  </div>
+                  {ms.date && (
+                    <div>
+                      <label className="text-xs text-muted-foreground">Date</label>
+                      <p className="text-sm font-medium" data-testid="detail-milestone-date">{ms.date}</p>
+                    </div>
+                  )}
+                  <div>
+                    <label className="text-xs text-muted-foreground">Status</label>
+                    <Badge variant="outline" className="mt-1" data-testid="detail-milestone-status">{ms.completed ? "Completed" : "Pending"}</Badge>
+                  </div>
+                </div>
+              );
+            })()}
+            {linkDetailSheet?.type === "checklist" && (() => {
+              const cl = checklistItems.find((c: any) => c.id === linkDetailSheet.id);
+              if (!cl) return <p className="text-sm text-muted-foreground">Checklist item not found</p>;
+              return (
+                <div className="space-y-4" data-testid="detail-checklist">
+                  <div>
+                    <label className="text-xs text-muted-foreground">Title</label>
+                    <p className="text-sm font-medium" data-testid="detail-checklist-title">{cl.title}</p>
+                  </div>
+                  {cl.notes && (
+                    <div>
+                      <label className="text-xs text-muted-foreground">Notes</label>
+                      <p className="text-sm" data-testid="detail-checklist-notes">{cl.notes}</p>
+                    </div>
+                  )}
+                  <div className="flex gap-6">
+                    <div>
+                      <label className="text-xs text-muted-foreground">Status</label>
+                      <Badge variant="outline" className="mt-1" data-testid="detail-checklist-status">{cl.completed ? "Completed" : "Pending"}</Badge>
+                    </div>
+                    {cl.priority && (
+                      <div>
+                        <label className="text-xs text-muted-foreground">Priority</label>
+                        <Badge variant="outline" className="mt-1" data-testid="detail-checklist-priority">{cl.priority}</Badge>
+                      </div>
+                    )}
+                  </div>
+                  {cl.group && (
+                    <div>
+                      <label className="text-xs text-muted-foreground">Group</label>
+                      <p className="text-sm" data-testid="detail-checklist-group">{cl.group}</p>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
