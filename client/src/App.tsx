@@ -10,6 +10,7 @@ import { Loader2 } from "lucide-react";
 import LandingPage from "@/pages/LandingPage";
 import Dashboard from "@/pages/Dashboard";
 import ProjectDetails from "@/pages/ProjectDetails";
+import Profile from "@/pages/Profile";
 import NotFound from "@/pages/not-found";
 
 function PresenceTracker() {
@@ -40,8 +41,8 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
+      <Route path="/profile" component={Profile} />
       <Route path="/project/:id" component={ProjectDetails} />
-      {/* Add more protected routes here */}
       <Route component={NotFound} />
     </Switch>
   );

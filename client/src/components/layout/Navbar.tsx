@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
-import { LogOut, UserCog, Eye, EyeOff } from "lucide-react";
+import { LogOut, UserCog, Eye, EyeOff, User } from "lucide-react";
 import { Link } from "wouter";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useOnlineUsers, useVisibilityToggle } from "@/hooks/use-presence";
@@ -125,6 +125,12 @@ export function Navbar() {
               </p>
             </div>
             <DropdownMenuSeparator />
+            <Link href="/profile">
+              <DropdownMenuItem data-testid="link-profile">
+                <User className="mr-2 h-4 w-4" />
+                Your Profile
+              </DropdownMenuItem>
+            </Link>
             <DropdownMenuItem onClick={toggleVisibility} data-testid="button-toggle-visibility">
               {visible ? <Eye className="mr-2 h-4 w-4" /> : <EyeOff className="mr-2 h-4 w-4" />}
               {visible ? "Appear Offline" : "Go Online"}

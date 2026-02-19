@@ -152,6 +152,58 @@ export async function registerRoutes(
     }
   });
 
+  const profileUpdateSchema = z.object({
+    firstName: z.string().min(1).max(100).optional(),
+    lastName: z.string().min(1).max(100).optional(),
+    email: z.string().email().max(255).optional(),
+    phone: z.string().max(30).nullable().optional(),
+  });
+
+  app.patch("/api/auth/profile", isAuthenticated, async (req: any, res) => {
+    try {
+      const parsed = profileUpdateSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid input", errors: parsed.error.flatten().fieldErrors });
+      }
+      const userId = req.user.claims.sub;
+      const user = await authStorage.updateUserProfile(userId, parsed.data);
+      if (!user) return res.status(404).json({ message: "User not found" });
+      res.json(user);
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      res.status(500).json({ message: "Failed to update profile" });
+    }
+  });
+
+  app.patch("/api/auth/profile-photo", isAuthenticated, (req: any, res) => {
+    imageUpload.single("image")(req, res, async (err: any) => {
+      if (err) {
+        const message = err instanceof multer.MulterError
+          ? (err.code === "LIMIT_FILE_SIZE" ? "File too large (max 10MB)" : err.message)
+          : err.message || "Upload failed";
+        return res.status(400).json({ message });
+      }
+      if (!req.file) return res.status(400).json({ message: "No image file provided" });
+      const url = `/uploads/${req.file.filename}`;
+      try {
+        const userId = req.user.claims.sub;
+        const { db } = await import("./db");
+        const { users } = await import("@shared/models/auth");
+        const { eq } = await import("drizzle-orm");
+        const [updated] = await db
+          .update(users)
+          .set({ profileImageUrl: url, updatedAt: new Date() })
+          .where(eq(users.id, userId))
+          .returning();
+        if (!updated) return res.status(404).json({ message: "User not found" });
+        res.json(updated);
+      } catch (error) {
+        console.error("Error updating profile photo:", error);
+        res.status(500).json({ message: "Failed to update profile photo" });
+      }
+    });
+  });
+
   app.patch("/api/users/:id/phone", isAuthenticated, async (req: any, res) => {
     try {
       const requesterId = req.user.claims.sub;
