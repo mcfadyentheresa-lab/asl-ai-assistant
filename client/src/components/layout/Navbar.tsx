@@ -10,13 +10,17 @@ import {
   DropdownMenuTrigger,
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
-import { LogOut, UserCog } from "lucide-react";
+import { LogOut, UserCog, Eye, EyeOff } from "lucide-react";
 import { Link } from "wouter";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useOnlineUsers, useVisibilityToggle } from "@/hooks/use-presence";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 export function Navbar() {
   const { user, logout } = useAuth();
   const queryClient = useQueryClient();
+  const { data: onlineUsers } = useOnlineUsers();
+  const { visible, toggleVisibility } = useVisibilityToggle();
 
   const switchRole = useMutation({
     mutationFn: async (role: string) => {
@@ -54,6 +58,27 @@ export function Navbar() {
       </Link>
 
       <div className="flex items-center gap-3">
+        {onlineUsers && onlineUsers.length > 0 && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex items-center gap-1.5" data-testid="indicator-online-users">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+                </span>
+                <span className="text-xs text-muted-foreground">{onlineUsers.length} online</span>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="max-w-xs">
+              <p className="text-xs font-medium mb-1">Currently online:</p>
+              {onlineUsers.map((u) => (
+                <p key={u.userId} className="text-xs">
+                  {u.firstName || ""} {u.lastName || ""} <span className="text-muted-foreground">({u.role})</span>
+                </p>
+              ))}
+            </TooltipContent>
+          </Tooltip>
+        )}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm" data-testid="button-role-switch">
@@ -100,6 +125,10 @@ export function Navbar() {
               </p>
             </div>
             <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={toggleVisibility} data-testid="button-toggle-visibility">
+              {visible ? <Eye className="mr-2 h-4 w-4" /> : <EyeOff className="mr-2 h-4 w-4" />}
+              {visible ? "Appear Offline" : "Go Online"}
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => logout()} data-testid="button-logout">
               <LogOut className="mr-2" />
               Sign Out

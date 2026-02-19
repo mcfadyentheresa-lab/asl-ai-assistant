@@ -165,6 +165,34 @@ export async function notifyDocumentUploaded(
   );
 }
 
+export async function notifyCalendarEventCreated(
+  projectName: string,
+  eventTitle: string,
+  eventDate: string,
+  projectClientId: string | null,
+  createdByUserId: string
+) {
+  const recipients = await getProjectParticipants(projectClientId, createdByUserId);
+  const body = `Aster & Spruce: New event on "${projectName}": ${eventTitle} (${eventDate})`;
+  await Promise.allSettled(
+    recipients.map((u) => sendSms(u.phone!, body))
+  );
+}
+
+export async function notifyCalendarEventChanged(
+  projectName: string,
+  eventTitle: string,
+  changeDescription: string,
+  projectClientId: string | null,
+  changedByUserId: string
+) {
+  const recipients = await getProjectParticipants(projectClientId, changedByUserId);
+  const body = `Aster & Spruce: Schedule change on "${projectName}": ${eventTitle} — ${changeDescription}`;
+  await Promise.allSettled(
+    recipients.map((u) => sendSms(u.phone!, body))
+  );
+}
+
 export async function sendTestSms(toPhone: string): Promise<boolean> {
   return sendSms(
     toPhone,

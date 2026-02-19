@@ -18,8 +18,11 @@ import {
   notifyMilestoneCreated,
   notifyPhotoUploaded,
   notifyDocumentUploaded,
+  notifyCalendarEventCreated,
+  notifyCalendarEventChanged,
   sendTestSms,
 } from "./sms";
+import { heartbeat, getOnlineUsers, setVisibility, getVisibility } from "./presence";
 
 const uploadDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadDir)) {
@@ -641,19 +644,45 @@ export async function registerRoutes(
   app.post(api.calendar.create.path, isAuthenticated, async (req: any, res) => {
     const input = api.calendar.create.input.parse(req.body);
     const userId = req.user.claims.sub;
+    const projectId = Number(req.params.projectId);
     const event = await storage.createCalendarEvent({
       ...input,
-      projectId: Number(req.params.projectId),
+      projectId,
       createdBy: userId,
     });
     res.status(201).json(event);
+
+    const project = await storage.getProject(projectId);
+    if (project) {
+      notifyCalendarEventCreated(
+        project.name,
+        input.title,
+        input.date || "TBD",
+        project.clientId,
+        userId
+      ).catch(() => {});
+    }
   });
 
-  app.put("/api/calendar/:id", isAuthenticated, async (req, res) => {
+  app.put("/api/calendar/:id", isAuthenticated, async (req: any, res) => {
     const input = api.calendar.update.input.parse(req.body);
     const event = await storage.updateCalendarEvent(Number(req.params.id), input);
     if (!event) return res.status(404).json({ message: "Calendar event not found" });
     res.json(event);
+
+    const userId = req.user?.claims?.sub;
+    if (event.projectId && userId) {
+      const project = await storage.getProject(event.projectId);
+      if (project) {
+        notifyCalendarEventChanged(
+          project.name,
+          input.title || event.title,
+          "Date or details updated",
+          project.clientId,
+          userId
+        ).catch(() => {});
+      }
+    }
   });
 
   app.delete("/api/calendar/:id", isAuthenticated, async (req, res) => {
@@ -726,6 +755,31 @@ export async function registerRoutes(
       console.error("Handwriting recognition error:", error);
       res.status(500).json({ error: "Failed to recognize handwriting" });
     }
+  });
+
+  app.post("/api/presence/heartbeat", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const dbUser = await authStorage.getUser(userId);
+    if (dbUser) {
+      heartbeat(userId, dbUser.firstName, dbUser.lastName, dbUser.role, dbUser.profileImageUrl);
+    }
+    res.json({ ok: true });
+  });
+
+  app.get("/api/presence/online", isAuthenticated, async (_req: any, res) => {
+    res.json(getOnlineUsers());
+  });
+
+  app.post("/api/presence/visibility", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const { visible } = req.body;
+    setVisibility(userId, !!visible);
+    res.json({ visible: getVisibility(userId) });
+  });
+
+  app.get("/api/presence/visibility", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    res.json({ visible: getVisibility(userId) });
   });
 
   app.post("/api/sms/test", isAuthenticated, async (req: any, res) => {

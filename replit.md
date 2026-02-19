@@ -131,6 +131,8 @@ Path aliases are configured:
 - **Milestone created** — All project participants notified
 - **Photo uploaded** — All project participants (except uploader) notified
 - **Document uploaded** — All project participants (except uploader) notified
+- **Calendar event created** — All project participants (except creator) notified
+- **Calendar event updated** — All project participants (except updater) notified
 
 ### Admin Features
 - **Test SMS** button in Project Access card sends a test message to the admin's phone
@@ -140,3 +142,26 @@ Path aliases are configured:
 - Twilio number (+14474274045) should be registered for A2P 10DLC to reduce spam flagging
 - Register at Twilio Console > Messaging > Compliance
 - Clients (Island, Hangar) prefer text messages over email
+
+## Online Presence System
+
+### Implementation (`server/presence.ts`)
+- In-memory Map tracks active users with heartbeat timestamps
+- Users are considered online if heartbeat received within last 60 seconds
+- Client polls heartbeat every 15 seconds, online list every 15 seconds
+- Visibility toggle allows users to appear offline (in-memory state)
+
+### API Endpoints
+- `POST /api/presence/heartbeat` — Update user's last-seen timestamp
+- `GET /api/presence/online` — Get list of currently online users
+- `POST /api/presence/visibility` — Toggle user's online visibility
+- `GET /api/presence/visibility` — Get user's current visibility setting
+
+### Frontend Integration
+- **Navbar**: Green pulsing dot with online user count; tooltip shows names and roles
+- **User dropdown menu**: "Appear Offline" / "Go Online" toggle
+- **Project Access card**: Green dots on avatars of online team members
+- Hook: `client/src/hooks/use-presence.ts` provides `useOnlineUsers`, `useVisibilityToggle`, `isUserOnline`
+
+### Future Enhancement
+- Calendar-based deadline reminders (scheduled job to notify users before upcoming deadlines) still pending

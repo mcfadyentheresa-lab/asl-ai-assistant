@@ -8,6 +8,7 @@ import {
   usePhotos, useCreatePhoto, useDeletePhoto, useUploadImage,
   useUsers, useUpdateProject, usePlanningBoards, useUpdateUserPhone, useSendTestSms,
 } from "@/hooks/use-projects";
+import { useOnlineUsers, isUserOnline } from "@/hooks/use-presence";
 import { Navbar } from "@/components/layout/Navbar";
 import SpatialCanvas from "@/components/SpatialCanvas";
 import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, ExternalLink, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, CalendarDays, ChevronLeft, Upload, Download, User, X, Paperclip, ZoomIn, Palette, Shield, Users, Phone, Check } from "lucide-react";
@@ -52,6 +53,7 @@ export default function ProjectDetails() {
   const { mutate: updateProject } = useUpdateProject();
   const { mutate: updatePhone } = useUpdateUserPhone();
   const { mutate: sendTestSms, isPending: sendingTestSms } = useSendTestSms();
+  const { data: onlineUsers } = useOnlineUsers();
   const { toast } = useToast();
 
   const [activeTab, setActiveTab] = useState("overview");
@@ -280,11 +282,19 @@ export default function ProjectDetails() {
                   const renderUserRow = (u: any, badge?: string) => (
                     <div key={u.id} className="space-y-1" data-testid={`access-user-${u.id}`}>
                       <div className="flex items-center gap-2">
-                        <Avatar className="h-6 w-6">
-                          <AvatarFallback className="text-[10px]">
-                            {(u.firstName?.[0] || "").toUpperCase()}{(u.lastName?.[0] || "").toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
+                        <div className="relative flex-shrink-0">
+                          <Avatar className="h-6 w-6">
+                            <AvatarFallback className="text-[10px]">
+                              {(u.firstName?.[0] || "").toUpperCase()}{(u.lastName?.[0] || "").toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          {isUserOnline(onlineUsers, u.id) && (
+                            <span
+                              className="absolute -bottom-0.5 -right-0.5 block h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-background"
+                              data-testid={`indicator-online-${u.id}`}
+                            />
+                          )}
+                        </div>
                         <div className="min-w-0 flex-1">
                           <span className="text-sm truncate block">{u.firstName} {u.lastName}</span>
                           {editingPhoneUserId === u.id ? (
