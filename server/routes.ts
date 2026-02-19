@@ -257,6 +257,44 @@ export async function registerRoutes(
     }
   });
 
+  const createUserSchema = z.object({
+    firstName: z.string().min(1).max(100),
+    lastName: z.string().min(1).max(100),
+    email: z.string().email().max(255),
+    phone: z.string().max(30).nullable().optional(),
+    role: z.enum(["admin", "crew", "client"]),
+  });
+
+  app.post("/api/users", isAuthenticated, async (req: any, res) => {
+    try {
+      const requesterId = req.user.claims.sub;
+      const requester = await authStorage.getUser(requesterId);
+      if (requester?.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can add team members" });
+      }
+      const parsed = createUserSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid input", errors: parsed.error.flatten().fieldErrors });
+      }
+      const id = `manual-${randomUUID().slice(0, 8)}`;
+      const user = await authStorage.upsertUser({
+        id,
+        email: parsed.data.email,
+        firstName: parsed.data.firstName,
+        lastName: parsed.data.lastName,
+        phone: parsed.data.phone || null,
+        role: parsed.data.role,
+      });
+      res.status(201).json(user);
+    } catch (error: any) {
+      console.error("Error creating user:", error);
+      if (error.code === '23505') {
+        return res.status(409).json({ message: "A user with that email already exists" });
+      }
+      res.status(500).json({ message: "Failed to create user" });
+    }
+  });
+
   app.post("/api/users/:id/archive", isAuthenticated, async (req: any, res) => {
     try {
       const requesterId = req.user.claims.sub;

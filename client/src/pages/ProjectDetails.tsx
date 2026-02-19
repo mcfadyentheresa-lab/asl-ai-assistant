@@ -71,6 +71,9 @@ export default function ProjectDetails() {
   const [profileForm, setProfileForm] = useState({ firstName: "", lastName: "", email: "", phone: "", role: "" });
   const [confirmDeleteUser, setConfirmDeleteUser] = useState(false);
   const [deletingUser, setDeletingUser] = useState(false);
+  const [showAddPerson, setShowAddPerson] = useState(false);
+  const [addPersonForm, setAddPersonForm] = useState({ firstName: "", lastName: "", email: "", phone: "", role: "crew" });
+  const [addingPerson, setAddingPerson] = useState(false);
   const { data: planningBoards } = usePlanningBoards(projectId);
   const assignedClient = users?.find((u) => u.id === project?.clientId);
 
@@ -390,6 +393,22 @@ export default function ProjectDetails() {
                             )}
                           </div>
                         </div>
+                        {userRole === "admin" && (
+                          <div className="pt-2 border-t">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              data-testid="button-add-person"
+                              onClick={() => {
+                                setShowAddPerson(true);
+                                setAddPersonForm({ firstName: "", lastName: "", email: "", phone: "", role: "crew" });
+                              }}
+                            >
+                              <Plus className="h-3 w-3 mr-1" />
+                              Add Person
+                            </Button>
+                          </div>
+                        )}
                         {(userRole === "admin" || userRole === "crew") && (
                           <div className="pt-2 border-t space-y-2">
                             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">SMS Notifications</p>
@@ -643,6 +662,105 @@ export default function ProjectDetails() {
           </TabsContent>
         </Tabs>
       </main>
+
+      <Dialog open={showAddPerson} onOpenChange={(open) => { if (!open) setShowAddPerson(false); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-serif">Add New Person</DialogTitle>
+            <DialogDescription>Add a team member, crew, or client.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">First Name</label>
+                <Input
+                  value={addPersonForm.firstName}
+                  onChange={(e) => setAddPersonForm({ ...addPersonForm, firstName: e.target.value })}
+                  placeholder="First name"
+                  data-testid="input-add-firstname"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Last Name</label>
+                <Input
+                  value={addPersonForm.lastName}
+                  onChange={(e) => setAddPersonForm({ ...addPersonForm, lastName: e.target.value })}
+                  placeholder="Last name"
+                  data-testid="input-add-lastname"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Email</label>
+              <Input
+                value={addPersonForm.email}
+                onChange={(e) => setAddPersonForm({ ...addPersonForm, email: e.target.value })}
+                placeholder="email@example.com"
+                data-testid="input-add-email"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Phone</label>
+              <Input
+                value={addPersonForm.phone}
+                onChange={(e) => setAddPersonForm({ ...addPersonForm, phone: e.target.value })}
+                placeholder="(705) 555-0123"
+                data-testid="input-add-phone"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Role</label>
+              <Select value={addPersonForm.role} onValueChange={(v) => setAddPersonForm({ ...addPersonForm, role: v })}>
+                <SelectTrigger data-testid="select-add-role">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="crew">Crew</SelectItem>
+                  <SelectItem value="client">Client</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="ghost" onClick={() => setShowAddPerson(false)} data-testid="button-cancel-add-person">Cancel</Button>
+              <Button
+                disabled={addingPerson || !addPersonForm.firstName || !addPersonForm.lastName || !addPersonForm.email}
+                data-testid="button-save-add-person"
+                onClick={async () => {
+                  setAddingPerson(true);
+                  try {
+                    const res = await fetch("/api/users", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      credentials: "include",
+                      body: JSON.stringify({
+                        firstName: addPersonForm.firstName,
+                        lastName: addPersonForm.lastName,
+                        email: addPersonForm.email,
+                        phone: addPersonForm.phone || null,
+                        role: addPersonForm.role,
+                      }),
+                    });
+                    if (!res.ok) {
+                      const data = await res.json();
+                      throw new Error(data.message || "Failed to add person");
+                    }
+                    toast({ title: "Person added", description: `${addPersonForm.firstName} ${addPersonForm.lastName} has been added` });
+                    setShowAddPerson(false);
+                    queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+                  } catch (err: any) {
+                    toast({ title: "Error", description: err.message, variant: "destructive" });
+                  } finally {
+                    setAddingPerson(false);
+                  }
+                }}
+              >
+                {addingPerson ? <Loader2 className="h-4 w-4 animate-spin" /> : "Add Person"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!editingUser} onOpenChange={(open) => { if (!open) { setEditingUser(null); setConfirmDeleteUser(false); } }}>
         <DialogContent className="sm:max-w-md">
