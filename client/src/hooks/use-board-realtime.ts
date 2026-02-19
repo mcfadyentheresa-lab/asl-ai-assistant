@@ -92,9 +92,30 @@ export function useBoardRealtime(
     }));
   }, []);
 
+  const lastPongRef = useRef<number>(Date.now());
+  const pingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const connectRef = useRef<() => void>(() => {});
+
+  const forceReconnect = useCallback(() => {
+    if (wsRef.current) {
+      wsRef.current.onclose = null;
+      wsRef.current.onerror = null;
+      try { wsRef.current.close(); } catch {}
+      wsRef.current = null;
+    }
+    isConnectedRef.current = false;
+    connectRef.current();
+  }, []);
+
   const connect = useCallback(() => {
     if (!boardId || !user) return;
-    if (wsRef.current?.readyState === WebSocket.OPEN) return;
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) return;
+    if (wsRef.current && wsRef.current.readyState === WebSocket.CONNECTING) return;
+
+    if (wsRef.current) {
+      try { wsRef.current.close(); } catch {}
+      wsRef.current = null;
+    }
 
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
@@ -102,6 +123,7 @@ export function useBoardRealtime(
 
     ws.onopen = () => {
       isConnectedRef.current = true;
+      lastPongRef.current = Date.now();
       ws.send(JSON.stringify({
         type: "join",
         boardId,
@@ -111,11 +133,25 @@ export function useBoardRealtime(
         role: user.role || "",
         profileImageUrl: user.profileImageUrl || null,
       }));
+      fetch(`/api/planning-boards/${boardId}/elements`)
+        .then((r) => r.json())
+        .then((els: CanvasElement[]) => {
+          if (Array.isArray(els)) {
+            useCanvasStore.getState().setElements(els);
+          }
+        })
+        .catch(() => {});
     };
 
     ws.onmessage = (event) => {
       try {
         const msg = JSON.parse(event.data);
+
+        if (msg.type === "pong") {
+          lastPongRef.current = Date.now();
+          return;
+        }
+
         const store = useCanvasStore.getState();
         const srcName = msg.sourceFirstName || "";
         const srcLast = msg.sourceLastName || "";
@@ -212,12 +248,54 @@ export function useBoardRealtime(
     };
   }, [boardId, user, trackEdit]);
 
+  connectRef.current = connect;
+
   useEffect(() => {
     connect();
-    return () => {
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
+
+    if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
+    pingIntervalRef.current = setInterval(() => {
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({ type: "ping" }));
+        if (Date.now() - lastPongRef.current > 15000) {
+          forceReconnect();
+        }
+      } else if (!wsRef.current || wsRef.current.readyState === WebSocket.CLOSED) {
+        connect();
       }
+    }, 5000);
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+          connect();
+        } else {
+          wsRef.current.send(JSON.stringify({ type: "ping" }));
+          setTimeout(() => {
+            if (Date.now() - lastPongRef.current > 6000) {
+              forceReconnect();
+            }
+          }, 2000);
+        }
+      }
+    };
+
+    const handleOnline = () => {
+      if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+        connect();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("focus", handleVisibility);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("focus", handleVisibility);
+      if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
+      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
       if (wsRef.current) {
         if (wsRef.current.readyState === WebSocket.OPEN) {
           wsRef.current.send(JSON.stringify({ type: "leave" }));
@@ -230,7 +308,7 @@ export function useBoardRealtime(
       setCursors({});
       setActiveEdits({});
     };
-  }, [connect]);
+  }, [connect, forceReconnect]);
 
   const sendElementAdd = useCallback((element: CanvasElement) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {

@@ -611,10 +611,10 @@ export default function ProjectDetails() {
   };
 
   return (
-    <div className={`min-h-screen bg-background ${safeActiveTab === "board" ? "h-[100dvh] overflow-hidden" : "pb-20"}`}>
+    <div className={`min-h-screen bg-background ${safeActiveTab === "board" ? "h-[100dvh] flex flex-col overflow-hidden" : "pb-20"}`}>
       <Navbar />
 
-      <div className={`relative w-full overflow-hidden ${safeActiveTab === "board" ? "h-20 landscape:h-10" : "h-56 md:h-72"}`} data-testid="project-hero">
+      <div className={`relative w-full overflow-hidden shrink-0 ${safeActiveTab === "board" ? "h-20 landscape:h-0" : "h-56 md:h-72"}`} data-testid="project-hero">
         {project.thumbnailUrl ? (
           <img
             src={project.thumbnailUrl}
@@ -647,7 +647,7 @@ export default function ProjectDetails() {
         </div>
       </div>
 
-      <main className={`container px-6 md:px-10 ${safeActiveTab === "board" ? "mt-1 flex flex-col board-main-height" : "mt-8"}`} id="project-main">
+      <main className={`container px-6 md:px-10 ${safeActiveTab === "board" ? "mt-1 flex flex-col flex-1 min-h-0" : "mt-8"}`} id="project-main">
         <Tabs value={safeActiveTab} onValueChange={setActiveTab} className={safeActiveTab === "board" ? "space-y-2 flex flex-col flex-1 min-h-0" : "space-y-8"}>
           <div className={`overflow-x-auto -mx-6 px-6 md:mx-0 md:px-0 ${safeActiveTab === "board" ? "landscape:hidden" : ""}`}>
             <TabsList className="w-max md:w-auto" data-testid="tabs-list">

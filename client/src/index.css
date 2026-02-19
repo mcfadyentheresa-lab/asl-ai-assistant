@@ -245,12 +245,3 @@
 ::-webkit-scrollbar-thumb:hover {
   @apply bg-muted-foreground/40;
 }
-
-.board-main-height {
-  height: calc(100dvh - 10rem);
-}
-@media (orientation: landscape) and (max-height: 500px) {
-  .board-main-height {
-    height: calc(100dvh - 5rem);
-  }
-}

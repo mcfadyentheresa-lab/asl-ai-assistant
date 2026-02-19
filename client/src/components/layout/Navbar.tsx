@@ -48,7 +48,7 @@ export function Navbar() {
 
   return (
     <nav
-      className="sticky top-0 z-50 flex items-center justify-between gap-4 px-6 md:px-10 h-16 landscape:h-10 border-b border-border/60 bg-background/80 backdrop-blur-md"
+      className="sticky top-0 z-50 flex items-center justify-between gap-4 px-6 md:px-10 h-16 landscape:h-10 shrink-0 border-b border-border/60 bg-background/80 backdrop-blur-md"
       data-testid="navbar"
     >
       <Link href="/" data-testid="link-home">

@@ -144,6 +144,13 @@ export function setupWebSocket(server: Server) {
             break;
           }
 
+          case "ping": {
+            if (ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({ type: "pong" }));
+            }
+            break;
+          }
+
           case "leave": {
             if (currentBoardId !== null) {
               removeFromRoom(ws, currentBoardId);
