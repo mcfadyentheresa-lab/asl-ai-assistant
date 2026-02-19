@@ -434,7 +434,7 @@ export function useCreatePlanningBoard() {
 export function useUpdatePlanningBoard() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, ...updates }: { id: number; name?: string; linkedMilestoneId?: number | null; linkedChecklistItemId?: number | null; linkedCalendarEventId?: number | null }) => {
+    mutationFn: async ({ id, ...updates }: { id: number; name?: string; linkedMilestoneId?: number | null; linkedChecklistItemId?: number | null; linkedCalendarEventId?: number | null; linkedUserIds?: string[]; linkedProjectIds?: number[] }) => {
       const url = buildUrl(api.planningBoards.update.path, { id });
       const res = await fetch(url, {
         method: "PATCH",

@@ -75,7 +75,12 @@ import {
   useMilestones,
   useChecklistItems,
   useCalendarEvents,
+  useUsers,
+  useProjects,
 } from "@/hooks/use-projects";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import type { PlanningBoard as PlanningBoardType } from "@shared/schema";
 
 type ToolMode = "select" | "draw" | "eraser" | "text" | "rect" | "circle" | "sticky";
@@ -157,6 +162,8 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
   const { data: milestones = [] } = useMilestones(projectId);
   const { data: checklistItems = [] } = useChecklistItems(projectId);
   const { data: calendarEvents = [] } = useCalendarEvents(projectId);
+  const { data: allUsers = [] } = useUsers();
+  const { data: allProjects = [] } = useProjects();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -1061,14 +1068,30 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
     }
   };
 
-  const handleLinkUpdate = async (field: string, value: number | null) => {
+  const handleLinkUpdate = async (field: string, value: number | null | string[] | number[]) => {
     if (!selectedBoardId) return;
     try {
-      await updateBoard({ id: selectedBoardId, [field]: value });
+      await updateBoard({ id: selectedBoardId, [field]: value } as any);
       toast({ title: "Updated", description: "Board link updated." });
     } catch {
       toast({ title: "Error", description: "Failed to update link.", variant: "destructive" });
     }
+  };
+
+  const toggleLinkedUser = (userId: string) => {
+    const current = currentBoard?.linkedUserIds || [];
+    const next = current.includes(userId)
+      ? current.filter((id: string) => id !== userId)
+      : [...current, userId];
+    handleLinkUpdate("linkedUserIds", next);
+  };
+
+  const toggleLinkedProject = (pid: number) => {
+    const current = currentBoard?.linkedProjectIds || [];
+    const next = current.includes(pid)
+      ? current.filter((id: number) => id !== pid)
+      : [...current, pid];
+    handleLinkUpdate("linkedProjectIds", next);
   };
 
   useEffect(() => {
@@ -1229,6 +1252,39 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
           <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-md" data-testid="badge-linked-event">
             Linked: {calendarEvents.find((e: any) => e.id === currentBoard.linkedCalendarEventId)?.title || "Event"}
           </span>
+        )}
+        {(currentBoard?.linkedUserIds?.length ?? 0) > 0 && (
+          <div className="flex items-center gap-1" data-testid="badges-linked-people">
+            <span className="text-xs text-muted-foreground mr-0.5">People:</span>
+            <div className="flex -space-x-1.5">
+              {currentBoard!.linkedUserIds!.slice(0, 4).map((uid: string) => {
+                const user = allUsers.find((u: any) => u.id === uid);
+                return (
+                  <Avatar key={uid} className="h-5 w-5 border border-background">
+                    <AvatarImage src={user?.profileImageUrl || undefined} />
+                    <AvatarFallback className="text-[8px]">
+                      {(user?.firstName?.[0] || "").toUpperCase()}{(user?.lastName?.[0] || "").toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                );
+              })}
+            </div>
+            {currentBoard!.linkedUserIds!.length > 4 && (
+              <span className="text-xs text-muted-foreground">+{currentBoard!.linkedUserIds!.length - 4}</span>
+            )}
+          </div>
+        )}
+        {(currentBoard?.linkedProjectIds?.length ?? 0) > 0 && (
+          <div className="flex items-center gap-1 flex-wrap" data-testid="badges-linked-projects">
+            {currentBoard!.linkedProjectIds!.map((pid: number) => {
+              const proj = allProjects.find((p: any) => p.id === pid);
+              return proj ? (
+                <Badge key={pid} variant="outline" className="text-[10px]" data-testid={`badge-project-${pid}`}>
+                  {proj.name}
+                </Badge>
+              ) : null;
+            })}
+          </div>
         )}
       </div>
 
@@ -1493,11 +1549,75 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
       </Dialog>
 
       <Dialog open={showLinkDialog} onOpenChange={setShowLinkDialog}>
-        <DialogContent>
+        <DialogContent className="max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Link Board To...</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium mb-2 block">People</label>
+              <div className="space-y-1 max-h-40 overflow-y-auto rounded border p-2" data-testid="link-people-list">
+                {allUsers.length === 0 && (
+                  <p className="text-xs text-muted-foreground">No team members found</p>
+                )}
+                {allUsers.map((u: any) => {
+                  const isLinked = (currentBoard?.linkedUserIds || []).includes(u.id);
+                  return (
+                    <label
+                      key={u.id}
+                      className="flex items-center gap-2 p-1.5 rounded hover-elevate cursor-pointer"
+                      data-testid={`link-person-${u.id}`}
+                    >
+                      <Checkbox
+                        checked={isLinked}
+                        onCheckedChange={() => toggleLinkedUser(u.id)}
+                        data-testid={`checkbox-person-${u.id}`}
+                      />
+                      <Avatar className="h-6 w-6">
+                        <AvatarImage src={u.profileImageUrl || undefined} />
+                        <AvatarFallback className="text-[10px]">
+                          {(u.firstName?.[0] || "").toUpperCase()}{(u.lastName?.[0] || "").toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="text-sm truncate">
+                        {u.firstName} {u.lastName}
+                      </span>
+                      <Badge variant="outline" className="ml-auto text-[10px]">{u.role}</Badge>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium mb-2 block">Projects</label>
+              <div className="space-y-1 max-h-40 overflow-y-auto rounded border p-2" data-testid="link-projects-list">
+                {allProjects.filter((p: any) => p.id !== projectId).length === 0 && (
+                  <p className="text-xs text-muted-foreground">No other projects available</p>
+                )}
+                {allProjects.filter((p: any) => p.id !== projectId).map((p: any) => {
+                  const isLinked = (currentBoard?.linkedProjectIds || []).includes(p.id);
+                  return (
+                    <label
+                      key={p.id}
+                      className="flex items-center gap-2 p-1.5 rounded hover-elevate cursor-pointer"
+                      data-testid={`link-project-${p.id}`}
+                    >
+                      <Checkbox
+                        checked={isLinked}
+                        onCheckedChange={() => toggleLinkedProject(p.id)}
+                        data-testid={`checkbox-project-${p.id}`}
+                      />
+                      <span className="text-sm truncate">{p.name}</span>
+                      <Badge variant="outline" className="ml-auto text-[10px]">{p.status}</Badge>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            <Separator />
+
             <div>
               <label className="text-sm font-medium mb-1 block">Milestone</label>
               <Select

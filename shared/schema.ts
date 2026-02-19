@@ -148,6 +148,8 @@ export const planningBoards = pgTable("planning_boards", {
   linkedMilestoneId: integer("linked_milestone_id").references(() => milestones.id),
   linkedChecklistItemId: integer("linked_checklist_item_id").references(() => checklistItems.id),
   linkedCalendarEventId: integer("linked_calendar_event_id").references(() => calendarEvents.id),
+  linkedUserIds: text("linked_user_ids").array().default([]),
+  linkedProjectIds: integer("linked_project_ids").array().default([]),
   updatedAt: timestamp("updated_at").defaultNow(),
   updatedBy: text("updated_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
