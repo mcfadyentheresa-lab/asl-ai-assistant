@@ -6,11 +6,11 @@ import {
   useCalendarEvents, useCreateCalendarEvent, useUpdateCalendarEvent, useDeleteCalendarEvent,
   useDocuments, useUploadDocument, useDeleteDocument,
   usePhotos, useCreatePhoto, useDeletePhoto, useUploadImage,
-  useUsers, useUpdateProject,
+  useUsers, useUpdateProject, usePlanningBoards,
 } from "@/hooks/use-projects";
 import { Navbar } from "@/components/layout/Navbar";
 import SpatialCanvas from "@/components/SpatialCanvas";
-import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, ExternalLink, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, CalendarDays, ChevronLeft, Upload, Download, User, X, Paperclip, ZoomIn, Palette } from "lucide-react";
+import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, ExternalLink, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, CalendarDays, ChevronLeft, Upload, Download, User, X, Paperclip, ZoomIn, Palette, Shield, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -53,7 +53,41 @@ export default function ProjectDetails() {
   const { toast } = useToast();
 
   const [activeTab, setActiveTab] = useState("overview");
+  const { data: planningBoards } = usePlanningBoards(projectId);
   const assignedClient = users?.find((u) => u.id === project?.clientId);
+
+  const userRole = user?.role || "client";
+
+  const isClientInvitedToBoard = userRole === "client" && Array.isArray(planningBoards) &&
+    planningBoards.some((b: any) => (b.linkedUserIds || []).includes(user?.id));
+
+  type TabConfig = {
+    id: string;
+    label: string;
+    icon: any;
+    roles: string[];
+    clientRequiresInvite?: boolean;
+  };
+
+  const tabConfig: TabConfig[] = [
+    { id: "overview", label: "Overview", icon: Clock, roles: ["admin", "crew", "client"] },
+    { id: "checklist", label: "Checklist", icon: CheckSquare, roles: ["admin", "client"] },
+    { id: "board", label: "Planning Board", icon: Palette, roles: ["admin", "crew", "client"], clientRequiresInvite: true },
+    { id: "calendar", label: "Calendar", icon: CalendarDays, roles: ["admin", "crew", "client"] },
+    { id: "photos", label: "Photos", icon: ImageIcon, roles: ["admin", "crew", "client"] },
+    { id: "docs", label: "Documents", icon: FileText, roles: ["admin", "client"] },
+    { id: "chat", label: "Messages", icon: MessageSquare, roles: ["admin", "crew", "client"] },
+  ];
+
+  const canViewTab = (tab: TabConfig) => {
+    if (!tab.roles.includes(userRole)) return false;
+    if (tab.clientRequiresInvite && userRole === "client" && !isClientInvitedToBoard) return false;
+    return true;
+  };
+
+  const visibleTabs = tabConfig.filter(canViewTab);
+
+  const safeActiveTab = visibleTabs.find(t => t.id === activeTab) ? activeTab : (visibleTabs[0]?.id || "overview");
 
   if (loadingProject) {
     return (
@@ -82,10 +116,10 @@ export default function ProjectDetails() {
   };
 
   return (
-    <div className={`min-h-screen bg-background ${activeTab === "board" ? "h-[100dvh] overflow-hidden" : "pb-20"}`}>
+    <div className={`min-h-screen bg-background ${safeActiveTab === "board" ? "h-[100dvh] overflow-hidden" : "pb-20"}`}>
       <Navbar />
 
-      <div className={`relative w-full overflow-hidden ${activeTab === "board" ? "h-20 landscape:h-14" : "h-56 md:h-72"}`} data-testid="project-hero">
+      <div className={`relative w-full overflow-hidden ${safeActiveTab === "board" ? "h-20 landscape:h-14" : "h-56 md:h-72"}`} data-testid="project-hero">
         {project.thumbnailUrl ? (
           <img
             src={project.thumbnailUrl}
@@ -118,38 +152,16 @@ export default function ProjectDetails() {
         </div>
       </div>
 
-      <main className={`container px-6 md:px-10 ${activeTab === "board" ? "mt-1 flex flex-col" : "mt-8"}`} style={activeTab === "board" ? { height: "calc(100dvh - 10rem)" } : undefined}>
-        <Tabs value={activeTab} onValueChange={setActiveTab} className={activeTab === "board" ? "space-y-2 flex flex-col flex-1 min-h-0" : "space-y-8"}>
+      <main className={`container px-6 md:px-10 ${safeActiveTab === "board" ? "mt-1 flex flex-col" : "mt-8"}`} style={safeActiveTab === "board" ? { height: "calc(100dvh - 10rem)" } : undefined}>
+        <Tabs value={safeActiveTab} onValueChange={setActiveTab} className={safeActiveTab === "board" ? "space-y-2 flex flex-col flex-1 min-h-0" : "space-y-8"}>
           <div className="overflow-x-auto -mx-6 px-6 md:mx-0 md:px-0">
             <TabsList className="w-max md:w-auto" data-testid="tabs-list">
-              <TabsTrigger value="overview" data-testid="tab-overview">
-                <Clock className="h-4 w-4 md:mr-2" />
-                <span className="hidden md:inline">Overview</span>
-              </TabsTrigger>
-              <TabsTrigger value="checklist" data-testid="tab-checklist">
-                <CheckSquare className="h-4 w-4 md:mr-2" />
-                <span className="hidden md:inline">Checklist</span>
-              </TabsTrigger>
-              <TabsTrigger value="board" data-testid="tab-board">
-                <Palette className="h-4 w-4 md:mr-2" />
-                <span className="hidden md:inline">Planning Board</span>
-              </TabsTrigger>
-              <TabsTrigger value="calendar" data-testid="tab-calendar">
-                <CalendarDays className="h-4 w-4 md:mr-2" />
-                <span className="hidden md:inline">Calendar</span>
-              </TabsTrigger>
-              <TabsTrigger value="photos" data-testid="tab-photos">
-                <ImageIcon className="h-4 w-4 md:mr-2" />
-                <span className="hidden md:inline">Photos</span>
-              </TabsTrigger>
-              <TabsTrigger value="docs" data-testid="tab-docs">
-                <FileText className="h-4 w-4 md:mr-2" />
-                <span className="hidden md:inline">Documents</span>
-              </TabsTrigger>
-              <TabsTrigger value="chat" data-testid="tab-chat">
-                <MessageSquare className="h-4 w-4 md:mr-2" />
-                <span className="hidden md:inline">Messages</span>
-              </TabsTrigger>
+              {visibleTabs.map((tab) => (
+                <TabsTrigger key={tab.id} value={tab.id} data-testid={`tab-${tab.id}`}>
+                  <tab.icon className="h-4 w-4 md:mr-2" />
+                  <span className="hidden md:inline">{tab.label}</span>
+                </TabsTrigger>
+              ))}
             </TabsList>
           </div>
 
@@ -250,6 +262,85 @@ export default function ProjectDetails() {
                     )}
                   </CardContent>
                 </Card>
+
+                {userRole !== "client" && (() => {
+                  const admins = users?.filter((u: any) => u.role === "admin") || [];
+                  const crewMembers = users?.filter((u: any) => u.role === "crew") || [];
+                  const clients = users?.filter((u: any) => u.role === "client" && u.id === project.clientId) || [];
+                  const boardInvitedClients = Array.isArray(planningBoards) ? users?.filter((u: any) =>
+                    u.role === "client" && u.id !== project.clientId &&
+                    planningBoards.some((b: any) => (b.linkedUserIds || []).includes(u.id))
+                  ) || [] : [];
+                  const allClients = [...clients, ...boardInvitedClients];
+
+                  return (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="font-serif text-lg flex items-center gap-2" data-testid="text-access-heading">
+                          <Shield className="h-4 w-4 text-muted-foreground" />
+                          Project Access
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div data-testid="access-group-admin">
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Admins ({admins.length})</p>
+                          <div className="space-y-1.5">
+                            {admins.map((u: any) => (
+                              <div key={u.id} className="flex items-center gap-2" data-testid={`access-user-${u.id}`}>
+                                <Avatar className="h-6 w-6">
+                                  <AvatarFallback className="text-[10px]">
+                                    {(u.firstName?.[0] || "").toUpperCase()}{(u.lastName?.[0] || "").toUpperCase()}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <span className="text-sm truncate">{u.firstName} {u.lastName}</span>
+                                <Badge variant="outline" className="ml-auto text-[10px]">Full access</Badge>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        <div data-testid="access-group-crew">
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Crew ({crewMembers.length})</p>
+                          <div className="space-y-1.5">
+                            {crewMembers.length > 0 ? crewMembers.map((u: any) => (
+                              <div key={u.id} className="flex items-center gap-2" data-testid={`access-user-${u.id}`}>
+                                <Avatar className="h-6 w-6">
+                                  <AvatarFallback className="text-[10px]">
+                                    {(u.firstName?.[0] || "").toUpperCase()}{(u.lastName?.[0] || "").toUpperCase()}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <span className="text-sm truncate">{u.firstName} {u.lastName}</span>
+                              </div>
+                            )) : (
+                              <p className="text-xs text-muted-foreground italic">No crew assigned</p>
+                            )}
+                          </div>
+                        </div>
+                        <div data-testid="access-group-client">
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Clients ({allClients.length})</p>
+                          <div className="space-y-1.5">
+                            {allClients.length > 0 ? allClients.map((u: any) => (
+                              <div key={u.id} className="flex items-center gap-2" data-testid={`access-user-${u.id}`}>
+                                <Avatar className="h-6 w-6">
+                                  <AvatarFallback className="text-[10px]">
+                                    {(u.firstName?.[0] || "").toUpperCase()}{(u.lastName?.[0] || "").toUpperCase()}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <span className="text-sm truncate">{u.firstName} {u.lastName}</span>
+                                {u.id === project.clientId ? (
+                                  <Badge variant="outline" className="ml-auto text-[10px]">Project owner</Badge>
+                                ) : (
+                                  <Badge variant="outline" className="ml-auto text-[10px]">Board invited</Badge>
+                                )}
+                              </div>
+                            )) : (
+                              <p className="text-xs text-muted-foreground italic">No client assigned</p>
+                            )}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })()}
 
                 <Card>
                   <CardHeader>
