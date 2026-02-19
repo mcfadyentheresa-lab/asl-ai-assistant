@@ -1,5 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
+import { storage } from "./storage";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { setupWebSocket } from "./websocket";
@@ -101,6 +102,16 @@ app.use((req, res, next) => {
     },
     () => {
       log(`serving on port ${port}`);
+
+      storage.cleanupOldActivity(7).then((count) => {
+        if (count > 0) log(`Cleaned up ${count} activity entries older than 7 days`);
+      }).catch(() => {});
+
+      setInterval(() => {
+        storage.cleanupOldActivity(7).then((count) => {
+          if (count > 0) log(`Cleaned up ${count} activity entries older than 7 days`);
+        }).catch(() => {});
+      }, 6 * 60 * 60 * 1000);
     },
   );
 })();

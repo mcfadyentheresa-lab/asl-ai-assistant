@@ -78,6 +78,7 @@ export interface IStorage {
   createActivityLog(entry: InsertActivityLog): Promise<ActivityLog>;
   getActivityViews(activityIds: number[]): Promise<{ activityId: number; userId: string; viewedAt: Date | null }[]>;
   markActivityViewed(activityId: number, userId: string): Promise<void>;
+  cleanupOldActivity(daysOld: number): Promise<number>;
 
   // Canvas Elements
   getCanvasElement(id: number): Promise<CanvasElement | undefined>;
@@ -301,6 +302,12 @@ export class DatabaseStorage implements IStorage {
     if (existing.length === 0) {
       await db.insert(activityViews).values({ activityId, userId });
     }
+  }
+  async cleanupOldActivity(daysOld: number): Promise<number> {
+    const { lt } = await import("drizzle-orm");
+    const cutoff = new Date(Date.now() - daysOld * 24 * 60 * 60 * 1000);
+    const deleted = await db.delete(activityLog).where(lt(activityLog.createdAt, cutoff)).returning({ id: activityLog.id });
+    return deleted.length;
   }
 
   // Canvas Elements
