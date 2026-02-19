@@ -226,12 +226,14 @@ export async function notifyBoardLinked(
   projectName: string,
   linkedByName: string,
   linkedByUserId: string,
-  newUserIds: string[]
+  newUserIds: string[],
+  projectId?: number
 ) {
   const recipients = await getUsersWithPhones(newUserIds);
   const filtered = recipients.filter((u) => u.id !== linkedByUserId);
   if (filtered.length === 0) return;
-  const body = `Aster & Spruce: ${linkedByName} added you to the planning board "${boardName}" on project "${projectName}". Log in to view it.`;
+  const link = projectId ? `${APP_URL}/project/${projectId}?tab=planning` : APP_URL;
+  const body = `Aster & Spruce: ${linkedByName} added you to the planning board "${boardName}" on project "${projectName}".\n\nView it here: ${link}`;
   await Promise.allSettled(
     filtered.map((u) => sendSms(u.phone!, body))
   );

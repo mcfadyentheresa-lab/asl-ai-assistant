@@ -709,7 +709,8 @@ export async function registerRoutes(
             project?.name || "a project",
             actorName,
             userId,
-            newUserIds
+            newUserIds,
+            board.projectId
           ).catch((err) => console.error("Board link SMS error:", err));
         }
       }

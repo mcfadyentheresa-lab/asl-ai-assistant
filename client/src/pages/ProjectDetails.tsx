@@ -62,7 +62,16 @@ export default function ProjectDetails() {
   const { data: onlineUsers } = useOnlineUsers();
   const { toast } = useToast();
 
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get("tab");
+    if (tab === "planning") return "board";
+    if (tab === "calendar") return "calendar";
+    if (tab === "checklist") return "checklist";
+    if (tab === "photos") return "photos";
+    if (tab === "documents") return "documents";
+    return "overview";
+  });
   const [editingPhoneUserId, setEditingPhoneUserId] = useState<string | null>(null);
   const [phoneInput, setPhoneInput] = useState("");
   const [showNotifyForm, setShowNotifyForm] = useState(false);
