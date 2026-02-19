@@ -22,7 +22,7 @@ import {
   CalendarDays, Milestone, ListChecks,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { usePlanningBoards, useCreatePlanningBoard, useDeletePlanningBoard, useUpdatePlanningBoard, useUploadImage, useUsers, useProjects, useMilestones, useChecklistItems, useCalendarEvents, useUpdateCalendarEvent } from "@/hooks/use-projects";
+import { usePlanningBoards, useCreatePlanningBoard, useDeletePlanningBoard, useUpdatePlanningBoard, useUploadImage, useUsers, useProjects, useMilestones, useChecklistItems, useCalendarEvents, useUpdateCalendarEvent, useDeleteCalendarEvent } from "@/hooks/use-projects";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -68,6 +68,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   const [linkDetailSheet, setLinkDetailSheet] = useState<{ type: "calendar" | "milestone" | "checklist"; id: number } | null>(null);
   const [editingEventTitle, setEditingEventTitle] = useState<string | null>(null);
   const { mutateAsync: updateCalendarEvent } = useUpdateCalendarEvent();
+  const { mutateAsync: deleteCalendarEvent } = useDeleteCalendarEvent();
   const [renameName, setRenameName] = useState("");
   const [newBoardName, setNewBoardName] = useState("");
 
@@ -156,10 +157,19 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
 
   const handleDeleteBoard = async () => {
     if (!selectedBoardId) return;
+    const board = selectedBoard;
+    const shouldDeleteEvent = board?.linkedCalendarEventId && !(board.linkedMilestoneId || board.linkedChecklistItemId);
+    const eventIdToDelete = shouldDeleteEvent ? board.linkedCalendarEventId : null;
     await deleteBoard({ id: selectedBoardId, projectId });
+    if (eventIdToDelete) {
+      try {
+        await deleteCalendarEvent(eventIdToDelete);
+      } catch {}
+    }
     setShowDeleteConfirm(false);
     setSelectedBoardId(null);
     queryClient.invalidateQueries({ queryKey: [api.planningBoards.list.path, projectId] });
+    queryClient.invalidateQueries({ queryKey: [api.calendar.list.path] });
   };
 
   const handleLinkUpdate = async (field: string, value: any) => {
@@ -2309,6 +2319,20 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
         <DialogContent>
           <DialogHeader><DialogTitle>Delete Board</DialogTitle></DialogHeader>
           <p className="text-sm text-muted-foreground">This will permanently delete &quot;{selectedBoard?.name}&quot; and all its elements. This cannot be undone.</p>
+          {selectedBoard?.linkedCalendarEventId && (() => {
+            const hasOtherLinks = !!(selectedBoard.linkedMilestoneId || selectedBoard.linkedChecklistItemId);
+            const ev = calendarEvents.find((e: any) => e.id === selectedBoard.linkedCalendarEventId);
+            if (!ev) return null;
+            return hasOtherLinks ? (
+              <p className="text-sm text-muted-foreground" data-testid="text-delete-unlink-warning">
+                The linked calendar event &quot;{ev.title}&quot; will be unlinked but kept on the calendar (other items are also linked to this board).
+              </p>
+            ) : (
+              <p className="text-sm text-destructive font-medium" data-testid="text-delete-calendar-warning">
+                The linked calendar event &quot;{ev.title}&quot; will also be removed from the calendar.
+              </p>
+            );
+          })()}
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>Cancel</Button>
             <Button variant="destructive" onClick={handleDeleteBoard} data-testid="button-confirm-delete-board">Delete</Button>
