@@ -110,3 +110,11 @@ Path aliases are configured:
 - `SESSION_SECRET` — Secret for session encryption
 - `REPL_ID` — Replit deployment identifier (set automatically in Replit)
 - `ISSUER_URL` — OpenID Connect issuer (defaults to Replit's OIDC)
+
+## Pending Integrations
+
+### Twilio SMS (Not Yet Set Up)
+- User wants SMS text notifications for all roles (admin, crew, clients) instead of/alongside email
+- Phone number field has been added to the users table and is editable by admins in the Project Access card
+- When ready: Set up Twilio connector, add `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `TWILIO_PHONE_NUMBER` secrets
+- Clients (Island, Hangar) prefer text messages over email

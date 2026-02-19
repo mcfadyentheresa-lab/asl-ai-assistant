@@ -4,12 +4,31 @@ import { type InsertProject, type InsertMilestone, type InsertTask, type InsertM
 
 // --- Users ---
 export function useUsers() {
-  return useQuery<{ id: string; firstName: string | null; lastName: string | null; email: string | null; role: string | null; profileImageUrl: string | null }[]>({
+  return useQuery<{ id: string; firstName: string | null; lastName: string | null; email: string | null; phone: string | null; role: string | null; profileImageUrl: string | null }[]>({
     queryKey: ["/api/users"],
     queryFn: async () => {
       const res = await fetch("/api/users", { credentials: "include" });
       if (!res.ok) return [];
       return res.json();
+    },
+  });
+}
+
+export function useUpdateUserPhone() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ userId, phone }: { userId: string; phone: string }) => {
+      const res = await fetch(`/api/users/${userId}/phone`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to update phone");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
     },
   });
 }

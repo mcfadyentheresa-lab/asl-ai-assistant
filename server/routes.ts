@@ -129,11 +129,29 @@ export async function registerRoutes(
         firstName: u.firstName,
         lastName: u.lastName,
         email: u.email,
+        phone: u.phone,
         role: u.role,
         profileImageUrl: u.profileImageUrl,
       })));
     } catch {
       res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+
+  app.patch("/api/users/:id/phone", isAuthenticated, async (req: any, res) => {
+    try {
+      const requesterId = req.user.claims.sub;
+      const requester = await authStorage.getUser(requesterId);
+      if (requester?.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can update phone numbers" });
+      }
+      const { phone } = req.body;
+      const user = await authStorage.updateUserPhone(req.params.id, phone || null);
+      if (!user) return res.status(404).json({ message: "User not found" });
+      res.json(user);
+    } catch (error) {
+      console.error("Error updating phone:", error);
+      res.status(500).json({ message: "Failed to update phone" });
     }
   });
 

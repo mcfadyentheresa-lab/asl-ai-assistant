@@ -6,11 +6,11 @@ import {
   useCalendarEvents, useCreateCalendarEvent, useUpdateCalendarEvent, useDeleteCalendarEvent,
   useDocuments, useUploadDocument, useDeleteDocument,
   usePhotos, useCreatePhoto, useDeletePhoto, useUploadImage,
-  useUsers, useUpdateProject, usePlanningBoards,
+  useUsers, useUpdateProject, usePlanningBoards, useUpdateUserPhone,
 } from "@/hooks/use-projects";
 import { Navbar } from "@/components/layout/Navbar";
 import SpatialCanvas from "@/components/SpatialCanvas";
-import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, ExternalLink, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, CalendarDays, ChevronLeft, Upload, Download, User, X, Paperclip, ZoomIn, Palette, Shield, Users } from "lucide-react";
+import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, ExternalLink, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, CalendarDays, ChevronLeft, Upload, Download, User, X, Paperclip, ZoomIn, Palette, Shield, Users, Phone, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -50,9 +50,12 @@ export default function ProjectDetails() {
   const { user } = useAuth();
   const { data: users } = useUsers();
   const { mutate: updateProject } = useUpdateProject();
+  const { mutate: updatePhone } = useUpdateUserPhone();
   const { toast } = useToast();
 
   const [activeTab, setActiveTab] = useState("overview");
+  const [editingPhoneUserId, setEditingPhoneUserId] = useState<string | null>(null);
+  const [phoneInput, setPhoneInput] = useState("");
   const { data: planningBoards } = usePlanningBoards(projectId);
   const assignedClient = users?.find((u) => u.id === project?.clientId);
 
@@ -273,6 +276,94 @@ export default function ProjectDetails() {
                   ) || [] : [];
                   const allClients = [...clients, ...boardInvitedClients];
 
+                  const renderUserRow = (u: any, badge?: string) => (
+                    <div key={u.id} className="space-y-1" data-testid={`access-user-${u.id}`}>
+                      <div className="flex items-center gap-2">
+                        <Avatar className="h-6 w-6">
+                          <AvatarFallback className="text-[10px]">
+                            {(u.firstName?.[0] || "").toUpperCase()}{(u.lastName?.[0] || "").toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0 flex-1">
+                          <span className="text-sm truncate block">{u.firstName} {u.lastName}</span>
+                          {editingPhoneUserId === u.id ? (
+                            <div className="flex items-center gap-1 mt-0.5">
+                              <Input
+                                value={phoneInput}
+                                onChange={(e) => setPhoneInput(e.target.value)}
+                                placeholder="(705) 555-0123"
+                                className="h-6 text-xs"
+                                data-testid={`input-phone-${u.id}`}
+                                autoFocus
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    updatePhone({ userId: u.id, phone: phoneInput }, {
+                                      onSuccess: () => {
+                                        toast({ title: "Phone updated" });
+                                        setEditingPhoneUserId(null);
+                                      },
+                                    });
+                                  } else if (e.key === "Escape") {
+                                    setEditingPhoneUserId(null);
+                                  }
+                                }}
+                              />
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-6 w-6"
+                                data-testid={`button-save-phone-${u.id}`}
+                                onClick={() => {
+                                  updatePhone({ userId: u.id, phone: phoneInput }, {
+                                    onSuccess: () => {
+                                      toast({ title: "Phone updated" });
+                                      setEditingPhoneUserId(null);
+                                    },
+                                  });
+                                }}
+                              >
+                                <Check className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-6 w-6"
+                                onClick={() => setEditingPhoneUserId(null)}
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1">
+                              {u.phone ? (
+                                <span className="text-xs text-muted-foreground flex items-center gap-1" data-testid={`text-phone-${u.id}`}>
+                                  <Phone className="h-3 w-3" />{u.phone}
+                                </span>
+                              ) : (
+                                <span className="text-xs text-muted-foreground/50 italic">No phone</span>
+                              )}
+                              {userRole === "admin" && (
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-5 w-5 ml-1"
+                                  data-testid={`button-edit-phone-${u.id}`}
+                                  onClick={() => {
+                                    setEditingPhoneUserId(u.id);
+                                    setPhoneInput(u.phone || "");
+                                  }}
+                                >
+                                  <Pencil className="h-3 w-3" />
+                                </Button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        {badge && <Badge variant="outline" className="ml-auto text-[10px] flex-shrink-0">{badge}</Badge>}
+                      </div>
+                    </div>
+                  );
+
                   return (
                     <Card>
                       <CardHeader>
@@ -284,55 +375,24 @@ export default function ProjectDetails() {
                       <CardContent className="space-y-4">
                         <div data-testid="access-group-admin">
                           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Admins ({admins.length})</p>
-                          <div className="space-y-1.5">
-                            {admins.map((u: any) => (
-                              <div key={u.id} className="flex items-center gap-2" data-testid={`access-user-${u.id}`}>
-                                <Avatar className="h-6 w-6">
-                                  <AvatarFallback className="text-[10px]">
-                                    {(u.firstName?.[0] || "").toUpperCase()}{(u.lastName?.[0] || "").toUpperCase()}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <span className="text-sm truncate">{u.firstName} {u.lastName}</span>
-                                <Badge variant="outline" className="ml-auto text-[10px]">Full access</Badge>
-                              </div>
-                            ))}
+                          <div className="space-y-3">
+                            {admins.map((u: any) => renderUserRow(u, "Full access"))}
                           </div>
                         </div>
                         <div data-testid="access-group-crew">
                           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Crew ({crewMembers.length})</p>
-                          <div className="space-y-1.5">
-                            {crewMembers.length > 0 ? crewMembers.map((u: any) => (
-                              <div key={u.id} className="flex items-center gap-2" data-testid={`access-user-${u.id}`}>
-                                <Avatar className="h-6 w-6">
-                                  <AvatarFallback className="text-[10px]">
-                                    {(u.firstName?.[0] || "").toUpperCase()}{(u.lastName?.[0] || "").toUpperCase()}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <span className="text-sm truncate">{u.firstName} {u.lastName}</span>
-                              </div>
-                            )) : (
+                          <div className="space-y-3">
+                            {crewMembers.length > 0 ? crewMembers.map((u: any) => renderUserRow(u)) : (
                               <p className="text-xs text-muted-foreground italic">No crew assigned</p>
                             )}
                           </div>
                         </div>
                         <div data-testid="access-group-client">
                           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Clients ({allClients.length})</p>
-                          <div className="space-y-1.5">
-                            {allClients.length > 0 ? allClients.map((u: any) => (
-                              <div key={u.id} className="flex items-center gap-2" data-testid={`access-user-${u.id}`}>
-                                <Avatar className="h-6 w-6">
-                                  <AvatarFallback className="text-[10px]">
-                                    {(u.firstName?.[0] || "").toUpperCase()}{(u.lastName?.[0] || "").toUpperCase()}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <span className="text-sm truncate">{u.firstName} {u.lastName}</span>
-                                {u.id === project.clientId ? (
-                                  <Badge variant="outline" className="ml-auto text-[10px]">Project owner</Badge>
-                                ) : (
-                                  <Badge variant="outline" className="ml-auto text-[10px]">Board invited</Badge>
-                                )}
-                              </div>
-                            )) : (
+                          <div className="space-y-3">
+                            {allClients.length > 0 ? allClients.map((u: any) =>
+                              renderUserRow(u, u.id === project.clientId ? "Project owner" : "Board invited")
+                            ) : (
                               <p className="text-xs text-muted-foreground italic">No client assigned</p>
                             )}
                           </div>
