@@ -133,6 +133,7 @@ Path aliases are configured:
 - **Document uploaded** — All project participants (except uploader) notified
 - **Calendar event created** — All project participants (except creator) notified
 - **Calendar event updated** — All project participants (except updater) notified
+- **Planning board user linked** — Newly linked users notified (except the person who linked them)
 
 ### Admin Features
 - **Test SMS** button in Project Access card sends a test message to the admin's phone

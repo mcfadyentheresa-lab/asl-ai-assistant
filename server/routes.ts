@@ -22,6 +22,7 @@ import {
   notifyCalendarEventChanged,
   notifyTeamCustom,
   sendTestSms,
+  notifyBoardLinked,
 } from "./sms";
 import { heartbeat, getOnlineUsers, setVisibility, getVisibility } from "./presence";
 
@@ -686,8 +687,31 @@ export async function registerRoutes(
       const board = await checkBoardAccess(req, res, Number(req.params.id));
       if (!board) return;
       const input = api.planningBoards.update.input.parse(req.body);
+      const previousLinkedUsers = (board.linkedUserIds || []) as string[];
       const updated = await storage.updatePlanningBoard(board.id, input);
       res.json(updated);
+
+      if (input.linkedUserIds) {
+        const newUserIds = (input.linkedUserIds as string[]).filter(
+          (uid) => !previousLinkedUsers.includes(uid)
+        );
+        if (newUserIds.length > 0) {
+          const project = await storage.getProject(board.projectId);
+          const userId = req.user.claims.sub;
+          const allUsers = await authStorage.getUsers();
+          const actor = allUsers.find((u) => u.id === userId);
+          const actorName = actor
+            ? `${actor.firstName || ""} ${actor.lastName || ""}`.trim() || "Someone"
+            : "Someone";
+          notifyBoardLinked(
+            updated.name,
+            project?.name || "a project",
+            actorName,
+            userId,
+            newUserIds
+          ).catch((err) => console.error("Board link SMS error:", err));
+        }
+      }
     } catch (err: any) {
       console.error("Planning board update error:", err.message);
       res.status(500).json({ message: "Failed to update planning board" });

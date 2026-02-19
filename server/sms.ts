@@ -221,6 +221,22 @@ export async function notifyTeamCustom(
   return { sent, failed, recipientNames };
 }
 
+export async function notifyBoardLinked(
+  boardName: string,
+  projectName: string,
+  linkedByName: string,
+  linkedByUserId: string,
+  newUserIds: string[]
+) {
+  const recipients = await getUsersWithPhones(newUserIds);
+  const filtered = recipients.filter((u) => u.id !== linkedByUserId);
+  if (filtered.length === 0) return;
+  const body = `Aster & Spruce: ${linkedByName} added you to the planning board "${boardName}" on project "${projectName}". Log in to view it.`;
+  await Promise.allSettled(
+    filtered.map((u) => sendSms(u.phone!, body))
+  );
+}
+
 export async function sendTestSms(toPhone: string): Promise<boolean> {
   return sendSms(
     toPhone,
