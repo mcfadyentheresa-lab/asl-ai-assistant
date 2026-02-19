@@ -104,6 +104,7 @@ export const calendarEvents = pgTable("calendar_events", {
   date: date("date").notNull(),
   endDate: date("end_date"),
   type: text("type").default("event"),
+  imageUrl: text("image_url"),
   createdBy: text("created_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
 });
