@@ -69,6 +69,8 @@ export default function ProjectDetails() {
   const [selectedRecipients, setSelectedRecipients] = useState<string[]>([]);
   const [editingUser, setEditingUser] = useState<any>(null);
   const [profileForm, setProfileForm] = useState({ firstName: "", lastName: "", email: "", phone: "", role: "" });
+  const [confirmDeleteUser, setConfirmDeleteUser] = useState(false);
+  const [deletingUser, setDeletingUser] = useState(false);
   const { data: planningBoards } = usePlanningBoards(projectId);
   const assignedClient = users?.find((u) => u.id === project?.clientId);
 
@@ -639,7 +641,7 @@ export default function ProjectDetails() {
         </Tabs>
       </main>
 
-      <Dialog open={!!editingUser} onOpenChange={(open) => { if (!open) setEditingUser(null); }}>
+      <Dialog open={!!editingUser} onOpenChange={(open) => { if (!open) { setEditingUser(null); setConfirmDeleteUser(false); } }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="font-serif">Edit Team Member</DialogTitle>
@@ -694,37 +696,88 @@ export default function ProjectDetails() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="ghost" onClick={() => setEditingUser(null)} data-testid="button-cancel-edit-user">Cancel</Button>
-              <Button
-                data-testid="button-save-edit-user"
-                onClick={async () => {
-                  if (!editingUser) return;
-                  try {
-                    const res = await fetch(`/api/users/${editingUser.id}/profile`, {
-                      method: "PATCH",
-                      headers: { "Content-Type": "application/json" },
-                      credentials: "include",
-                      body: JSON.stringify({
-                        firstName: profileForm.firstName,
-                        lastName: profileForm.lastName,
-                        email: profileForm.email,
-                        phone: profileForm.phone || null,
-                        role: profileForm.role,
-                      }),
-                    });
-                    if (!res.ok) throw new Error("Failed to update");
-                    toast({ title: "Profile updated" });
-                    setEditingUser(null);
-                    queryClient.invalidateQueries({ queryKey: ["/api/users"] });
-                  } catch (err: any) {
-                    toast({ title: "Error", description: err.message, variant: "destructive" });
-                  }
-                }}
-              >
-                Save Changes
-              </Button>
-            </div>
+            {confirmDeleteUser ? (
+              <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 space-y-3">
+                <p className="text-sm text-destructive font-medium">Are you sure you want to remove this person? Their messages and time entries will also be deleted. This cannot be undone.</p>
+                <div className="flex justify-end gap-2">
+                  <Button variant="ghost" size="sm" onClick={() => setConfirmDeleteUser(false)} data-testid="button-cancel-delete-user">No, Keep</Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    disabled={deletingUser}
+                    data-testid="button-confirm-delete-user"
+                    onClick={async () => {
+                      if (!editingUser) return;
+                      setDeletingUser(true);
+                      try {
+                        const res = await fetch(`/api/users/${editingUser.id}`, {
+                          method: "DELETE",
+                          credentials: "include",
+                        });
+                        if (!res.ok) {
+                          const data = await res.json();
+                          throw new Error(data.message || "Failed to delete");
+                        }
+                        toast({ title: "User removed" });
+                        setEditingUser(null);
+                        setConfirmDeleteUser(false);
+                        queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+                      } catch (err: any) {
+                        toast({ title: "Error", description: err.message, variant: "destructive" });
+                      } finally {
+                        setDeletingUser(false);
+                      }
+                    }}
+                  >
+                    {deletingUser ? <Loader2 className="h-4 w-4 animate-spin" /> : "Yes, Remove"}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex justify-between gap-2 pt-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-destructive"
+                  onClick={() => setConfirmDeleteUser(true)}
+                  data-testid="button-delete-user"
+                >
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  Remove
+                </Button>
+                <div className="flex gap-2">
+                  <Button variant="ghost" onClick={() => setEditingUser(null)} data-testid="button-cancel-edit-user">Cancel</Button>
+                  <Button
+                    data-testid="button-save-edit-user"
+                    onClick={async () => {
+                      if (!editingUser) return;
+                      try {
+                        const res = await fetch(`/api/users/${editingUser.id}/profile`, {
+                          method: "PATCH",
+                          headers: { "Content-Type": "application/json" },
+                          credentials: "include",
+                          body: JSON.stringify({
+                            firstName: profileForm.firstName,
+                            lastName: profileForm.lastName,
+                            email: profileForm.email,
+                            phone: profileForm.phone || null,
+                            role: profileForm.role,
+                          }),
+                        });
+                        if (!res.ok) throw new Error("Failed to update");
+                        toast({ title: "Profile updated" });
+                        setEditingUser(null);
+                        queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+                      } catch (err: any) {
+                        toast({ title: "Error", description: err.message, variant: "destructive" });
+                      }
+                    }}
+                  >
+                    Save Changes
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>

@@ -1,6 +1,6 @@
-import { users, type User, type UpsertUser } from "@shared/models/auth";
+import { users, sessions, type User, type UpsertUser } from "@shared/models/auth";
 import { db } from "../../db";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 // Interface for auth storage operations
 // (IMPORTANT) These user operations are mandatory for Replit Auth.
@@ -11,6 +11,7 @@ export interface IAuthStorage {
   updateUserPhone(id: string, phone: string | null): Promise<User | undefined>;
   updateUserProfile(id: string, data: { firstName?: string; lastName?: string; email?: string; role?: string; phone?: string | null }): Promise<User | undefined>;
   getUsers(): Promise<User[]>;
+  deleteUser(id: string): Promise<boolean>;
 }
 
 class AuthStorage implements IAuthStorage {
@@ -69,6 +70,21 @@ class AuthStorage implements IAuthStorage {
 
   async getUsers(): Promise<User[]> {
     return await db.select().from(users);
+  }
+
+  async deleteUser(id: string): Promise<boolean> {
+    await db.execute(sql`UPDATE projects SET client_id = NULL WHERE client_id = ${id}`);
+    await db.execute(sql`UPDATE tasks SET assigned_to = NULL WHERE assigned_to = ${id}`);
+    await db.execute(sql`UPDATE photos SET created_by = NULL WHERE created_by = ${id}`);
+    await db.execute(sql`UPDATE documents SET created_by = NULL WHERE created_by = ${id}`);
+    await db.execute(sql`DELETE FROM time_entries WHERE user_id = ${id}`);
+    await db.execute(sql`UPDATE planning_boards SET created_by = NULL WHERE created_by = ${id}`);
+    await db.execute(sql`DELETE FROM messages WHERE sender_id = ${id}`);
+    await db.execute(sql`DELETE FROM activity_log WHERE user_id = ${id}`);
+    await db.execute(sql`DELETE FROM activity_views WHERE user_id = ${id}`);
+    await db.execute(sql`DELETE FROM sessions WHERE "sess" ::jsonb -> 'passport' ->> 'user' = ${id}`);
+    const result = await db.delete(users).where(eq(users.id, id)).returning();
+    return result.length > 0;
   }
 }
 

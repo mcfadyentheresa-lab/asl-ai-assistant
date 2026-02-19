@@ -238,6 +238,25 @@ export async function registerRoutes(
     }
   });
 
+  app.delete("/api/users/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const requesterId = req.user.claims.sub;
+      const requester = await authStorage.getUser(requesterId);
+      if (requester?.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can delete users" });
+      }
+      if (req.params.id === requesterId) {
+        return res.status(400).json({ message: "You cannot delete your own account" });
+      }
+      const deleted = await authStorage.deleteUser(req.params.id);
+      if (!deleted) return res.status(404).json({ message: "User not found" });
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      res.status(500).json({ message: "Failed to delete user" });
+    }
+  });
+
   // Projects
   app.get(api.projects.list.path, isAuthenticated, async (req, res) => {
     const user = req.user as any;
