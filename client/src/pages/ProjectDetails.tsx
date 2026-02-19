@@ -1,4 +1,5 @@
 import { useParams, Link } from "wouter";
+import { queryClient } from "@/lib/queryClient";
 import {
   useProject, useMilestones, useTasks, useMessages, useSendMessage,
   useChecklistItems, useCreateChecklistItem, useUpdateChecklistItem, useDeleteChecklistItem,
@@ -66,6 +67,8 @@ export default function ProjectDetails() {
   const [showNotifyForm, setShowNotifyForm] = useState(false);
   const [notifyMessage, setNotifyMessage] = useState("");
   const [selectedRecipients, setSelectedRecipients] = useState<string[]>([]);
+  const [editingUser, setEditingUser] = useState<any>(null);
+  const [profileForm, setProfileForm] = useState({ firstName: "", lastName: "", email: "", phone: "", role: "" });
   const { data: planningBoards } = usePlanningBoards(projectId);
   const assignedClient = users?.find((u) => u.id === project?.clientId);
 
@@ -314,78 +317,35 @@ export default function ProjectDetails() {
                         </div>
                         <div className="min-w-0 flex-1">
                           <span className="text-sm truncate block">{u.firstName} {u.lastName}</span>
-                          {editingPhoneUserId === u.id ? (
-                            <div className="flex items-center gap-1 mt-0.5">
-                              <Input
-                                value={phoneInput}
-                                onChange={(e) => setPhoneInput(e.target.value)}
-                                placeholder="(705) 555-0123"
-                                className="h-6 text-xs"
-                                data-testid={`input-phone-${u.id}`}
-                                autoFocus
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") {
-                                    updatePhone({ userId: u.id, phone: phoneInput }, {
-                                      onSuccess: () => {
-                                        toast({ title: "Phone updated" });
-                                        setEditingPhoneUserId(null);
-                                      },
-                                    });
-                                  } else if (e.key === "Escape") {
-                                    setEditingPhoneUserId(null);
-                                  }
-                                }}
-                              />
+                          <div className="flex items-center gap-1">
+                            {u.phone ? (
+                              <span className="text-xs text-muted-foreground flex items-center gap-1" data-testid={`text-phone-${u.id}`}>
+                                <Phone className="h-3 w-3" />{u.phone}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground/50 italic">No phone</span>
+                            )}
+                            {userRole === "admin" && (
                               <Button
                                 size="icon"
                                 variant="ghost"
-                                className="h-6 w-6"
-                                data-testid={`button-save-phone-${u.id}`}
+                                className="h-5 w-5 ml-1"
+                                data-testid={`button-edit-user-${u.id}`}
                                 onClick={() => {
-                                  updatePhone({ userId: u.id, phone: phoneInput }, {
-                                    onSuccess: () => {
-                                      toast({ title: "Phone updated" });
-                                      setEditingPhoneUserId(null);
-                                    },
+                                  setEditingUser(u);
+                                  setProfileForm({
+                                    firstName: u.firstName || "",
+                                    lastName: u.lastName || "",
+                                    email: u.email || "",
+                                    phone: u.phone || "",
+                                    role: u.role || "client",
                                   });
                                 }}
                               >
-                                <Check className="h-3 w-3" />
+                                <Pencil className="h-3 w-3" />
                               </Button>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-6 w-6"
-                                onClick={() => setEditingPhoneUserId(null)}
-                              >
-                                <X className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-1">
-                              {u.phone ? (
-                                <span className="text-xs text-muted-foreground flex items-center gap-1" data-testid={`text-phone-${u.id}`}>
-                                  <Phone className="h-3 w-3" />{u.phone}
-                                </span>
-                              ) : (
-                                <span className="text-xs text-muted-foreground/50 italic">No phone</span>
-                              )}
-                              {userRole === "admin" && (
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className="h-5 w-5 ml-1"
-                                  data-testid={`button-edit-phone-${u.id}`}
-                                  onClick={() => {
-                                    setEditingPhoneUserId(u.id);
-                                    setPhoneInput(u.phone || "");
-                                  }}
-                                >
-                                  <Pencil className="h-3 w-3" />
-                                </Button>
-                              )}
-                            </div>
-                          )}
+                            )}
+                          </div>
                         </div>
                         {badge && <Badge variant="outline" className="ml-auto text-[10px] flex-shrink-0">{badge}</Badge>}
                       </div>
@@ -678,6 +638,96 @@ export default function ProjectDetails() {
           </TabsContent>
         </Tabs>
       </main>
+
+      <Dialog open={!!editingUser} onOpenChange={(open) => { if (!open) setEditingUser(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-serif">Edit Team Member</DialogTitle>
+            <DialogDescription>Update this person's details.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">First Name</label>
+                <Input
+                  value={profileForm.firstName}
+                  onChange={(e) => setProfileForm({ ...profileForm, firstName: e.target.value })}
+                  data-testid="input-edit-firstname"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Last Name</label>
+                <Input
+                  value={profileForm.lastName}
+                  onChange={(e) => setProfileForm({ ...profileForm, lastName: e.target.value })}
+                  data-testid="input-edit-lastname"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Email</label>
+              <Input
+                value={profileForm.email}
+                onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
+                data-testid="input-edit-email"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Phone</label>
+              <Input
+                value={profileForm.phone}
+                onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
+                placeholder="(705) 555-0123"
+                data-testid="input-edit-phone"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Role</label>
+              <Select value={profileForm.role} onValueChange={(v) => setProfileForm({ ...profileForm, role: v })}>
+                <SelectTrigger data-testid="select-edit-role">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="crew">Crew</SelectItem>
+                  <SelectItem value="client">Client</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="ghost" onClick={() => setEditingUser(null)} data-testid="button-cancel-edit-user">Cancel</Button>
+              <Button
+                data-testid="button-save-edit-user"
+                onClick={async () => {
+                  if (!editingUser) return;
+                  try {
+                    const res = await fetch(`/api/users/${editingUser.id}/profile`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      credentials: "include",
+                      body: JSON.stringify({
+                        firstName: profileForm.firstName,
+                        lastName: profileForm.lastName,
+                        email: profileForm.email,
+                        phone: profileForm.phone || null,
+                        role: profileForm.role,
+                      }),
+                    });
+                    if (!res.ok) throw new Error("Failed to update");
+                    toast({ title: "Profile updated" });
+                    setEditingUser(null);
+                    queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+                  } catch (err: any) {
+                    toast({ title: "Error", description: err.message, variant: "destructive" });
+                  }
+                }}
+              >
+                Save Changes
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
