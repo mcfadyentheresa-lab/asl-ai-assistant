@@ -893,7 +893,12 @@ export async function registerRoutes(
   });
 
   app.delete("/api/calendar/:id", isAuthenticated, async (req, res) => {
-    await storage.deleteCalendarEvent(Number(req.params.id));
+    const eventId = Number(req.params.id);
+    const event = await storage.getCalendarEvent(eventId);
+    if (event) {
+      await storage.deleteActivityByTypeAndTitle(event.projectId, "calendar_event_created", `Event added: ${event.title}`);
+    }
+    await storage.deleteCalendarEvent(eventId);
     res.json({ success: true });
   });
 

@@ -2289,7 +2289,10 @@ function CalendarTab({ projectId }: { projectId: number }) {
 
   const handleDeleteEvent = (id: number) => {
     deleteEvent(id, {
-      onSuccess: () => toast({ title: "Removed", description: "Event deleted." }),
+      onSuccess: () => {
+        toast({ title: "Removed", description: "Event deleted." });
+        queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'activity'] });
+      },
       onError: (err) => toast({ title: "Error", description: err.message, variant: "destructive" }),
     });
   };

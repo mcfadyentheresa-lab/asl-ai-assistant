@@ -61,6 +61,7 @@ export interface IStorage {
 
   // Calendar Events
   getCalendarEvents(projectId: number): Promise<CalendarEvent[]>;
+  getCalendarEvent(id: number): Promise<CalendarEvent | undefined>;
   createCalendarEvent(event: InsertCalendarEvent): Promise<CalendarEvent>;
   updateCalendarEvent(id: number, updates: Partial<InsertCalendarEvent>): Promise<CalendarEvent>;
   deleteCalendarEvent(id: number): Promise<void>;
@@ -79,6 +80,7 @@ export interface IStorage {
   getActivityViews(activityIds: number[]): Promise<{ activityId: number; userId: string; viewedAt: Date | null }[]>;
   markActivityViewed(activityId: number, userId: string): Promise<void>;
   cleanupOldActivity(daysOld: number): Promise<number>;
+  deleteActivityByTypeAndTitle(projectId: number, type: string, titlePattern: string): Promise<number>;
 
   // Canvas Elements
   getCanvasElement(id: number): Promise<CanvasElement | undefined>;
@@ -239,6 +241,10 @@ export class DatabaseStorage implements IStorage {
   async getCalendarEvents(projectId: number): Promise<CalendarEvent[]> {
     return await db.select().from(calendarEvents).where(eq(calendarEvents.projectId, projectId)).orderBy(calendarEvents.date);
   }
+  async getCalendarEvent(id: number): Promise<CalendarEvent | undefined> {
+    const [event] = await db.select().from(calendarEvents).where(eq(calendarEvents.id, id));
+    return event;
+  }
   async createCalendarEvent(event: InsertCalendarEvent): Promise<CalendarEvent> {
     const [newEvent] = await db.insert(calendarEvents).values(event).returning();
     return newEvent;
@@ -307,6 +313,10 @@ export class DatabaseStorage implements IStorage {
     const { lt } = await import("drizzle-orm");
     const cutoff = new Date(Date.now() - daysOld * 24 * 60 * 60 * 1000);
     const deleted = await db.delete(activityLog).where(lt(activityLog.createdAt, cutoff)).returning({ id: activityLog.id });
+    return deleted.length;
+  }
+  async deleteActivityByTypeAndTitle(projectId: number, type: string, titlePattern: string): Promise<number> {
+    const deleted = await db.delete(activityLog).where(and(eq(activityLog.projectId, projectId), eq(activityLog.type, type), eq(activityLog.title, titlePattern))).returning({ id: activityLog.id });
     return deleted.length;
   }
 

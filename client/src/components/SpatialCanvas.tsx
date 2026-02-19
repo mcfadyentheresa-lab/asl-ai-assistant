@@ -193,6 +193,9 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     setSelectedBoardId(null);
     queryClient.invalidateQueries({ queryKey: [api.planningBoards.list.path, projectId] });
     queryClient.invalidateQueries({ queryKey: [api.calendar.list.path] });
+    if (eventIdToDelete) {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'activity'] });
+    }
   };
 
   const handleLinkUpdate = async (field: string, value: any, extraFields?: Record<string, any>) => {
