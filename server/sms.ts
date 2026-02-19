@@ -8,6 +8,14 @@ const fromNumber = process.env.TWILIO_PHONE_NUMBER;
 
 let client: twilio.Twilio | null = null;
 
+const APP_URL = process.env.REPLIT_DEPLOYMENT_URL
+  ? `https://${process.env.REPLIT_DEPLOYMENT_URL}`
+  : process.env.REPLIT_DEV_DOMAIN
+    ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+    : "https://asterandspruce.com";
+
+const SMS_FOOTER = `\n\nDo not reply to this number. Log in for updates: ${APP_URL}`;
+
 function getClient(): twilio.Twilio | null {
   if (!accountSid || !authToken || !fromNumber) {
     console.warn("Twilio credentials not configured — SMS disabled");
@@ -27,12 +35,12 @@ function formatPhone(phone: string): string {
   return `+${digits}`;
 }
 
-async function sendSms(to: string, body: string): Promise<boolean> {
+async function sendSms(to: string, body: string, includeFooter = true): Promise<boolean> {
   const tw = getClient();
   if (!tw) return false;
   try {
     await tw.messages.create({
-      body,
+      body: includeFooter ? body + SMS_FOOTER : body,
       from: fromNumber,
       to: formatPhone(to),
     });
@@ -160,6 +168,7 @@ export async function notifyDocumentUploaded(
 export async function sendTestSms(toPhone: string): Promise<boolean> {
   return sendSms(
     toPhone,
-    "Aster & Spruce Connect: This is a test notification. Your SMS alerts are working!"
+    `Aster & Spruce Connect: This is a test notification. Your SMS alerts are working!\n\nDo not reply to this number. Log in for updates: ${APP_URL}`,
+    false
   );
 }
