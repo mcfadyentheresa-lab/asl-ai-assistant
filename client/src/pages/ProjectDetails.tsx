@@ -2085,6 +2085,7 @@ const eventTypeColors: Record<string, string> = {
   milestone: "#059669",
   deadline: "#dc2626",
   meeting: "#d97706",
+  delivery: "#0891b2",
   inspection: "#7c3aed",
 };
 
@@ -2467,6 +2468,7 @@ function CalendarTab({ projectId }: { projectId: number }) {
                   <SelectItem value="milestone">Milestone</SelectItem>
                   <SelectItem value="deadline">Deadline</SelectItem>
                   <SelectItem value="meeting">Meeting</SelectItem>
+                  <SelectItem value="delivery">Delivery</SelectItem>
                   <SelectItem value="inspection">Inspection</SelectItem>
                 </SelectContent>
               </Select>
