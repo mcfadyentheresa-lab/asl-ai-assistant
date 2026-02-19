@@ -164,6 +164,7 @@ export function useCreateMilestone() {
     onSuccess: (_, variables) => {
       const url = buildUrl(api.milestones.list.path, { projectId: variables.projectId });
       queryClient.invalidateQueries({ queryKey: [url, variables.projectId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', variables.projectId, 'activity'] });
     },
   });
 }
@@ -256,6 +257,7 @@ export function useSendMessage() {
     onSuccess: (_, variables) => {
       const url = buildUrl(api.messages.list.path, { projectId: variables.projectId });
       queryClient.invalidateQueries({ queryKey: [url, variables.projectId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', variables.projectId, 'activity'] });
     },
   });
 }
@@ -588,6 +590,7 @@ export function useCreateCalendarEvent() {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: [api.calendar.list.path, variables.projectId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', variables.projectId, 'activity'] });
     },
   });
 }
@@ -660,6 +663,7 @@ export function useCreatePhoto() {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: [api.photos.list.path, variables.projectId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', variables.projectId, 'activity'] });
     },
   });
 }
@@ -733,8 +737,9 @@ export function useUploadDocument() {
       }
       return res.json() as Promise<Document>;
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: [api.documents.list.path] });
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', variables.projectId, 'activity'] });
     },
   });
 }
