@@ -2457,7 +2457,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           <div className="space-y-4">
             <div>
               <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
-                <label className="text-sm font-medium">People</label>
+                <label className="text-sm font-medium">Collaborators</label>
                 <label className="flex items-center gap-1.5 cursor-pointer" data-testid="toggle-notify-on-link">
                   <Checkbox
                     checked={notifyOnLink}
