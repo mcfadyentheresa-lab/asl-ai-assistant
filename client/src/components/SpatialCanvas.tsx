@@ -82,6 +82,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   const [isDrawing, setIsDrawing] = useState(false);
   const drawCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [aiProcessing, setAiProcessing] = useState(false);
+  const autoConvertInFlightRef = useRef(false);
 
   const elements = useCanvasStore((s) => s.elements);
   const loading = useCanvasStore((s) => s.loading);
@@ -757,9 +758,11 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     const hasUnrecognized = paths.some((p: any) => !recognizeShape(p));
     if (!hasUnrecognized) return;
 
+    if (autoConvertInFlightRef.current) return;
     const canvas = drawCanvasRef.current;
     if (!canvas) return;
 
+    autoConvertInFlightRef.current = true;
     setAutoTextConverting(true);
     try {
       const tempCanvas = document.createElement("canvas");
@@ -772,12 +775,12 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           if (pt.y > bb.maxY) bb.maxY = pt.y;
         }
       }
-      const padding = 40;
+      const padding = 20;
       const w = bb.maxX - bb.minX + padding * 2;
       const h = bb.maxY - bb.minY + padding * 2;
-      const renderScale = 3;
-      tempCanvas.width = Math.max(400, Math.min(w * renderScale, 1600));
-      tempCanvas.height = Math.max(200, Math.min(h * renderScale, 1000));
+      const renderScale = 2;
+      tempCanvas.width = Math.max(200, Math.min(w * renderScale, 800));
+      tempCanvas.height = Math.max(100, Math.min(h * renderScale, 500));
       const ctx = tempCanvas.getContext("2d");
       if (!ctx) return;
       ctx.fillStyle = "#ffffff";
@@ -809,23 +812,22 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       if (resp.ok) {
         const { text } = await resp.json();
         if (text && text.trim().length > 0 && selectedBoardId) {
-          const centerX = (bb.minX + bb.maxX) / 2;
-          const centerY = (bb.minY + bb.maxY) / 2;
-          const maxZ = Math.max(0, ...Object.values(elements).map((el) => el.zIndex || 0));
-          const textWidth = Math.max(180, Math.min(text.trim().length * 12, 400));
+          const topMaxZ = Math.max(0, ...Object.values(elements).map((el) => el.zIndex || 0));
+          const noteWidth = Math.max(220, Math.min(text.trim().length * 10, 360));
+          const noteHeight = Math.max(80, Math.ceil(text.trim().length / 30) * 28 + 60);
           const apiUrl = buildUrl(api.canvasElements.create.path, { boardId: selectedBoardId });
           const res = await fetch(apiUrl, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             credentials: "include",
             body: JSON.stringify({
-              type: "section-header",
+              type: "note",
               x: bb.minX,
-              y: bb.minY,
-              width: textWidth,
-              height: 40,
-              zIndex: maxZ + 1,
-              content: { title: text.trim() },
+              y: bb.minY - 10,
+              width: noteWidth,
+              height: noteHeight,
+              zIndex: topMaxZ + 1,
+              content: { title: "", text: text.trim() },
             }),
           });
           const el = await res.json();
@@ -840,6 +842,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       console.error("Auto text conversion error:", err);
     } finally {
       setAutoTextConverting(false);
+      autoConvertInFlightRef.current = false;
     }
   }, [selectedBoardId, elements, addElement, redrawOverlayCanvas, toast]);
 
@@ -939,7 +942,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           if (!isDrawingRef.current) {
             tryAutoTextConvert();
           }
-        }, 2000);
+        }, 800);
       }
     };
 
@@ -1951,8 +1954,8 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                               setDrawingPaths([]);
                               drawPathsRef.current = [];
                               setDrawUndoStack([]);
-                              setDrawingMode(false);
-                              toast({ title: "Text Recognized", description: `Created note: "${data.text.trim().substring(0, 50)}..."` });
+                              redrawOverlayCanvas();
+                              toast({ title: "Text Recognized", description: `Created note: "${data.text.trim().substring(0, 50)}"` });
                             } else {
                               toast({ title: "No Text Found", description: "Could not identify any handwriting in the drawing", variant: "destructive" });
                             }
