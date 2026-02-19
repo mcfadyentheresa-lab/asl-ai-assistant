@@ -562,31 +562,41 @@ export default function ProjectDetails() {
                   <CardContent>
                     <div className="space-y-4">
                       {activityLog?.slice(0, 8).map((entry: any) => {
-                        const typeIcons: Record<string, string> = {
-                          milestone_created: "bg-blue-500",
-                          photo_uploaded: "bg-emerald-500",
-                          document_uploaded: "bg-amber-500",
-                          notification_sent: "bg-purple-500",
-                          message_sent: "bg-sky-500",
-                          calendar_event_created: "bg-rose-500",
-                          task_created: "bg-teal-500",
+                        const typeStyles: Record<string, { dot: string; tab: string | null; label: string }> = {
+                          milestone_created: { dot: "bg-blue-500", tab: "checklist", label: "View Checklist" },
+                          photo_uploaded: { dot: "bg-emerald-500", tab: "photos", label: "View Photos" },
+                          document_uploaded: { dot: "bg-amber-500", tab: "docs", label: "View Documents" },
+                          notification_sent: { dot: "bg-purple-500", tab: null, label: "" },
+                          message_sent: { dot: "bg-sky-500", tab: "chat", label: "View Chat" },
+                          calendar_event_created: { dot: "bg-rose-500", tab: "calendar", label: "View Calendar" },
+                          task_created: { dot: "bg-teal-500", tab: "checklist", label: "View Checklist" },
                         };
-                        const dotColor = typeIcons[entry.type] || "bg-muted-foreground";
+                        const style = typeStyles[entry.type] || { dot: "bg-muted-foreground", tab: null, label: "" };
                         const timeAgo = entry.createdAt ? formatDistanceToNow(new Date(entry.createdAt), { addSuffix: true }) : "";
+                        const isClickable = !!style.tab;
                         return (
                           <div
                             key={entry.id}
-                            className="flex items-start gap-3 text-sm pb-3 border-b last:border-0 last:pb-0"
+                            className={`flex items-start gap-3 text-sm pb-3 border-b last:border-0 last:pb-0 rounded-sm ${isClickable ? "cursor-pointer hover-elevate p-1.5 -m-1.5" : ""}`}
                             data-testid={`activity-${entry.id}`}
+                            onClick={isClickable ? () => setActiveTab(style.tab!) : undefined}
+                            role={isClickable ? "button" : undefined}
+                            tabIndex={isClickable ? 0 : undefined}
                           >
-                            <div className={`mt-1 h-2 w-2 rounded-full flex-shrink-0 ${dotColor}`} />
+                            <div className={`mt-1 h-2 w-2 rounded-full flex-shrink-0 ${style.dot}`} />
                             <div className="min-w-0 flex-1">
                               <p className="font-medium text-foreground">{entry.title}</p>
                               {entry.description && (
                                 <p className="text-muted-foreground text-xs truncate">{entry.description}</p>
                               )}
-                              <p className="text-muted-foreground text-xs mt-0.5">{timeAgo}</p>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <span className="text-muted-foreground text-xs">{timeAgo}</span>
+                                {isClickable && (
+                                  <span className="text-xs text-primary/70">{style.label}</span>
+                                )}
+                              </div>
                             </div>
+                            {isClickable && <ChevronRight className="h-3.5 w-3.5 mt-1 text-muted-foreground flex-shrink-0" />}
                           </div>
                         );
                       })}
