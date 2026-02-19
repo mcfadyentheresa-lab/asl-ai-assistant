@@ -19,7 +19,7 @@ import {
   CalendarDays, Milestone, ListChecks,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { usePlanningBoards, useCreatePlanningBoard, useDeletePlanningBoard, useUpdatePlanningBoard, useUploadImage, useUsers, useProjects, useMilestones, useChecklistItems, useCalendarEvents } from "@/hooks/use-projects";
+import { usePlanningBoards, useCreatePlanningBoard, useDeletePlanningBoard, useUpdatePlanningBoard, useUploadImage, useUsers, useProjects, useMilestones, useChecklistItems, useCalendarEvents, useUpdateCalendarEvent } from "@/hooks/use-projects";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -63,6 +63,8 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   const [showNewBoardDialog, setShowNewBoardDialog] = useState(false);
   const [showLinkDialog, setShowLinkDialog] = useState(false);
   const [linkDetailSheet, setLinkDetailSheet] = useState<{ type: "calendar" | "milestone" | "checklist"; id: number } | null>(null);
+  const [editingEventTitle, setEditingEventTitle] = useState<string | null>(null);
+  const { mutateAsync: updateCalendarEvent } = useUpdateCalendarEvent();
   const [renameName, setRenameName] = useState("");
   const [newBoardName, setNewBoardName] = useState("");
 
@@ -2362,7 +2364,55 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                 <div className="space-y-4" data-testid="detail-calendar-event">
                   <div>
                     <label className="text-xs text-muted-foreground">Title</label>
-                    <p className="text-sm font-medium" data-testid="detail-event-title">{ev.title}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      {editingEventTitle !== null ? (
+                        <form
+                          className="flex items-center gap-2 flex-1"
+                          onSubmit={async (e) => {
+                            e.preventDefault();
+                            const trimmed = editingEventTitle.trim();
+                            if (trimmed && trimmed !== ev.title) {
+                              try {
+                                await updateCalendarEvent({ id: ev.id, title: trimmed });
+                                toast({ title: "Updated", description: "Event title saved." });
+                              } catch {
+                                toast({ title: "Error", description: "Failed to update title.", variant: "destructive" });
+                              }
+                            }
+                            setEditingEventTitle(null);
+                          }}
+                        >
+                          <Input
+                            autoFocus
+                            value={editingEventTitle}
+                            onChange={(e) => setEditingEventTitle(e.target.value)}
+                            onBlur={async () => {
+                              const trimmed = editingEventTitle.trim();
+                              if (trimmed && trimmed !== ev.title) {
+                                try {
+                                  await updateCalendarEvent({ id: ev.id, title: trimmed });
+                                  toast({ title: "Updated", description: "Event title saved." });
+                                } catch {
+                                  toast({ title: "Error", description: "Failed to update title.", variant: "destructive" });
+                                }
+                              }
+                              setEditingEventTitle(null);
+                            }}
+                            className="text-sm"
+                            data-testid="input-edit-event-title"
+                          />
+                        </form>
+                      ) : (
+                        <p
+                          className="text-sm font-medium cursor-pointer hover:text-primary transition-colors flex items-center gap-1.5"
+                          onClick={() => setEditingEventTitle(ev.title)}
+                          data-testid="detail-event-title"
+                        >
+                          {ev.title}
+                          <Edit3 className="h-3 w-3 text-muted-foreground" />
+                        </p>
+                      )}
+                    </div>
                   </div>
                   {ev.description && (
                     <div>
