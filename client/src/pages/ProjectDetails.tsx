@@ -2499,7 +2499,7 @@ function CalendarTab({ projectId }: { projectId: number }) {
                   <SelectItem value="meeting">Meeting</SelectItem>
                   <SelectItem value="delivery">Delivery</SelectItem>
                   <SelectItem value="inspection">Inspection</SelectItem>
-                  <SelectItem value="time_off">Time Off</SelectItem>
+                  {user?.role === "admin" && <SelectItem value="time_off">Time Off</SelectItem>}
                 </SelectContent>
               </Select>
             </div>
