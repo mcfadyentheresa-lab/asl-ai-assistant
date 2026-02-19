@@ -13,7 +13,7 @@ import {
 import { useOnlineUsers, isUserOnline } from "@/hooks/use-presence";
 import { Navbar } from "@/components/layout/Navbar";
 import SpatialCanvas from "@/components/SpatialCanvas";
-import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, ExternalLink, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, CalendarDays, ChevronLeft, Upload, Download, User, X, Paperclip, ZoomIn, Palette, Shield, Users, Phone, Check, Bell, Eye, EyeOff, Archive, ArchiveRestore } from "lucide-react";
+import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, ExternalLink, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, CalendarDays, ChevronLeft, Upload, Download, User, X, Paperclip, ZoomIn, Palette, Shield, Users, Phone, Check, Bell, Eye, EyeOff, Archive, ArchiveRestore, PanelRightOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -40,11 +40,454 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+  SheetDescription,
+} from "@/components/ui/sheet";
 import { useState, useRef, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths, isSameDay, isSameMonth, parseISO, formatDistanceToNow } from "date-fns";
 import type { ChecklistItem, BoardItem, CalendarEvent } from "@shared/schema";
+
+function SidebarCards({
+  project, user, users, userRole, onlineUsers, planningBoards, assignedClient,
+  activityLog, seenLocally, toast, updateProject, sendTestSms, sendingTestSms,
+  notifyTeam, sendingNotification, showNotifyForm, setShowNotifyForm,
+  notifyMessage, setNotifyMessage, selectedRecipients, setSelectedRecipients,
+  setEditingUser, setProfileForm, setShowAddPerson, setAddPersonForm, setActiveTab, projectId,
+}: any) {
+  const admins = users?.filter((u: any) => u.role === "admin") || [];
+  const crewMembers = users?.filter((u: any) => u.role === "crew") || [];
+  const clients = users?.filter((u: any) => u.role === "client" && u.id === project.clientId) || [];
+  const boardInvitedClients = Array.isArray(planningBoards) ? users?.filter((u: any) =>
+    u.role === "client" && u.id !== project.clientId &&
+    planningBoards.some((b: any) => (b.linkedUserIds || []).includes(u.id))
+  ) || [] : [];
+  const allClients = [...clients, ...boardInvitedClients];
+
+  const renderUserRow = (u: any, badge?: string) => (
+    <div key={u.id} className={`space-y-1 ${u.archivedAt ? "opacity-50" : ""}`} data-testid={`access-user-${u.id}`}>
+      <div className="flex items-center gap-2">
+        <div className="relative flex-shrink-0">
+          <Avatar className="h-6 w-6">
+            <AvatarFallback className="text-[10px]">
+              {(u.firstName?.[0] || "").toUpperCase()}{(u.lastName?.[0] || "").toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+          {!u.archivedAt && isUserOnline(onlineUsers, u.id) && (
+            <span
+              className="absolute -bottom-0.5 -right-0.5 block h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-background"
+              data-testid={`indicator-online-${u.id}`}
+            />
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <span className="text-sm truncate block">
+            {u.firstName} {u.lastName}
+            {u.archivedAt && <Badge variant="outline" className="ml-1 text-[9px] no-default-hover-elevate no-default-active-elevate">Archived</Badge>}
+          </span>
+          <div className="flex items-center gap-1">
+            {u.phone ? (
+              <span className="text-xs text-muted-foreground flex items-center gap-1" data-testid={`text-phone-${u.id}`}>
+                <Phone className="h-3 w-3" />{u.phone}
+              </span>
+            ) : (
+              <span className="text-xs text-muted-foreground/50 italic">No phone</span>
+            )}
+            {userRole === "admin" && (
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-5 w-5 ml-1"
+                data-testid={`button-edit-user-${u.id}`}
+                onClick={() => {
+                  setEditingUser(u);
+                  setProfileForm({
+                    firstName: u.firstName || "",
+                    lastName: u.lastName || "",
+                    email: u.email || "",
+                    phone: u.phone || "",
+                    role: u.role || "client",
+                  });
+                }}
+              >
+                <Pencil className="h-3 w-3" />
+              </Button>
+            )}
+          </div>
+        </div>
+        {badge && <Badge variant="outline" className="ml-auto text-[10px] flex-shrink-0">{badge}</Badge>}
+      </div>
+    </div>
+  );
+
+  const missedEntries = activityLog?.filter((e: any) =>
+    e.userId !== user?.id && !e.views?.some((v: any) => v.userId === user?.id) && !seenLocally.has(e.id)
+  ) || [];
+  const seenEntries = activityLog?.filter((e: any) =>
+    e.userId === user?.id || e.views?.some((v: any) => v.userId === user?.id) || seenLocally.has(e.id)
+  ) || [];
+
+  const typeStyles: Record<string, { dot: string; tab: string | null; label: string }> = {
+    milestone_created: { dot: "bg-blue-500", tab: "checklist", label: "View Checklist" },
+    photo_uploaded: { dot: "bg-emerald-500", tab: "photos", label: "View Photos" },
+    document_uploaded: { dot: "bg-amber-500", tab: "docs", label: "View Documents" },
+    notification_sent: { dot: "bg-purple-500", tab: null, label: "" },
+    message_sent: { dot: "bg-sky-500", tab: "chat", label: "View Chat" },
+    calendar_event_created: { dot: "bg-rose-500", tab: "calendar", label: "View Calendar" },
+    task_created: { dot: "bg-teal-500", tab: "checklist", label: "View Checklist" },
+  };
+
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-serif text-lg" data-testid="text-client-heading">
+            Assigned Client
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {user?.role !== "client" ? (
+            <Select
+              value={project.clientId || "none"}
+              onValueChange={(val) => {
+                const clientId = val === "none" ? null : val;
+                updateProject({ id: projectId, data: { clientId } }, {
+                  onSuccess: () => toast({ title: "Client updated" }),
+                });
+              }}
+            >
+              <SelectTrigger data-testid="select-project-client">
+                <SelectValue placeholder="Select a client..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No client assigned</SelectItem>
+                {users?.map((u: any) => (
+                  <SelectItem key={u.id} value={u.id}>
+                    <div className="flex items-center gap-2">
+                      <span>{u.firstName || ""} {u.lastName || ""}</span>
+                      {u.email && <span className="text-muted-foreground text-xs">({u.email})</span>}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : assignedClient ? (
+            <div className="flex items-center gap-3" data-testid="text-assigned-client">
+              <Avatar>
+                <AvatarFallback>
+                  {(assignedClient.firstName?.[0] || "") + (assignedClient.lastName?.[0] || "")}
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <p className="font-medium text-foreground text-sm">
+                  {assignedClient.firstName || ""} {assignedClient.lastName || ""}
+                </p>
+                {assignedClient.email && (
+                  <p className="text-muted-foreground text-xs">{assignedClient.email}</p>
+                )}
+              </div>
+            </div>
+          ) : (
+            <p className="text-muted-foreground text-sm" data-testid="text-no-client">No client assigned</p>
+          )}
+        </CardContent>
+      </Card>
+
+      {userRole !== "client" && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="font-serif text-lg flex items-center gap-2" data-testid="text-access-heading">
+              <Shield className="h-4 w-4 text-muted-foreground" />
+              Project Access
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div data-testid="access-group-admin">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Admins ({admins.length})</p>
+              <div className="space-y-3">
+                {admins.map((u: any) => renderUserRow(u, "Full access"))}
+              </div>
+            </div>
+            <div data-testid="access-group-crew">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Crew ({crewMembers.length})</p>
+              <div className="space-y-3">
+                {crewMembers.length > 0 ? crewMembers.map((u: any) => renderUserRow(u)) : (
+                  <p className="text-xs text-muted-foreground italic">No crew assigned</p>
+                )}
+              </div>
+            </div>
+            <div data-testid="access-group-client">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Clients ({allClients.length})</p>
+              <div className="space-y-3">
+                {allClients.length > 0 ? allClients.map((u: any) =>
+                  renderUserRow(u, u.id === project.clientId ? "Project owner" : "Board invited")
+                ) : (
+                  <p className="text-xs text-muted-foreground italic">No client assigned</p>
+                )}
+              </div>
+            </div>
+            {userRole === "admin" && (
+              <div className="pt-2 border-t">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  data-testid="button-add-person"
+                  onClick={() => {
+                    setShowAddPerson(true);
+                    setAddPersonForm({ firstName: "", lastName: "", email: "", phone: "", role: "crew" });
+                  }}
+                >
+                  <Plus className="h-3 w-3 mr-1" />
+                  Add Person
+                </Button>
+              </div>
+            )}
+            {(userRole === "admin" || userRole === "crew") && (
+              <div className="pt-2 border-t space-y-2">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">SMS Notifications</p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    data-testid="button-notify-team"
+                    onClick={() => setShowNotifyForm(!showNotifyForm)}
+                  >
+                    <Send className="h-3 w-3 mr-1" />
+                    Notify Team
+                  </Button>
+                  {userRole === "admin" && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={sendingTestSms}
+                      data-testid="button-send-test-sms"
+                      onClick={() => {
+                        const adminUser = users?.find((u: any) => u.id === user?.id);
+                        const phone = adminUser?.phone;
+                        if (!phone) {
+                          toast({ title: "No phone number", description: "Add your phone number first to receive a test SMS", variant: "destructive" });
+                          return;
+                        }
+                        sendTestSms(phone, {
+                          onSuccess: () => toast({ title: "Test SMS sent", description: `Sent to ${phone}` }),
+                          onError: (err: any) => toast({ title: "SMS failed", description: err.message, variant: "destructive" }),
+                        });
+                      }}
+                    >
+                      {sendingTestSms ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Phone className="h-3 w-3 mr-1" />}
+                      Test SMS
+                    </Button>
+                  )}
+                </div>
+                {showNotifyForm && (() => {
+                  const eligibleRecipients = (users || []).filter(
+                    (u: any) => u.id !== user?.id && (u.role === "admin" || u.role === "crew" || (u.role === "client" && u.id === project?.clientId))
+                  );
+                  const toggleRecipient = (id: string) => {
+                    setSelectedRecipients((prev: string[]) =>
+                      prev.includes(id) ? prev.filter((r: string) => r !== id) : [...prev, id]
+                    );
+                  };
+                  const selectAll = () => {
+                    if (selectedRecipients.length === eligibleRecipients.length) {
+                      setSelectedRecipients([]);
+                    } else {
+                      setSelectedRecipients(eligibleRecipients.map((u: any) => u.id));
+                    }
+                  };
+                  return (
+                    <div className="space-y-3" data-testid="notify-team-form">
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-xs font-medium text-muted-foreground">Send to:</span>
+                          <Button variant="ghost" size="sm" className="h-6 text-xs px-2" onClick={selectAll} data-testid="button-select-all-recipients">
+                            {selectedRecipients.length === eligibleRecipients.length ? "Deselect All" : "Select All"}
+                          </Button>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5" data-testid="recipient-list">
+                          {eligibleRecipients.map((u: any) => {
+                            const selected = selectedRecipients.includes(u.id);
+                            const name = `${u.firstName || ""} ${u.lastName || ""}`.trim() || u.email;
+                            const hasPhone = !!u.phone;
+                            return (
+                              <Button
+                                key={u.id}
+                                variant={selected ? "default" : "outline"}
+                                size="sm"
+                                disabled={!hasPhone}
+                                className={`text-xs toggle-elevate ${selected ? "toggle-elevated" : ""}`}
+                                onClick={() => toggleRecipient(u.id)}
+                                data-testid={`recipient-toggle-${u.id}`}
+                              >
+                                {selected && <Check className="h-3 w-3 mr-1" />}
+                                {name}
+                                <span className="ml-1 opacity-60">({u.role})</span>
+                                {!hasPhone && <span className="ml-1 opacity-60">- no phone</span>}
+                              </Button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      <Textarea
+                        value={notifyMessage}
+                        onChange={(e) => setNotifyMessage(e.target.value.slice(0, 300))}
+                        placeholder="Type a message to send via SMS..."
+                        className="text-sm min-h-[60px]"
+                        data-testid="input-notify-message"
+                      />
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs text-muted-foreground">{notifyMessage.length}/300</span>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => { setShowNotifyForm(false); setNotifyMessage(""); setSelectedRecipients([]); }}
+                            data-testid="button-cancel-notify"
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            size="sm"
+                            disabled={sendingNotification || !notifyMessage.trim() || selectedRecipients.length === 0}
+                            data-testid="button-send-notify"
+                            onClick={() => {
+                              notifyTeam(
+                                { projectId, message: notifyMessage.trim(), recipientIds: selectedRecipients },
+                                {
+                                  onSuccess: (data: any) => {
+                                    toast({ title: "Notification sent", description: data.message });
+                                    setNotifyMessage("");
+                                    setSelectedRecipients([]);
+                                    setShowNotifyForm(false);
+                                  },
+                                  onError: (err: any) => toast({ title: "Failed to notify", description: err.message, variant: "destructive" }),
+                                }
+                              );
+                            }}
+                          >
+                            {sendingNotification ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Send className="h-3 w-3 mr-1" />}
+                            Send ({selectedRecipients.length})
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-serif text-lg flex items-center gap-2 flex-wrap" data-testid="text-activity-heading">
+            Recent Activity
+            {missedEntries.length > 0 && (
+              <Badge variant="destructive" className="text-[10px]" data-testid="badge-missed-count">
+                {missedEntries.length} new
+              </Badge>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {missedEntries.length > 0 && (
+              <>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider" data-testid="text-missed-label">Missed while you were away</p>
+                {missedEntries.slice(0, 10).map((entry: any) => {
+                  const style = typeStyles[entry.type] || { dot: "bg-muted-foreground", tab: null, label: "" };
+                  const timeAgo = entry.createdAt ? formatDistanceToNow(new Date(entry.createdAt), { addSuffix: true }) : "";
+                  const isClickable = !!style.tab;
+                  return (
+                    <div
+                      key={entry.id}
+                      className={`flex items-start gap-3 text-sm pb-3 border-b last:border-0 last:pb-0 rounded-sm bg-primary/5 p-2 -mx-2 ${isClickable ? "cursor-pointer hover-elevate" : ""}`}
+                      data-testid={`activity-missed-${entry.id}`}
+                      onClick={isClickable ? () => setActiveTab(style.tab!) : undefined}
+                      role={isClickable ? "button" : undefined}
+                      tabIndex={isClickable ? 0 : undefined}
+                    >
+                      <div className="relative mt-1 flex-shrink-0">
+                        <div className={`h-2 w-2 rounded-full ${style.dot}`} />
+                        <span className="absolute -top-1 -right-1 h-1.5 w-1.5 rounded-full bg-destructive" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-medium text-foreground">{entry.title}</p>
+                          <Badge variant="outline" className="text-[9px] py-0 px-1 border-destructive/40 text-destructive" data-testid={`badge-new-${entry.id}`}>NEW</Badge>
+                        </div>
+                        {entry.description && (
+                          <p className="text-muted-foreground text-xs truncate">{entry.description}</p>
+                        )}
+                        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                          <span className="text-muted-foreground text-xs">{timeAgo}</span>
+                          {isClickable && (
+                            <span className="text-xs text-primary/70">{style.label}</span>
+                          )}
+                        </div>
+                      </div>
+                      {isClickable && <ChevronRight className="h-3.5 w-3.5 mt-1 text-muted-foreground flex-shrink-0" />}
+                    </div>
+                  );
+                })}
+                {seenEntries.length > 0 && (
+                  <Separator className="my-2" />
+                )}
+              </>
+            )}
+            {seenEntries.length > 0 && (
+              <>
+                {missedEntries.length > 0 && (
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider" data-testid="text-earlier-label">Earlier</p>
+                )}
+                {seenEntries.slice(0, 8).map((entry: any) => {
+                  const style = typeStyles[entry.type] || { dot: "bg-muted-foreground", tab: null, label: "" };
+                  const timeAgo = entry.createdAt ? formatDistanceToNow(new Date(entry.createdAt), { addSuffix: true }) : "";
+                  const isClickable = !!style.tab;
+                  return (
+                    <div
+                      key={entry.id}
+                      className={`flex items-start gap-3 text-sm pb-3 border-b last:border-0 last:pb-0 ${isClickable ? "cursor-pointer hover-elevate rounded-sm p-1 -mx-1" : ""}`}
+                      data-testid={`activity-seen-${entry.id}`}
+                      onClick={isClickable ? () => setActiveTab(style.tab!) : undefined}
+                      role={isClickable ? "button" : undefined}
+                      tabIndex={isClickable ? 0 : undefined}
+                    >
+                      <div className={`h-2 w-2 mt-1.5 rounded-full ${style.dot} flex-shrink-0`} />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-foreground">{entry.title}</p>
+                        {entry.description && (
+                          <p className="text-muted-foreground text-xs truncate">{entry.description}</p>
+                        )}
+                        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                          <span className="text-muted-foreground text-xs">{timeAgo}</span>
+                          {isClickable && (
+                            <span className="text-xs text-primary/70">{style.label}</span>
+                          )}
+                        </div>
+                      </div>
+                      {isClickable && <ChevronRight className="h-3.5 w-3.5 mt-1 text-muted-foreground flex-shrink-0" />}
+                    </div>
+                  );
+                })}
+              </>
+            )}
+            {missedEntries.length === 0 && seenEntries.length === 0 && (
+              <p className="text-muted-foreground text-sm" data-testid="text-no-activity">No recent activity</p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </>
+  );
+}
 
 export default function ProjectDetails() {
   const { id } = useParams();
@@ -260,475 +703,92 @@ export default function ProjectDetails() {
                 </div>
               </div>
 
-              <div className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="font-serif text-lg" data-testid="text-client-heading">
-                      Assigned Client
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {user?.role !== "client" ? (
-                      <Select
-                        value={project.clientId || "none"}
-                        onValueChange={(val) => {
-                          const clientId = val === "none" ? null : val;
-                          updateProject({ id: projectId, data: { clientId } }, {
-                            onSuccess: () => toast({ title: "Client updated" }),
-                          });
-                        }}
-                      >
-                        <SelectTrigger data-testid="select-project-client">
-                          <SelectValue placeholder="Select a client..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">No client assigned</SelectItem>
-                          {users?.map((u) => (
-                            <SelectItem key={u.id} value={u.id}>
-                              <div className="flex items-center gap-2">
-                                <span>{u.firstName || ""} {u.lastName || ""}</span>
-                                {u.email && <span className="text-muted-foreground text-xs">({u.email})</span>}
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : assignedClient ? (
-                      <div className="flex items-center gap-3" data-testid="text-assigned-client">
-                        <Avatar>
-                          <AvatarFallback>
-                            {(assignedClient.firstName?.[0] || "") + (assignedClient.lastName?.[0] || "")}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="font-medium text-foreground text-sm">
-                            {assignedClient.firstName || ""} {assignedClient.lastName || ""}
-                          </p>
-                          {assignedClient.email && (
-                            <p className="text-muted-foreground text-xs">{assignedClient.email}</p>
-                          )}
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="text-muted-foreground text-sm" data-testid="text-no-client">No client assigned</p>
-                    )}
-                  </CardContent>
-                </Card>
-
-                {userRole !== "client" && (() => {
-                  const admins = users?.filter((u: any) => u.role === "admin") || [];
-                  const crewMembers = users?.filter((u: any) => u.role === "crew") || [];
-                  const clients = users?.filter((u: any) => u.role === "client" && u.id === project.clientId) || [];
-                  const boardInvitedClients = Array.isArray(planningBoards) ? users?.filter((u: any) =>
-                    u.role === "client" && u.id !== project.clientId &&
-                    planningBoards.some((b: any) => (b.linkedUserIds || []).includes(u.id))
-                  ) || [] : [];
-                  const allClients = [...clients, ...boardInvitedClients];
-
-                  const renderUserRow = (u: any, badge?: string) => (
-                    <div key={u.id} className={`space-y-1 ${u.archivedAt ? "opacity-50" : ""}`} data-testid={`access-user-${u.id}`}>
-                      <div className="flex items-center gap-2">
-                        <div className="relative flex-shrink-0">
-                          <Avatar className="h-6 w-6">
-                            <AvatarFallback className="text-[10px]">
-                              {(u.firstName?.[0] || "").toUpperCase()}{(u.lastName?.[0] || "").toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
-                          {!u.archivedAt && isUserOnline(onlineUsers, u.id) && (
-                            <span
-                              className="absolute -bottom-0.5 -right-0.5 block h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-background"
-                              data-testid={`indicator-online-${u.id}`}
-                            />
-                          )}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <span className="text-sm truncate block">
-                            {u.firstName} {u.lastName}
-                            {u.archivedAt && <Badge variant="outline" className="ml-1 text-[9px] no-default-hover-elevate no-default-active-elevate">Archived</Badge>}
-                          </span>
-                          <div className="flex items-center gap-1">
-                            {u.phone ? (
-                              <span className="text-xs text-muted-foreground flex items-center gap-1" data-testid={`text-phone-${u.id}`}>
-                                <Phone className="h-3 w-3" />{u.phone}
-                              </span>
-                            ) : (
-                              <span className="text-xs text-muted-foreground/50 italic">No phone</span>
-                            )}
-                            {userRole === "admin" && (
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-5 w-5 ml-1"
-                                data-testid={`button-edit-user-${u.id}`}
-                                onClick={() => {
-                                  setEditingUser(u);
-                                  setProfileForm({
-                                    firstName: u.firstName || "",
-                                    lastName: u.lastName || "",
-                                    email: u.email || "",
-                                    phone: u.phone || "",
-                                    role: u.role || "client",
-                                  });
-                                }}
-                              >
-                                <Pencil className="h-3 w-3" />
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                        {badge && <Badge variant="outline" className="ml-auto text-[10px] flex-shrink-0">{badge}</Badge>}
-                      </div>
+              <div className="md:hidden mb-4">
+                <Sheet>
+                  <SheetTrigger asChild>
+                    <Button variant="outline" size="sm" className="w-full" data-testid="button-open-sidebar-drawer">
+                      <PanelRightOpen className="h-4 w-4 mr-2" />
+                      Project Details
+                      {(() => {
+                        const missedCount = activityLog?.filter((e: any) =>
+                          e.userId !== user?.id && !e.views?.some((v: any) => v.userId === user?.id) && !seenLocally.has(e.id)
+                        ).length || 0;
+                        return missedCount > 0 ? (
+                          <Badge variant="destructive" className="ml-2 text-[10px]" data-testid="badge-drawer-missed">{missedCount} new</Badge>
+                        ) : null;
+                      })()}
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent side="right" className="w-[90vw] sm:max-w-md overflow-y-auto">
+                    <SheetHeader>
+                      <SheetTitle className="font-serif">Project Details</SheetTitle>
+                      <SheetDescription className="sr-only">Project sidebar with client, access, and activity information</SheetDescription>
+                    </SheetHeader>
+                    <div className="space-y-6 mt-4">
+                      <SidebarCards
+                        project={project}
+                        user={user}
+                        users={users}
+                        userRole={userRole}
+                        onlineUsers={onlineUsers}
+                        planningBoards={planningBoards}
+                        assignedClient={assignedClient}
+                        activityLog={activityLog}
+                        seenLocally={seenLocally}
+                        toast={toast}
+                        updateProject={updateProject}
+                        sendTestSms={sendTestSms}
+                        sendingTestSms={sendingTestSms}
+                        notifyTeam={notifyTeam}
+                        sendingNotification={sendingNotification}
+                        showNotifyForm={showNotifyForm}
+                        setShowNotifyForm={setShowNotifyForm}
+                        notifyMessage={notifyMessage}
+                        setNotifyMessage={setNotifyMessage}
+                        selectedRecipients={selectedRecipients}
+                        setSelectedRecipients={setSelectedRecipients}
+                        setEditingUser={setEditingUser}
+                        setProfileForm={setProfileForm}
+                        setShowAddPerson={setShowAddPerson}
+                        setAddPersonForm={setAddPersonForm}
+                        setActiveTab={setActiveTab}
+                        projectId={projectId}
+                      />
                     </div>
-                  );
+                  </SheetContent>
+                </Sheet>
+              </div>
 
-                  return (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="font-serif text-lg flex items-center gap-2" data-testid="text-access-heading">
-                          <Shield className="h-4 w-4 text-muted-foreground" />
-                          Project Access
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div data-testid="access-group-admin">
-                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Admins ({admins.length})</p>
-                          <div className="space-y-3">
-                            {admins.map((u: any) => renderUserRow(u, "Full access"))}
-                          </div>
-                        </div>
-                        <div data-testid="access-group-crew">
-                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Crew ({crewMembers.length})</p>
-                          <div className="space-y-3">
-                            {crewMembers.length > 0 ? crewMembers.map((u: any) => renderUserRow(u)) : (
-                              <p className="text-xs text-muted-foreground italic">No crew assigned</p>
-                            )}
-                          </div>
-                        </div>
-                        <div data-testid="access-group-client">
-                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Clients ({allClients.length})</p>
-                          <div className="space-y-3">
-                            {allClients.length > 0 ? allClients.map((u: any) =>
-                              renderUserRow(u, u.id === project.clientId ? "Project owner" : "Board invited")
-                            ) : (
-                              <p className="text-xs text-muted-foreground italic">No client assigned</p>
-                            )}
-                          </div>
-                        </div>
-                        {userRole === "admin" && (
-                          <div className="pt-2 border-t">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              data-testid="button-add-person"
-                              onClick={() => {
-                                setShowAddPerson(true);
-                                setAddPersonForm({ firstName: "", lastName: "", email: "", phone: "", role: "crew" });
-                              }}
-                            >
-                              <Plus className="h-3 w-3 mr-1" />
-                              Add Person
-                            </Button>
-                          </div>
-                        )}
-                        {(userRole === "admin" || userRole === "crew") && (
-                          <div className="pt-2 border-t space-y-2">
-                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">SMS Notifications</p>
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                data-testid="button-notify-team"
-                                onClick={() => setShowNotifyForm(!showNotifyForm)}
-                              >
-                                <Send className="h-3 w-3 mr-1" />
-                                Notify Team
-                              </Button>
-                              {userRole === "admin" && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  disabled={sendingTestSms}
-                                  data-testid="button-send-test-sms"
-                                  onClick={() => {
-                                    const adminUser = users?.find((u: any) => u.id === user?.id);
-                                    const phone = adminUser?.phone;
-                                    if (!phone) {
-                                      toast({ title: "No phone number", description: "Add your phone number first to receive a test SMS", variant: "destructive" });
-                                      return;
-                                    }
-                                    sendTestSms(phone, {
-                                      onSuccess: () => toast({ title: "Test SMS sent", description: `Sent to ${phone}` }),
-                                      onError: (err: any) => toast({ title: "SMS failed", description: err.message, variant: "destructive" }),
-                                    });
-                                  }}
-                                >
-                                  {sendingTestSms ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Phone className="h-3 w-3 mr-1" />}
-                                  Test SMS
-                                </Button>
-                              )}
-                            </div>
-                            {showNotifyForm && (() => {
-                              const eligibleRecipients = (users || []).filter(
-                                (u: any) => u.id !== user?.id && (u.role === "admin" || u.role === "crew" || (u.role === "client" && u.id === project?.clientId))
-                              );
-                              const toggleRecipient = (id: string) => {
-                                setSelectedRecipients((prev) =>
-                                  prev.includes(id) ? prev.filter((r) => r !== id) : [...prev, id]
-                                );
-                              };
-                              const selectAll = () => {
-                                if (selectedRecipients.length === eligibleRecipients.length) {
-                                  setSelectedRecipients([]);
-                                } else {
-                                  setSelectedRecipients(eligibleRecipients.map((u: any) => u.id));
-                                }
-                              };
-                              return (
-                                <div className="space-y-3" data-testid="notify-team-form">
-                                  <div>
-                                    <div className="flex items-center justify-between mb-1.5">
-                                      <span className="text-xs font-medium text-muted-foreground">Send to:</span>
-                                      <Button variant="ghost" size="sm" className="h-6 text-xs px-2" onClick={selectAll} data-testid="button-select-all-recipients">
-                                        {selectedRecipients.length === eligibleRecipients.length ? "Deselect All" : "Select All"}
-                                      </Button>
-                                    </div>
-                                    <div className="flex flex-wrap gap-1.5" data-testid="recipient-list">
-                                      {eligibleRecipients.map((u: any) => {
-                                        const selected = selectedRecipients.includes(u.id);
-                                        const name = `${u.firstName || ""} ${u.lastName || ""}`.trim() || u.email;
-                                        const hasPhone = !!u.phone;
-                                        return (
-                                          <Button
-                                            key={u.id}
-                                            variant={selected ? "default" : "outline"}
-                                            size="sm"
-                                            disabled={!hasPhone}
-                                            className={`text-xs toggle-elevate ${selected ? "toggle-elevated" : ""}`}
-                                            onClick={() => toggleRecipient(u.id)}
-                                            data-testid={`recipient-toggle-${u.id}`}
-                                          >
-                                            {selected && <Check className="h-3 w-3 mr-1" />}
-                                            {name}
-                                            <span className="ml-1 opacity-60">({u.role})</span>
-                                            {!hasPhone && <span className="ml-1 opacity-60">- no phone</span>}
-                                          </Button>
-                                        );
-                                      })}
-                                    </div>
-                                  </div>
-                                  <Textarea
-                                    value={notifyMessage}
-                                    onChange={(e) => setNotifyMessage(e.target.value.slice(0, 300))}
-                                    placeholder="Type a message to send via SMS..."
-                                    className="text-sm min-h-[60px]"
-                                    data-testid="input-notify-message"
-                                  />
-                                  <div className="flex items-center justify-between gap-2">
-                                    <span className="text-xs text-muted-foreground">{notifyMessage.length}/300</span>
-                                    <div className="flex items-center gap-2">
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => { setShowNotifyForm(false); setNotifyMessage(""); setSelectedRecipients([]); }}
-                                        data-testid="button-cancel-notify"
-                                      >
-                                        Cancel
-                                      </Button>
-                                      <Button
-                                        size="sm"
-                                        disabled={sendingNotification || !notifyMessage.trim() || selectedRecipients.length === 0}
-                                        data-testid="button-send-notify"
-                                        onClick={() => {
-                                          notifyTeam(
-                                            { projectId, message: notifyMessage.trim(), recipientIds: selectedRecipients },
-                                            {
-                                              onSuccess: (data: any) => {
-                                                toast({ title: "Notification sent", description: data.message });
-                                                setNotifyMessage("");
-                                                setSelectedRecipients([]);
-                                                setShowNotifyForm(false);
-                                              },
-                                              onError: (err: any) => toast({ title: "Failed to notify", description: err.message, variant: "destructive" }),
-                                            }
-                                          );
-                                        }}
-                                      >
-                                        {sendingNotification ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Send className="h-3 w-3 mr-1" />}
-                                        Send ({selectedRecipients.length})
-                                      </Button>
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })()}
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  );
-                })()}
-
-                {(() => {
-                  const missedEntries = activityLog?.filter((e: any) =>
-                    e.userId !== user?.id && !e.views?.some((v: any) => v.userId === user?.id) && !seenLocally.has(e.id)
-                  ) || [];
-                  const seenEntries = activityLog?.filter((e: any) =>
-                    e.userId === user?.id || e.views?.some((v: any) => v.userId === user?.id) || seenLocally.has(e.id)
-                  ) || [];
-                  return (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="font-serif text-lg flex items-center gap-2 flex-wrap" data-testid="text-activity-heading">
-                          Recent Activity
-                          {missedEntries.length > 0 && (
-                            <Badge variant="destructive" className="text-[10px]" data-testid="badge-missed-count">
-                              {missedEntries.length} new
-                            </Badge>
-                          )}
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-4">
-                          {missedEntries.length > 0 && (
-                            <>
-                              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider" data-testid="text-missed-label">Missed while you were away</p>
-                              {missedEntries.slice(0, 10).map((entry: any) => {
-                                const typeStyles: Record<string, { dot: string; tab: string | null; label: string }> = {
-                                  milestone_created: { dot: "bg-blue-500", tab: "checklist", label: "View Checklist" },
-                                  photo_uploaded: { dot: "bg-emerald-500", tab: "photos", label: "View Photos" },
-                                  document_uploaded: { dot: "bg-amber-500", tab: "docs", label: "View Documents" },
-                                  notification_sent: { dot: "bg-purple-500", tab: null, label: "" },
-                                  message_sent: { dot: "bg-sky-500", tab: "chat", label: "View Chat" },
-                                  calendar_event_created: { dot: "bg-rose-500", tab: "calendar", label: "View Calendar" },
-                                  task_created: { dot: "bg-teal-500", tab: "checklist", label: "View Checklist" },
-                                };
-                                const style = typeStyles[entry.type] || { dot: "bg-muted-foreground", tab: null, label: "" };
-                                const timeAgo = entry.createdAt ? formatDistanceToNow(new Date(entry.createdAt), { addSuffix: true }) : "";
-                                const isClickable = !!style.tab;
-                                return (
-                                  <div
-                                    key={entry.id}
-                                    className={`flex items-start gap-3 text-sm pb-3 border-b last:border-0 last:pb-0 rounded-sm bg-primary/5 p-2 -mx-2 ${isClickable ? "cursor-pointer hover-elevate" : ""}`}
-                                    data-testid={`activity-missed-${entry.id}`}
-                                    onClick={isClickable ? () => setActiveTab(style.tab!) : undefined}
-                                    role={isClickable ? "button" : undefined}
-                                    tabIndex={isClickable ? 0 : undefined}
-                                  >
-                                    <div className="relative mt-1 flex-shrink-0">
-                                      <div className={`h-2 w-2 rounded-full ${style.dot}`} />
-                                      <span className="absolute -top-1 -right-1 h-1.5 w-1.5 rounded-full bg-destructive" />
-                                    </div>
-                                    <div className="min-w-0 flex-1">
-                                      <div className="flex items-center gap-2 flex-wrap">
-                                        <p className="font-medium text-foreground">{entry.title}</p>
-                                        <Badge variant="outline" className="text-[9px] py-0 px-1 border-destructive/40 text-destructive" data-testid={`badge-new-${entry.id}`}>NEW</Badge>
-                                      </div>
-                                      {entry.description && (
-                                        <p className="text-muted-foreground text-xs truncate">{entry.description}</p>
-                                      )}
-                                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                                        <span className="text-muted-foreground text-xs">{timeAgo}</span>
-                                        {isClickable && (
-                                          <span className="text-xs text-primary/70">{style.label}</span>
-                                        )}
-                                      </div>
-                                    </div>
-                                    {isClickable && <ChevronRight className="h-3.5 w-3.5 mt-1 text-muted-foreground flex-shrink-0" />}
-                                  </div>
-                                );
-                              })}
-                              {seenEntries.length > 0 && (
-                                <Separator className="my-2" />
-                              )}
-                            </>
-                          )}
-                          {seenEntries.length > 0 && (
-                            <>
-                              {missedEntries.length > 0 && (
-                                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider" data-testid="text-earlier-label">Earlier</p>
-                              )}
-                              {seenEntries.slice(0, 8).map((entry: any) => {
-                                const typeStyles: Record<string, { dot: string; tab: string | null; label: string }> = {
-                                  milestone_created: { dot: "bg-blue-500", tab: "checklist", label: "View Checklist" },
-                                  photo_uploaded: { dot: "bg-emerald-500", tab: "photos", label: "View Photos" },
-                                  document_uploaded: { dot: "bg-amber-500", tab: "docs", label: "View Documents" },
-                                  notification_sent: { dot: "bg-purple-500", tab: null, label: "" },
-                                  message_sent: { dot: "bg-sky-500", tab: "chat", label: "View Chat" },
-                                  calendar_event_created: { dot: "bg-rose-500", tab: "calendar", label: "View Calendar" },
-                                  task_created: { dot: "bg-teal-500", tab: "checklist", label: "View Checklist" },
-                                };
-                                const style = typeStyles[entry.type] || { dot: "bg-muted-foreground", tab: null, label: "" };
-                                const timeAgo = entry.createdAt ? formatDistanceToNow(new Date(entry.createdAt), { addSuffix: true }) : "";
-                                const isClickable = !!style.tab;
-                                const viewedByUsers = (entry.views || []).map((v: any) => {
-                                  const u = users?.find((usr: any) => usr.id === v.userId);
-                                  return u ? `${u.firstName || ""} ${u.lastName || ""}`.trim() || u.email : null;
-                                }).filter(Boolean) as string[];
-                                const isCreator = entry.userId === user?.id;
-                                return (
-                                  <div
-                                    key={entry.id}
-                                    className={`flex items-start gap-3 text-sm pb-3 border-b last:border-0 last:pb-0 rounded-sm ${isClickable ? "cursor-pointer hover-elevate p-1.5 -m-1.5" : ""}`}
-                                    data-testid={`activity-${entry.id}`}
-                                    onClick={isClickable ? () => setActiveTab(style.tab!) : undefined}
-                                    role={isClickable ? "button" : undefined}
-                                    tabIndex={isClickable ? 0 : undefined}
-                                  >
-                                    <div className={`mt-1 h-2 w-2 rounded-full flex-shrink-0 ${style.dot}`} />
-                                    <div className="min-w-0 flex-1">
-                                      <p className="font-medium text-foreground">{entry.title}</p>
-                                      {entry.description && (
-                                        <p className="text-muted-foreground text-xs truncate">{entry.description}</p>
-                                      )}
-                                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                                        <span className="text-muted-foreground text-xs">{timeAgo}</span>
-                                        {isClickable && (
-                                          <span className="text-xs text-primary/70">{style.label}</span>
-                                        )}
-                                      </div>
-                                      {viewedByUsers.length > 0 && (
-                                        <Tooltip>
-                                          <TooltipTrigger asChild>
-                                            <div className="flex items-center gap-1 mt-1 cursor-default" data-testid={`activity-views-${entry.id}`}>
-                                              <Eye className="h-3 w-3 text-muted-foreground" />
-                                              <span className="text-muted-foreground text-xs">
-                                                Seen by {viewedByUsers.length}
-                                              </span>
-                                            </div>
-                                          </TooltipTrigger>
-                                          <TooltipContent side="bottom" align="start">
-                                            <p className="text-xs font-medium">Seen by:</p>
-                                            {viewedByUsers.map((name, i) => (
-                                              <p key={i} className="text-xs">{name}</p>
-                                            ))}
-                                          </TooltipContent>
-                                        </Tooltip>
-                                      )}
-                                      {viewedByUsers.length === 0 && (
-                                        <div className="flex items-center gap-1 mt-1" data-testid={`activity-unseen-${entry.id}`}>
-                                          <EyeOff className="h-3 w-3 text-muted-foreground/40" />
-                                          <span className="text-xs text-muted-foreground/50">
-                                            {isCreator ? "Not yet seen by others" : "Not yet seen"}
-                                          </span>
-                                        </div>
-                                      )}
-                                    </div>
-                                    {isClickable && <ChevronRight className="h-3.5 w-3.5 mt-1 text-muted-foreground flex-shrink-0" />}
-                                  </div>
-                                );
-                              })}
-                            </>
-                          )}
-                          {(!activityLog || activityLog.length === 0) && (
-                            <p className="text-muted-foreground text-sm" data-testid="text-no-activity">
-                              No recent activity.
-                            </p>
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })()}
+              <div className="space-y-6 hidden md:block">
+                <SidebarCards
+                  project={project}
+                  user={user}
+                  users={users}
+                  userRole={userRole}
+                  onlineUsers={onlineUsers}
+                  planningBoards={planningBoards}
+                  assignedClient={assignedClient}
+                  activityLog={activityLog}
+                  seenLocally={seenLocally}
+                  toast={toast}
+                  updateProject={updateProject}
+                  sendTestSms={sendTestSms}
+                  sendingTestSms={sendingTestSms}
+                  notifyTeam={notifyTeam}
+                  sendingNotification={sendingNotification}
+                  showNotifyForm={showNotifyForm}
+                  setShowNotifyForm={setShowNotifyForm}
+                  notifyMessage={notifyMessage}
+                  setNotifyMessage={setNotifyMessage}
+                  selectedRecipients={selectedRecipients}
+                  setSelectedRecipients={setSelectedRecipients}
+                  setEditingUser={setEditingUser}
+                  setProfileForm={setProfileForm}
+                  setShowAddPerson={setShowAddPerson}
+                  setAddPersonForm={setAddPersonForm}
+                  setActiveTab={setActiveTab}
+                  projectId={projectId}
+                />
               </div>
             </div>
           </TabsContent>

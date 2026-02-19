@@ -143,7 +143,9 @@ export function useBoardRealtime(
         clearTimeout(reconnectTimeoutRef.current);
       }
       if (wsRef.current) {
-        wsRef.current.send(JSON.stringify({ type: "leave" }));
+        if (wsRef.current.readyState === WebSocket.OPEN) {
+          wsRef.current.send(JSON.stringify({ type: "leave" }));
+        }
         wsRef.current.close();
         wsRef.current = null;
       }
