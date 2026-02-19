@@ -8,6 +8,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarPicker } from "@/components/ui/calendar";
+import { format, parseISO } from "date-fns";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -2423,12 +2426,41 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                   <div className="flex gap-6">
                     <div>
                       <label className="text-xs text-muted-foreground">Date</label>
-                      <p className="text-sm font-medium" data-testid="detail-event-date">{ev.date}</p>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <button
+                            className="text-sm font-medium cursor-pointer hover:text-primary transition-colors flex items-center gap-1.5 mt-1"
+                            data-testid="detail-event-date"
+                          >
+                            {format(parseISO(ev.date), "MMM d, yyyy")}
+                            <Edit3 className="h-3 w-3 text-muted-foreground" />
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <CalendarPicker
+                            mode="single"
+                            selected={parseISO(ev.date)}
+                            onSelect={async (day) => {
+                              if (!day) return;
+                              const newDate = format(day, "yyyy-MM-dd");
+                              if (newDate !== ev.date) {
+                                try {
+                                  await updateCalendarEvent({ id: ev.id, date: newDate });
+                                  toast({ title: "Updated", description: "Event date saved." });
+                                } catch {
+                                  toast({ title: "Error", description: "Failed to update date.", variant: "destructive" });
+                                }
+                              }
+                            }}
+                            data-testid="picker-event-date"
+                          />
+                        </PopoverContent>
+                      </Popover>
                     </div>
                     {ev.endDate && (
                       <div>
                         <label className="text-xs text-muted-foreground">End Date</label>
-                        <p className="text-sm font-medium" data-testid="detail-event-end-date">{ev.endDate}</p>
+                        <p className="text-sm font-medium mt-1" data-testid="detail-event-end-date">{format(parseISO(ev.endDate), "MMM d, yyyy")}</p>
                       </div>
                     )}
                   </div>
