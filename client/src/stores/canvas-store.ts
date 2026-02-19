@@ -2,11 +2,20 @@ import { create } from "zustand";
 import type { CanvasElement, InsertCanvasElement } from "@shared/schema";
 import { api, buildUrl } from "@shared/routes";
 
+type UndoAction =
+  | { type: "create"; elementId: number }
+  | { type: "delete"; element: CanvasElement }
+  | { type: "move"; elementId: number; prevX: number; prevY: number }
+  | { type: "update"; elementId: number; prevUpdates: Partial<CanvasElement> };
+
+const MAX_UNDO = 50;
+
 interface CanvasStore {
   elements: Record<number, CanvasElement>;
   dirtyIds: Set<number>;
   boardId: number | null;
   loading: boolean;
+  undoStack: UndoAction[];
 
   setElements: (elements: CanvasElement[]) => void;
   setBoardId: (id: number | null) => void;
@@ -16,6 +25,10 @@ interface CanvasStore {
   updateElement: (id: number, updates: Partial<CanvasElement>) => void;
   removeElement: (id: number) => void;
   moveElement: (id: number, x: number, y: number) => void;
+
+  pushUndo: (action: UndoAction) => void;
+  popUndo: () => UndoAction | undefined;
+  clearUndo: () => void;
 
   markDirty: (id: number) => void;
   clearDirty: () => void;
@@ -27,13 +40,14 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   dirtyIds: new Set(),
   boardId: null,
   loading: false,
+  undoStack: [],
 
   setElements: (elements) => {
     const map: Record<number, CanvasElement> = {};
     elements.forEach((e) => { map[e.id] = e; });
     set({ elements: map, dirtyIds: new Set() });
   },
-  setBoardId: (id) => set({ boardId: id }),
+  setBoardId: (id) => set({ boardId: id, undoStack: [] }),
   setLoading: (loading) => set({ loading }),
 
   addElement: (element) => {
@@ -67,6 +81,20 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       };
     });
   },
+
+  pushUndo: (action) => {
+    set((s) => ({
+      undoStack: [...s.undoStack.slice(-MAX_UNDO + 1), action],
+    }));
+  },
+  popUndo: () => {
+    const s = get();
+    if (s.undoStack.length === 0) return undefined;
+    const action = s.undoStack[s.undoStack.length - 1];
+    set({ undoStack: s.undoStack.slice(0, -1) });
+    return action;
+  },
+  clearUndo: () => set({ undoStack: [] }),
 
   markDirty: (id) => {
     set((s) => ({ dirtyIds: new Set(Array.from(s.dirtyIds).concat([id])) }));

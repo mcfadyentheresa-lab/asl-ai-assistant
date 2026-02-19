@@ -98,7 +98,8 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
 
   const elements = useCanvasStore((s) => s.elements);
   const loading = useCanvasStore((s) => s.loading);
-  const { setElements, addElement, updateElement, removeElement, moveElement, setLoading, setBoardId } = useCanvasStore.getState();
+  const { setElements, addElement, updateElement, removeElement, moveElement, setLoading, setBoardId, pushUndo, popUndo } = useCanvasStore.getState();
+  const undoStack = useCanvasStore((s) => s.undoStack);
 
   const { data: boards = [], isLoading: isLoadingBoards } = usePlanningBoards(projectId);
   const { mutateAsync: createBoard } = useCreatePlanningBoard();
@@ -205,12 +206,15 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       });
       const el = await res.json();
       addElement(el);
+      pushUndo({ type: "create", elementId: el.id });
     } catch {
       toast({ title: "Error", description: "Failed to create element", variant: "destructive" });
     }
   };
 
   const handleDeleteElement = async (id: number) => {
+    const el = elements[id];
+    if (el) pushUndo({ type: "delete", element: { ...el } });
     removeElement(id);
     setEditingId(null);
     try {
@@ -220,6 +224,8 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   };
 
   const handleUpdateContent = async (id: number, content: any) => {
+    const prev = elements[id];
+    if (prev) pushUndo({ type: "update", elementId: id, prevUpdates: { content: prev.content } });
     updateElement(id, { content });
     try {
       const url = buildUrl(api.canvasElements.update.path, { id });
@@ -231,6 +237,79 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       });
     } catch {}
   };
+
+  const handleUndo = useCallback(async () => {
+    if (!selectedBoardId) return;
+    const action = popUndo();
+    if (!action) return;
+
+    switch (action.type) {
+      case "create": {
+        removeElement(action.elementId);
+        try {
+          const url = buildUrl(api.canvasElements.delete.path, { id: action.elementId });
+          await fetch(url, { method: "DELETE", credentials: "include" });
+        } catch {}
+        break;
+      }
+      case "delete": {
+        try {
+          const url = buildUrl(api.canvasElements.create.path, { boardId: selectedBoardId });
+          const res = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+              type: action.element.type,
+              x: action.element.x,
+              y: action.element.y,
+              width: action.element.width,
+              height: action.element.height,
+              zIndex: action.element.zIndex,
+              content: action.element.content,
+              parentColumnId: action.element.parentColumnId,
+            }),
+          });
+          const restored = await res.json();
+          addElement(restored);
+        } catch {}
+        break;
+      }
+      case "move": {
+        moveElement(action.elementId, action.prevX, action.prevY);
+        debouncedSavePositions(selectedBoardId);
+        break;
+      }
+      case "update": {
+        const el = elements[action.elementId];
+        if (el) {
+          updateElement(action.elementId, action.prevUpdates);
+          try {
+            const url = buildUrl(api.canvasElements.update.path, { id: action.elementId });
+            await fetch(url, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify(action.prevUpdates),
+            });
+          } catch {}
+        }
+        break;
+      }
+    }
+    toast({ title: "Undone", description: "Last action reversed." });
+  }, [selectedBoardId, elements]);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        handleUndo();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [handleUndo]);
 
   const handleFileUpload = async (file: File, targetElementId?: number) => {
     if (!selectedBoardId) return;
@@ -387,9 +466,13 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     }
     if (draggingId !== null && selectedBoardId) {
       const el = elements[draggingId];
+      const startPos = dragStartRef.current;
       if (el) {
         const snappedX = Math.round(el.x / GRID_SIZE) * GRID_SIZE;
         const snappedY = Math.round(el.y / GRID_SIZE) * GRID_SIZE;
+        if (startPos && (startPos.elX !== snappedX || startPos.elY !== snappedY)) {
+          pushUndo({ type: "move", elementId: draggingId, prevX: startPos.elX, prevY: startPos.elY });
+        }
         moveElement(draggingId, snappedX, snappedY);
         if (el.type !== "column") {
           assignToColumn(draggingId);
@@ -636,9 +719,13 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     }
     if (draggingId !== null && selectedBoardId) {
       const el = elements[draggingId];
+      const startPos = dragStartRef.current;
       if (el) {
         const snappedX = Math.round(el.x / GRID_SIZE) * GRID_SIZE;
         const snappedY = Math.round(el.y / GRID_SIZE) * GRID_SIZE;
+        if (startPos && (startPos.elX !== snappedX || startPos.elY !== snappedY)) {
+          pushUndo({ type: "move", elementId: draggingId, prevX: startPos.elX, prevY: startPos.elY });
+        }
         moveElement(draggingId, snappedX, snappedY);
         if (el.type !== "column") {
           assignToColumn(draggingId);
@@ -1747,6 +1834,15 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
         })()}
         <div className="flex-1" />
         <div className="flex items-center gap-1">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button size="icon" variant="ghost" onClick={handleUndo} disabled={undoStack.length === 0} data-testid="button-undo">
+                <Undo2 className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-xs">Undo (Ctrl+Z)</TooltipContent>
+          </Tooltip>
+          <Separator orientation="vertical" className="h-4 mx-1" />
           <Tooltip>
             <TooltipTrigger asChild>
               <Button size="icon" variant="ghost" onClick={() => setZoom((z) => Math.max(0.15, z - 0.1))} data-testid="button-zoom-out">
