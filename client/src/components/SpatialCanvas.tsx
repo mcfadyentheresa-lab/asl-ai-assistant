@@ -731,6 +731,26 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     if (drawingMode) redrawOverlayCanvas();
   }, [drawingMode, redrawOverlayCanvas]);
 
+  useEffect(() => {
+    if (!drawingMode) return;
+    const canvas = drawCanvasRef.current;
+    if (!canvas) return;
+    const parent = canvas.parentElement;
+    if (!parent) return;
+    const syncSize = () => {
+      if (canvas.width !== parent.clientWidth || canvas.height !== parent.clientHeight) {
+        canvas.width = parent.clientWidth;
+        canvas.height = parent.clientHeight;
+        drawPathsRef.current = drawingPaths;
+        redrawOverlayCanvas();
+      }
+    };
+    syncSize();
+    const ro = new ResizeObserver(() => syncSize());
+    ro.observe(parent);
+    return () => ro.disconnect();
+  }, [drawingMode, drawingPaths, redrawOverlayCanvas]);
+
   const tryAutoTextConvert = useCallback(async () => {
     const paths = drawPathsRef.current;
     if (paths.length === 0 || !looksLikeHandwriting(paths)) return;
@@ -1564,7 +1584,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   return (
     <div className="flex flex-col h-full overflow-hidden" data-testid="spatial-canvas-root">
       {/* Board selector bar */}
-      <div className="flex items-center gap-2 mb-2 flex-wrap shrink-0">
+      <div className="flex items-center gap-1.5 mb-1 flex-wrap shrink-0">
         {!isLoadingBoards && boards.length > 0 && (
           <Select value={String(selectedBoardId || "")} onValueChange={(v) => setSelectedBoardId(Number(v))}>
             <SelectTrigger className="w-[200px]" data-testid="select-board-trigger">
@@ -1646,12 +1666,12 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       {boards.length > 0 && selectedBoardId && (
         <div className="flex flex-1 gap-0 min-h-0">
           {/* Left sidebar */}
-          <div className="w-16 shrink-0 border-r flex flex-col items-center py-2 gap-0.5 bg-muted/20 overflow-y-auto" data-testid="canvas-sidebar">
+          <div className="w-14 sm:w-16 landscape:w-12 shrink-0 border-r flex flex-col items-center py-1 sm:py-2 gap-0 sm:gap-0.5 bg-muted/20 overflow-y-auto" data-testid="canvas-sidebar">
             {sidebarTools.map((t) => (
               <Tooltip key={t.type}>
                 <TooltipTrigger asChild>
                   <button
-                    className="w-12 h-11 flex flex-col items-center justify-center rounded-md text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors gap-0.5 cursor-grab active:cursor-grabbing shrink-0"
+                    className="w-11 sm:w-12 h-10 sm:h-11 landscape:h-8 flex flex-col items-center justify-center rounded-md text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors gap-0.5 cursor-grab active:cursor-grabbing shrink-0"
                     draggable
                     onDragStart={(e) => {
                       e.dataTransfer.setData("tool-type", t.type);
@@ -1660,8 +1680,8 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                     onClick={() => t.type === "image" ? setShowImagePopup(!showImagePopup) : t.type === "draw" ? (() => { setDrawingMode(true); setDrawTool("pen"); setDrawingPaths([]); drawPathsRef.current = []; setDrawUndoStack([]); setEditingId(null); })() : createElement(t.type)}
                     data-testid={`sidebar-tool-${t.type}`}
                   >
-                    <t.icon className="h-5 w-5" />
-                    <span className="text-[9px] leading-none">{t.label}</span>
+                    <t.icon className="h-4 w-4 sm:h-5 sm:w-5" />
+                    <span className="text-[9px] leading-none landscape:hidden">{t.label}</span>
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="right" className="text-xs">{t.label}</TooltipContent>
@@ -1671,12 +1691,12 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
-                  className="w-12 h-11 flex flex-col items-center justify-center rounded-md text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors gap-0.5 shrink-0"
+                  className="w-11 sm:w-12 h-10 sm:h-11 landscape:h-8 flex flex-col items-center justify-center rounded-md text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors gap-0.5 shrink-0"
                   onClick={() => { if (editingId) handleDeleteElement(editingId); }}
                   data-testid="sidebar-tool-delete"
                 >
-                  <Trash2 className="h-5 w-5" />
-                  <span className="text-[9px] leading-none">Delete</span>
+                  <Trash2 className="h-4 w-4 sm:h-5 sm:w-5" />
+                  <span className="text-[9px] leading-none landscape:hidden">Delete</span>
                 </button>
               </TooltipTrigger>
               <TooltipContent side="right" className="text-xs">Delete Selected</TooltipContent>
@@ -1823,7 +1843,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                   </div>
                 )}
                 <div
-                  className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[101] flex items-center gap-2 bg-card border border-border rounded-lg shadow-lg px-3 py-2"
+                  className="absolute bottom-2 left-1/2 -translate-x-1/2 z-[101] flex flex-wrap items-center justify-center gap-1.5 bg-card border border-border rounded-lg shadow-lg px-2 py-1.5 max-w-[calc(100vw-2rem)] max-h-[40vh] overflow-y-auto"
                   onMouseDown={(e) => e.stopPropagation()}
                   onTouchStart={(e) => e.stopPropagation()}
                   data-testid="draw-overlay-toolbar"
@@ -1832,7 +1852,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                   <button className={`p-1.5 rounded transition-colors ${drawTool === "eraser" ? "bg-primary/20 text-primary" : "text-muted-foreground hover:text-foreground"}`} onClick={() => setDrawTool("eraser")} data-testid="draw-tool-eraser"><Eraser className="h-4 w-4" /></button>
                   <div className="w-px h-5 bg-border" />
                   <input type="color" value={drawColor} onChange={(e) => setDrawColor(e.target.value)} className="w-6 h-6 rounded cursor-pointer border border-border" data-testid="draw-tool-color" />
-                  <button className="px-2 py-1 rounded text-xs font-mono text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" onClick={() => setDrawStrokeWidth((w) => w >= 10 ? 1 : w + 1)} data-testid="draw-tool-stroke">{drawStrokeWidth}px</button>
+                  <button className="px-1.5 py-1 rounded text-xs font-mono text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" onClick={() => setDrawStrokeWidth((w) => w >= 10 ? 1 : w + 1)} data-testid="draw-tool-stroke">{drawStrokeWidth}px</button>
                   <div className="w-px h-5 bg-border" />
                   <button className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30" disabled={drawingPaths.length === 0} onClick={() => { if (drawingPaths.length > 0) { setDrawUndoStack((s) => [...s, drawingPaths[drawingPaths.length - 1]]); const next = drawingPaths.slice(0, -1); setDrawingPaths(next); drawPathsRef.current = next; redrawOverlayCanvas(); } }} data-testid="draw-tool-undo"><Undo2 className="h-4 w-4" /></button>
                   <button className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30" disabled={drawUndoStack.length === 0} onClick={() => { if (drawUndoStack.length > 0) { const restored = drawUndoStack[drawUndoStack.length - 1]; setDrawUndoStack((s) => s.slice(0, -1)); const next = [...drawingPaths, restored]; setDrawingPaths(next); drawPathsRef.current = next; redrawOverlayCanvas(); } }} data-testid="draw-tool-redo"><Redo2 className="h-4 w-4" /></button>
@@ -1951,8 +1971,8 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                     <TooltipContent side="top"><p>Convert handwriting to text</p></TooltipContent>
                   </Tooltip>
                   <div className="w-px h-5 bg-border" />
-                  <Button size="sm" variant="ghost" className="text-destructive text-xs" onClick={() => { setDrawingPaths([]); drawPathsRef.current = []; setDrawUndoStack([]); setDrawingMode(false); }} data-testid="draw-tool-discard"><X className="h-3.5 w-3.5 mr-1" />Discard</Button>
-                  <Button size="sm" variant="default" className="text-xs" onClick={() => {
+                  <Button size="sm" variant="ghost" className="text-destructive text-xs px-1.5 sm:px-2" onClick={() => { setDrawingPaths([]); drawPathsRef.current = []; setDrawUndoStack([]); setDrawingMode(false); }} data-testid="draw-tool-discard"><X className="h-3.5 w-3.5 sm:mr-1" /><span className="hidden sm:inline">Discard</span></Button>
+                  <Button size="sm" variant="default" className="text-xs px-1.5 sm:px-2" onClick={() => {
                     if (drawingPaths.length > 0 && selectedBoardId) {
                       const newZ = maxZ;
                       setMaxZ(newZ + 1);
@@ -1971,7 +1991,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                     drawPathsRef.current = [];
                     setDrawUndoStack([]);
                     setDrawingMode(false);
-                  }} data-testid="draw-tool-save"><Save className="h-3.5 w-3.5 mr-1" />Save</Button>
+                  }} data-testid="draw-tool-save"><Save className="h-3.5 w-3.5 sm:mr-1" /><span className="hidden sm:inline">Save</span></Button>
                 </div>
               </>
             )}
