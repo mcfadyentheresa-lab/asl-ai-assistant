@@ -2087,12 +2087,24 @@ const eventTypeColors: Record<string, string> = {
   meeting: "#d97706",
   delivery: "#0891b2",
   inspection: "#7c3aed",
+  time_off: "#64748b",
+};
+
+const eventTypeLabelsCalendar: Record<string, string> = {
+  event: "Event",
+  milestone: "Milestone",
+  deadline: "Deadline",
+  meeting: "Meeting",
+  delivery: "Delivery",
+  inspection: "Inspection",
+  time_off: "Time Off",
 };
 
 function CalendarTab({ projectId }: { projectId: number }) {
   const { toast } = useToast();
   const { user } = useAuth();
   const { data: events, isLoading } = useCalendarEvents(projectId);
+  const { data: allUsers } = useUsers();
   const { mutate: createEvent, isPending: isCreating } = useCreateCalendarEvent();
   const { mutate: updateEvent } = useUpdateCalendarEvent();
   const { mutate: deleteEvent } = useDeleteCalendarEvent();
@@ -2102,6 +2114,8 @@ function CalendarTab({ projectId }: { projectId: number }) {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [eventForm, setEventForm] = useState({ title: "", description: "", type: "event" });
+  const [timeOffCrewId, setTimeOffCrewId] = useState<string>("");
+  const crewMembers = (allUsers as any[] || []).filter((u: any) => u.role === "crew" || u.role === "admin");
   const [eventImageFile, setEventImageFile] = useState<File | null>(null);
   const [eventImagePreview, setEventImagePreview] = useState<string | null>(null);
   const [expandedImage, setExpandedImage] = useState<string | null>(null);
@@ -2143,11 +2157,18 @@ function CalendarTab({ projectId }: { projectId: number }) {
 
   const handleAddEvent = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!eventForm.title.trim() || !selectedDate) return;
+    let title = eventForm.title.trim();
+    if (eventForm.type === "time_off" && timeOffCrewId) {
+      const member = crewMembers.find((u: any) => u.id === timeOffCrewId);
+      if (member) {
+        title = title || `${member.firstName} ${member.lastName} — Time Off`;
+      }
+    }
+    if (!title || !selectedDate) return;
     createEvent(
       {
         projectId,
-        title: eventForm.title.trim(),
+        title,
         description: eventForm.description.trim() || null,
         date: format(selectedDate, "yyyy-MM-dd"),
         type: eventForm.type,
@@ -2171,6 +2192,7 @@ function CalendarTab({ projectId }: { projectId: number }) {
           }
           setAddDialogOpen(false);
           setEventForm({ title: "", description: "", type: "event" });
+          setTimeOffCrewId("");
           clearEventImage();
         },
         onError: (err) => toast({ title: "Error", description: err.message, variant: "destructive" }),
@@ -2357,7 +2379,7 @@ function CalendarTab({ projectId }: { projectId: number }) {
                             </p>
                           )}
                           <Badge variant="outline" className="mt-1 text-[10px] no-default-hover-elevate" data-testid={`badge-event-type-${ev.id}`}>
-                            {ev.type || "event"}
+                            {eventTypeLabelsCalendar[ev.type || "event"] || ev.type || "Event"}
                           </Badge>
                         </div>
                       </div>
@@ -2430,7 +2452,7 @@ function CalendarTab({ projectId }: { projectId: number }) {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={addDialogOpen} onOpenChange={(open) => { setAddDialogOpen(open); if (!open) clearEventImage(); }}>
+      <Dialog open={addDialogOpen} onOpenChange={(open) => { setAddDialogOpen(open); if (!open) { clearEventImage(); setTimeOffCrewId(""); } }}>
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
             <DialogTitle className="font-serif text-xl" data-testid="text-add-event-title">
@@ -2463,7 +2485,10 @@ function CalendarTab({ projectId }: { projectId: number }) {
             </div>
             <div>
               <label className="text-sm font-medium mb-1 block">Type</label>
-              <Select value={eventForm.type} onValueChange={(v) => setEventForm({ ...eventForm, type: v })}>
+              <Select value={eventForm.type} onValueChange={(v) => {
+                setEventForm({ ...eventForm, type: v });
+                if (v !== "time_off") setTimeOffCrewId("");
+              }}>
                 <SelectTrigger data-testid="select-event-type">
                   <SelectValue />
                 </SelectTrigger>
@@ -2474,9 +2499,34 @@ function CalendarTab({ projectId }: { projectId: number }) {
                   <SelectItem value="meeting">Meeting</SelectItem>
                   <SelectItem value="delivery">Delivery</SelectItem>
                   <SelectItem value="inspection">Inspection</SelectItem>
+                  <SelectItem value="time_off">Time Off</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+            {eventForm.type === "time_off" && (
+              <div>
+                <label className="text-sm font-medium mb-1 block">Crew Member</label>
+                <Select value={timeOffCrewId} onValueChange={(v) => {
+                  setTimeOffCrewId(v);
+                  const member = crewMembers.find((u: any) => u.id === v);
+                  if (member && !eventForm.title.trim()) {
+                    setEventForm({ ...eventForm, title: `${member.firstName} ${member.lastName} — Time Off` });
+                  }
+                }}>
+                  <SelectTrigger data-testid="select-time-off-crew">
+                    <SelectValue placeholder="Select crew member..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {crewMembers.map((u: any) => (
+                      <SelectItem key={u.id} value={u.id}>
+                        {u.firstName} {u.lastName} ({u.role})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">For planning around scheduled holidays and time away</p>
+              </div>
+            )}
             <div>
               <label className="text-sm font-medium mb-1 block">Date</label>
               <Input
@@ -2527,7 +2577,7 @@ function CalendarTab({ projectId }: { projectId: number }) {
               <Button type="button" variant="outline" onClick={() => { setAddDialogOpen(false); clearEventImage(); }} data-testid="button-cancel-event">
                 Cancel
               </Button>
-              <Button type="submit" disabled={isCreating || !eventForm.title.trim() || !selectedDate} data-testid="button-save-event">
+              <Button type="submit" disabled={isCreating || (!eventForm.title.trim() && !(eventForm.type === "time_off" && timeOffCrewId)) || !selectedDate} data-testid="button-save-event">
                 {isCreating ? <Loader2 className="mr-2 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
                 Add Event
               </Button>
