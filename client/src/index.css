@@ -4,6 +4,10 @@
 @tailwind components;
 @tailwind utilities;
 
+html, body {
+  -webkit-text-size-adjust: 100%;
+}
+
 :root {
   --background: 40 33% 98%;
   --foreground: 160 15% 15%;
