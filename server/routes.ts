@@ -1082,6 +1082,41 @@ export async function registerRoutes(
     res.json({ ok: true });
   });
 
+  // ── Color Tags ──
+  const colorTagSchema = z.object({
+    colorTagId: z.number().nullable(),
+  });
+
+  app.patch("/api/projects/:id/color-tag", isAuthenticated, async (req: any, res) => {
+    try {
+      const id = Number(req.params.id);
+      const existing = await storage.getProject(id);
+      if (!existing) return res.status(404).json({ message: "Project not found" });
+      const parsed = colorTagSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: "Invalid input" });
+      const project = await storage.updateProject(id, { colorTagId: parsed.data.colorTagId });
+      res.json(project);
+    } catch (error) {
+      console.error("Error updating project color tag:", error);
+      res.status(500).json({ message: "Failed to update color tag" });
+    }
+  });
+
+  app.patch("/api/planning-boards/:id/color-tag", isAuthenticated, async (req: any, res) => {
+    try {
+      const id = Number(req.params.id);
+      const existing = await storage.getPlanningBoard(id);
+      if (!existing) return res.status(404).json({ message: "Planning board not found" });
+      const parsed = colorTagSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: "Invalid input" });
+      const board = await storage.updatePlanningBoard(id, { colorTagId: parsed.data.colorTagId });
+      res.json(board);
+    } catch (error) {
+      console.error("Error updating board color tag:", error);
+      res.status(500).json({ message: "Failed to update color tag" });
+    }
+  });
+
   // ── Paint Colors ──
   app.get("/api/paint-colors", isAuthenticated, async (req, res) => {
     const { brand, colorFamily, search, popular } = req.query;

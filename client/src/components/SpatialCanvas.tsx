@@ -34,6 +34,7 @@ import { recognizeAllShapes, recognizeShape, looksLikeHandwriting } from "@/lib/
 import type { CanvasElement, PlanningBoard as PlanningBoardType, PaintColor } from "@shared/schema";
 import { queryClient } from "@/lib/queryClient";
 import { useQuery } from "@tanstack/react-query";
+import { ColorPalettePicker, ColorTagDot } from "@/components/ColorPalettePicker";
 
 function BmColorPicker({ onSelect }: { onSelect: (color: PaintColor) => void }) {
   const [open, setOpen] = useState(false);
@@ -364,6 +365,22 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       ? current.filter((id: number) => id !== pid)
       : [...current, pid];
     handleLinkUpdate("linkedProjectIds", next);
+  };
+
+  const handleBoardColorTag = async (colorId: number | null) => {
+    if (!selectedBoardId) return;
+    try {
+      await fetch(`/api/planning-boards/${selectedBoardId}/color-tag`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ colorTagId: colorId }),
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'planning-boards'] });
+      toast({ title: colorId ? "Color tag set" : "Color tag removed" });
+    } catch {
+      toast({ title: "Error", description: "Failed to update color tag", variant: "destructive" });
+    }
   };
 
   const createElement = async (type: string, x?: number, y?: number) => {
@@ -1945,27 +1962,44 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           <Plus className="h-3.5 w-3.5 mobile-landscape:mr-0 mr-1" /> <span className="mobile-landscape:hidden">New Board</span>
         </Button>
         {selectedBoardId && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" data-testid="button-board-menu">
-                <MoreVertical className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
-              <DropdownMenuItem onClick={() => { setRenameName(selectedBoard?.name || ""); setShowRenameDialog(true); }} data-testid="menu-rename-board">
-                <Edit3 className="h-4 w-4 mr-2" /> Rename
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => { setLinkCreateMode({ milestone: false, checklist: false, calendar: false }); setShowLinkDialog(true); }} data-testid="menu-link-board">
-                <Link2 className="h-4 w-4 mr-2" /> Link to...
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={createWeeklyPlanner} data-testid="menu-weekly-template">
-                <Columns3 className="h-4 w-4 mr-2" /> Add Weekly Planner
-              </DropdownMenuItem>
-              <DropdownMenuItem className="text-destructive" onClick={() => setShowDeleteConfirm(true)} data-testid="menu-delete-board">
-                <Trash2 className="h-4 w-4 mr-2" /> Delete Board
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" data-testid="button-board-menu">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem onClick={() => { setRenameName(selectedBoard?.name || ""); setShowRenameDialog(true); }} data-testid="menu-rename-board">
+                  <Edit3 className="h-4 w-4 mr-2" /> Rename
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => { setLinkCreateMode({ milestone: false, checklist: false, calendar: false }); setShowLinkDialog(true); }} data-testid="menu-link-board">
+                  <Link2 className="h-4 w-4 mr-2" /> Link to...
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={createWeeklyPlanner} data-testid="menu-weekly-template">
+                  <Columns3 className="h-4 w-4 mr-2" /> Add Weekly Planner
+                </DropdownMenuItem>
+                <DropdownMenuItem className="text-destructive" onClick={() => setShowDeleteConfirm(true)} data-testid="menu-delete-board">
+                  <Trash2 className="h-4 w-4 mr-2" /> Delete Board
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <ColorPalettePicker
+              selectedColorId={selectedBoard?.colorTagId ?? null}
+              onSelect={(colorId) => handleBoardColorTag(colorId)}
+              trigger={
+                selectedBoard?.colorTagId ? (
+                  <Button variant="ghost" size="icon" className="relative" data-testid="button-board-color-tag">
+                    <ColorTagDot colorTagId={selectedBoard.colorTagId} size="md" />
+                  </Button>
+                ) : (
+                  <Button variant="ghost" size="icon" data-testid="button-board-color-tag">
+                    <Palette className="h-4 w-4 text-muted-foreground" />
+                  </Button>
+                )
+              }
+            />
+          </>
         )}
         {(selectedBoard?.linkedUserIds?.length ?? 0) > 0 && (
           <div className="flex items-center gap-1 mobile-landscape:hidden" data-testid="badges-linked-people">

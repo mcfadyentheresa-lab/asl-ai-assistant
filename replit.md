@@ -184,5 +184,18 @@ Path aliases are configured:
 - **Planning Board integration**: `BmColorPicker` component in `SpatialCanvas.tsx` lets users pick a Benjamin Moore color directly when editing a color swatch element on the planning board
 - Navigation: Accessible from user menu dropdown in Navbar
 
+### Color Tagging
+- Projects and planning boards can be tagged with a Benjamin Moore color via `colorTagId` column
+- `PATCH /api/projects/:id/color-tag` — Set/clear project color tag
+- `PATCH /api/planning-boards/:id/color-tag` — Set/clear board color tag
+- Reusable `ColorPalettePicker` component (`client/src/components/ColorPalettePicker.tsx`) with BM Color Catalog-style tabs (Off-Whites, Colors, Muted Hues), sub-family filters, search, and color grid
+- `ColorTagDot` component displays a small colored circle for tagged items
+- Integration: ProjectCard shows color dot on hover + picker button; SpatialCanvas board toolbar shows palette button for board tagging
+
+### Text Size Accessibility
+- `useTextZoom` hook (`client/src/hooks/use-text-zoom.ts`) cycles through 100%, 115%, 130%, 150% text sizes
+- Accessible from Navbar user dropdown menu ("Text Size: X%")
+- Persisted in localStorage, applies to root HTML font-size for rem-based scaling
+
 ### Seeding
 - `server/seed-paint-colors.ts` — Seeds 290 curated Benjamin Moore colors on server startup if table is empty

@@ -20,6 +20,7 @@ export const projects = pgTable("projects", {
   thumbnailUrl: text("thumbnail_url"),
   totalBudget: integer("total_budget").default(0),
   budgetUsed: integer("budget_used").default(0),
+  colorTagId: integer("color_tag_id"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -151,6 +152,7 @@ export const planningBoards = pgTable("planning_boards", {
   linkedCalendarEventId: integer("linked_calendar_event_id").references(() => calendarEvents.id),
   linkedUserIds: text("linked_user_ids").array().default([]),
   linkedProjectIds: integer("linked_project_ids").array().default([]),
+  colorTagId: integer("color_tag_id"),
   updatedAt: timestamp("updated_at").defaultNow(),
   updatedBy: text("updated_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),

@@ -285,7 +285,7 @@ export const api = {
     update: {
       method: 'PATCH' as const,
       path: '/api/planning-boards/:id' as const,
-      input: insertPlanningBoardSchema.pick({ name: true, linkedMilestoneId: true, linkedChecklistItemId: true, linkedCalendarEventId: true, linkedUserIds: true, linkedProjectIds: true }).partial(),
+      input: insertPlanningBoardSchema.pick({ name: true, linkedMilestoneId: true, linkedChecklistItemId: true, linkedCalendarEventId: true, linkedUserIds: true, linkedProjectIds: true, colorTagId: true }).partial(),
       responses: {
         200: z.custom<typeof planningBoards.$inferSelect>(),
       },
