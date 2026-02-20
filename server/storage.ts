@@ -19,6 +19,7 @@ export interface IStorage {
 
   // Milestones
   getMilestones(projectId: number): Promise<Milestone[]>;
+  getMilestone(id: number): Promise<Milestone | undefined>;
   createMilestone(milestone: InsertMilestone): Promise<Milestone>;
   updateMilestone(id: number, data: Partial<InsertMilestone>): Promise<Milestone>;
   deleteMilestone(id: number): Promise<void>;
@@ -123,6 +124,10 @@ export class DatabaseStorage implements IStorage {
   // Milestones
   async getMilestones(projectId: number): Promise<Milestone[]> {
     return await db.select().from(milestones).where(eq(milestones.projectId, projectId)).orderBy(milestones.date);
+  }
+  async getMilestone(id: number): Promise<Milestone | undefined> {
+    const [m] = await db.select().from(milestones).where(eq(milestones.id, id));
+    return m;
   }
   async createMilestone(milestone: InsertMilestone): Promise<Milestone> {
     const [newMilestone] = await db.insert(milestones).values(milestone).returning();

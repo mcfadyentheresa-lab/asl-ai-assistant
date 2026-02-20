@@ -187,8 +187,7 @@ export function useUpdateMilestone() {
       return res.json();
     },
     onSuccess: (_, variables) => {
-      const url = buildUrl(api.milestones.list.path, { projectId: variables.projectId });
-      queryClient.invalidateQueries({ queryKey: [url, variables.projectId] });
+      queryClient.invalidateQueries({ queryKey: [api.milestones.list.path, variables.projectId] });
     },
   });
 }
@@ -205,8 +204,7 @@ export function useDeleteMilestone() {
       return res.json();
     },
     onSuccess: (_, variables) => {
-      const url = buildUrl(api.milestones.list.path, { projectId: variables.projectId });
-      queryClient.invalidateQueries({ queryKey: [url, variables.projectId] });
+      queryClient.invalidateQueries({ queryKey: [api.milestones.list.path, variables.projectId] });
     },
   });
 }

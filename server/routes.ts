@@ -446,9 +446,39 @@ export async function registerRoutes(
   app.patch("/api/milestones/:id", isAuthenticated, async (req: any, res) => {
     try {
       const id = Number(req.params.id);
-      const { title, date, completed, order } = req.body;
-      const milestone = await storage.updateMilestone(id, { title, date, completed, order });
-      res.json(milestone);
+      const userId = req.user.claims.sub;
+      
+      // Validate request body
+      const schema = z.object({
+        title: z.string().optional(),
+        date: z.string().nullable().optional(),
+        completed: z.boolean().optional(),
+        order: z.number().optional()
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid input", errors: parsed.error.flatten().fieldErrors });
+      }
+
+      // Fetch milestone to verify it exists
+      const milestone = await storage.getMilestone(id);
+      if (!milestone) {
+        return res.status(404).json({ message: "Milestone not found" });
+      }
+
+      // Check user has access to the milestone's project
+      const project = await storage.getProject(milestone.projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      const dbUser = await authStorage.getUser(userId);
+      if (dbUser?.role === 'client' && project.clientId !== userId) {
+        return res.status(403).json({ message: "Not authorized to update this milestone" });
+      }
+
+      const updated = await storage.updateMilestone(id, parsed.data);
+      res.json(updated);
     } catch (error) {
       res.status(500).json({ message: "Failed to update milestone" });
     }
@@ -457,6 +487,25 @@ export async function registerRoutes(
   app.delete("/api/milestones/:id", isAuthenticated, async (req: any, res) => {
     try {
       const id = Number(req.params.id);
+      const userId = req.user.claims.sub;
+
+      // Fetch milestone to verify it exists
+      const milestone = await storage.getMilestone(id);
+      if (!milestone) {
+        return res.status(404).json({ message: "Milestone not found" });
+      }
+
+      // Check user has access to the milestone's project
+      const project = await storage.getProject(milestone.projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      const dbUser = await authStorage.getUser(userId);
+      if (dbUser?.role === 'client' && project.clientId !== userId) {
+        return res.status(403).json({ message: "Not authorized to delete this milestone" });
+      }
+
       await storage.deleteMilestone(id);
       res.json({ ok: true });
     } catch (error) {
