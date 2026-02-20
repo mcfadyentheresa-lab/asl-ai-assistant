@@ -13,7 +13,7 @@ import {
 import { useOnlineUsers, isUserOnline } from "@/hooks/use-presence";
 import { Navbar } from "@/components/layout/Navbar";
 import SpatialCanvas from "@/components/SpatialCanvas";
-import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, ExternalLink, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, CalendarDays, ChevronLeft, Upload, Download, User, X, Paperclip, ZoomIn, Palette, Shield, Users, Phone, Check, Bell, Eye, EyeOff, Archive, ArchiveRestore, PanelRightOpen } from "lucide-react";
+import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, ExternalLink, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, CalendarDays, ChevronLeft, Upload, Download, User, X, Paperclip, ZoomIn, Palette, Shield, Users, Phone, Check, Bell, Eye, EyeOff, Archive, ArchiveRestore, PanelRightOpen, MoreVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -48,6 +48,12 @@ import {
   SheetTrigger,
   SheetDescription,
 } from "@/components/ui/sheet";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useState, useRef, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
@@ -1386,7 +1392,7 @@ function ChecklistTab({ projectId }: { projectId: number }) {
                             </p>
                           )}
                         </div>
-                        <div className="flex items-center gap-1 relative z-[1]">
+                        <div className="hidden sm:flex items-center gap-1 relative z-[1]">
                           <Button
                             size="icon"
                             variant="ghost"
@@ -1425,6 +1431,53 @@ function ChecklistTab({ projectId }: { projectId: number }) {
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
+                        </div>
+                        <div className="sm:hidden relative z-[1]">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button size="icon" variant="ghost" data-testid={`button-checklist-menu-${item.id}`}>
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  addToCalendar(
+                                    {
+                                      projectId,
+                                      title: item.title,
+                                      description: item.notes || null,
+                                      date: format(new Date(), "yyyy-MM-dd"),
+                                      type: "event",
+                                    },
+                                    {
+                                      onSuccess: () => toast({ title: "Added to Calendar", description: `"${item.title}" added to today's calendar.` }),
+                                      onError: (err) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+                                    }
+                                  );
+                                }}
+                                data-testid={`menu-calendar-${item.id}`}
+                              >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                Add to Calendar
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => openEditDialog(item)}
+                                data-testid={`menu-edit-${item.id}`}
+                              >
+                                <Pencil className="mr-2 h-4 w-4" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleDelete(item.id)}
+                                className="text-destructive"
+                                data-testid={`menu-delete-${item.id}`}
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </div>
                     );
