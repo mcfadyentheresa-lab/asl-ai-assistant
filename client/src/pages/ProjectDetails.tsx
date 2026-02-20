@@ -1273,7 +1273,7 @@ function ChecklistTab({ projectId }: { projectId: number }) {
         )}
       </div>
 
-      <form onSubmit={handleAdd} className="flex flex-col sm:flex-row gap-3 flex-wrap" data-testid="form-add-checklist">
+      <form onSubmit={handleAdd} className="space-y-2 sm:space-y-0 sm:flex sm:flex-row sm:gap-3 sm:flex-wrap" data-testid="form-add-checklist">
         <Input
           value={newTitle}
           onChange={(e) => setNewTitle(e.target.value)}
@@ -1281,17 +1281,40 @@ function ChecklistTab({ projectId }: { projectId: number }) {
           className="flex-1 min-w-[200px]"
           data-testid="input-checklist-title"
         />
-        <Select value={newGroup} onValueChange={(v) => { setNewGroup(v); if (v !== "__custom__") setCustomGroup(""); }}>
-          <SelectTrigger className="w-full sm:w-[160px]" data-testid="select-checklist-group">
-            <SelectValue placeholder="Group" />
-          </SelectTrigger>
-          <SelectContent>
-            {allGroups.map((g) => (
-              <SelectItem key={g} value={g}>{g}</SelectItem>
-            ))}
-            <SelectItem value="__custom__">Custom...</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-row sm:gap-3">
+          <Select value={newGroup} onValueChange={(v) => { setNewGroup(v); if (v !== "__custom__") setCustomGroup(""); }}>
+            <SelectTrigger className="w-full sm:w-[160px]" data-testid="select-checklist-group">
+              <SelectValue placeholder="Group" />
+            </SelectTrigger>
+            <SelectContent>
+              {allGroups.map((g) => (
+                <SelectItem key={g} value={g}>{g}</SelectItem>
+              ))}
+              <SelectItem value="__custom__">Custom...</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={newPriority} onValueChange={setNewPriority}>
+            <SelectTrigger className="w-full sm:w-[120px]" data-testid="select-checklist-priority">
+              <SelectValue placeholder="Priority" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="low">Low</SelectItem>
+              <SelectItem value="normal">Normal</SelectItem>
+              <SelectItem value="high">High</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={newStatus} onValueChange={setNewStatus}>
+            <SelectTrigger className="w-full sm:w-[140px]" data-testid="select-checklist-status">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todo">To Do</SelectItem>
+              <SelectItem value="in_progress">In Progress</SelectItem>
+              <SelectItem value="done">Done</SelectItem>
+              <SelectItem value="next_year">Next Year</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
         {newGroup === "__custom__" && (
           <Input
             value={customGroup}
@@ -1301,28 +1324,7 @@ function ChecklistTab({ projectId }: { projectId: number }) {
             data-testid="input-custom-group"
           />
         )}
-        <Select value={newPriority} onValueChange={setNewPriority}>
-          <SelectTrigger className="w-full sm:w-[120px]" data-testid="select-checklist-priority">
-            <SelectValue placeholder="Priority" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="low">Low</SelectItem>
-            <SelectItem value="normal">Normal</SelectItem>
-            <SelectItem value="high">High</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={newStatus} onValueChange={setNewStatus}>
-          <SelectTrigger className="w-full sm:w-[140px]" data-testid="select-checklist-status">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todo">To Do</SelectItem>
-            <SelectItem value="in_progress">In Progress</SelectItem>
-            <SelectItem value="done">Done</SelectItem>
-            <SelectItem value="next_year">Next Year</SelectItem>
-          </SelectContent>
-        </Select>
-        <Button type="submit" disabled={isCreating || !newTitle.trim()} data-testid="button-add-checklist">
+        <Button type="submit" className="w-full sm:w-auto" disabled={isCreating || !newTitle.trim()} data-testid="button-add-checklist">
           {isCreating ? <Loader2 className="mr-2 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
           Add
         </Button>
