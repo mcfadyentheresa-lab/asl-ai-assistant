@@ -16,7 +16,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Search, ArrowLeft, Copy, Check, Star, Palette } from "lucide-react";
+import { Search, ArrowLeft, Copy, Check, Star, X } from "lucide-react";
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -29,6 +29,18 @@ function getContrastColor(hex: string): string {
   const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
   return luminance > 0.55 ? "#1a1a1a" : "#ffffff";
 }
+
+const CATEGORY_TABS = [
+  { label: "Off-Whites", families: ["White", "Neutral"] },
+  { label: "Colors", families: ["Blue", "Green", "Yellow", "Orange", "Red", "Pink", "Purple"] },
+  { label: "Muted Hues", families: ["Gray", "Brown", "Black"] },
+];
+
+const SUB_FAMILIES: Record<string, string[]> = {
+  "Off-Whites": ["White", "Neutral"],
+  "Colors": ["Blue", "Green", "Yellow", "Orange", "Red", "Pink", "Purple"],
+  "Muted Hues": ["Gray", "Brown", "Black"],
+};
 
 function ColorSwatch({ color, onClick }: { color: PaintColor; onClick: () => void }) {
   const textColor = getContrastColor(color.hex);
@@ -144,6 +156,10 @@ function ColorDetail({ color, onClose }: { color: PaintColor; onClose: () => voi
             <span>Popular color</span>
           </div>
         )}
+
+        <div className="text-[10px] text-muted-foreground pt-2 border-t border-border">
+          Benjamin Moore & Co. All color names, codes, and formulations are trademarks of Benjamin Moore & Co. Colors shown are approximate digital representations.
+        </div>
       </div>
     </DialogContent>
   );
@@ -189,31 +205,17 @@ function InfoRow({
   );
 }
 
-const FAMILY_ORDER = [
-  "White", "Neutral", "Gray", "Blue", "Green",
-  "Brown", "Yellow", "Orange", "Red", "Pink", "Purple", "Black",
-];
-
 export default function ColorPortfolio() {
   const [search, setSearch] = useState("");
-  const [selectedFamily, setSelectedFamily] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState("Off-Whites");
+  const [activeSubFamily, setActiveSubFamily] = useState<string | null>(null);
   const [showPopularOnly, setShowPopularOnly] = useState(false);
   const [selectedColor, setSelectedColor] = useState<PaintColor | null>(null);
 
-  const { data: families } = useQuery<string[]>({
-    queryKey: ["/api/paint-colors/families"],
-  });
-
-  const queryParams = new URLSearchParams();
-  queryParams.set("brand", "Benjamin Moore");
-  if (selectedFamily) queryParams.set("colorFamily", selectedFamily);
-  if (search.trim()) queryParams.set("search", search.trim());
-  if (showPopularOnly) queryParams.set("popular", "true");
-
-  const { data: colors, isLoading } = useQuery<PaintColor[]>({
-    queryKey: ["/api/paint-colors", selectedFamily, search, showPopularOnly],
+  const { data: allColors, isLoading } = useQuery<PaintColor[]>({
+    queryKey: ["/api/paint-colors", "all-portfolio"],
     queryFn: async () => {
-      const res = await fetch(`/api/paint-colors?${queryParams.toString()}`, {
+      const res = await fetch("/api/paint-colors?brand=Benjamin+Moore", {
         credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to fetch colors");
@@ -221,44 +223,66 @@ export default function ColorPortfolio() {
     },
   });
 
-  const sortedFamilies = useMemo(() => {
-    if (!families) return [];
-    return [...families].sort(
-      (a, b) => (FAMILY_ORDER.indexOf(a) === -1 ? 99 : FAMILY_ORDER.indexOf(a)) -
-                (FAMILY_ORDER.indexOf(b) === -1 ? 99 : FAMILY_ORDER.indexOf(b))
-    );
-  }, [families]);
+  const subFamilies = SUB_FAMILIES[activeTab] || [];
+  const currentSubFamily = activeSubFamily && subFamilies.includes(activeSubFamily) ? activeSubFamily : null;
 
-  const groupedColors = useMemo(() => {
-    if (!colors || selectedFamily || search.trim()) return null;
+  const filteredColors = useMemo(() => {
+    if (!allColors) return [];
+    let filtered = allColors;
+
+    if (showPopularOnly) {
+      filtered = filtered.filter((c) => c.isPopular);
+    }
+
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      filtered = filtered.filter(
+        (c) =>
+          c.name.toLowerCase().includes(q) ||
+          c.code.toLowerCase().includes(q)
+      );
+      return filtered;
+    }
+
+    const tabFamilies = CATEGORY_TABS.find((t) => t.label === activeTab)?.families || [];
+    if (currentSubFamily) {
+      filtered = filtered.filter((c) => c.colorFamily === currentSubFamily);
+    } else {
+      filtered = filtered.filter((c) => tabFamilies.includes(c.colorFamily));
+    }
+
+    return filtered;
+  }, [allColors, activeTab, currentSubFamily, search, showPopularOnly]);
+
+  const groupedByFamily = useMemo(() => {
+    if (search.trim() || currentSubFamily) return null;
     const groups: Record<string, PaintColor[]> = {};
-    for (const c of colors) {
+    for (const c of filteredColors) {
       if (!groups[c.colorFamily]) groups[c.colorFamily] = [];
       groups[c.colorFamily].push(c);
     }
     return groups;
-  }, [colors, selectedFamily, search]);
+  }, [filteredColors, search, currentSubFamily]);
 
   return (
     <div className="min-h-screen bg-background" data-testid="color-portfolio-page">
       <Navbar />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5">
         <div className="flex items-center gap-3 flex-wrap">
           <Link href="/">
             <Button variant="ghost" size="icon" data-testid="button-back-dashboard">
               <ArrowLeft className="w-4 h-4" />
             </Button>
           </Link>
-          <div className="flex items-center gap-2">
-            <Palette className="w-5 h-5 text-primary" />
+          <div>
             <h1 className="font-serif text-2xl font-bold text-foreground" data-testid="text-page-title">
               Color Portfolio
             </h1>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              by <span className="font-medium">Benjamin Moore</span> & Co.
+            </p>
           </div>
-          <Badge variant="secondary" className="ml-auto">
-            Benjamin Moore
-          </Badge>
         </div>
 
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
@@ -271,6 +295,15 @@ export default function ColorPortfolio() {
               className="pl-9"
               data-testid="input-search-colors"
             />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2"
+                data-testid="button-clear-search"
+              >
+                <X className="w-4 h-4 text-muted-foreground" />
+              </button>
+            )}
           </div>
           <Button
             variant={showPopularOnly ? "default" : "outline"}
@@ -283,50 +316,66 @@ export default function ColorPortfolio() {
           </Button>
         </div>
 
-        <div className="flex flex-wrap gap-1.5">
-          <Badge
-            variant={selectedFamily === null ? "default" : "outline"}
-            className="cursor-pointer"
-            onClick={() => setSelectedFamily(null)}
-            data-testid="filter-family-all"
-          >
-            All
-          </Badge>
-          {sortedFamilies.map((f) => (
-            <Badge
-              key={f}
-              variant={selectedFamily === f ? "default" : "outline"}
-              className="cursor-pointer"
-              onClick={() => setSelectedFamily(selectedFamily === f ? null : f)}
-              data-testid={`filter-family-${f.toLowerCase()}`}
-            >
-              {f}
-            </Badge>
-          ))}
-        </div>
+        {!search.trim() && (
+          <>
+            <div className="flex border-b border-border">
+              {CATEGORY_TABS.map((tab) => (
+                <button
+                  key={tab.label}
+                  onClick={() => {
+                    setActiveTab(tab.label);
+                    setActiveSubFamily(null);
+                  }}
+                  className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                    activeTab === tab.label
+                      ? "border-foreground text-foreground"
+                      : "border-transparent text-muted-foreground"
+                  }`}
+                  data-testid={`tab-${tab.label.replace(/\s/g, "-").toLowerCase()}`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex flex-wrap gap-1.5">
+              {subFamilies.map((fam) => (
+                <Badge
+                  key={fam}
+                  variant={currentSubFamily === fam ? "default" : "outline"}
+                  className="cursor-pointer"
+                  onClick={() => setActiveSubFamily(currentSubFamily === fam ? null : fam)}
+                  data-testid={`filter-sub-${fam.toLowerCase()}`}
+                >
+                  {fam}
+                </Badge>
+              ))}
+            </div>
+          </>
+        )}
 
         {isLoading ? (
           <div className="flex items-center justify-center py-20">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
           </div>
-        ) : colors && colors.length === 0 ? (
+        ) : filteredColors.length === 0 ? (
           <Card className="p-8 text-center">
-            <Palette className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+            <Search className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
             <p className="text-muted-foreground">No colors found matching your search.</p>
           </Card>
-        ) : groupedColors && !showPopularOnly ? (
+        ) : groupedByFamily ? (
           <div className="space-y-8">
-            {FAMILY_ORDER.filter((f) => groupedColors[f]).map((family) => (
+            {Object.entries(groupedByFamily).map(([family, familyColors]) => (
               <section key={family}>
                 <h2 className="font-serif text-lg font-semibold text-foreground mb-3" data-testid={`section-${family.toLowerCase()}`}>
                   {family}
                   <span className="ml-2 text-sm font-normal text-muted-foreground">
-                    ({groupedColors[family].length})
+                    ({familyColors.length})
                   </span>
                 </h2>
                 <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-12 gap-2">
                   <AnimatePresence>
-                    {groupedColors[family].map((color) => (
+                    {familyColors.map((color) => (
                       <ColorSwatch
                         key={color.id}
                         color={color}
@@ -341,7 +390,7 @@ export default function ColorPortfolio() {
         ) : (
           <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-12 gap-2">
             <AnimatePresence>
-              {colors?.map((color) => (
+              {filteredColors.map((color) => (
                 <ColorSwatch
                   key={color.id}
                   color={color}
@@ -352,11 +401,13 @@ export default function ColorPortfolio() {
           </div>
         )}
 
-        <div className="text-center text-xs text-muted-foreground pt-4 pb-8">
-          {colors && (
-            <span data-testid="text-color-count">{colors.length} colors</span>
+        <div className="text-center text-xs text-muted-foreground pt-4 pb-8 space-y-1">
+          {filteredColors.length > 0 && (
+            <p data-testid="text-color-count">{filteredColors.length} colors</p>
           )}
-          {" · "}Benjamin Moore is a registered trademark. Colors shown are approximate digital representations.
+          <p>
+            Benjamin Moore<sup>&reg;</sup> and all color names are registered trademarks of Benjamin Moore & Co. Colors shown are approximate digital representations.
+          </p>
         </div>
       </div>
 
