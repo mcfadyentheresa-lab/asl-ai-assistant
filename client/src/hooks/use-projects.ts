@@ -173,6 +173,44 @@ export function useCreateMilestone() {
   });
 }
 
+export function useUpdateMilestone() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, projectId, ...data }: { id: number; projectId: number; title?: string; date?: string | null; completed?: boolean; order?: number }) => {
+      const res = await fetch(`/api/milestones/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to update milestone");
+      return res.json();
+    },
+    onSuccess: (_, variables) => {
+      const url = buildUrl(api.milestones.list.path, { projectId: variables.projectId });
+      queryClient.invalidateQueries({ queryKey: [url, variables.projectId] });
+    },
+  });
+}
+
+export function useDeleteMilestone() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id }: { id: number; projectId: number }) => {
+      const res = await fetch(`/api/milestones/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to delete milestone");
+      return res.json();
+    },
+    onSuccess: (_, variables) => {
+      const url = buildUrl(api.milestones.list.path, { projectId: variables.projectId });
+      queryClient.invalidateQueries({ queryKey: [url, variables.projectId] });
+    },
+  });
+}
+
 // --- Tasks ---
 export function useTasks(projectId: number) {
   return useQuery({

@@ -20,6 +20,8 @@ export interface IStorage {
   // Milestones
   getMilestones(projectId: number): Promise<Milestone[]>;
   createMilestone(milestone: InsertMilestone): Promise<Milestone>;
+  updateMilestone(id: number, data: Partial<InsertMilestone>): Promise<Milestone>;
+  deleteMilestone(id: number): Promise<void>;
 
   // Tasks
   getTasks(projectId: number): Promise<Task[]>;
@@ -125,6 +127,13 @@ export class DatabaseStorage implements IStorage {
   async createMilestone(milestone: InsertMilestone): Promise<Milestone> {
     const [newMilestone] = await db.insert(milestones).values(milestone).returning();
     return newMilestone;
+  }
+  async updateMilestone(id: number, data: Partial<InsertMilestone>): Promise<Milestone> {
+    const [updated] = await db.update(milestones).set(data).where(eq(milestones.id, id)).returning();
+    return updated;
+  }
+  async deleteMilestone(id: number): Promise<void> {
+    await db.delete(milestones).where(eq(milestones.id, id));
   }
 
   // Tasks

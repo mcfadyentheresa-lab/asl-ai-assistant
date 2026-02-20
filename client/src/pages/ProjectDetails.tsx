@@ -8,7 +8,7 @@ import {
   useDocuments, useUploadDocument, useDeleteDocument,
   usePhotos, useCreatePhoto, useDeletePhoto, useUploadImage,
   useUsers, useUpdateProject, usePlanningBoards, useUpdateUserPhone, useSendTestSms, useNotifyTeam,
-  useActivityLog,
+  useActivityLog, useCreateMilestone, useUpdateMilestone, useDeleteMilestone,
 } from "@/hooks/use-projects";
 import { useOnlineUsers, isUserOnline } from "@/hooks/use-presence";
 import { Navbar } from "@/components/layout/Navbar";
@@ -505,6 +505,9 @@ export default function ProjectDetails() {
   const { user } = useAuth();
   const { data: users } = useUsers();
   const { mutate: updateProject } = useUpdateProject();
+  const { mutate: createMilestone, isPending: creatingMilestone } = useCreateMilestone();
+  const { mutate: updateMilestone } = useUpdateMilestone();
+  const { mutate: deleteMilestone } = useDeleteMilestone();
   const { mutate: updatePhone } = useUpdateUserPhone();
   const { mutate: sendTestSms, isPending: sendingTestSms } = useSendTestSms();
   const { mutate: notifyTeam, isPending: sendingNotification } = useNotifyTeam();
@@ -533,6 +536,10 @@ export default function ProjectDetails() {
   const [showAddPerson, setShowAddPerson] = useState(false);
   const [addPersonForm, setAddPersonForm] = useState({ firstName: "", lastName: "", email: "", phone: "", role: "crew" });
   const [addingPerson, setAddingPerson] = useState(false);
+  const [newMilestoneTitle, setNewMilestoneTitle] = useState("");
+  const [newMilestoneDate, setNewMilestoneDate] = useState("");
+  const [editingMilestone, setEditingMilestone] = useState<any>(null);
+  const [editMilestoneForm, setEditMilestoneForm] = useState({ title: "", date: "" });
   const { data: planningBoards } = usePlanningBoards(projectId);
   const assignedClient = users?.find((u) => u.id === project?.clientId);
 
@@ -673,6 +680,47 @@ export default function ProjectDetails() {
                   Project Timeline
                 </h3>
 
+                {userRole !== "client" && (
+                  <form
+                    className="flex flex-col sm:flex-row gap-2"
+                    data-testid="form-add-milestone"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      if (!newMilestoneTitle.trim()) return;
+                      createMilestone(
+                        { projectId, title: newMilestoneTitle.trim(), date: newMilestoneDate || null },
+                        {
+                          onSuccess: () => {
+                            toast({ title: "Milestone added" });
+                            setNewMilestoneTitle("");
+                            setNewMilestoneDate("");
+                          },
+                          onError: () => toast({ title: "Failed to add milestone", variant: "destructive" }),
+                        }
+                      );
+                    }}
+                  >
+                    <Input
+                      placeholder="Milestone title..."
+                      value={newMilestoneTitle}
+                      onChange={(e) => setNewMilestoneTitle(e.target.value)}
+                      data-testid="input-milestone-title"
+                      className="flex-1"
+                    />
+                    <Input
+                      type="date"
+                      value={newMilestoneDate}
+                      onChange={(e) => setNewMilestoneDate(e.target.value)}
+                      data-testid="input-milestone-date"
+                      className="sm:w-44"
+                    />
+                    <Button type="submit" size="default" disabled={creatingMilestone || !newMilestoneTitle.trim()} data-testid="button-add-milestone">
+                      {creatingMilestone ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Plus className="h-4 w-4 mr-1" />}
+                      Add
+                    </Button>
+                  </form>
+                )}
+
                 <div className="relative border-l-2 border-border ml-3 space-y-6 pb-2">
                   {milestones && milestones.length > 0 ? (
                     milestones.map((milestone) => (
@@ -692,11 +740,68 @@ export default function ProjectDetails() {
                                 {milestone.date && format(new Date(milestone.date), "MMMM d, yyyy")}
                               </CardDescription>
                             </div>
-                            {milestone.completed && (
-                              <Badge variant="outline" data-testid={`badge-milestone-complete-${milestone.id}`}>
-                                Completed
-                              </Badge>
-                            )}
+                            <div className="flex items-center gap-2">
+                              {milestone.completed && (
+                                <Badge variant="outline" data-testid={`badge-milestone-complete-${milestone.id}`}>
+                                  Completed
+                                </Badge>
+                              )}
+                              {userRole !== "client" && (
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button size="icon" variant="ghost" data-testid={`button-milestone-menu-${milestone.id}`}>
+                                      <MoreVertical className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem
+                                      data-testid={`button-milestone-toggle-${milestone.id}`}
+                                      onClick={() => {
+                                        updateMilestone(
+                                          { id: milestone.id, projectId, completed: !milestone.completed },
+                                          {
+                                            onSuccess: () => toast({ title: milestone.completed ? "Milestone marked incomplete" : "Milestone marked complete" }),
+                                            onError: () => toast({ title: "Failed to update milestone", variant: "destructive" }),
+                                          }
+                                        );
+                                      }}
+                                    >
+                                      <Check className="h-4 w-4 mr-2" />
+                                      {milestone.completed ? "Mark Incomplete" : "Mark Complete"}
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      data-testid={`button-milestone-edit-${milestone.id}`}
+                                      onClick={() => {
+                                        setEditingMilestone(milestone);
+                                        setEditMilestoneForm({
+                                          title: milestone.title,
+                                          date: milestone.date || "",
+                                        });
+                                      }}
+                                    >
+                                      <Pencil className="h-4 w-4 mr-2" />
+                                      Edit
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      className="text-destructive"
+                                      data-testid={`button-milestone-delete-${milestone.id}`}
+                                      onClick={() => {
+                                        deleteMilestone(
+                                          { id: milestone.id, projectId },
+                                          {
+                                            onSuccess: () => toast({ title: "Milestone deleted" }),
+                                            onError: () => toast({ title: "Failed to delete milestone", variant: "destructive" }),
+                                          }
+                                        );
+                                      }}
+                                    >
+                                      <Trash2 className="h-4 w-4 mr-2" />
+                                      Delete
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              )}
+                            </div>
                           </CardHeader>
                         </Card>
                       </div>
@@ -707,6 +812,64 @@ export default function ProjectDetails() {
                     </div>
                   )}
                 </div>
+
+                <Dialog open={!!editingMilestone} onOpenChange={(open) => { if (!open) setEditingMilestone(null); }}>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Edit Milestone</DialogTitle>
+                      <DialogDescription>Update the milestone title and date.</DialogDescription>
+                    </DialogHeader>
+                    <form
+                      className="space-y-4"
+                      data-testid="form-edit-milestone"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        if (!editMilestoneForm.title.trim() || !editingMilestone) return;
+                        updateMilestone(
+                          {
+                            id: editingMilestone.id,
+                            projectId,
+                            title: editMilestoneForm.title.trim(),
+                            date: editMilestoneForm.date || null,
+                          },
+                          {
+                            onSuccess: () => {
+                              toast({ title: "Milestone updated" });
+                              setEditingMilestone(null);
+                            },
+                            onError: () => toast({ title: "Failed to update milestone", variant: "destructive" }),
+                          }
+                        );
+                      }}
+                    >
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Title</label>
+                        <Input
+                          value={editMilestoneForm.title}
+                          onChange={(e) => setEditMilestoneForm({ ...editMilestoneForm, title: e.target.value })}
+                          data-testid="input-edit-milestone-title"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Date</label>
+                        <Input
+                          type="date"
+                          value={editMilestoneForm.date}
+                          onChange={(e) => setEditMilestoneForm({ ...editMilestoneForm, date: e.target.value })}
+                          data-testid="input-edit-milestone-date"
+                        />
+                      </div>
+                      <div className="flex justify-end gap-2">
+                        <Button type="button" variant="ghost" onClick={() => setEditingMilestone(null)} data-testid="button-cancel-edit-milestone">
+                          Cancel
+                        </Button>
+                        <Button type="submit" disabled={!editMilestoneForm.title.trim()} data-testid="button-save-milestone">
+                          Save
+                        </Button>
+                      </div>
+                    </form>
+                  </DialogContent>
+                </Dialog>
               </div>
 
               <div className="md:hidden mb-4">

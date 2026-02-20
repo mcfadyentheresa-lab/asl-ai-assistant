@@ -443,6 +443,27 @@ export async function registerRoutes(
     }
   });
 
+  app.patch("/api/milestones/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const id = Number(req.params.id);
+      const { title, date, completed, order } = req.body;
+      const milestone = await storage.updateMilestone(id, { title, date, completed, order });
+      res.json(milestone);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update milestone" });
+    }
+  });
+
+  app.delete("/api/milestones/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const id = Number(req.params.id);
+      await storage.deleteMilestone(id);
+      res.json({ ok: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete milestone" });
+    }
+  });
+
   // Photos
   app.get(api.photos.list.path, isAuthenticated, async (req, res) => {
     const photos = await storage.getPhotos(Number(req.params.projectId));
