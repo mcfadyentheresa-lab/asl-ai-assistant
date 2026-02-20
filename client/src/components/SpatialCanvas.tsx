@@ -1926,10 +1926,10 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   return (
     <div className="flex flex-col h-full overflow-hidden" data-testid="spatial-canvas-root">
       {/* Board selector bar */}
-      <div className="flex items-center gap-1.5 mb-1 flex-wrap landscape:flex-nowrap landscape:overflow-x-auto landscape:mb-0 shrink-0">
+      <div className="flex items-center gap-1.5 mb-1 flex-wrap mobile-landscape:flex-nowrap mobile-landscape:overflow-x-auto mobile-landscape:mb-0 shrink-0">
         {!isLoadingBoards && boards.length > 0 && (
           <Select value={String(selectedBoardId || "")} onValueChange={(v) => setSelectedBoardId(Number(v))}>
-            <SelectTrigger className="w-[200px] landscape:w-[140px]" data-testid="select-board-trigger">
+            <SelectTrigger className="w-[200px] mobile-landscape:w-[140px]" data-testid="select-board-trigger">
               <SelectValue placeholder="Select board" />
             </SelectTrigger>
             <SelectContent>
@@ -1942,7 +1942,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           </Select>
         )}
         <Button variant="outline" size="sm" onClick={() => { setNewBoardName(""); setShowNewBoardDialog(true); }} data-testid="button-new-board">
-          <Plus className="h-3.5 w-3.5 landscape:mr-0 mr-1" /> <span className="landscape:hidden">New Board</span>
+          <Plus className="h-3.5 w-3.5 mobile-landscape:mr-0 mr-1" /> <span className="mobile-landscape:hidden">New Board</span>
         </Button>
         {selectedBoardId && (
           <DropdownMenu>
@@ -1968,7 +1968,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           </DropdownMenu>
         )}
         {(selectedBoard?.linkedUserIds?.length ?? 0) > 0 && (
-          <div className="flex items-center gap-1 landscape:hidden" data-testid="badges-linked-people">
+          <div className="flex items-center gap-1 mobile-landscape:hidden" data-testid="badges-linked-people">
             <div className="flex -space-x-1.5">
               {selectedBoard!.linkedUserIds!.slice(0, 4).map((uid: string) => {
                 const user = allUsers.find((u: any) => u.id === uid);
@@ -1988,7 +1988,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           </div>
         )}
         {(selectedBoard?.linkedProjectIds?.length ?? 0) > 0 && (
-          <div className="flex items-center gap-1 flex-wrap landscape:hidden" data-testid="badges-linked-projects">
+          <div className="flex items-center gap-1 flex-wrap mobile-landscape:hidden" data-testid="badges-linked-projects">
             {selectedBoard!.linkedProjectIds!.map((pid: number) => {
               const proj = allProjects.find((p: any) => p.id === pid);
               return proj ? (
@@ -1999,7 +1999,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             })}
           </div>
         )}
-        <div className="flex items-center gap-1.5 landscape:hidden">
+        <div className="flex items-center gap-1.5 mobile-landscape:hidden">
         {selectedBoard?.linkedCalendarEventId && (() => {
           const ev = calendarEvents.find((e: any) => e.id === selectedBoard.linkedCalendarEventId);
           return ev ? (
@@ -2127,12 +2127,12 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       {boards.length > 0 && selectedBoardId && (
         <div className="flex flex-1 gap-0 min-h-0">
           {/* Left sidebar */}
-          <div className="w-14 sm:w-16 landscape:w-12 shrink-0 border-r flex flex-col items-center py-1 sm:py-2 gap-0 sm:gap-0.5 bg-muted/20 overflow-y-auto" data-testid="canvas-sidebar">
+          <div className="w-14 sm:w-16 mobile-landscape:w-12 shrink-0 border-r flex flex-col items-center py-1 sm:py-2 gap-0 sm:gap-0.5 bg-muted/20 overflow-y-auto" data-testid="canvas-sidebar">
             {sidebarTools.map((t) => (
               <Tooltip key={t.type}>
                 <TooltipTrigger asChild>
                   <button
-                    className="w-11 sm:w-12 h-10 sm:h-11 landscape:h-8 flex flex-col items-center justify-center rounded-md text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors gap-0.5 cursor-grab active:cursor-grabbing shrink-0"
+                    className="w-11 sm:w-12 h-10 sm:h-11 mobile-landscape:h-8 flex flex-col items-center justify-center rounded-md text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors gap-0.5 cursor-grab active:cursor-grabbing shrink-0"
                     draggable
                     onDragStart={(e) => {
                       e.dataTransfer.setData("tool-type", t.type);
@@ -2142,7 +2142,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                     data-testid={`sidebar-tool-${t.type}`}
                   >
                     <t.icon className="h-4 w-4 sm:h-5 sm:w-5" />
-                    <span className="text-[9px] leading-none landscape:hidden">{t.label}</span>
+                    <span className="text-[9px] leading-none mobile-landscape:hidden">{t.label}</span>
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="right" className="text-xs">{t.label}</TooltipContent>
@@ -2152,12 +2152,12 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
-                  className="w-11 sm:w-12 h-10 sm:h-11 landscape:h-8 flex flex-col items-center justify-center rounded-md text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors gap-0.5 shrink-0"
+                  className="w-11 sm:w-12 h-10 sm:h-11 mobile-landscape:h-8 flex flex-col items-center justify-center rounded-md text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors gap-0.5 shrink-0"
                   onClick={() => { if (editingId) handleDeleteElement(editingId); }}
                   data-testid="sidebar-tool-delete"
                 >
                   <Trash2 className="h-4 w-4 sm:h-5 sm:w-5" />
-                  <span className="text-[9px] leading-none landscape:hidden">Delete</span>
+                  <span className="text-[9px] leading-none mobile-landscape:hidden">Delete</span>
                 </button>
               </TooltipTrigger>
               <TooltipContent side="right" className="text-xs">Delete Selected</TooltipContent>
