@@ -4,8 +4,9 @@
 @tailwind components;
 @tailwind utilities;
 
-html, body {
-  -webkit-text-size-adjust: 100%;
+html {
+  -webkit-text-size-adjust: auto;
+  text-size-adjust: auto;
 }
 
 :root {

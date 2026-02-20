@@ -10,7 +10,8 @@ import {
   DropdownMenuTrigger,
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
-import { LogOut, UserCog, Eye, EyeOff, User, Palette } from "lucide-react";
+import { LogOut, UserCog, Eye, EyeOff, User, Palette, ZoomIn } from "lucide-react";
+import { useTextZoom } from "@/hooks/use-text-zoom";
 import { Link } from "wouter";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useOnlineUsers, useVisibilityToggle } from "@/hooks/use-presence";
@@ -21,6 +22,7 @@ export function Navbar() {
   const queryClient = useQueryClient();
   const { data: onlineUsers } = useOnlineUsers();
   const { visible, toggleVisibility } = useVisibilityToggle();
+  const { zoom, cycleZoom } = useTextZoom();
 
   const switchRole = useMutation({
     mutationFn: async (role: string) => {
@@ -137,6 +139,16 @@ export function Navbar() {
                 Color Portfolio
               </DropdownMenuItem>
             </Link>
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.preventDefault();
+                cycleZoom();
+              }}
+              data-testid="button-text-zoom"
+            >
+              <ZoomIn className="mr-2 h-4 w-4" />
+              Text Size: {zoom}%
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={toggleVisibility} data-testid="button-toggle-visibility">
               {visible ? <Eye className="mr-2 h-4 w-4" /> : <EyeOff className="mr-2 h-4 w-4" />}
               {visible ? "Appear Offline" : "Go Online"}
