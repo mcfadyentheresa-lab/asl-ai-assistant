@@ -6,6 +6,10 @@ Aster & Spruce Connect is a premium client and crew portal web application for a
 
 The app follows a "warm minimalist" luxury aesthetic with a deep forest green primary palette, warm neutrals, and elegant typography (DM Sans + Playfair Display).
 
+## Future Plans
+
+- **SaaS Subscription Model**: User wants to explore offering this app to other renovation companies as a paid monthly subscription service. Potential tiers: Starter ($49-69/mo), Pro ($99-149/mo), Growth ($199-249/mo). Would need multi-tenant architecture, Stripe billing, onboarding flow, and marketing page. Revisit once core features are more fully built out.
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
