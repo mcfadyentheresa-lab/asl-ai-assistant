@@ -198,6 +198,9 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [maxZ, setMaxZ] = useState(1);
 
+  const [resizingId, setResizingId] = useState<number | null>(null);
+  const resizeStartRef = useRef<{ x: number; y: number; elW: number; elH: number; elX: number; elY: number; handle: string } | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadTargetId, setUploadTargetId] = useState<number | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -965,6 +968,21 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
         });
       }
     }
+    if (resizingId !== null && resizeStartRef.current) {
+      const r = resizeStartRef.current;
+      const dx = (e.clientX - r.x) / zoom;
+      const dy = (e.clientY - r.y) / zoom;
+      let newW = r.elW;
+      let newH = r.elH;
+      let newX = r.elX;
+      let newY = r.elY;
+      if (r.handle.includes("r")) newW = Math.max(80, r.elW + dx);
+      if (r.handle.includes("b")) newH = Math.max(60, r.elH + dy);
+      if (r.handle.includes("l")) { newW = Math.max(80, r.elW - dx); newX = r.elX + (r.elW - newW); }
+      if (r.handle.includes("t")) { newH = Math.max(60, r.elH - dy); newY = r.elY + (r.elH - newH); }
+      updateElement(resizingId, { width: newW, height: newH });
+      moveElement(resizingId, newX, newY);
+    }
   };
 
   const handleCanvasMouseUp = () => {
@@ -999,6 +1017,21 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       debouncedSavePositions(selectedBoardId);
       setDraggingId(null);
       dragStartRef.current = null;
+    }
+    if (resizingId !== null && selectedBoardId) {
+      const el = elements[resizingId];
+      if (el) {
+        const snappedW = Math.round((el.width || 200) / GRID_SIZE) * GRID_SIZE;
+        const snappedH = Math.round((el.height || 200) / GRID_SIZE) * GRID_SIZE;
+        const snappedX = Math.round(el.x / GRID_SIZE) * GRID_SIZE;
+        const snappedY = Math.round(el.y / GRID_SIZE) * GRID_SIZE;
+        updateElement(resizingId, { width: snappedW, height: snappedH });
+        moveElement(resizingId, snappedX, snappedY);
+        sendElementMove(resizingId, snappedX, snappedY);
+      }
+      debouncedSavePositions(selectedBoardId);
+      setResizingId(null);
+      resizeStartRef.current = null;
     }
   };
 
@@ -1076,6 +1109,21 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   };
 
   const resetView = () => { setPan({ x: 0, y: 0 }); setZoom(1); };
+
+  const startResize = (id: number, handle: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const el = elements[id];
+    if (!el) return;
+    setResizingId(id);
+    setEditingId(id);
+    resizeStartRef.current = {
+      x: e.clientX, y: e.clientY,
+      elW: el.width || 200, elH: el.height || 200,
+      elX: el.x, elY: el.y,
+      handle,
+    };
+  };
 
   const startDrag = (id: number, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -1443,6 +1491,23 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       </div>
     );
 
+    const resizeHandles = (elId: number) => {
+      const handleStyle = "absolute opacity-0 hover:opacity-100 transition-opacity z-20";
+      const dotStyle = "w-2.5 h-2.5 rounded-full bg-primary/60 border border-primary/80";
+      return (
+        <>
+          <div className={`${handleStyle} -right-1 top-1/2 -translate-y-1/2 cursor-e-resize p-1`} onMouseDown={(e) => startResize(elId, "r", e)} data-testid={`resize-r-${elId}`}><div className={dotStyle} /></div>
+          <div className={`${handleStyle} -bottom-1 left-1/2 -translate-x-1/2 cursor-s-resize p-1`} onMouseDown={(e) => startResize(elId, "b", e)} data-testid={`resize-b-${elId}`}><div className={dotStyle} /></div>
+          <div className={`${handleStyle} -right-1 -bottom-1 cursor-se-resize p-1`} onMouseDown={(e) => startResize(elId, "br", e)} data-testid={`resize-br-${elId}`}><div className={dotStyle} /></div>
+          <div className={`${handleStyle} -left-1 top-1/2 -translate-y-1/2 cursor-w-resize p-1`} onMouseDown={(e) => startResize(elId, "l", e)} data-testid={`resize-l-${elId}`}><div className={dotStyle} /></div>
+          <div className={`${handleStyle} left-1/2 -top-1 -translate-x-1/2 cursor-n-resize p-1`} onMouseDown={(e) => startResize(elId, "t", e)} data-testid={`resize-t-${elId}`}><div className={dotStyle} /></div>
+          <div className={`${handleStyle} -left-1 -top-1 cursor-nw-resize p-1`} onMouseDown={(e) => startResize(elId, "tl", e)} data-testid={`resize-tl-${elId}`}><div className={dotStyle} /></div>
+          <div className={`${handleStyle} -right-1 -top-1 cursor-ne-resize p-1`} onMouseDown={(e) => startResize(elId, "tr", e)} data-testid={`resize-tr-${elId}`}><div className={dotStyle} /></div>
+          <div className={`${handleStyle} -left-1 -bottom-1 cursor-sw-resize p-1`} onMouseDown={(e) => startResize(elId, "bl", e)} data-testid={`resize-bl-${elId}`}><div className={dotStyle} /></div>
+        </>
+      );
+    };
+
     if (el.type === "room_zone") {
       return (
         <div
@@ -1498,11 +1563,14 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             )}
           </div>
           {isSelected && (
-            <div className="absolute -top-8 right-0 flex gap-1">
-              <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleDeleteElement(el.id)} data-testid={`button-delete-${el.id}`}>
-                <Trash2 className="h-3 w-3" />
-              </Button>
-            </div>
+            <>
+              <div className="absolute -top-8 right-0 flex gap-1">
+                <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleDeleteElement(el.id)} data-testid={`button-delete-${el.id}`}>
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              </div>
+              {resizeHandles(el.id)}
+            </>
           )}
         </div>
       );
@@ -2155,7 +2223,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
         <div
           key={el.id}
           className={`${cardBase} bg-card border border-border overflow-hidden cursor-grab`}
-          style={{ left: el.x, top: el.y, width: el.width, zIndex: effectiveZ }}
+          style={{ left: el.x, top: el.y, width: el.width, ...(el.height ? { height: el.height } : {}), zIndex: effectiveZ }}
           onMouseDown={(e) => {
             const tag = (e.target as HTMLElement).tagName.toLowerCase();
             if (tag === "input" || tag === "button" || (e.target as HTMLElement).closest("button")) return;
@@ -2169,10 +2237,11 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           data-testid={`element-image-${el.id}`}
         >
           {c.url ? (
-            <img src={c.url} alt={c.caption || ""} className="w-full h-auto max-h-[300px] object-cover pointer-events-none select-none" draggable={false} />
+            <img src={c.url} alt={c.caption || ""} className="w-full object-cover pointer-events-none select-none" style={{ height: el.height ? Math.max(el.height - (c.caption ? 32 : 0), 40) : "auto", maxHeight: el.height ? undefined : 300 }} draggable={false} />
           ) : (
             <div
-              className="h-[120px] bg-muted flex flex-col items-center justify-center gap-2 cursor-pointer"
+              className="bg-muted flex flex-col items-center justify-center gap-2 cursor-pointer"
+              style={{ height: el.height ? Math.max(el.height, 60) : 120 }}
               onClick={(e) => { e.stopPropagation(); triggerImageUpload(el.id); }}
               data-testid={`image-upload-area-${el.id}`}
             >
@@ -2221,14 +2290,17 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             )}
           </div>
           {isSelected && (
-            <div className="absolute -top-8 right-0 flex gap-1">
-              <Button size="icon" variant="ghost" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); triggerImageUpload(el.id); }} disabled={isUploading} data-testid={`button-replace-image-${el.id}`}>
-                <Upload className="h-3 w-3" />
-              </Button>
-              <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleDeleteElement(el.id)} data-testid={`button-delete-${el.id}`}>
-                <Trash2 className="h-3 w-3" />
-              </Button>
-            </div>
+            <>
+              <div className="absolute -top-8 right-0 flex gap-1">
+                <Button size="icon" variant="ghost" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); triggerImageUpload(el.id); }} disabled={isUploading} data-testid={`button-replace-image-${el.id}`}>
+                  <Upload className="h-3 w-3" />
+                </Button>
+                <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleDeleteElement(el.id)} data-testid={`button-delete-${el.id}`}>
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              </div>
+              {resizeHandles(el.id)}
+            </>
           )}
         </div>
       );
