@@ -136,6 +136,8 @@ function SidebarCards({
     </div>
   );
 
+  const [activityExpanded, setActivityExpanded] = useState(false);
+
   const missedEntries = activityLog?.filter((e: any) =>
     e.userId !== user?.id && !e.views?.some((v: any) => v.userId === user?.id) && !seenLocally.has(e.id)
   ) || [];
@@ -395,8 +397,13 @@ function SidebarCards({
         </Card>
       )}
 
-      <Card>
-        <CardHeader>
+      <Card
+        data-testid="card-recent-activity"
+      >
+        <CardHeader
+          className="cursor-pointer select-none"
+          onClick={() => setActivityExpanded(prev => !prev)}
+        >
           <CardTitle className="font-serif text-lg flex items-center gap-2 flex-wrap" data-testid="text-activity-heading">
             Recent Activity
             {missedEntries.length > 0 && (
@@ -404,9 +411,11 @@ function SidebarCards({
                 {missedEntries.length} new
               </Badge>
             )}
+            <ChevronDown className={`h-4 w-4 ml-auto text-muted-foreground transition-transform duration-200 ${activityExpanded ? 'rotate-0' : '-rotate-90'}`} />
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        {activityExpanded && (
+        <CardContent onClick={(e) => e.stopPropagation()}>
           <div className="space-y-4">
             {missedEntries.length > 0 && (
               <>
@@ -494,6 +503,7 @@ function SidebarCards({
             )}
           </div>
         </CardContent>
+        )}
       </Card>
     </>
   );
@@ -631,13 +641,14 @@ export default function ProjectDetails() {
               data-testid={`sub-milestone-${sub.id}`}
             >
               <button
-                onClick={() => toggleSub.mutate(sub)}
+                onClick={() => isAdmin && toggleSub.mutate(sub)}
                 className={`shrink-0 h-4 w-4 rounded border transition-colors flex items-center justify-center ${
                   sub.completed
                     ? "bg-primary border-primary"
                     : "border-muted-foreground/40 bg-background"
-                }`}
+                } ${isAdmin ? "cursor-pointer" : "cursor-default"}`}
                 data-testid={`button-toggle-sub-${sub.id}`}
+                disabled={!isAdmin}
               >
                 {sub.completed && <Check className="h-2.5 w-2.5 text-primary-foreground" />}
               </button>
@@ -662,7 +673,7 @@ export default function ProjectDetails() {
 
         {isAdmin && (
           <form
-            className="flex items-center gap-2 mt-1"
+            className="flex items-center gap-2 mt-1 min-w-0"
             onSubmit={(e) => {
               e.preventDefault();
               const title = newSubTitle[milestoneId]?.trim();
@@ -915,7 +926,7 @@ export default function ProjectDetails() {
                                       )}
                                     </button>
                                     <p
-                                      className={`font-medium text-[15px] leading-snug ${milestone.completed ? "line-through text-muted-foreground" : "text-foreground"}`}
+                                      className={`font-medium text-[15px] leading-snug overflow-hidden text-ellipsis ${milestone.completed ? "line-through text-muted-foreground" : "text-foreground"}`}
                                       data-testid={`text-milestone-title-${milestone.id}`}
                                     >
                                       {milestone.title}
