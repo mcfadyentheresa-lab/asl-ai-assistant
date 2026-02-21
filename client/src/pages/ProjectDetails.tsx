@@ -509,6 +509,117 @@ function SidebarCards({
   );
 }
 
+function SubMilestoneList({ milestoneId, isAdmin }: { milestoneId: number; isAdmin: boolean }) {
+  const [inputValue, setInputValue] = useState("");
+  const { data: subs = [] } = useQuery<any[]>({
+    queryKey: [`/api/milestones/${milestoneId}/sub-milestones`],
+  });
+
+  const toggleSub = useMutation({
+    mutationFn: (sub: any) => apiRequest("PATCH", `/api/sub-milestones/${sub.id}`, { completed: !sub.completed }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [`/api/milestones/${milestoneId}/sub-milestones`] }),
+  });
+
+  const createSub = useMutation({
+    mutationFn: (title: string) => apiRequest("POST", `/api/milestones/${milestoneId}/sub-milestones`, { title }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/milestones/${milestoneId}/sub-milestones`] });
+      setInputValue("");
+    },
+  });
+
+  const deleteSub = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/sub-milestones/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [`/api/milestones/${milestoneId}/sub-milestones`] }),
+  });
+
+  const completedCount = subs.filter((s: any) => s.completed).length;
+  const totalCount = subs.length;
+
+  return (
+    <div className="mt-3 space-y-2">
+      {totalCount > 0 && (
+        <div className="flex items-center gap-2 mb-2">
+          <div className="flex-1 h-1 rounded-full bg-muted overflow-hidden">
+            <div
+              className="h-full rounded-full bg-primary/60 transition-all duration-300"
+              style={{ width: totalCount > 0 ? `${(completedCount / totalCount) * 100}%` : "0%" }}
+            />
+          </div>
+          <span className="text-[11px] text-muted-foreground tabular-nums">{completedCount}/{totalCount}</span>
+        </div>
+      )}
+
+      <div className="space-y-1">
+        {subs.map((sub: any) => (
+          <div
+            key={sub.id}
+            className="flex items-center gap-2 group/sub py-1 px-1 rounded"
+            data-testid={`sub-milestone-${sub.id}`}
+          >
+            <button
+              onClick={() => isAdmin && toggleSub.mutate(sub)}
+              className={`shrink-0 h-4 w-4 rounded border transition-colors flex items-center justify-center ${
+                sub.completed
+                  ? "bg-primary border-primary"
+                  : "border-muted-foreground/40 bg-background"
+              } ${isAdmin ? "cursor-pointer" : "cursor-default"}`}
+              data-testid={`button-toggle-sub-${sub.id}`}
+              disabled={!isAdmin}
+            >
+              {sub.completed && <Check className="h-2.5 w-2.5 text-primary-foreground" />}
+            </button>
+            <span
+              className={`flex-1 text-sm ${sub.completed ? "line-through text-muted-foreground" : "text-foreground"}`}
+              data-testid={`text-sub-title-${sub.id}`}
+            >
+              {sub.title}
+            </span>
+            {isAdmin && (
+              <button
+                onClick={() => deleteSub.mutate(sub.id)}
+                className="invisible group-hover/sub:visible transition-opacity text-muted-foreground"
+                data-testid={`button-delete-sub-${sub.id}`}
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {isAdmin && (
+        <form
+          className="flex items-center gap-2 mt-1 min-w-0"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const title = inputValue.trim();
+            if (title) createSub.mutate(title);
+          }}
+          data-testid={`form-add-sub-${milestoneId}`}
+        >
+          <Input
+            placeholder="Add sub-item..."
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            className="text-sm flex-1"
+            data-testid={`input-sub-title-${milestoneId}`}
+          />
+          <Button
+            type="submit"
+            size="icon"
+            variant="ghost"
+            disabled={!inputValue.trim()}
+            data-testid={`button-add-sub-${milestoneId}`}
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </Button>
+        </form>
+      )}
+    </div>
+  );
+}
+
 export default function ProjectDetails() {
   const { id } = useParams();
   const projectId = Number(id);
@@ -557,7 +668,6 @@ export default function ProjectDetails() {
   const [completingMilestone, setCompletingMilestone] = useState<any>(null);
   const [completedByUser, setCompletedByUser] = useState<string>("");
   const [expandedMilestones, setExpandedMilestones] = useState<Set<number>>(new Set());
-  const [newSubTitle, setNewSubTitle] = useState<Record<number, string>>({});
   const { data: planningBoards } = usePlanningBoards(projectId);
   const assignedClient = users?.find((u) => u.id === project?.clientId);
 
@@ -593,115 +703,6 @@ export default function ProjectDetails() {
     });
   };
 
-  const SubMilestoneList = ({ milestoneId, isAdmin }: { milestoneId: number; isAdmin: boolean }) => {
-    const { data: subs = [] } = useQuery<any[]>({
-      queryKey: [`/api/milestones/${milestoneId}/sub-milestones`],
-    });
-
-    const toggleSub = useMutation({
-      mutationFn: (sub: any) => apiRequest("PATCH", `/api/sub-milestones/${sub.id}`, { completed: !sub.completed }),
-      onSuccess: () => queryClient.invalidateQueries({ queryKey: [`/api/milestones/${milestoneId}/sub-milestones`] }),
-    });
-
-    const createSub = useMutation({
-      mutationFn: (title: string) => apiRequest("POST", `/api/milestones/${milestoneId}/sub-milestones`, { title }),
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: [`/api/milestones/${milestoneId}/sub-milestones`] });
-        setNewSubTitle(prev => ({ ...prev, [milestoneId]: "" }));
-      },
-    });
-
-    const deleteSub = useMutation({
-      mutationFn: (id: number) => apiRequest("DELETE", `/api/sub-milestones/${id}`),
-      onSuccess: () => queryClient.invalidateQueries({ queryKey: [`/api/milestones/${milestoneId}/sub-milestones`] }),
-    });
-
-    const completedCount = subs.filter((s: any) => s.completed).length;
-    const totalCount = subs.length;
-
-    return (
-      <div className="mt-3 space-y-2">
-        {totalCount > 0 && (
-          <div className="flex items-center gap-2 mb-2">
-            <div className="flex-1 h-1 rounded-full bg-muted overflow-hidden">
-              <div
-                className="h-full rounded-full bg-primary/60 transition-all duration-300"
-                style={{ width: totalCount > 0 ? `${(completedCount / totalCount) * 100}%` : "0%" }}
-              />
-            </div>
-            <span className="text-[11px] text-muted-foreground tabular-nums">{completedCount}/{totalCount}</span>
-          </div>
-        )}
-
-        <div className="space-y-1">
-          {subs.map((sub: any) => (
-            <div
-              key={sub.id}
-              className="flex items-center gap-2 group/sub py-1 px-1 rounded"
-              data-testid={`sub-milestone-${sub.id}`}
-            >
-              <button
-                onClick={() => isAdmin && toggleSub.mutate(sub)}
-                className={`shrink-0 h-4 w-4 rounded border transition-colors flex items-center justify-center ${
-                  sub.completed
-                    ? "bg-primary border-primary"
-                    : "border-muted-foreground/40 bg-background"
-                } ${isAdmin ? "cursor-pointer" : "cursor-default"}`}
-                data-testid={`button-toggle-sub-${sub.id}`}
-                disabled={!isAdmin}
-              >
-                {sub.completed && <Check className="h-2.5 w-2.5 text-primary-foreground" />}
-              </button>
-              <span
-                className={`flex-1 text-sm ${sub.completed ? "line-through text-muted-foreground" : "text-foreground"}`}
-                data-testid={`text-sub-title-${sub.id}`}
-              >
-                {sub.title}
-              </span>
-              {isAdmin && (
-                <button
-                  onClick={() => deleteSub.mutate(sub.id)}
-                  className="invisible group-hover/sub:visible transition-opacity text-muted-foreground"
-                  data-testid={`button-delete-sub-${sub.id}`}
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-
-        {isAdmin && (
-          <form
-            className="flex items-center gap-2 mt-1 min-w-0"
-            onSubmit={(e) => {
-              e.preventDefault();
-              const title = newSubTitle[milestoneId]?.trim();
-              if (title) createSub.mutate(title);
-            }}
-            data-testid={`form-add-sub-${milestoneId}`}
-          >
-            <Input
-              placeholder="Add sub-item..."
-              value={newSubTitle[milestoneId] || ""}
-              onChange={(e) => setNewSubTitle(prev => ({ ...prev, [milestoneId]: e.target.value }))}
-              className="text-sm flex-1"
-              data-testid={`input-sub-title-${milestoneId}`}
-            />
-            <Button
-              type="submit"
-              size="icon"
-              variant="ghost"
-              disabled={!newSubTitle[milestoneId]?.trim()}
-              data-testid={`button-add-sub-${milestoneId}`}
-            >
-              <Plus className="h-3.5 w-3.5" />
-            </Button>
-          </form>
-        )}
-      </div>
-    );
-  };
 
   const isClientInvitedToBoard = userRole === "client" && Array.isArray(planningBoards) &&
     planningBoards.some((b: any) => (b.linkedUserIds || []).includes(user?.id));
