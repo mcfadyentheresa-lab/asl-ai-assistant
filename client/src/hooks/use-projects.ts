@@ -166,8 +166,8 @@ export function useCreateMilestone() {
       return api.milestones.create.responses[201].parse(await res.json());
     },
     onSuccess: (_, variables) => {
-      const url = buildUrl(api.milestones.list.path, { projectId: variables.projectId });
-      queryClient.invalidateQueries({ queryKey: [url, variables.projectId] });
+      queryClient.invalidateQueries({ queryKey: [api.milestones.list.path, variables.projectId] });
+      queryClient.invalidateQueries({ queryKey: [api.calendar.list.path, variables.projectId] });
       queryClient.invalidateQueries({ queryKey: ['/api/projects', variables.projectId, 'activity'] });
     },
   });
