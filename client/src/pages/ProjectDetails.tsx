@@ -577,60 +577,56 @@ function SubMilestoneList({ milestoneId, isAdmin }: { milestoneId: number; isAdm
   const totalCount = subs.length;
 
   return (
-    <div className="mt-3 space-y-2">
+    <div className="space-y-0.5">
+      {subs.map((sub: any) => (
+        <div
+          key={sub.id}
+          className="flex items-center gap-1.5 group/sub py-0.5"
+          data-testid={`sub-milestone-${sub.id}`}
+        >
+          <button
+            onClick={() => isAdmin && toggleSub.mutate(sub)}
+            className={`shrink-0 h-3.5 w-3.5 rounded-sm border transition-colors flex items-center justify-center ${
+              sub.completed
+                ? "bg-primary border-primary"
+                : "border-muted-foreground/30 bg-background"
+            } ${isAdmin ? "cursor-pointer" : "cursor-default"}`}
+            data-testid={`button-toggle-sub-${sub.id}`}
+            disabled={!isAdmin}
+          >
+            {sub.completed && <Check className="h-2 w-2 text-primary-foreground" />}
+          </button>
+          <span
+            className={`flex-1 text-xs ${sub.completed ? "line-through text-muted-foreground" : "text-foreground"}`}
+            data-testid={`text-sub-title-${sub.id}`}
+          >
+            {sub.title}
+          </span>
+          {isAdmin && (
+            <button
+              onClick={() => deleteSub.mutate(sub.id)}
+              className="invisible group-hover/sub:visible text-muted-foreground/60"
+              data-testid={`button-delete-sub-${sub.id}`}
+            >
+              <X className="h-3 w-3" />
+            </button>
+          )}
+        </div>
+      ))}
       {totalCount > 0 && (
-        <div className="flex items-center gap-2 mb-2">
-          <div className="flex-1 h-1 rounded-full bg-muted overflow-hidden">
+        <div className="flex items-center gap-1.5 pt-0.5">
+          <div className="flex-1 h-0.5 rounded-full bg-muted overflow-hidden">
             <div
-              className="h-full rounded-full bg-primary/60 transition-all duration-300"
-              style={{ width: totalCount > 0 ? `${(completedCount / totalCount) * 100}%` : "0%" }}
+              className="h-full rounded-full bg-primary/50 transition-all duration-300"
+              style={{ width: `${(completedCount / totalCount) * 100}%` }}
             />
           </div>
-          <span className="text-[11px] text-muted-foreground tabular-nums">{completedCount}/{totalCount}</span>
+          <span className="text-[10px] text-muted-foreground/60 tabular-nums">{completedCount}/{totalCount}</span>
         </div>
       )}
-
-      <div className="space-y-1">
-        {subs.map((sub: any) => (
-          <div
-            key={sub.id}
-            className="flex items-center gap-2 group/sub py-1 px-1 rounded"
-            data-testid={`sub-milestone-${sub.id}`}
-          >
-            <button
-              onClick={() => isAdmin && toggleSub.mutate(sub)}
-              className={`shrink-0 h-4 w-4 rounded border transition-colors flex items-center justify-center ${
-                sub.completed
-                  ? "bg-primary border-primary"
-                  : "border-muted-foreground/40 bg-background"
-              } ${isAdmin ? "cursor-pointer" : "cursor-default"}`}
-              data-testid={`button-toggle-sub-${sub.id}`}
-              disabled={!isAdmin}
-            >
-              {sub.completed && <Check className="h-2.5 w-2.5 text-primary-foreground" />}
-            </button>
-            <span
-              className={`flex-1 text-sm ${sub.completed ? "line-through text-muted-foreground" : "text-foreground"}`}
-              data-testid={`text-sub-title-${sub.id}`}
-            >
-              {sub.title}
-            </span>
-            {isAdmin && (
-              <button
-                onClick={() => deleteSub.mutate(sub.id)}
-                className="invisible group-hover/sub:visible transition-opacity text-muted-foreground"
-                data-testid={`button-delete-sub-${sub.id}`}
-              >
-                <X className="h-3 w-3" />
-              </button>
-            )}
-          </div>
-        ))}
-      </div>
-
       {isAdmin && (
         <form
-          className="flex items-center gap-2 mt-1 min-w-0"
+          className="flex items-center gap-1 pt-1 min-w-0"
           onSubmit={(e) => {
             e.preventDefault();
             const title = inputValue.trim();
@@ -638,22 +634,21 @@ function SubMilestoneList({ milestoneId, isAdmin }: { milestoneId: number; isAdm
           }}
           data-testid={`form-add-sub-${milestoneId}`}
         >
-          <Input
+          <input
             placeholder="Add sub-item..."
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            className="text-sm flex-1"
+            className="flex-1 text-xs bg-transparent border-b border-border/50 focus:border-primary/40 outline-none py-1 placeholder:text-muted-foreground/40"
             data-testid={`input-sub-title-${milestoneId}`}
           />
-          <Button
+          <button
             type="submit"
-            size="icon"
-            variant="ghost"
             disabled={!inputValue.trim()}
+            className="text-muted-foreground/50 hover:text-foreground disabled:opacity-30 p-0.5"
             data-testid={`button-add-sub-${milestoneId}`}
           >
-            <Plus className="h-3.5 w-3.5" />
-          </Button>
+            <Plus className="h-3 w-3" />
+          </button>
         </form>
       )}
     </div>
