@@ -684,12 +684,12 @@ export default function ProjectDetails() {
                   <div className="flex items-center justify-between flex-wrap gap-3">
                     <div>
                       <h3 className="font-serif text-xl font-bold text-foreground" data-testid="text-timeline-heading">
-                        Project Journey
+                        Milestones
                       </h3>
                       <p className="text-sm text-muted-foreground mt-0.5">
                         {milestones && milestones.length > 0
-                          ? `${milestones.filter((m) => m.completed).length} of ${milestones.length} milestones complete`
-                          : "Track your renovation progress"}
+                          ? `${milestones.filter((m) => m.completed).length} of ${milestones.length} complete`
+                          : "Track project progress"}
                       </p>
                     </div>
                     {milestones && milestones.length > 0 && (
@@ -879,7 +879,7 @@ export default function ProjectDetails() {
                     <div className="text-center py-10 space-y-2" data-testid="text-no-milestones">
                       <Flag className="h-8 w-8 mx-auto text-muted-foreground/30" />
                       <p className="text-muted-foreground text-sm">
-                        No milestones yet. Add your first milestone to track progress.
+                        No milestones added yet.
                       </p>
                     </div>
                   )}
