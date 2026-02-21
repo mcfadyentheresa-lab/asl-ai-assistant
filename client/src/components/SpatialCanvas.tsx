@@ -2540,11 +2540,11 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       {boards.length > 0 && selectedBoardId && (
         <div className="flex flex-1 gap-0 min-h-0">
           {/* Left sidebar — modern toolbar */}
-          <div className="w-14 shrink-0 border-r border-border/40 flex flex-col items-center py-3 bg-background overflow-y-auto" data-testid="canvas-sidebar">
+          <div className="w-[52px] shrink-0 border-r border-border/25 flex flex-col items-center py-3 bg-background overflow-y-auto" data-testid="canvas-sidebar">
             {sidebarToolGroups.map((group, gi) => (
               <div key={group.label} className="w-full flex flex-col items-center">
-                {gi > 0 && <div className="w-7 h-px bg-border/40 my-2.5" />}
-                <span className="text-[9px] uppercase tracking-[0.12em] text-foreground/30 font-semibold mb-1 select-none">{group.label}</span>
+                {gi > 0 && <div className="w-6 h-px bg-border/30 my-2" />}
+                <span className="text-[7px] uppercase tracking-[0.14em] text-foreground/25 font-semibold mb-0.5 select-none">{group.label}</span>
                 {group.tools.map((t) => (
                   <Tooltip key={t.type}>
                     <TooltipTrigger asChild>
@@ -2566,7 +2566,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                 ))}
               </div>
             ))}
-            <div className="w-7 h-px bg-border/40 my-2.5" />
+            <div className="w-6 h-px bg-border/30 my-2" />
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
@@ -2582,7 +2582,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           </div>
 
           {showImagePopup && (
-            <div className="absolute left-[60px] top-1/3 z-50 bg-card border border-border rounded-md shadow-lg w-64" data-testid="image-popup-panel">
+            <div className="absolute left-[56px] top-1/3 z-50 bg-card border border-border rounded-md shadow-lg w-64" data-testid="image-popup-panel">
               <div className="flex items-center justify-between p-3 border-b border-border">
                 <span className="text-sm font-semibold">Add Image</span>
                 <button className="p-0.5 rounded hover:bg-muted transition-colors" onClick={() => setShowImagePopup(false)} data-testid="image-popup-close"><X className="h-4 w-4" /></button>
