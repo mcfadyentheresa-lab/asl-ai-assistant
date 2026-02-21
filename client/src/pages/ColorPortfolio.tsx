@@ -492,24 +492,33 @@ export default function ColorPortfolio() {
       `}</style>
       <Navbar />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5">
-        <div className="flex items-center gap-3 flex-wrap">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-6 space-y-4 sm:space-y-5">
+        <div className="flex items-start gap-3 sm:gap-4">
           <Link href="/">
-            <Button variant="ghost" size="icon" data-testid="button-back-dashboard">
+            <Button variant="ghost" size="icon" className="mt-1 shrink-0" data-testid="button-back-dashboard">
               <ArrowLeft className="w-4 h-4" />
             </Button>
           </Link>
-          <div>
-            <h1 className="font-serif text-2xl font-bold text-foreground" data-testid="text-page-title">
+          <div className="flex-1 min-w-0">
+            <h1 className="font-serif text-xl sm:text-2xl md:text-3xl font-bold text-foreground leading-tight" data-testid="text-page-title">
               Color Portfolio
             </h1>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              by <span className="font-medium">Benjamin Moore</span><sup>&reg;</sup> & Co.
-            </p>
+            <div className="flex items-center gap-2 mt-1 sm:mt-1.5">
+              <div className="h-px flex-1 max-w-[40px] sm:max-w-[60px] bg-primary/30" />
+              <p className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap" data-testid="text-brand-attribution">
+                curated by{" "}
+                <span className="font-semibold tracking-wide text-foreground">
+                  Benjamin Moore
+                </span>
+                <sup className="text-[8px] sm:text-[9px]">&reg;</sup>
+                <span className="hidden sm:inline"> & Co.</span>
+              </p>
+              <div className="h-px flex-1 max-w-[40px] sm:max-w-[60px] bg-primary/30" />
+            </div>
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
           <div className="relative w-full sm:w-72">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
@@ -542,7 +551,7 @@ export default function ColorPortfolio() {
 
         {!search.trim() && (
           <>
-            <div className="flex border-b border-border">
+            <div className="flex border-b border-border overflow-x-auto scrollbar-none -mx-4 px-4 sm:mx-0 sm:px-0">
               {CATEGORY_TABS.map((tab) => (
                 <button
                   key={tab.label}
@@ -550,7 +559,7 @@ export default function ColorPortfolio() {
                     setActiveTab(tab.label);
                     setActiveSubFamily(null);
                   }}
-                  className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                  className={`px-3 sm:px-4 py-2 sm:py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                     activeTab === tab.label
                       ? "border-foreground text-foreground"
                       : "border-transparent text-muted-foreground"
@@ -567,7 +576,7 @@ export default function ColorPortfolio() {
                 <Badge
                   key={fam}
                   variant={currentSubFamily === fam ? "default" : "outline"}
-                  className="cursor-pointer"
+                  className="cursor-pointer text-xs"
                   onClick={() => setActiveSubFamily(currentSubFamily === fam ? null : fam)}
                   data-testid={`filter-sub-${fam.toLowerCase()}`}
                 >
@@ -597,7 +606,7 @@ export default function ColorPortfolio() {
                     ({familyColors.length})
                   </span>
                 </h2>
-                <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-12 gap-2">
+                <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-9 xl:grid-cols-12 gap-2 sm:gap-2.5">
                   <AnimatePresence>
                     {familyColors.map(renderSwatch)}
                   </AnimatePresence>
@@ -606,18 +615,20 @@ export default function ColorPortfolio() {
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-12 gap-2">
+          <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-9 xl:grid-cols-12 gap-2 sm:gap-2.5">
             <AnimatePresence>
               {filteredColors.map(renderSwatch)}
             </AnimatePresence>
           </div>
         )}
 
-        <div className="text-center text-xs text-muted-foreground pt-4 pb-8 space-y-1">
+        <div className="text-center pt-6 sm:pt-8 pb-8 sm:pb-12 space-y-2 border-t border-border/60">
           {filteredColors.length > 0 && (
-            <p data-testid="text-color-count">{filteredColors.length} colors</p>
+            <p className="text-xs text-muted-foreground" data-testid="text-color-count">
+              {filteredColors.length} colors
+            </p>
           )}
-          <p>
+          <p className="text-[10px] sm:text-xs text-muted-foreground/70 max-w-md mx-auto leading-relaxed">
             Benjamin Moore<sup>&reg;</sup> and all color names are registered trademarks of Benjamin Moore & Co. Colors shown are approximate digital representations.
           </p>
         </div>
