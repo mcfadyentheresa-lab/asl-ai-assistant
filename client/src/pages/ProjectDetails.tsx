@@ -585,26 +585,25 @@ export default function ProjectDetails() {
 
   const SubMilestoneList = ({ milestoneId, isAdmin }: { milestoneId: number; isAdmin: boolean }) => {
     const { data: subs = [] } = useQuery<any[]>({
-      queryKey: ["/api/milestones/:milestoneId/sub-milestones", milestoneId],
-      queryFn: () => fetch(`/api/milestones/${milestoneId}/sub-milestones`, { credentials: "include" }).then(r => r.json()),
+      queryKey: [`/api/milestones/${milestoneId}/sub-milestones`],
     });
 
     const toggleSub = useMutation({
       mutationFn: (sub: any) => apiRequest("PATCH", `/api/sub-milestones/${sub.id}`, { completed: !sub.completed }),
-      onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/milestones/:milestoneId/sub-milestones", milestoneId] }),
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: [`/api/milestones/${milestoneId}/sub-milestones`] }),
     });
 
     const createSub = useMutation({
       mutationFn: (title: string) => apiRequest("POST", `/api/milestones/${milestoneId}/sub-milestones`, { title }),
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: ["/api/milestones/:milestoneId/sub-milestones", milestoneId] });
+        queryClient.invalidateQueries({ queryKey: [`/api/milestones/${milestoneId}/sub-milestones`] });
         setNewSubTitle(prev => ({ ...prev, [milestoneId]: "" }));
       },
     });
 
     const deleteSub = useMutation({
       mutationFn: (id: number) => apiRequest("DELETE", `/api/sub-milestones/${id}`),
-      onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/milestones/:milestoneId/sub-milestones", milestoneId] }),
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: [`/api/milestones/${milestoneId}/sub-milestones`] }),
     });
 
     const completedCount = subs.filter((s: any) => s.completed).length;
@@ -675,7 +674,7 @@ export default function ProjectDetails() {
               placeholder="Add sub-item..."
               value={newSubTitle[milestoneId] || ""}
               onChange={(e) => setNewSubTitle(prev => ({ ...prev, [milestoneId]: e.target.value }))}
-              className="h-8 text-sm flex-1"
+              className="text-sm flex-1"
               data-testid={`input-sub-title-${milestoneId}`}
             />
             <Button

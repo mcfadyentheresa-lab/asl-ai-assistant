@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
+import { insertSubMilestoneSchema } from "@shared/schema";
 import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
@@ -570,15 +571,15 @@ export async function registerRoutes(
 
   app.post("/api/milestones/:milestoneId/sub-milestones", isAuthenticated, async (req, res) => {
     const milestoneId = Number(req.params.milestoneId);
-    const { title } = req.body;
-    if (!title || !title.trim()) return res.status(400).json({ message: "Title required" });
-    const sub = await storage.createSubMilestone({ milestoneId, title: title.trim(), completed: false, order: 0 });
+    const input = insertSubMilestoneSchema.parse({ ...req.body, milestoneId });
+    const sub = await storage.createSubMilestone(input);
     res.status(201).json(sub);
   });
 
   app.patch("/api/sub-milestones/:id", isAuthenticated, async (req, res) => {
     try {
-      const updated = await storage.updateSubMilestone(Number(req.params.id), req.body);
+      const parsed = insertSubMilestoneSchema.partial().parse(req.body);
+      const updated = await storage.updateSubMilestone(Number(req.params.id), parsed);
       res.json(updated);
     } catch (e) {
       res.status(500).json({ message: "Failed to update sub-milestone" });
