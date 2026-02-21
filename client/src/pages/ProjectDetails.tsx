@@ -53,6 +53,8 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { useState, useRef, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
@@ -2238,6 +2240,7 @@ function BoardTab({ projectId }: { projectId: number }) {
 
 function PhotosTab({ projectId }: { projectId: number }) {
   const { data: photos, isLoading } = usePhotos(projectId);
+  const { data: boards } = usePlanningBoards(projectId);
   const { mutate: createPhoto } = useCreatePhoto();
   const { mutate: deletePhoto } = useDeletePhoto();
   const { mutateAsync: uploadImage, isPending: isUploading } = useUploadImage();
@@ -2245,6 +2248,22 @@ function PhotosTab({ projectId }: { projectId: number }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [lightboxPhoto, setLightboxPhoto] = useState<{ url: string; caption?: string | null } | null>(null);
   const [caption, setCaption] = useState("");
+
+  const handleTagPhoto = async (photoId: number, boardId: number | null) => {
+    try {
+      const res = await fetch(`/api/photos/${photoId}/tag`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ planningBoardId: boardId }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      queryClient.invalidateQueries({ queryKey: ["/api/projects/:projectId/photos", projectId] });
+      toast({ title: boardId ? "Photo tagged to board" : "Board tag removed" });
+    } catch {
+      toast({ title: "Failed to tag photo", variant: "destructive" });
+    }
+  };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -2345,25 +2364,51 @@ function PhotosTab({ projectId }: { projectId: number }) {
               />
               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors rounded-md pointer-events-none" />
               <div className="absolute top-2 right-2 flex gap-1 invisible group-hover:visible">
-                <Button
-                  size="icon"
-                  variant="secondary"
-                  className="h-7 w-7"
-                  onClick={() => setLightboxPhoto({ url: photo.url, caption: photo.caption })}
-                  data-testid={`button-zoom-photo-${photo.id}`}
-                >
-                  <ZoomIn className="h-3 w-3" />
-                </Button>
-                <Button
-                  size="icon"
-                  variant="secondary"
-                  className="h-7 w-7"
-                  onClick={() => handleDelete(photo.id)}
-                  data-testid={`button-delete-photo-${photo.id}`}
-                >
-                  <Trash2 className="h-3 w-3" />
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="icon" variant="secondary" className="h-7 w-7" data-testid={`button-photo-menu-${photo.id}`}>
+                      <MoreVertical className="h-3 w-3" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => setLightboxPhoto({ url: photo.url, caption: photo.caption })} data-testid={`button-zoom-photo-${photo.id}`}>
+                      <ZoomIn className="h-4 w-4 mr-2" /> View Full Size
+                    </DropdownMenuItem>
+                    {boards && boards.length > 0 && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuLabel className="text-xs">Tag to Board</DropdownMenuLabel>
+                        {boards.map((board: any) => (
+                          <DropdownMenuItem key={board.id} onClick={() => handleTagPhoto(photo.id, board.id)} data-testid={`button-tag-photo-${photo.id}-board-${board.id}`}>
+                            <LayoutGrid className="h-4 w-4 mr-2" /> {board.name}
+                            {photo.planningBoardId === board.id && <Check className="h-3 w-3 ml-auto" />}
+                          </DropdownMenuItem>
+                        ))}
+                      </>
+                    )}
+                    {photo.planningBoardId && (
+                      <DropdownMenuItem onClick={() => handleTagPhoto(photo.id, null)} data-testid={`button-untag-photo-${photo.id}`}>
+                        <X className="h-4 w-4 mr-2" /> Remove Board Tag
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(photo.id)} data-testid={`button-delete-photo-${photo.id}`}>
+                      <Trash2 className="h-4 w-4 mr-2" /> Delete Photo
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
+              {photo.planningBoardId && boards && (() => {
+                const board = boards.find((b: any) => b.id === photo.planningBoardId);
+                return board ? (
+                  <div className="absolute top-2 left-2">
+                    <Badge variant="secondary" className="text-[10px] gap-1">
+                      <LayoutGrid className="h-2.5 w-2.5" />
+                      {board.name}
+                    </Badge>
+                  </div>
+                ) : null;
+              })()}
               {photo.caption && (
                 <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/60 to-transparent rounded-b-md">
                   <p className="text-white text-xs truncate" data-testid={`text-photo-caption-${photo.id}`}>

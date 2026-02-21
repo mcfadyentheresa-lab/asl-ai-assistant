@@ -57,6 +57,7 @@ export const photos = pgTable("photos", {
   tags: text("tags").array(), // e.g. ["kitchen", "before"]
   isShowcase: boolean("is_showcase").default(false), // For "Project Story"
   isBeforeAfter: boolean("is_before_after").default(false),
+  planningBoardId: integer("planning_board_id"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

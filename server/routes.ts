@@ -591,6 +591,17 @@ export async function registerRoutes(
     }
   });
 
+  app.patch("/api/photos/:id/tag", isAuthenticated, async (req: any, res) => {
+    try {
+      const photoId = Number(req.params.id);
+      const { planningBoardId } = req.body;
+      await storage.tagPhoto(photoId, planningBoardId ?? null);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to tag photo" });
+    }
+  });
+
   // Documents
   app.get(api.documents.list.path, isAuthenticated, async (req, res) => {
     const docs = await storage.getDocuments(Number(req.params.projectId));
