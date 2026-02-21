@@ -86,9 +86,20 @@ export const timeEntries = pgTable("time_entries", {
   projectId: integer("project_id").notNull().references(() => projects.id),
   userId: text("user_id").notNull().references(() => users.id),
   taskId: integer("task_id").references(() => tasks.id),
-  startTime: timestamp("start_time").notNull(),
+  date: date("date").notNull(),
+  hours: text("hours").notNull(),
+  startTime: timestamp("start_time"),
   endTime: timestamp("end_time"),
   description: text("description"),
+  milestoneId: integer("milestone_id").references(() => milestones.id),
+  calendarEventId: integer("calendar_event_id").references(() => calendarEvents.id),
+  status: text("status").notNull().default("draft"),
+  payPeriodStart: date("pay_period_start"),
+  payPeriodEnd: date("pay_period_end"),
+  submittedAt: timestamp("submitted_at"),
+  approvedAt: timestamp("approved_at"),
+  approvedBy: text("approved_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 // Checklist Items (collaborative wish-list / to-do)
@@ -364,7 +375,7 @@ export const insertSubMilestoneSchema = createInsertSchema(subMilestones).omit({
 export const insertTaskSchema = createInsertSchema(tasks).omit({ id: true, createdAt: true });
 export const insertPhotoSchema = createInsertSchema(photos).omit({ id: true, createdAt: true });
 export const insertDocumentSchema = createInsertSchema(documents).omit({ id: true, createdAt: true });
-export const insertTimeEntrySchema = createInsertSchema(timeEntries).omit({ id: true });
+export const insertTimeEntrySchema = createInsertSchema(timeEntries).omit({ id: true, createdAt: true });
 export const insertMessageSchema = createInsertSchema(messages).omit({ id: true, createdAt: true });
 export const insertChecklistItemSchema = createInsertSchema(checklistItems).omit({ id: true, createdAt: true });
 export const insertBoardItemSchema = createInsertSchema(boardItems).omit({ id: true, createdAt: true });
