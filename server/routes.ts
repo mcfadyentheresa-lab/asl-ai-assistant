@@ -1790,6 +1790,53 @@ export async function registerRoutes(
     res.json(updated);
   });
 
+  // Board Materials (import materials/products from planning boards into estimates)
+  app.get("/api/projects/:id/board-materials", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const dbUser = await authStorage.getUser(userId);
+      if (!dbUser || (dbUser.role !== "admin" && dbUser.role !== "crew")) {
+        return res.status(403).json({ message: "Admin or crew access required" });
+      }
+      const projectId = parseInt(req.params.id);
+      const project = await storage.getProject(projectId);
+      if (!project) return res.status(404).json({ message: "Project not found" });
+      if (dbUser.role === "client" && project.clientId !== userId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const { db } = await import("./db");
+      const { planningBoards, canvasElements } = await import("@shared/schema");
+      const { eq, and, inArray } = await import("drizzle-orm");
+
+      const boards = await db.select().from(planningBoards).where(eq(planningBoards.projectId, projectId));
+      if (boards.length === 0) {
+        return res.json([]);
+      }
+      const boardIds = boards.map(b => b.id);
+      const elements = await db.select().from(canvasElements).where(
+        and(
+          inArray(canvasElements.boardId, boardIds),
+          inArray(canvasElements.type, ["material", "product"])
+        )
+      );
+
+      const grouped = boards
+        .map(board => ({
+          boardId: board.id,
+          boardName: board.name,
+          materials: elements
+            .filter(el => el.boardId === board.id)
+            .map(el => ({ id: el.id, type: el.type, content: el.content })),
+        }))
+        .filter(g => g.materials.length > 0);
+
+      res.json(grouped);
+    } catch (error) {
+      console.error("Error fetching board materials:", error);
+      res.status(500).json({ message: "Failed to fetch board materials" });
+    }
+  });
+
   // AI Scope Analyzer
   app.post("/api/estimates/:estimateId/ai-analyze", isAuthenticated, async (req: any, res) => {
     const userId = req.user.claims.sub;

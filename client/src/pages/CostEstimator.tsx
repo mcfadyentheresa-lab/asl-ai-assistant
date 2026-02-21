@@ -27,7 +27,7 @@ import {
 import {
   Calculator, Plus, Trash2, AlertTriangle, CheckCircle2,
   DollarSign, ArrowLeft, Receipt as ReceiptIcon, EyeOff,
-  TrendingUp, TrendingDown, Minus, Loader2, Sparkles
+  TrendingUp, TrendingDown, Minus, Loader2, Sparkles, Shapes, ChevronDown, ChevronRight
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import type { CostCategory, MarketRate, ProjectEstimate, EstimateItem, Receipt, EstimateWarning, Project, CrewRate, Subcontractor } from "@shared/schema";
@@ -46,6 +46,8 @@ export default function CostEstimator() {
   const [showAddReceipt, setShowAddReceipt] = useState(false);
   const [viewMode, setViewMode] = useState<"all" | "sq_ft" | "board">("all");
   const [showAiAnalyzer, setShowAiAnalyzer] = useState(false);
+  const [showBoardImport, setShowBoardImport] = useState(false);
+  const [expandedBoards, setExpandedBoards] = useState<Set<number>>(new Set());
   const [aiDescription, setAiDescription] = useState("");
   const [aiResults, setAiResults] = useState<any>(null);
 
@@ -64,6 +66,10 @@ export default function CostEstimator() {
   const { data: estimates = [] } = useQuery<ProjectEstimate[]>({ queryKey: ["/api/projects", projectId, "estimates"] });
   const { data: crewRates = [] } = useQuery<CrewRate[]>({ queryKey: ["/api/crew-rates"], enabled: canEdit });
   const { data: subcontractors = [] } = useQuery<Subcontractor[]>({ queryKey: ["/api/subcontractors"], enabled: canEdit });
+  const { data: boardMaterials = [], isLoading: boardMaterialsLoading } = useQuery<any[]>({
+    queryKey: ["/api/projects", projectId, "board-materials"],
+    enabled: showBoardImport,
+  });
 
   const activeEstimate = estimates[0];
 
@@ -371,6 +377,9 @@ export default function CostEstimator() {
 
             {canEdit && (
               <div className="flex gap-2 flex-wrap">
+                <Button variant="outline" onClick={() => setShowBoardImport(true)} data-testid="button-import-board">
+                  <Shapes className="h-4 w-4 mr-2" /> Import from Board
+                </Button>
                 <Button variant="outline" onClick={() => setShowAiAnalyzer(true)} data-testid="button-ai-analyze">
                   <Sparkles className="h-4 w-4 mr-2" /> AI Scope Analyzer
                 </Button>
@@ -704,6 +713,107 @@ export default function CostEstimator() {
               {addReceiptMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ReceiptIcon className="h-4 w-4 mr-2" />}
               Add Receipt
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showBoardImport} onOpenChange={(open) => { setShowBoardImport(open); if (!open) setExpandedBoards(new Set()); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Shapes className="h-5 w-5" /> Import from Planning Board
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            {boardMaterialsLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : boardMaterials.length === 0 ? (
+              <p className="text-muted-foreground text-sm text-center py-6" data-testid="text-no-board-materials">
+                No materials or products found on this project's planning boards.
+              </p>
+            ) : (
+              <div className="max-h-96 overflow-y-auto space-y-3">
+                {boardMaterials.map((board: any) => (
+                  <div key={board.boardId} data-testid={`board-group-${board.boardId}`}>
+                    <button
+                      className="flex items-center gap-2 w-full text-left text-sm font-medium py-1.5 hover-elevate rounded-md px-2"
+                      onClick={() => {
+                        setExpandedBoards(prev => {
+                          const next = new Set(prev);
+                          if (next.has(board.boardId)) next.delete(board.boardId);
+                          else next.add(board.boardId);
+                          return next;
+                        });
+                      }}
+                      data-testid={`button-toggle-board-${board.boardId}`}
+                    >
+                      {expandedBoards.has(board.boardId) ? (
+                        <ChevronDown className="h-4 w-4 shrink-0" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 shrink-0" />
+                      )}
+                      {board.boardName}
+                      <Badge variant="secondary" className="ml-auto">{board.materials.length}</Badge>
+                    </button>
+                    {expandedBoards.has(board.boardId) && (
+                      <div className="ml-6 mt-1 space-y-1">
+                        {board.materials.map((mat: any) => {
+                          const content = mat.content || {};
+                          const name = content.name || "Untitled";
+                          const supplier = content.supplier || "";
+                          const price = content.price || "";
+                          const code = content.code || "";
+                          return (
+                            <button
+                              key={mat.id}
+                              className="w-full text-left p-2 rounded-md border text-sm hover-elevate"
+                              onClick={() => {
+                                if (mat.type === "product") {
+                                  const notes = [name, supplier].filter(Boolean).join(" — ");
+                                  setNewItem(prev => ({
+                                    ...prev,
+                                    notes,
+                                    materialCost: price || prev.materialCost,
+                                    unitCost: price || prev.unitCost,
+                                    quantity: prev.quantity || "1",
+                                    isCustomRate: true,
+                                    customCategory: name || "Product",
+                                  }));
+                                } else {
+                                  const notes = [name, supplier, code].filter(Boolean).join(" — ");
+                                  setNewItem(prev => ({
+                                    ...prev,
+                                    notes,
+                                    quantity: prev.quantity || "1",
+                                    isCustomRate: true,
+                                    customCategory: name,
+                                  }));
+                                }
+                                setShowBoardImport(false);
+                                setShowAddItem(true);
+                              }}
+                              data-testid={`button-select-material-${mat.id}`}
+                            >
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-medium">{name}</span>
+                                <Badge variant="outline" className="text-[10px]">{mat.type}</Badge>
+                              </div>
+                              <div className="text-xs text-muted-foreground mt-0.5">
+                                {supplier && <span>{supplier}</span>}
+                                {price && <span className="ml-2">${price}</span>}
+                                {code && <span className="ml-2">Code: {code}</span>}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>
