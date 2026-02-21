@@ -436,6 +436,17 @@ export async function registerRoutes(
     const milestone = await storage.createMilestone({ ...input, projectId });
     res.status(201).json(milestone);
 
+    if (milestone.date) {
+      storage.createCalendarEvent({
+        projectId,
+        title: `Milestone Due: ${milestone.title}`,
+        description: `milestone:${milestone.id}`,
+        date: milestone.date,
+        type: "milestone",
+        createdBy: (req as any).user?.claims?.sub,
+      }).catch(() => {});
+    }
+
     const project = await storage.getProject(projectId);
     if (project) {
       notifyMilestoneCreated(project.name, input.title, project.clientId).catch(() => {});
@@ -448,11 +459,11 @@ export async function registerRoutes(
       const id = Number(req.params.id);
       const userId = req.user.claims.sub;
       
-      // Validate request body
       const schema = z.object({
         title: z.string().optional(),
         date: z.string().nullable().optional(),
         completed: z.boolean().optional(),
+        completedBy: z.string().nullable().optional(),
         order: z.number().optional()
       });
       const parsed = schema.safeParse(req.body);
@@ -460,13 +471,11 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Invalid input", errors: parsed.error.flatten().fieldErrors });
       }
 
-      // Fetch milestone to verify it exists
       const milestone = await storage.getMilestone(id);
       if (!milestone) {
         return res.status(404).json({ message: "Milestone not found" });
       }
 
-      // Check user has access to the milestone's project
       const project = await storage.getProject(milestone.projectId);
       if (!project) {
         return res.status(404).json({ message: "Project not found" });
@@ -477,7 +486,41 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Not authorized to update this milestone" });
       }
 
-      const updated = await storage.updateMilestone(id, parsed.data);
+      const updateData: any = { ...parsed.data };
+      if (parsed.data.completed === false) {
+        updateData.completedBy = null;
+      }
+
+      const updated = await storage.updateMilestone(id, updateData);
+
+      const milestoneEvents = await storage.getCalendarEventsByType(milestone.projectId, "milestone");
+      const linkedEvent = milestoneEvents.find(e => e.description === `milestone:${id}`);
+
+      if ('date' in parsed.data || 'title' in parsed.data) {
+        const newDate = 'date' in parsed.data ? parsed.data.date : milestone.date;
+        const newTitle = parsed.data.title || milestone.title;
+
+        if (linkedEvent) {
+          if (newDate === null || newDate === undefined) {
+            await storage.deleteCalendarEvent(linkedEvent.id);
+          } else {
+            await storage.updateCalendarEvent(linkedEvent.id, {
+              title: `Milestone Due: ${newTitle}`,
+              date: newDate,
+            });
+          }
+        } else if (newDate) {
+          await storage.createCalendarEvent({
+            projectId: milestone.projectId,
+            title: `Milestone Due: ${newTitle}`,
+            description: `milestone:${id}`,
+            date: newDate,
+            type: "milestone",
+            createdBy: userId,
+          });
+        }
+      }
+
       res.json(updated);
     } catch (error) {
       res.status(500).json({ message: "Failed to update milestone" });
@@ -504,6 +547,12 @@ export async function registerRoutes(
       const dbUser = await authStorage.getUser(userId);
       if (dbUser?.role === 'client' && project.clientId !== userId) {
         return res.status(403).json({ message: "Not authorized to delete this milestone" });
+      }
+
+      const milestoneEvents = await storage.getCalendarEventsByType(milestone.projectId, "milestone");
+      const linkedEvent = milestoneEvents.find(e => e.description === `milestone:${id}`);
+      if (linkedEvent) {
+        await storage.deleteCalendarEvent(linkedEvent.id);
       }
 
       await storage.deleteMilestone(id);

@@ -68,6 +68,7 @@ export interface IStorage {
   createCalendarEvent(event: InsertCalendarEvent): Promise<CalendarEvent>;
   updateCalendarEvent(id: number, updates: Partial<InsertCalendarEvent>): Promise<CalendarEvent>;
   deleteCalendarEvent(id: number): Promise<void>;
+  getCalendarEventsByType(projectId: number, type: string): Promise<CalendarEvent[]>;
 
   // Planning Boards
   getPlanningBoards(projectId: number): Promise<PlanningBoard[]>;
@@ -274,6 +275,10 @@ export class DatabaseStorage implements IStorage {
   }
   async deleteCalendarEvent(id: number): Promise<void> {
     await db.delete(calendarEvents).where(eq(calendarEvents.id, id));
+  }
+  async getCalendarEventsByType(projectId: number, type: string): Promise<CalendarEvent[]> {
+    return await db.select().from(calendarEvents)
+      .where(and(eq(calendarEvents.projectId, projectId), eq(calendarEvents.type, type)));
   }
 
   // Planning Boards

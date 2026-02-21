@@ -31,6 +31,7 @@ export const milestones = pgTable("milestones", {
   title: text("title").notNull(),
   date: date("date"),
   completed: boolean("completed").default(false),
+  completedBy: text("completed_by").references(() => users.id),
   order: integer("order").default(0),
 });
 

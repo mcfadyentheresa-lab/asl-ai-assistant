@@ -13,7 +13,7 @@ import {
 import { useOnlineUsers, isUserOnline } from "@/hooks/use-presence";
 import { Navbar } from "@/components/layout/Navbar";
 import SpatialCanvas from "@/components/SpatialCanvas";
-import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, ExternalLink, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, CalendarDays, ChevronLeft, Upload, Download, User, X, Paperclip, ZoomIn, Palette, Shield, Users, Phone, Check, Bell, Eye, EyeOff, Archive, ArchiveRestore, PanelRightOpen, MoreVertical } from "lucide-react";
+import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, ExternalLink, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, CalendarDays, ChevronLeft, Upload, Download, User, X, Paperclip, ZoomIn, Palette, Shield, Users, Phone, Check, Bell, Eye, EyeOff, Archive, ArchiveRestore, PanelRightOpen, MoreVertical, Flag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -540,6 +540,8 @@ export default function ProjectDetails() {
   const [newMilestoneDate, setNewMilestoneDate] = useState("");
   const [editingMilestone, setEditingMilestone] = useState<any>(null);
   const [editMilestoneForm, setEditMilestoneForm] = useState({ title: "", date: "" });
+  const [completingMilestone, setCompletingMilestone] = useState<any>(null);
+  const [completedByUser, setCompletedByUser] = useState<string>("");
   const { data: planningBoards } = usePlanningBoards(projectId);
   const assignedClient = users?.find((u) => u.id === project?.clientId);
 
@@ -733,12 +735,23 @@ export default function ProjectDetails() {
                         <Card>
                           <CardHeader className="p-4 flex flex-row flex-wrap items-start justify-between gap-2">
                             <div>
-                              <CardTitle className="text-base font-semibold" data-testid={`text-milestone-title-${milestone.id}`}>
+                              <CardTitle
+                                className={`text-base font-semibold ${milestone.completed ? "line-through text-muted-foreground" : ""}`}
+                                data-testid={`text-milestone-title-${milestone.id}`}
+                              >
                                 {milestone.title}
                               </CardTitle>
                               <CardDescription>
                                 {milestone.date && format(new Date(milestone.date), "MMMM d, yyyy")}
                               </CardDescription>
+                              {milestone.completed && milestone.completedBy && (() => {
+                                const completedUser = users?.find((u: any) => u.id === milestone.completedBy);
+                                return completedUser ? (
+                                  <span className="text-xs text-muted-foreground mt-1 block" data-testid={`text-milestone-completedby-${milestone.id}`}>
+                                    Completed by {completedUser.firstName} {completedUser.lastName}
+                                  </span>
+                                ) : null;
+                              })()}
                             </div>
                             <div className="flex items-center gap-2">
                               {milestone.completed && (
@@ -757,13 +770,18 @@ export default function ProjectDetails() {
                                     <DropdownMenuItem
                                       data-testid={`button-milestone-toggle-${milestone.id}`}
                                       onClick={() => {
-                                        updateMilestone(
-                                          { id: milestone.id, projectId, completed: !milestone.completed },
-                                          {
-                                            onSuccess: () => toast({ title: milestone.completed ? "Milestone marked incomplete" : "Milestone marked complete" }),
-                                            onError: () => toast({ title: "Failed to update milestone", variant: "destructive" }),
-                                          }
-                                        );
+                                        if (milestone.completed) {
+                                          updateMilestone(
+                                            { id: milestone.id, projectId, completed: false, completedBy: null },
+                                            {
+                                              onSuccess: () => toast({ title: "Milestone marked incomplete" }),
+                                              onError: () => toast({ title: "Failed to update milestone", variant: "destructive" }),
+                                            }
+                                          );
+                                        } else {
+                                          setCompletingMilestone(milestone);
+                                          setCompletedByUser("");
+                                        }
                                       }}
                                     >
                                       <Check className="h-4 w-4 mr-2" />
@@ -868,6 +886,76 @@ export default function ProjectDetails() {
                         </Button>
                       </div>
                     </form>
+                  </DialogContent>
+                </Dialog>
+
+                <Dialog open={!!completingMilestone} onOpenChange={(open) => { if (!open) setCompletingMilestone(null); }}>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Mark Milestone Complete</DialogTitle>
+                      <DialogDescription>
+                        Mark &quot;{completingMilestone?.title}&quot; as completed.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Completed by (optional)</label>
+                        <Select value={completedByUser} onValueChange={setCompletedByUser}>
+                          <SelectTrigger data-testid="select-completed-by">
+                            <SelectValue placeholder="Select who completed this..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Not specified</SelectItem>
+                            {users?.map((u: any) => (
+                              <SelectItem key={u.id} value={u.id}>
+                                {u.firstName} {u.lastName}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          onClick={() => {
+                            if (!completingMilestone) return;
+                            updateMilestone(
+                              { id: completingMilestone.id, projectId, completed: true },
+                              {
+                                onSuccess: () => {
+                                  toast({ title: "Milestone marked complete" });
+                                  setCompletingMilestone(null);
+                                },
+                                onError: () => toast({ title: "Failed to update milestone", variant: "destructive" }),
+                              }
+                            );
+                          }}
+                          data-testid="button-skip-completedby"
+                        >
+                          Skip
+                        </Button>
+                        <Button
+                          onClick={() => {
+                            if (!completingMilestone) return;
+                            const cb = completedByUser && completedByUser !== "none" ? completedByUser : null;
+                            updateMilestone(
+                              { id: completingMilestone.id, projectId, completed: true, completedBy: cb },
+                              {
+                                onSuccess: () => {
+                                  toast({ title: "Milestone marked complete" });
+                                  setCompletingMilestone(null);
+                                  setCompletedByUser("");
+                                },
+                                onError: () => toast({ title: "Failed to update milestone", variant: "destructive" }),
+                              }
+                            );
+                          }}
+                          data-testid="button-confirm-complete"
+                        >
+                          Confirm
+                        </Button>
+                      </div>
+                    </div>
                   </DialogContent>
                 </Dialog>
               </div>
@@ -1273,6 +1361,9 @@ function ChecklistTab({ projectId }: { projectId: number }) {
   const { mutate: updateItem } = useUpdateChecklistItem();
   const { mutate: deleteItem } = useDeleteChecklistItem();
   const { mutate: addToCalendar } = useCreateCalendarEvent();
+  const { data: checklistMilestones } = useMilestones(projectId);
+  const { mutate: updateChecklistMilestone } = useUpdateMilestone();
+  const { data: allChecklistUsers } = useUsers();
 
   const [newTitle, setNewTitle] = useState("");
   const [newGroup, setNewGroup] = useState("General");
@@ -1435,6 +1526,72 @@ function ChecklistTab({ projectId }: { projectId: number }) {
           </>
         )}
       </div>
+
+      {checklistMilestones && checklistMilestones.length > 0 && (
+        <Card data-testid="checklist-milestones-section">
+          <div className="p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Flag className="h-4 w-4 text-muted-foreground" />
+              <span className="font-serif font-semibold text-foreground" data-testid="text-milestones-heading">
+                Milestones
+              </span>
+              <span className="text-xs text-muted-foreground">
+                ({checklistMilestones.length})
+              </span>
+            </div>
+            <div className="border-t">
+              {checklistMilestones.map((ms: any) => {
+                const isDone = !!ms.completed;
+                const completedUser = ms.completedBy
+                  ? (allChecklistUsers as any[])?.find((u: any) => u.id === ms.completedBy)
+                  : null;
+                return (
+                  <div
+                    key={ms.id}
+                    className={`flex items-start gap-3 px-4 py-3 border-b last:border-b-0 transition-opacity ${isDone ? "opacity-60" : ""}`}
+                    data-testid={`checklist-milestone-${ms.id}`}
+                  >
+                    <Checkbox
+                      checked={isDone}
+                      onCheckedChange={() => {
+                        updateChecklistMilestone(
+                          { id: ms.id, projectId, completed: !isDone, completedBy: isDone ? null : undefined },
+                          {
+                            onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+                          }
+                        );
+                      }}
+                      className="mt-0.5"
+                      data-testid={`checkbox-milestone-${ms.id}`}
+                    />
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Flag className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" />
+                        <span
+                          className={`font-medium text-sm ${isDone ? "line-through text-muted-foreground" : ""}`}
+                          data-testid={`text-checklist-milestone-title-${ms.id}`}
+                        >
+                          {ms.title}
+                        </span>
+                        {ms.date && (
+                          <Badge variant="outline" className="text-[10px] no-default-hover-elevate" data-testid={`badge-milestone-date-${ms.id}`}>
+                            {format(new Date(ms.date), "MMM d, yyyy")}
+                          </Badge>
+                        )}
+                      </div>
+                      {completedUser && (
+                        <span className="text-xs text-muted-foreground" data-testid={`text-checklist-milestone-completedby-${ms.id}`}>
+                          Completed by: {completedUser.firstName} {completedUser.lastName}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </Card>
+      )}
 
       <form onSubmit={handleAdd} className="space-y-2 sm:space-y-0 sm:flex sm:flex-row sm:gap-3 sm:flex-wrap" data-testid="form-add-checklist">
         <Input
@@ -2456,7 +2613,7 @@ function ChatTab({ projectId }: { projectId: number }) {
 
 const eventTypeColors: Record<string, string> = {
   event: "#4f46e5",
-  milestone: "#059669",
+  milestone: "#b45309",
   deadline: "#dc2626",
   meeting: "#d97706",
   delivery: "#0891b2",

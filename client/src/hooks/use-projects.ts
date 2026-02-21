@@ -176,7 +176,7 @@ export function useCreateMilestone() {
 export function useUpdateMilestone() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, projectId, ...data }: { id: number; projectId: number; title?: string; date?: string | null; completed?: boolean; order?: number }) => {
+    mutationFn: async ({ id, projectId, ...data }: { id: number; projectId: number; title?: string; date?: string | null; completed?: boolean; completedBy?: string | null; order?: number }) => {
       const res = await fetch(`/api/milestones/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -188,6 +188,7 @@ export function useUpdateMilestone() {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: [api.milestones.list.path, variables.projectId] });
+      queryClient.invalidateQueries({ queryKey: [api.calendar.list.path, variables.projectId] });
     },
   });
 }
@@ -205,6 +206,7 @@ export function useDeleteMilestone() {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: [api.milestones.list.path, variables.projectId] });
+      queryClient.invalidateQueries({ queryKey: [api.calendar.list.path, variables.projectId] });
     },
   });
 }
