@@ -562,6 +562,38 @@ export async function registerRoutes(
     }
   });
 
+  // Sub-Milestones
+  app.get("/api/milestones/:milestoneId/sub-milestones", isAuthenticated, async (req, res) => {
+    const subs = await storage.getSubMilestones(Number(req.params.milestoneId));
+    res.json(subs);
+  });
+
+  app.post("/api/milestones/:milestoneId/sub-milestones", isAuthenticated, async (req, res) => {
+    const milestoneId = Number(req.params.milestoneId);
+    const { title } = req.body;
+    if (!title || !title.trim()) return res.status(400).json({ message: "Title required" });
+    const sub = await storage.createSubMilestone({ milestoneId, title: title.trim(), completed: false, order: 0 });
+    res.status(201).json(sub);
+  });
+
+  app.patch("/api/sub-milestones/:id", isAuthenticated, async (req, res) => {
+    try {
+      const updated = await storage.updateSubMilestone(Number(req.params.id), req.body);
+      res.json(updated);
+    } catch (e) {
+      res.status(500).json({ message: "Failed to update sub-milestone" });
+    }
+  });
+
+  app.delete("/api/sub-milestones/:id", isAuthenticated, async (req, res) => {
+    try {
+      await storage.deleteSubMilestone(Number(req.params.id));
+      res.json({ ok: true });
+    } catch (e) {
+      res.status(500).json({ message: "Failed to delete sub-milestone" });
+    }
+  });
+
   // Photos
   app.get(api.photos.list.path, isAuthenticated, async (req, res) => {
     const photos = await storage.getPhotos(Number(req.params.projectId));

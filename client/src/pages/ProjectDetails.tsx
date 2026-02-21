@@ -57,6 +57,8 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { useState, useRef, useEffect } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths, isSameDay, isSameMonth, parseISO, formatDistanceToNow } from "date-fns";
@@ -544,6 +546,8 @@ export default function ProjectDetails() {
   const [editMilestoneForm, setEditMilestoneForm] = useState({ title: "", date: "" });
   const [completingMilestone, setCompletingMilestone] = useState<any>(null);
   const [completedByUser, setCompletedByUser] = useState<string>("");
+  const [expandedMilestones, setExpandedMilestones] = useState<Set<number>>(new Set());
+  const [newSubTitle, setNewSubTitle] = useState<Record<number, string>>({});
   const { data: planningBoards } = usePlanningBoards(projectId);
   const assignedClient = users?.find((u) => u.id === project?.clientId);
 
@@ -569,6 +573,125 @@ export default function ProjectDetails() {
     }, 3000);
     return () => clearTimeout(timer);
   }, [activeTab, activityLog, user?.id]);
+
+  const toggleMilestoneExpand = (id: number) => {
+    setExpandedMilestones(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const SubMilestoneList = ({ milestoneId, isAdmin }: { milestoneId: number; isAdmin: boolean }) => {
+    const { data: subs = [] } = useQuery<any[]>({
+      queryKey: ["/api/milestones/:milestoneId/sub-milestones", milestoneId],
+      queryFn: () => fetch(`/api/milestones/${milestoneId}/sub-milestones`, { credentials: "include" }).then(r => r.json()),
+    });
+
+    const toggleSub = useMutation({
+      mutationFn: (sub: any) => apiRequest("PATCH", `/api/sub-milestones/${sub.id}`, { completed: !sub.completed }),
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/milestones/:milestoneId/sub-milestones", milestoneId] }),
+    });
+
+    const createSub = useMutation({
+      mutationFn: (title: string) => apiRequest("POST", `/api/milestones/${milestoneId}/sub-milestones`, { title }),
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["/api/milestones/:milestoneId/sub-milestones", milestoneId] });
+        setNewSubTitle(prev => ({ ...prev, [milestoneId]: "" }));
+      },
+    });
+
+    const deleteSub = useMutation({
+      mutationFn: (id: number) => apiRequest("DELETE", `/api/sub-milestones/${id}`),
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/milestones/:milestoneId/sub-milestones", milestoneId] }),
+    });
+
+    const completedCount = subs.filter((s: any) => s.completed).length;
+    const totalCount = subs.length;
+
+    return (
+      <div className="mt-3 space-y-2">
+        {totalCount > 0 && (
+          <div className="flex items-center gap-2 mb-2">
+            <div className="flex-1 h-1 rounded-full bg-muted overflow-hidden">
+              <div
+                className="h-full rounded-full bg-primary/60 transition-all duration-300"
+                style={{ width: totalCount > 0 ? `${(completedCount / totalCount) * 100}%` : "0%" }}
+              />
+            </div>
+            <span className="text-[11px] text-muted-foreground tabular-nums">{completedCount}/{totalCount}</span>
+          </div>
+        )}
+
+        <div className="space-y-1">
+          {subs.map((sub: any) => (
+            <div
+              key={sub.id}
+              className="flex items-center gap-2 group/sub py-1 px-1 rounded"
+              data-testid={`sub-milestone-${sub.id}`}
+            >
+              <button
+                onClick={() => toggleSub.mutate(sub)}
+                className={`shrink-0 h-4 w-4 rounded border transition-colors flex items-center justify-center ${
+                  sub.completed
+                    ? "bg-primary border-primary"
+                    : "border-muted-foreground/40 bg-background"
+                }`}
+                data-testid={`button-toggle-sub-${sub.id}`}
+              >
+                {sub.completed && <Check className="h-2.5 w-2.5 text-primary-foreground" />}
+              </button>
+              <span
+                className={`flex-1 text-sm ${sub.completed ? "line-through text-muted-foreground" : "text-foreground"}`}
+                data-testid={`text-sub-title-${sub.id}`}
+              >
+                {sub.title}
+              </span>
+              {isAdmin && (
+                <button
+                  onClick={() => deleteSub.mutate(sub.id)}
+                  className="invisible group-hover/sub:visible transition-opacity text-muted-foreground"
+                  data-testid={`button-delete-sub-${sub.id}`}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {isAdmin && (
+          <form
+            className="flex items-center gap-2 mt-1"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const title = newSubTitle[milestoneId]?.trim();
+              if (title) createSub.mutate(title);
+            }}
+            data-testid={`form-add-sub-${milestoneId}`}
+          >
+            <Input
+              placeholder="Add sub-item..."
+              value={newSubTitle[milestoneId] || ""}
+              onChange={(e) => setNewSubTitle(prev => ({ ...prev, [milestoneId]: e.target.value }))}
+              className="h-8 text-sm flex-1"
+              data-testid={`input-sub-title-${milestoneId}`}
+            />
+            <Button
+              type="submit"
+              size="icon"
+              variant="ghost"
+              disabled={!newSubTitle[milestoneId]?.trim()}
+              data-testid={`button-add-sub-${milestoneId}`}
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </Button>
+          </form>
+        )}
+      </div>
+    );
+  };
 
   const isClientInvitedToBoard = userRole === "client" && Array.isArray(planningBoards) &&
     planningBoards.some((b: any) => (b.linkedUserIds || []).includes(user?.id));
@@ -780,12 +903,25 @@ export default function ProjectDetails() {
                             >
                               <div className="flex items-start justify-between gap-2 flex-wrap">
                                 <div className="flex-1 min-w-0">
-                                  <p
-                                    className={`font-medium text-[15px] leading-snug ${milestone.completed ? "line-through text-muted-foreground" : "text-foreground"}`}
-                                    data-testid={`text-milestone-title-${milestone.id}`}
-                                  >
-                                    {milestone.title}
-                                  </p>
+                                  <div className="flex items-center gap-1.5">
+                                    <button
+                                      onClick={() => toggleMilestoneExpand(milestone.id)}
+                                      className="shrink-0 text-muted-foreground/60 transition-colors"
+                                      data-testid={`button-expand-milestone-${milestone.id}`}
+                                    >
+                                      {expandedMilestones.has(milestone.id) ? (
+                                        <ChevronDown className="h-4 w-4" />
+                                      ) : (
+                                        <ChevronRight className="h-4 w-4" />
+                                      )}
+                                    </button>
+                                    <p
+                                      className={`font-medium text-[15px] leading-snug ${milestone.completed ? "line-through text-muted-foreground" : "text-foreground"}`}
+                                      data-testid={`text-milestone-title-${milestone.id}`}
+                                    >
+                                      {milestone.title}
+                                    </p>
+                                  </div>
                                   <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                                     {milestone.date && (
                                       <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
@@ -870,6 +1006,12 @@ export default function ProjectDetails() {
                                   </DropdownMenu>
                                 )}
                               </div>
+
+                              {expandedMilestones.has(milestone.id) && (
+                                <div className="border-t border-border/50 mt-3 pt-3">
+                                  <SubMilestoneList milestoneId={milestone.id} isAdmin={userRole !== "client"} />
+                                </div>
+                              )}
                             </div>
                           </div>
                         </div>

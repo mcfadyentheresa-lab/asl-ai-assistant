@@ -1,9 +1,9 @@
 import { db } from "./db";
 import { 
-  users, projects, milestones, tasks, photos, documents, timeEntries, messages, checklistItems, boardItems, calendarEvents, planningBoards, canvasElements, activityLog, activityViews, paintColors,
-  type Project, type Milestone, type Task, type Photo, type Document, type TimeEntry, type Message,
+  users, projects, milestones, subMilestones, tasks, photos, documents, timeEntries, messages, checklistItems, boardItems, calendarEvents, planningBoards, canvasElements, activityLog, activityViews, paintColors,
+  type Project, type Milestone, type SubMilestone, type Task, type Photo, type Document, type TimeEntry, type Message,
   type ChecklistItem, type BoardItem, type CalendarEvent, type PlanningBoard, type CanvasElement, type ActivityLog, type PaintColor,
-  type InsertProject, type InsertMilestone, type InsertTask, type InsertPhoto, type InsertDocument, 
+  type InsertProject, type InsertMilestone, type InsertSubMilestone, type InsertTask, type InsertPhoto, type InsertDocument, 
   type InsertTimeEntry, type InsertMessage, type InsertChecklistItem, type InsertBoardItem, type InsertCalendarEvent, type InsertPlanningBoard, type InsertCanvasElement, type InsertActivityLog
 } from "@shared/schema";
 import { type User } from "@shared/models/auth";
@@ -23,6 +23,12 @@ export interface IStorage {
   createMilestone(milestone: InsertMilestone): Promise<Milestone>;
   updateMilestone(id: number, data: Partial<InsertMilestone>): Promise<Milestone>;
   deleteMilestone(id: number): Promise<void>;
+
+  // Sub-Milestones
+  getSubMilestones(milestoneId: number): Promise<SubMilestone[]>;
+  createSubMilestone(sub: InsertSubMilestone): Promise<SubMilestone>;
+  updateSubMilestone(id: number, data: Partial<InsertSubMilestone>): Promise<SubMilestone>;
+  deleteSubMilestone(id: number): Promise<void>;
 
   // Tasks
   getTasks(projectId: number): Promise<Task[]>;
@@ -141,6 +147,22 @@ export class DatabaseStorage implements IStorage {
   }
   async deleteMilestone(id: number): Promise<void> {
     await db.delete(milestones).where(eq(milestones.id, id));
+  }
+
+  // Sub-Milestones
+  async getSubMilestones(milestoneId: number): Promise<SubMilestone[]> {
+    return await db.select().from(subMilestones).where(eq(subMilestones.milestoneId, milestoneId)).orderBy(subMilestones.order);
+  }
+  async createSubMilestone(sub: InsertSubMilestone): Promise<SubMilestone> {
+    const [newSub] = await db.insert(subMilestones).values(sub).returning();
+    return newSub;
+  }
+  async updateSubMilestone(id: number, data: Partial<InsertSubMilestone>): Promise<SubMilestone> {
+    const [updated] = await db.update(subMilestones).set(data).where(eq(subMilestones.id, id)).returning();
+    return updated;
+  }
+  async deleteSubMilestone(id: number): Promise<void> {
+    await db.delete(subMilestones).where(eq(subMilestones.id, id));
   }
 
   // Tasks

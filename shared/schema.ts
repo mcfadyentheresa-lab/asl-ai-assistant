@@ -35,6 +35,15 @@ export const milestones = pgTable("milestones", {
   order: integer("order").default(0),
 });
 
+// Sub-Milestones
+export const subMilestones = pgTable("sub_milestones", {
+  id: serial("id").primaryKey(),
+  milestoneId: integer("milestone_id").notNull().references(() => milestones.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  completed: boolean("completed").default(false),
+  order: integer("order").default(0),
+});
+
 // Tasks
 export const tasks = pgTable("tasks", {
   id: serial("id").primaryKey(),
@@ -237,6 +246,14 @@ export const milestonesRelations = relations(milestones, ({ one, many }) => ({
     references: [projects.id],
   }),
   tasks: many(tasks),
+  subMilestones: many(subMilestones),
+}));
+
+export const subMilestonesRelations = relations(subMilestones, ({ one }) => ({
+  milestone: one(milestones, {
+    fields: [subMilestones.milestoneId],
+    references: [milestones.id],
+  }),
 }));
 
 export const tasksRelations = relations(tasks, ({ one }) => ({
@@ -333,6 +350,7 @@ export const insertQueuedSmsSchema = createInsertSchema(queuedSms).omit({ id: tr
 // SCHEMAS
 export const insertProjectSchema = createInsertSchema(projects).omit({ id: true, createdAt: true });
 export const insertMilestoneSchema = createInsertSchema(milestones).omit({ id: true });
+export const insertSubMilestoneSchema = createInsertSchema(subMilestones).omit({ id: true });
 export const insertTaskSchema = createInsertSchema(tasks).omit({ id: true, createdAt: true });
 export const insertPhotoSchema = createInsertSchema(photos).omit({ id: true, createdAt: true });
 export const insertDocumentSchema = createInsertSchema(documents).omit({ id: true, createdAt: true });
@@ -376,5 +394,7 @@ export type ActivityLog = typeof activityLog.$inferSelect;
 export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;
 export type PaintColor = typeof paintColors.$inferSelect;
 export type InsertPaintColor = z.infer<typeof insertPaintColorSchema>;
+export type SubMilestone = typeof subMilestones.$inferSelect;
+export type InsertSubMilestone = z.infer<typeof insertSubMilestoneSchema>;
 export type QueuedSms = typeof queuedSms.$inferSelect;
 export type InsertQueuedSms = z.infer<typeof insertQueuedSmsSchema>;
