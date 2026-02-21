@@ -680,155 +680,207 @@ export default function ProjectDetails() {
           <TabsContent value="overview" className="space-y-8">
             <div className="grid md:grid-cols-3 gap-8">
               <div className="md:col-span-2 space-y-6">
-                <h3 className="font-serif text-xl font-bold text-foreground" data-testid="text-timeline-heading">
-                  Project Timeline
-                </h3>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between flex-wrap gap-3">
+                    <div>
+                      <h3 className="font-serif text-xl font-bold text-foreground" data-testid="text-timeline-heading">
+                        Project Journey
+                      </h3>
+                      <p className="text-sm text-muted-foreground mt-0.5">
+                        {milestones && milestones.length > 0
+                          ? `${milestones.filter((m) => m.completed).length} of ${milestones.length} milestones complete`
+                          : "Track your renovation progress"}
+                      </p>
+                    </div>
+                    {milestones && milestones.length > 0 && (
+                      <div className="flex items-center gap-3" data-testid="progress-indicator">
+                        <div className="w-32 h-2 rounded-full bg-muted overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-primary transition-all duration-500"
+                            style={{ width: `${Math.round((milestones.filter((m) => m.completed).length / milestones.length) * 100)}%` }}
+                          />
+                        </div>
+                        <span className="text-sm font-medium text-foreground tabular-nums">
+                          {Math.round((milestones.filter((m) => m.completed).length / milestones.length) * 100)}%
+                        </span>
+                      </div>
+                    )}
+                  </div>
 
-                {userRole !== "client" && (
-                  <form
-                    className="flex flex-col sm:flex-row gap-2"
-                    data-testid="form-add-milestone"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      if (!newMilestoneTitle.trim()) return;
-                      createMilestone(
-                        { projectId, title: newMilestoneTitle.trim(), date: newMilestoneDate || null },
-                        {
-                          onSuccess: () => {
-                            toast({ title: "Milestone added" });
-                            setNewMilestoneTitle("");
-                            setNewMilestoneDate("");
-                          },
-                          onError: () => toast({ title: "Failed to add milestone", variant: "destructive" }),
-                        }
-                      );
-                    }}
-                  >
-                    <Input
-                      placeholder="Milestone title..."
-                      value={newMilestoneTitle}
-                      onChange={(e) => setNewMilestoneTitle(e.target.value)}
-                      data-testid="input-milestone-title"
-                      className="flex-1"
-                    />
-                    <Input
-                      type="date"
-                      value={newMilestoneDate}
-                      onChange={(e) => setNewMilestoneDate(e.target.value)}
-                      data-testid="input-milestone-date"
-                      className="sm:w-44"
-                    />
-                    <Button type="submit" size="default" disabled={creatingMilestone || !newMilestoneTitle.trim()} data-testid="button-add-milestone">
-                      {creatingMilestone ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Plus className="h-4 w-4 mr-1" />}
-                      Add
-                    </Button>
-                  </form>
-                )}
+                  {userRole !== "client" && (
+                    <form
+                      className="flex flex-col sm:flex-row gap-2"
+                      data-testid="form-add-milestone"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        if (!newMilestoneTitle.trim()) return;
+                        createMilestone(
+                          { projectId, title: newMilestoneTitle.trim(), date: newMilestoneDate || null },
+                          {
+                            onSuccess: () => {
+                              toast({ title: "Milestone added" });
+                              setNewMilestoneTitle("");
+                              setNewMilestoneDate("");
+                            },
+                            onError: () => toast({ title: "Failed to add milestone", variant: "destructive" }),
+                          }
+                        );
+                      }}
+                    >
+                      <Input
+                        placeholder="Add a milestone..."
+                        value={newMilestoneTitle}
+                        onChange={(e) => setNewMilestoneTitle(e.target.value)}
+                        data-testid="input-milestone-title"
+                        className="flex-1"
+                      />
+                      <Input
+                        type="date"
+                        value={newMilestoneDate}
+                        onChange={(e) => setNewMilestoneDate(e.target.value)}
+                        data-testid="input-milestone-date"
+                        className="sm:w-44"
+                      />
+                      <Button type="submit" size="default" disabled={creatingMilestone || !newMilestoneTitle.trim()} data-testid="button-add-milestone">
+                        {creatingMilestone ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Plus className="h-4 w-4 mr-1" />}
+                        Add
+                      </Button>
+                    </form>
+                  )}
+                </div>
 
-                <div className="relative border-l-2 border-border ml-3 space-y-6 pb-2">
+                <div className="space-y-3">
                   {milestones && milestones.length > 0 ? (
-                    milestones.map((milestone) => (
-                      <div key={milestone.id} className="relative pl-8" data-testid={`milestone-${milestone.id}`}>
-                        <div
-                          className={`absolute -left-[9px] top-1.5 h-4 w-4 rounded-full border-2 border-background ${
-                            milestone.completed ? "bg-foreground" : "bg-muted-foreground/30"
-                          }`}
-                        />
-                        <Card>
-                          <CardHeader className="p-4 flex flex-row flex-wrap items-start justify-between gap-2">
-                            <div>
-                              <CardTitle
-                                className={`text-base font-semibold ${milestone.completed ? "line-through text-muted-foreground" : ""}`}
-                                data-testid={`text-milestone-title-${milestone.id}`}
-                              >
-                                {milestone.title}
-                              </CardTitle>
-                              <CardDescription>
-                                {milestone.date && format(new Date(milestone.date), "MMMM d, yyyy")}
-                              </CardDescription>
-                              {milestone.completed && milestone.completedBy && (() => {
-                                const completedUser = users?.find((u: any) => u.id === milestone.completedBy);
-                                return completedUser ? (
-                                  <span className="text-xs text-muted-foreground mt-1 block" data-testid={`text-milestone-completedby-${milestone.id}`}>
-                                    Completed by {completedUser.firstName} {completedUser.lastName}
-                                  </span>
-                                ) : null;
-                              })()}
+                    milestones.map((milestone, idx) => {
+                      const isLast = idx === milestones.length - 1;
+                      return (
+                        <div key={milestone.id} className="relative flex gap-4" data-testid={`milestone-${milestone.id}`}>
+                          <div className="flex flex-col items-center shrink-0 pt-1">
+                            <div
+                              className={`h-5 w-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                                milestone.completed
+                                  ? "border-primary bg-primary"
+                                  : "border-muted-foreground/40 bg-background"
+                              }`}
+                            >
+                              {milestone.completed && <Check className="h-3 w-3 text-primary-foreground" />}
                             </div>
-                            <div className="flex items-center gap-2">
-                              {milestone.completed && (
-                                <Badge variant="outline" data-testid={`badge-milestone-complete-${milestone.id}`}>
-                                  Completed
-                                </Badge>
-                              )}
-                              {userRole !== "client" && (
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button size="icon" variant="ghost" data-testid={`button-milestone-menu-${milestone.id}`}>
-                                      <MoreVertical className="h-4 w-4" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end">
-                                    <DropdownMenuItem
-                                      data-testid={`button-milestone-toggle-${milestone.id}`}
-                                      onClick={() => {
-                                        if (milestone.completed) {
-                                          updateMilestone(
-                                            { id: milestone.id, projectId, completed: false, completedBy: null },
+                            {!isLast && (
+                              <div className={`w-0.5 flex-1 mt-1 rounded-full ${milestone.completed ? "bg-primary/40" : "bg-border"}`} />
+                            )}
+                          </div>
+
+                          <div className={`flex-1 pb-4 ${isLast ? "" : ""}`}>
+                            <div
+                              className={`rounded-md border p-4 transition-colors ${
+                                milestone.completed
+                                  ? "bg-muted/30 border-border/60"
+                                  : "bg-card border-border"
+                              }`}
+                            >
+                              <div className="flex items-start justify-between gap-2 flex-wrap">
+                                <div className="flex-1 min-w-0">
+                                  <p
+                                    className={`font-medium text-[15px] leading-snug ${milestone.completed ? "line-through text-muted-foreground" : "text-foreground"}`}
+                                    data-testid={`text-milestone-title-${milestone.id}`}
+                                  >
+                                    {milestone.title}
+                                  </p>
+                                  <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                                    {milestone.date && (
+                                      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                                        <CalendarDays className="h-3 w-3" />
+                                        {format(new Date(milestone.date), "MMM d, yyyy")}
+                                      </span>
+                                    )}
+                                    {milestone.completed && (
+                                      <Badge variant="outline" className="text-[10px] h-5 border-primary/30 text-primary" data-testid={`badge-milestone-complete-${milestone.id}`}>
+                                        Done
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  {milestone.completed && milestone.completedBy && (() => {
+                                    const completedUser = users?.find((u: any) => u.id === milestone.completedBy);
+                                    return completedUser ? (
+                                      <span className="text-[11px] text-muted-foreground mt-1 block" data-testid={`text-milestone-completedby-${milestone.id}`}>
+                                        Completed by {completedUser.firstName} {completedUser.lastName}
+                                      </span>
+                                    ) : null;
+                                  })()}
+                                </div>
+
+                                {userRole !== "client" && (
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button size="icon" variant="ghost" className="shrink-0" data-testid={`button-milestone-menu-${milestone.id}`}>
+                                        <MoreVertical className="h-4 w-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuItem
+                                        data-testid={`button-milestone-toggle-${milestone.id}`}
+                                        onClick={() => {
+                                          if (milestone.completed) {
+                                            updateMilestone(
+                                              { id: milestone.id, projectId, completed: false, completedBy: null },
+                                              {
+                                                onSuccess: () => toast({ title: "Milestone marked incomplete" }),
+                                                onError: () => toast({ title: "Failed to update milestone", variant: "destructive" }),
+                                              }
+                                            );
+                                          } else {
+                                            setCompletingMilestone(milestone);
+                                            setCompletedByUser("");
+                                          }
+                                        }}
+                                      >
+                                        <Check className="h-4 w-4 mr-2" />
+                                        {milestone.completed ? "Mark Incomplete" : "Mark Complete"}
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem
+                                        data-testid={`button-milestone-edit-${milestone.id}`}
+                                        onClick={() => {
+                                          setEditingMilestone(milestone);
+                                          setEditMilestoneForm({
+                                            title: milestone.title,
+                                            date: milestone.date || "",
+                                          });
+                                        }}
+                                      >
+                                        <Pencil className="h-4 w-4 mr-2" />
+                                        Edit
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem
+                                        className="text-destructive"
+                                        data-testid={`button-milestone-delete-${milestone.id}`}
+                                        onClick={() => {
+                                          deleteMilestone(
+                                            { id: milestone.id, projectId },
                                             {
-                                              onSuccess: () => toast({ title: "Milestone marked incomplete" }),
-                                              onError: () => toast({ title: "Failed to update milestone", variant: "destructive" }),
+                                              onSuccess: () => toast({ title: "Milestone deleted" }),
+                                              onError: () => toast({ title: "Failed to delete milestone", variant: "destructive" }),
                                             }
                                           );
-                                        } else {
-                                          setCompletingMilestone(milestone);
-                                          setCompletedByUser("");
-                                        }
-                                      }}
-                                    >
-                                      <Check className="h-4 w-4 mr-2" />
-                                      {milestone.completed ? "Mark Incomplete" : "Mark Complete"}
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem
-                                      data-testid={`button-milestone-edit-${milestone.id}`}
-                                      onClick={() => {
-                                        setEditingMilestone(milestone);
-                                        setEditMilestoneForm({
-                                          title: milestone.title,
-                                          date: milestone.date || "",
-                                        });
-                                      }}
-                                    >
-                                      <Pencil className="h-4 w-4 mr-2" />
-                                      Edit
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem
-                                      className="text-destructive"
-                                      data-testid={`button-milestone-delete-${milestone.id}`}
-                                      onClick={() => {
-                                        deleteMilestone(
-                                          { id: milestone.id, projectId },
-                                          {
-                                            onSuccess: () => toast({ title: "Milestone deleted" }),
-                                            onError: () => toast({ title: "Failed to delete milestone", variant: "destructive" }),
-                                          }
-                                        );
-                                      }}
-                                    >
-                                      <Trash2 className="h-4 w-4 mr-2" />
-                                      Delete
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              )}
+                                        }}
+                                      >
+                                        <Trash2 className="h-4 w-4 mr-2" />
+                                        Delete
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                )}
+                              </div>
                             </div>
-                          </CardHeader>
-                        </Card>
-                      </div>
-                    ))
+                          </div>
+                        </div>
+                      );
+                    })
                   ) : (
-                    <div className="pl-8 text-muted-foreground text-sm italic" data-testid="text-no-milestones">
-                      No milestones set yet.
+                    <div className="text-center py-10 space-y-2" data-testid="text-no-milestones">
+                      <Flag className="h-8 w-8 mx-auto text-muted-foreground/30" />
+                      <p className="text-muted-foreground text-sm">
+                        No milestones yet. Add your first milestone to track progress.
+                      </p>
                     </div>
                   )}
                 </div>
@@ -2366,7 +2418,7 @@ function PhotosTab({ projectId }: { projectId: number }) {
               <div className="absolute top-2 right-2 flex gap-1 invisible group-hover:visible">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button size="icon" variant="secondary" className="h-7 w-7" data-testid={`button-photo-menu-${photo.id}`}>
+                    <Button size="icon" variant="secondary" data-testid={`button-photo-menu-${photo.id}`}>
                       <MoreVertical className="h-3 w-3" />
                     </Button>
                   </DropdownMenuTrigger>
