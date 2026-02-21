@@ -368,6 +368,84 @@ export const queuedSms = pgTable("queued_sms", {
 
 export const insertQueuedSmsSchema = createInsertSchema(queuedSms).omit({ id: true, sentAt: true, error: true });
 
+// Cost Categories (renovation work types)
+export const costCategories = pgTable("cost_categories", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  defaultUnitType: text("default_unit_type").notNull().default("sq_ft"),
+  sortOrder: integer("sort_order").default(0),
+});
+
+// Market Rates (baseline pricing for categories)
+export const marketRates = pgTable("market_rates", {
+  id: serial("id").primaryKey(),
+  categoryId: integer("category_id").notNull().references(() => costCategories.id, { onDelete: "cascade" }),
+  unitType: text("unit_type").notNull().default("sq_ft"),
+  lowRate: text("low_rate").notNull(),
+  highRate: text("high_rate").notNull(),
+  typicalRate: text("typical_rate").notNull(),
+  effectiveDate: date("effective_date").notNull(),
+  isActive: boolean("is_active").default(true),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Project Estimates (per-project cost estimates)
+export const projectEstimates = pgTable("project_estimates", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  name: text("name").notNull().default("Main Estimate"),
+  status: text("status").notNull().default("draft"),
+  markupEnabled: boolean("markup_enabled").default(true),
+  markupPercent: text("markup_percent").notNull().default("25"),
+  createdBy: text("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Estimate Items (individual line items in an estimate)
+export const estimateItems = pgTable("estimate_items", {
+  id: serial("id").primaryKey(),
+  estimateId: integer("estimate_id").notNull().references(() => projectEstimates.id, { onDelete: "cascade" }),
+  categoryId: integer("category_id").references(() => costCategories.id),
+  customCategory: text("custom_category"),
+  unitType: text("unit_type").notNull().default("sq_ft"),
+  quantity: text("quantity").notNull(),
+  unitCost: text("unit_cost").notNull(),
+  materialCost: text("material_cost").notNull().default("0"),
+  laborCost: text("labor_cost").notNull().default("0"),
+  isCustomRate: boolean("is_custom_rate").default(false),
+  marketRateId: integer("market_rate_id").references(() => marketRates.id),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Receipts (actual expenses to compare against estimates)
+export const receipts = pgTable("receipts", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  estimateItemId: integer("estimate_item_id").references(() => estimateItems.id),
+  vendor: text("vendor").notNull(),
+  description: text("description"),
+  date: date("date").notNull(),
+  amount: text("amount").notNull(),
+  fileUrl: text("file_url"),
+  createdBy: text("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Estimate Warnings (price variance alerts)
+export const estimateWarnings = pgTable("estimate_warnings", {
+  id: serial("id").primaryKey(),
+  estimateItemId: integer("estimate_item_id").notNull().references(() => estimateItems.id, { onDelete: "cascade" }),
+  warningType: text("warning_type").notNull(),
+  message: text("message").notNull(),
+  percentDiff: text("percent_diff"),
+  ignored: boolean("ignored").default(false),
+  ignoredBy: text("ignored_by").references(() => users.id),
+  ignoredAt: timestamp("ignored_at"),
+});
+
 // SCHEMAS
 export const insertProjectSchema = createInsertSchema(projects).omit({ id: true, createdAt: true });
 export const insertMilestoneSchema = createInsertSchema(milestones).omit({ id: true });
@@ -385,6 +463,12 @@ export const insertCalendarEventSchema = createInsertSchema(calendarEvents).omit
 export const insertActivityLogSchema = createInsertSchema(activityLog).omit({ id: true, createdAt: true });
 export const insertPaintColorSchema = createInsertSchema(paintColors).omit({ id: true });
 export const insertBoardSnapshotSchema = createInsertSchema(boardSnapshots).omit({ id: true, createdAt: true });
+export const insertCostCategorySchema = createInsertSchema(costCategories).omit({ id: true });
+export const insertMarketRateSchema = createInsertSchema(marketRates).omit({ id: true, createdAt: true });
+export const insertProjectEstimateSchema = createInsertSchema(projectEstimates).omit({ id: true, createdAt: true });
+export const insertEstimateItemSchema = createInsertSchema(estimateItems).omit({ id: true, createdAt: true });
+export const insertReceiptSchema = createInsertSchema(receipts).omit({ id: true, createdAt: true });
+export const insertEstimateWarningSchema = createInsertSchema(estimateWarnings).omit({ id: true });
 
 // TYPES
 export type Project = typeof projects.$inferSelect;
@@ -422,3 +506,15 @@ export type QueuedSms = typeof queuedSms.$inferSelect;
 export type InsertQueuedSms = z.infer<typeof insertQueuedSmsSchema>;
 export type BoardSnapshot = typeof boardSnapshots.$inferSelect;
 export type InsertBoardSnapshot = z.infer<typeof insertBoardSnapshotSchema>;
+export type CostCategory = typeof costCategories.$inferSelect;
+export type InsertCostCategory = z.infer<typeof insertCostCategorySchema>;
+export type MarketRate = typeof marketRates.$inferSelect;
+export type InsertMarketRate = z.infer<typeof insertMarketRateSchema>;
+export type ProjectEstimate = typeof projectEstimates.$inferSelect;
+export type InsertProjectEstimate = z.infer<typeof insertProjectEstimateSchema>;
+export type EstimateItem = typeof estimateItems.$inferSelect;
+export type InsertEstimateItem = z.infer<typeof insertEstimateItemSchema>;
+export type Receipt = typeof receipts.$inferSelect;
+export type InsertReceipt = z.infer<typeof insertReceiptSchema>;
+export type EstimateWarning = typeof estimateWarnings.$inferSelect;
+export type InsertEstimateWarning = z.infer<typeof insertEstimateWarningSchema>;
