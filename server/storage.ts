@@ -127,6 +127,7 @@ export interface IStorage {
 
   // Market Rates
   getMarketRates(categoryId?: number, activeOnly?: boolean): Promise<MarketRate[]>;
+  getAllMarketRates(): Promise<MarketRate[]>;
   createMarketRate(rate: InsertMarketRate): Promise<MarketRate>;
   updateMarketRate(id: number, updates: Partial<InsertMarketRate>): Promise<MarketRate>;
   
@@ -570,6 +571,9 @@ export class DatabaseStorage implements IStorage {
       return db.select().from(marketRates).where(and(...conditions)).orderBy(desc(marketRates.effectiveDate));
     }
     return db.select().from(marketRates).orderBy(desc(marketRates.effectiveDate));
+  }
+  async getAllMarketRates(): Promise<MarketRate[]> {
+    return await db.select().from(marketRates).orderBy(marketRates.categoryId);
   }
   async createMarketRate(rate: InsertMarketRate): Promise<MarketRate> {
     const [created] = await db.insert(marketRates).values(rate).returning();

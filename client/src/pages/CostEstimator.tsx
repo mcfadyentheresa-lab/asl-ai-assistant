@@ -27,8 +27,9 @@ import {
 import {
   Calculator, Plus, Trash2, AlertTriangle, CheckCircle2,
   DollarSign, ArrowLeft, Receipt as ReceiptIcon, EyeOff,
-  TrendingUp, TrendingDown, Minus, Loader2
+  TrendingUp, TrendingDown, Minus, Loader2, Sparkles
 } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 import type { CostCategory, MarketRate, ProjectEstimate, EstimateItem, Receipt, EstimateWarning, Project } from "@shared/schema";
 
 export default function CostEstimator() {
@@ -44,6 +45,9 @@ export default function CostEstimator() {
   const [showAddItem, setShowAddItem] = useState(false);
   const [showAddReceipt, setShowAddReceipt] = useState(false);
   const [viewMode, setViewMode] = useState<"all" | "sq_ft" | "board">("all");
+  const [showAiAnalyzer, setShowAiAnalyzer] = useState(false);
+  const [aiDescription, setAiDescription] = useState("");
+  const [aiResults, setAiResults] = useState<any>(null);
 
   const [newItem, setNewItem] = useState({
     categoryId: "", customCategory: "", unitType: "sq_ft",
@@ -136,6 +140,52 @@ export default function CostEstimator() {
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/estimates", activeEstimate?.id, "warnings"] }),
   });
+
+  const aiAnalyzeMutation = useMutation({
+    mutationFn: async (description: string) => {
+      const res = await apiRequest("POST", `/api/estimates/${activeEstimate?.id}/ai-analyze`, { description });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setAiResults(data);
+      toast({ title: "AI analysis complete", description: data.summary });
+    },
+    onError: () => {
+      toast({ title: "Analysis failed", description: "Could not analyze project scope", variant: "destructive" });
+    },
+  });
+
+  const [applyingAi, setApplyingAi] = useState(false);
+
+  async function applyAiResults() {
+    if (!aiResults?.items || applyingAi) return;
+    setApplyingAi(true);
+    let added = 0;
+    try {
+      for (const item of aiResults.items) {
+        await addItemMutation.mutateAsync({
+          categoryId: item.categoryId,
+          customCategory: null,
+          unitType: item.unitType,
+          quantity: item.quantity,
+          unitCost: item.unitCost,
+          materialCost: item.materialCost || "0",
+          laborCost: "0",
+          notes: item.notes || null,
+          isCustomRate: false,
+        });
+        added++;
+      }
+      setAiResults(null);
+      setShowAiAnalyzer(false);
+      setAiDescription("");
+      toast({ title: "Estimate populated", description: `${added} line items added from AI analysis` });
+    } catch {
+      toast({ title: "Partially applied", description: `${added} of ${aiResults.items.length} items added before an error occurred`, variant: "destructive" });
+    } finally {
+      setApplyingAi(false);
+    }
+  }
 
   function onCategoryChange(catId: string) {
     const cat = categories.find(c => c.id === parseInt(catId));
@@ -312,6 +362,14 @@ export default function CostEstimator() {
                 </CardContent>
               </Card>
             </div>
+
+            {canEdit && (
+              <div className="flex gap-2 flex-wrap">
+                <Button variant="outline" onClick={() => setShowAiAnalyzer(true)} data-testid="button-ai-analyze">
+                  <Sparkles className="h-4 w-4 mr-2" /> AI Scope Analyzer
+                </Button>
+              </div>
+            )}
 
             {canEdit && (
               <Card>
@@ -592,6 +650,87 @@ export default function CostEstimator() {
               {addReceiptMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ReceiptIcon className="h-4 w-4 mr-2" />}
               Add Receipt
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showAiAnalyzer} onOpenChange={setShowAiAnalyzer}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5" /> AI Scope Analyzer
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label className="mb-2 block">Describe the project scope</Label>
+              <Textarea
+                placeholder="e.g., 2,400 sq ft lakefront cottage renovation. 3 bedrooms, 2 full bathrooms, open-concept kitchen and living area. Full gut renovation including new roof, windows, insulation, electrical and plumbing. Hardwood floors throughout, quartz countertops, custom cabinetry. New composite deck (600 sq ft) and dock replacement."
+                value={aiDescription}
+                onChange={(e) => setAiDescription(e.target.value)}
+                rows={5}
+                data-testid="textarea-ai-description"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Include details like total square footage, number of rooms, scope of work, finish level, and any special features. The more detail you provide, the more accurate the estimate.
+              </p>
+            </div>
+
+            {!aiResults && (
+              <Button
+                onClick={() => aiAnalyzeMutation.mutate(aiDescription)}
+                disabled={!aiDescription.trim() || aiAnalyzeMutation.isPending}
+                className="w-full"
+                data-testid="button-run-ai-analysis"
+              >
+                {aiAnalyzeMutation.isPending ? (
+                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Analyzing scope...</>
+                ) : (
+                  <><Sparkles className="h-4 w-4 mr-2" /> Analyze & Generate Estimate</>
+                )}
+              </Button>
+            )}
+
+            {aiResults && (
+              <div className="space-y-3">
+                <div className="p-3 rounded-lg bg-muted/50 text-sm" data-testid="text-ai-summary">
+                  {aiResults.summary}
+                </div>
+                <div className="max-h-64 overflow-y-auto space-y-1">
+                  {aiResults.items?.map((item: any, idx: number) => (
+                    <div key={idx} className="flex items-center justify-between gap-3 p-2 rounded border text-sm" data-testid={`ai-item-${idx}`}>
+                      <div>
+                        <span className="font-medium">{item.categoryName}</span>
+                        <span className="text-muted-foreground ml-2">
+                          {item.quantity} {item.unitType === "sq_ft" ? "sq ft" : "units"} @ ${parseFloat(item.unitCost).toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="font-medium shrink-0">
+                        ${(parseFloat(item.quantity) * parseFloat(item.unitCost)).toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex items-center justify-between gap-3 pt-2 border-t font-semibold">
+                  <span>Projected Total</span>
+                  <span data-testid="text-ai-projected-total">
+                    ${aiResults.items?.reduce((sum: number, item: any) => sum + parseFloat(item.quantity) * parseFloat(item.unitCost), 0).toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <div className="flex gap-2 flex-wrap">
+                  <Button onClick={applyAiResults} disabled={applyingAi} className="flex-1" data-testid="button-apply-ai-results">
+                    {applyingAi ? (
+                      <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Adding items...</>
+                    ) : (
+                      <><CheckCircle2 className="h-4 w-4 mr-2" /> Apply to Estimate</>
+                    )}
+                  </Button>
+                  <Button variant="outline" onClick={() => { setAiResults(null); }} data-testid="button-retry-ai">
+                    Re-analyze
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>

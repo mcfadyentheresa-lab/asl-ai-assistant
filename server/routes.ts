@@ -1790,6 +1790,120 @@ export async function registerRoutes(
     res.json(updated);
   });
 
+  // AI Scope Analyzer
+  app.post("/api/estimates/:estimateId/ai-analyze", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const user = await authStorage.getUser(userId);
+    if (!user || (user.role !== "admin" && user.role !== "crew")) {
+      return res.status(403).json({ message: "Admin or crew only" });
+    }
+
+    const { description } = req.body;
+    if (!description || typeof description !== "string") {
+      return res.status(400).json({ message: "Project description is required" });
+    }
+
+    const estimateId = parseInt(req.params.estimateId as string);
+    const estimate = await storage.getEstimate(estimateId);
+    if (!estimate) {
+      return res.status(404).json({ message: "Estimate not found" });
+    }
+
+    const categories = await storage.getCostCategories();
+    const allRates = await storage.getAllMarketRates();
+    const activeRates = allRates.filter(r => r.isActive);
+
+    const categoryInfo = categories.map(cat => {
+      const rate = activeRates.find(r => r.categoryId === cat.id);
+      return {
+        id: cat.id,
+        name: cat.name,
+        description: cat.description,
+        unitType: cat.defaultUnitType,
+        lowRate: rate ? rate.lowRate : null,
+        typicalRate: rate ? rate.typicalRate : null,
+        highRate: rate ? rate.highRate : null,
+      };
+    });
+
+    const OpenAI = (await import("openai")).default;
+    const openai = new OpenAI({
+      apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+      baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+    });
+
+    const systemPrompt = `You are an expert construction estimator specializing in high-end Muskoka, Ontario cottage renovations. 
+Given a project description, analyze the scope and estimate square footage or unit quantities for each relevant trade category.
+
+Available categories with current market rates (CAD):
+${categoryInfo.map(c => `- ${c.name} (ID: ${c.id}, Unit: ${c.unitType === "sq_ft" ? "per sq ft" : "per unit"}${c.typicalRate ? `, Typical: $${c.typicalRate}` : ""}): ${c.description}`).join("\n")}
+
+Rules:
+- Only include categories that are relevant to the described project scope
+- For sq_ft categories, estimate the square footage that would need that trade work
+- For unit-based categories (Windows & Doors, Cabinetry, Septic & Well), estimate the number of units
+- Use the typical market rate for unit cost unless the description suggests premium or budget finishes
+- If premium/luxury is mentioned, use a rate between typical and high
+- If budget-conscious is mentioned, use a rate between low and typical  
+- Provide a brief note explaining your quantity estimate for each line
+- Be realistic for Muskoka cottage renovation context
+
+Respond with valid JSON only, no markdown. Format:
+{
+  "items": [
+    {
+      "categoryId": <number>,
+      "categoryName": "<string>",
+      "unitType": "sq_ft" or "board",
+      "quantity": "<string number>",
+      "unitCost": "<string number>",
+      "materialCost": "<string number - estimate 30-40% of line total for material>",
+      "notes": "<brief explanation of quantity estimate>"
+    }
+  ],
+  "summary": "<1-2 sentence summary of scope>"
+}`;
+
+    try {
+      const response = await openai.chat.completions.create({
+        model: "gpt-5-mini",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: description },
+        ],
+        response_format: { type: "json_object" },
+      });
+
+      const content = response.choices[0]?.message?.content;
+      if (!content) {
+        return res.status(500).json({ message: "No response from AI" });
+      }
+
+      const parsed = JSON.parse(content);
+
+      if (!parsed.items || !Array.isArray(parsed.items)) {
+        return res.status(422).json({ message: "AI returned invalid format" });
+      }
+
+      const validItems = parsed.items
+        .filter((item: any) => item.categoryId && item.quantity && item.unitCost)
+        .map((item: any) => ({
+          categoryId: Number(item.categoryId),
+          categoryName: String(item.categoryName || ""),
+          unitType: item.unitType === "board" ? "board" : "sq_ft",
+          quantity: String(parseFloat(item.quantity) || 0),
+          unitCost: String(parseFloat(item.unitCost) || 0),
+          materialCost: String(parseFloat(item.materialCost) || 0),
+          notes: item.notes ? String(item.notes) : null,
+        }));
+
+      res.json({ items: validItems, summary: String(parsed.summary || "") });
+    } catch (error: any) {
+      console.error("AI analysis error:", error);
+      res.status(500).json({ message: "Failed to analyze project scope" });
+    }
+  });
+
   // Initialize seed data
   await seedDatabase();
 
