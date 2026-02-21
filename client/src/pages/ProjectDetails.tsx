@@ -137,6 +137,7 @@ function SidebarCards({
   );
 
   const [activityExpanded, setActivityExpanded] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   const missedEntries = activityLog?.filter((e: any) =>
     e.userId !== user?.id && !e.views?.some((v: any) => v.userId === user?.id) && !seenLocally.has(e.id)
@@ -219,30 +220,69 @@ function SidebarCards({
               Project Access
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3">
             <div data-testid="access-group-admin">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Admins ({admins.length})</p>
-              <div className="space-y-3">
-                {admins.map((u: any) => renderUserRow(u, "Full access"))}
-              </div>
+              <button
+                className="flex items-center gap-1.5 w-full text-left cursor-pointer select-none"
+                onClick={() => setExpandedGroups(prev => {
+                  const next = new Set(prev);
+                  next.has("admin") ? next.delete("admin") : next.add("admin");
+                  return next;
+                })}
+                data-testid="button-toggle-admins"
+              >
+                <ChevronRight className={`h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 ${expandedGroups.has("admin") ? "rotate-90" : ""}`} />
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Admins ({admins.length})</span>
+              </button>
+              {expandedGroups.has("admin") && (
+                <div className="space-y-3 mt-2 ml-5">
+                  {admins.map((u: any) => renderUserRow(u, "Full access"))}
+                </div>
+              )}
             </div>
             <div data-testid="access-group-crew">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Crew ({crewMembers.length})</p>
-              <div className="space-y-3">
-                {crewMembers.length > 0 ? crewMembers.map((u: any) => renderUserRow(u)) : (
-                  <p className="text-xs text-muted-foreground italic">No crew assigned</p>
-                )}
-              </div>
+              <button
+                className="flex items-center gap-1.5 w-full text-left cursor-pointer select-none"
+                onClick={() => setExpandedGroups(prev => {
+                  const next = new Set(prev);
+                  next.has("crew") ? next.delete("crew") : next.add("crew");
+                  return next;
+                })}
+                data-testid="button-toggle-crew"
+              >
+                <ChevronRight className={`h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 ${expandedGroups.has("crew") ? "rotate-90" : ""}`} />
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Crew ({crewMembers.length})</span>
+              </button>
+              {expandedGroups.has("crew") && (
+                <div className="space-y-3 mt-2 ml-5">
+                  {crewMembers.length > 0 ? crewMembers.map((u: any) => renderUserRow(u)) : (
+                    <p className="text-xs text-muted-foreground italic">No crew assigned</p>
+                  )}
+                </div>
+              )}
             </div>
             <div data-testid="access-group-client">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Clients ({allClients.length})</p>
-              <div className="space-y-3">
-                {allClients.length > 0 ? allClients.map((u: any) =>
-                  renderUserRow(u, u.id === project.clientId ? "Project owner" : "Board invited")
-                ) : (
-                  <p className="text-xs text-muted-foreground italic">No client assigned</p>
-                )}
-              </div>
+              <button
+                className="flex items-center gap-1.5 w-full text-left cursor-pointer select-none"
+                onClick={() => setExpandedGroups(prev => {
+                  const next = new Set(prev);
+                  next.has("client") ? next.delete("client") : next.add("client");
+                  return next;
+                })}
+                data-testid="button-toggle-clients"
+              >
+                <ChevronRight className={`h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 ${expandedGroups.has("client") ? "rotate-90" : ""}`} />
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Clients ({allClients.length})</span>
+              </button>
+              {expandedGroups.has("client") && (
+                <div className="space-y-3 mt-2 ml-5">
+                  {allClients.length > 0 ? allClients.map((u: any) =>
+                    renderUserRow(u, u.id === project.clientId ? "Project owner" : "Board invited")
+                  ) : (
+                    <p className="text-xs text-muted-foreground italic">No client assigned</p>
+                  )}
+                </div>
+              )}
             </div>
             {userRole === "admin" && (
               <div className="pt-2 border-t">
