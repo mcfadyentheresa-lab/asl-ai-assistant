@@ -2,13 +2,9 @@
 
 ## Overview
 
-Aster & Spruce Connect is a premium client and crew portal web application for a high-end Muskoka cottage renovation company (Aster & Spruce Living). It provides role-based experiences where **clients** (homeowners) can track their renovation projects — viewing progress, timelines, photos, documents, budgets, and messaging — while **crew/field teams** get a mobile-first interface for time tracking, task management, daily logs, and internal communication. An admin role has full access to all projects and reporting.
+Aster & Spruce Connect is a premium web application designed for Aster & Spruce Living, a high-end Muskoka cottage renovation company. It serves as a dual-purpose portal, providing tailored experiences for both clients and internal crew/field teams. Clients can track their renovation projects, accessing progress updates, timelines, photos, documents, budgets, and communication tools. Crew members benefit from a mobile-first interface for time tracking, task management, daily logs, and internal messaging. An administrative role offers comprehensive project oversight and reporting capabilities. The application aims for a "warm minimalist" luxury aesthetic, utilizing a deep forest green, warm neutrals, and elegant typography.
 
-The app follows a "warm minimalist" luxury aesthetic with a deep forest green primary palette, warm neutrals, and elegant typography (DM Sans + Playfair Display).
-
-## Future Plans
-
-- **SaaS Subscription Model**: User wants to explore offering this app to other renovation companies as a paid monthly subscription service. Potential tiers: Starter ($49-69/mo), Pro ($99-149/mo), Growth ($199-249/mo). Would need multi-tenant architecture, Stripe billing, onboarding flow, and marketing page. Revisit once core features are more fully built out.
+The long-term vision includes transitioning Aster & Spruce Connect into a SaaS offering for other renovation companies, featuring a multi-tenant architecture, tiered subscriptions, and integrated billing.
 
 ## User Preferences
 
@@ -18,199 +14,65 @@ Preferred communication style: Simple, everyday language.
 
 ### Overall Structure
 
-The project uses a **monorepo layout** with three main directories:
-
-- **`client/`** — React SPA (Single Page Application) frontend
-- **`server/`** — Express.js backend API server
-- **`shared/`** — Shared TypeScript types, database schema, and API route definitions used by both client and server
+The project employs a monorepo structure, separating the React SPA frontend (`client/`), the Express.js backend API (`server/`), and shared TypeScript assets (`shared/`) including types, database schema, and API route definitions.
 
 ### Frontend Architecture
 
-- **Framework**: React 18 with TypeScript
-- **Bundler**: Vite (with HMR in development, static build for production)
-- **Routing**: Wouter (lightweight client-side router)
-- **State/Data Fetching**: TanStack React Query for server state management
-- **UI Components**: shadcn/ui (new-york style) built on Radix UI primitives
-- **Styling**: Tailwind CSS with CSS custom properties for theming (Muskoka Modern palette)
-- **Animations**: Framer Motion for page transitions and UI animations
-- **Forms**: React Hook Form with Zod resolvers for validation
-- **Charts**: Recharts for budget visualization and analytics
-- **Date Handling**: date-fns + react-day-picker for calendars
-
-Path aliases are configured:
-- `@/*` → `client/src/*`
-- `@shared/*` → `shared/*`
-- `@assets/*` → `attached_assets/*`
+The frontend is a React 18 SPA built with TypeScript, using Vite for bundling, Wouter for routing, and TanStack React Query for state management. UI components are built with shadcn/ui on Radix UI primitives, styled with Tailwind CSS and custom properties for theming. Animations are handled by Framer Motion, forms by React Hook Form with Zod validation, and charts by Recharts. Date handling is managed with date-fns and react-day-picker.
 
 ### Backend Architecture
 
-- **Runtime**: Node.js with Express.js
-- **Language**: TypeScript, executed via `tsx` in development
-- **Build**: esbuild bundles server code to `dist/index.cjs` for production; Vite builds the client to `dist/public/`
-- **API Pattern**: RESTful JSON API under `/api/*` prefix, with route definitions shared between client and server via `shared/routes.ts`
-- **Input Validation**: Zod schemas (generated from Drizzle schemas via `drizzle-zod`) validate all API inputs
-- **Dev Server**: Vite middleware serves the frontend in development; in production, Express serves static files from `dist/public/`
+The backend utilizes Node.js with Express.js and TypeScript. It provides a RESTful JSON API under the `/api/*` prefix, with shared route definitions. Input validation is enforced using Zod schemas derived from Drizzle schemas. The development server uses Vite middleware for frontend serving, while production serves static files from a built client.
 
 ### Database & ORM
 
-- **Database**: PostgreSQL (required via `DATABASE_URL` environment variable)
-- **ORM**: Drizzle ORM with `drizzle-orm/node-postgres` driver
-- **Schema Location**: `shared/schema.ts` and `shared/models/auth.ts`
-- **Migrations**: Drizzle Kit with `drizzle-kit push` command (no migration files committed by default)
-- **Schema Design**:
-  - `users` — User accounts with roles (client, crew, admin)
-  - `sessions` — Session storage for authentication (required by Replit Auth)
-  - `projects` — Renovation projects with budget, status, dates, client association
-  - `milestones` — Project milestones with ordering
-  - `tasks` — Tasks linked to projects and optionally milestones, with assignment
-  - `photos` — Progress photos linked to projects
-  - `documents` — Project documents (contracts, invoices, etc.)
-  - `time_entries` — Crew time tracking per project
-  - `messages` — Project-scoped messaging with sender references
-  - `planning_boards` — Planning boards (Fabric.js canvas) with multiple boards per project, linking to milestones/checklist items/calendar events (replaces legacy `moodboards` table)
+PostgreSQL is the chosen database, accessed via Drizzle ORM. The schema, defined in `shared/schema.ts` and `shared/models/auth.ts`, includes tables for users (with roles), sessions, projects, milestones, tasks, photos, documents, time entries, messages, and planning boards. Drizzle Kit is used for schema management.
 
 ### Authentication & Authorization
 
-- **Auth Provider**: Replit Auth (OpenID Connect via `openid-client` and Passport.js)
-- **Session Management**: `express-session` with `connect-pg-simple` storing sessions in PostgreSQL
-- **Role-Based Access**: Users have a `role` field (client, crew, admin). Clients see only their own projects; crew/admin see all projects.
-- **Auth Files**: Located in `server/replit_integrations/auth/` — do NOT modify or delete the `sessions` and `users` tables as they are mandatory for Replit Auth.
-- **Client-Side**: `useAuth` hook fetches current user from `/api/auth/user`; unauthenticated users see a landing page; login redirects to `/api/login`.
+Replit Auth provides authentication via OpenID Connect, with session management handled by `express-session` storing data in PostgreSQL. Role-based access control (client, crew, admin) ensures appropriate data visibility. The `users` and `sessions` tables are critical for Replit Auth and should not be modified.
 
 ### Storage Layer
 
-- **Pattern**: Repository/Storage pattern — `server/storage.ts` defines an `IStorage` interface and `DatabaseStorage` implementation
-- **Separation**: Auth storage is separate in `server/replit_integrations/auth/storage.ts`
+A Repository/Storage pattern is implemented in `server/storage.ts` for data persistence, with a separate storage module for authentication.
 
 ### Shared API Contract
 
-- `shared/routes.ts` defines all API endpoints with their HTTP methods, paths, input schemas, and response schemas
-- The client uses a `buildUrl` helper to construct parameterized URLs
-- Custom hooks in `client/src/hooks/use-projects.ts` wrap React Query calls for each endpoint
+`shared/routes.ts` defines the API contract, specifying all endpoints, HTTP methods, input, and response schemas, ensuring type-safe communication between client and server.
 
 ### Build & Development
 
-- **Dev**: `npm run dev` — runs tsx with Vite middleware for HMR
-- **Build**: `npm run build` — builds client with Vite, bundles server with esbuild
-- **Production**: `npm start` — serves the built `dist/index.cjs`
-- **DB Push**: `npm run db:push` — pushes schema changes to the database
+Development uses `npm run dev` for HMR, `npm run build` compiles both client and server for production, and `npm start` runs the production build. `npm run db:push` handles database schema updates.
+
+### Feature Specifications
+
+*   **Twilio SMS Notifications**: Automated SMS notifications for key project events (e.g., new messages, task assignments, photo uploads). Notifications respect business hours (Monday-Friday, specific times), with messages outside these hours queued and sent later. Admin features include a test SMS capability.
+*   **Online Presence System**: Tracks active users with heartbeats and displays online status. Users can toggle their online visibility.
+*   **Paint Color Portfolio**: Manages a database of paint colors (e.g., Benjamin Moore), allowing users to browse, search, and filter colors. Integrated into planning boards for color tagging of projects and boards.
+*   **Planning Board Designer Tools**: A spatial canvas (`SpatialCanvas.tsx`) supporting various element types for design and collaboration, including notes, links, to-dos, images, color swatches, material swatches, and drawing tools.
+*   **Board Version Snapshots**: Allows users to save and restore named versions of planning boards.
+*   **Text Size Accessibility**: Provides a text zoom feature with multiple scaling options, persistent across sessions.
 
 ## External Dependencies
 
 ### Required Services
 
-- **PostgreSQL Database** — Connection string via `DATABASE_URL` environment variable. Used for all data storage including sessions.
-- **Replit Auth (OpenID Connect)** — Provides user authentication. Requires `ISSUER_URL` (defaults to `https://replit.com/oidc`), `REPL_ID`, and `SESSION_SECRET` environment variables.
+*   **PostgreSQL Database**: Essential for all data storage. Connection string via `DATABASE_URL`.
+*   **Replit Auth**: Provides user authentication. Requires `ISSUER_URL`, `REPL_ID`, and `SESSION_SECRET` environment variables.
+*   **Twilio**: Used for SMS notifications. Requires `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `TWILIO_PHONE_NUMBER`.
 
 ### Key NPM Packages
 
-- **Frontend**: React, Vite, Wouter, TanStack React Query, shadcn/ui (Radix UI), Tailwind CSS, Framer Motion, Recharts, date-fns, react-day-picker, react-hook-form, zod
-- **Backend**: Express, Passport, openid-client, express-session, connect-pg-simple, Drizzle ORM, pg (node-postgres), drizzle-zod
-- **Build Tools**: esbuild, tsx, drizzle-kit
+*   **Frontend**: React, Vite, Wouter, TanStack React Query, shadcn/ui, Radix UI, Tailwind CSS, Framer Motion, Recharts, date-fns, react-day-picker, react-hook-form, zod.
+*   **Backend**: Express, Passport, openid-client, express-session, connect-pg-simple, Drizzle ORM, pg (node-postgres), drizzle-zod.
+*   **Build Tools**: esbuild, tsx, drizzle-kit.
 
 ### Environment Variables Required
 
-- `DATABASE_URL` — PostgreSQL connection string
-- `SESSION_SECRET` — Secret for session encryption
-- `REPL_ID` — Replit deployment identifier (set automatically in Replit)
-- `ISSUER_URL` — OpenID Connect issuer (defaults to Replit's OIDC)
-- `TWILIO_ACCOUNT_SID` — Twilio account identifier
-- `TWILIO_AUTH_TOKEN` — Twilio authentication token
-- `TWILIO_PHONE_NUMBER` — Twilio sender phone number (+14474274045)
-
-## Twilio SMS Notifications
-
-### Implementation (`server/sms.ts`)
-- Twilio SDK sends SMS notifications for key project events
-- Secrets configured: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`
-- Phone numbers stored in `users.phone` column, editable by admins in Project Access card
-- Notifications fire asynchronously (non-blocking) after the API response is sent
-- Recipients are determined by role: admins and crew always receive notifications; clients only for their assigned projects
-- The sender of an action is excluded from receiving that notification
-
-### Business Hours & SMS Queuing
-- SMS notifications are only sent during business hours (Eastern Time):
-  - Monday–Thursday: 8:00 AM – 5:00 PM ET
-  - Friday: 8:00 AM – 12:00 PM (noon) ET
-  - No notifications on weekends
-- Messages triggered outside business hours are stored in the `queued_sms` database table
-- A background queue processor runs every 5 minutes and sends queued messages when business hours resume
-- Every SMS includes a footer note explaining the business hours policy
-- Admin test SMS (`sendTestSms`) bypasses business hours and sends immediately
-- Queue table schema: id, toPhone, body, createdAt, scheduledFor, sent, sentAt, error
-
-### SMS Notification Triggers
-- **New message** — All project participants (except sender) notified
-- **Task created** (with assignee) — Assigned user notified
-- **Task status changed** — All project participants notified
-- **Milestone created** — All project participants notified
-- **Photo uploaded** — All project participants (except uploader) notified
-- **Document uploaded** — All project participants (except uploader) notified
-- **Calendar event created** — All project participants (except creator) notified
-- **Calendar event updated** — All project participants (except updater) notified
-- **Planning board user linked** — Newly linked users notified (except the person who linked them)
-
-### Admin Features
-- **Test SMS** button in Project Access card sends a test message to the admin's phone
-- Test endpoint: `POST /api/sms/test` (admin-only)
-
-### A2P 10DLC Registration
-- Twilio number (+14474274045) should be registered for A2P 10DLC to reduce spam flagging
-- Register at Twilio Console > Messaging > Compliance
-- Clients (Island, Hangar) prefer text messages over email
-
-## Online Presence System
-
-### Implementation (`server/presence.ts`)
-- In-memory Map tracks active users with heartbeat timestamps
-- Users are considered online if heartbeat received within last 60 seconds
-- Client polls heartbeat every 15 seconds, online list every 15 seconds
-- Visibility toggle allows users to appear offline (in-memory state)
-
-### API Endpoints
-- `POST /api/presence/heartbeat` — Update user's last-seen timestamp
-- `GET /api/presence/online` — Get list of currently online users
-- `POST /api/presence/visibility` — Toggle user's online visibility
-- `GET /api/presence/visibility` — Get user's current visibility setting
-
-### Frontend Integration
-- **Navbar**: Green pulsing dot with online user count; tooltip shows names and roles
-- **User dropdown menu**: "Appear Offline" / "Go Online" toggle
-- **Project Access card**: Green dots on avatars of online team members
-- Hook: `client/src/hooks/use-presence.ts` provides `useOnlineUsers`, `useVisibilityToggle`, `isUserOnline`
-
-### Future Enhancement
-- Calendar-based deadline reminders (scheduled job to notify users before upcoming deadlines) still pending
-
-## Paint Color Portfolio
-
-### Database (`paint_colors` table)
-- Fields: id, brand, name, code, hex, colorFamily, collection, lrv (Light Reflectance Value), isPopular
-- Schema supports multiple brands (currently seeded: Benjamin Moore with 290 curated colors)
-- Colors organized into 12 families: White, Neutral, Gray, Blue, Green, Brown, Yellow, Orange, Red, Pink, Purple, Black
-
-### API Endpoints
-- `GET /api/paint-colors` — List/search colors with optional query params: brand, colorFamily, search, popular
-- `GET /api/paint-colors/families` — Get list of available color families
-- `GET /api/paint-colors/:id` — Get single color by ID
-
-### Frontend
-- **Color Portfolio page** (`client/src/pages/ColorPortfolio.tsx`): Browse, search, filter by family, toggle popular colors, responsive grid with detailed color dialog
-- **Planning Board integration**: `BmColorPicker` component in `SpatialCanvas.tsx` lets users pick a Benjamin Moore color directly when editing a color swatch element on the planning board
-- Navigation: Accessible from user menu dropdown in Navbar
-
-### Color Tagging
-- Projects and planning boards can be tagged with a Benjamin Moore color via `colorTagId` column
-- `PATCH /api/projects/:id/color-tag` — Set/clear project color tag
-- `PATCH /api/planning-boards/:id/color-tag` — Set/clear board color tag
-- Reusable `ColorPalettePicker` component (`client/src/components/ColorPalettePicker.tsx`) with BM Color Catalog-style tabs (Off-Whites, Colors, Muted Hues), sub-family filters, search, and color grid
-- `ColorTagDot` component displays a small colored circle for tagged items
-- Integration: ProjectCard shows color dot on hover + picker button; SpatialCanvas board toolbar shows palette button for board tagging
-
-### Text Size Accessibility
-- `useTextZoom` hook (`client/src/hooks/use-text-zoom.ts`) cycles through 100%, 115%, 130%, 150% text sizes
-- Accessible from Navbar user dropdown menu ("Text Size: X%")
-- Persisted in localStorage, applies to root HTML font-size for rem-based scaling
-
-### Seeding
-- `server/seed-paint-colors.ts` — Seeds 290 curated Benjamin Moore colors on server startup if table is empty
+*   `DATABASE_URL`
+*   `SESSION_SECRET`
+*   `REPL_ID`
+*   `ISSUER_URL`
+*   `TWILIO_ACCOUNT_SID`
+*   `TWILIO_AUTH_TOKEN`
+*   `TWILIO_PHONE_NUMBER`

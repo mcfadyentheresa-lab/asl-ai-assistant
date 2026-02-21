@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
 import { type InsertProject, type InsertMilestone, type InsertTask, type InsertMessage, type InsertChecklistItem, type InsertBoardItem, type InsertCalendarEvent, type Document } from "@shared/schema";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 // --- Users ---
 export function useUsers() {
@@ -819,6 +820,51 @@ export function useDeleteDocument() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.documents.list.path] });
+    },
+  });
+}
+
+// --- Board Snapshots ---
+export function useBoardSnapshots(boardId: number | null) {
+  return useQuery<any[]>({
+    queryKey: ['/api/planning-boards', boardId, 'snapshots'],
+    queryFn: () => boardId ? fetch(`/api/planning-boards/${boardId}/snapshots`, { credentials: 'include' }).then(r => r.json()) : Promise.resolve([]),
+    enabled: !!boardId,
+  });
+}
+
+export function useCreateBoardSnapshot() {
+  return useMutation({
+    mutationFn: async (variables: { boardId: number; name: string }) => {
+      const res = await apiRequest("POST", `/api/planning-boards/${variables.boardId}/snapshots`, { name: variables.name });
+      return res.json();
+    },
+    onSuccess: (_data: any, variables: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/planning-boards', variables.boardId, 'snapshots'] });
+    },
+  });
+}
+
+export function useRestoreBoardSnapshot() {
+  return useMutation({
+    mutationFn: async (variables: { id: number; boardId: number }) => {
+      const res = await apiRequest("POST", `/api/board-snapshots/${variables.id}/restore`);
+      return res.json();
+    },
+    onSuccess: (_data: any, variables: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/planning-boards', variables.boardId, 'elements'] });
+    },
+  });
+}
+
+export function useDeleteBoardSnapshot() {
+  return useMutation({
+    mutationFn: async (variables: { id: number; boardId: number }) => {
+      const res = await apiRequest("DELETE", `/api/board-snapshots/${variables.id}`);
+      return res.json();
+    },
+    onSuccess: (_data: any, variables: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/planning-boards', variables.boardId, 'snapshots'] });
     },
   });
 }

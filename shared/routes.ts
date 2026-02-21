@@ -3,7 +3,7 @@ import {
   insertProjectSchema, insertMilestoneSchema, insertTaskSchema, 
   insertPhotoSchema, insertDocumentSchema, insertTimeEntrySchema, insertMessageSchema,
   insertChecklistItemSchema, insertBoardItemSchema, insertCalendarEventSchema, insertPlanningBoardSchema, insertCanvasElementSchema,
-  projects, milestones, tasks, photos, documents, timeEntries, messages, users, checklistItems, boardItems, calendarEvents, planningBoards, canvasElements
+  projects, milestones, tasks, photos, documents, timeEntries, messages, users, checklistItems, boardItems, calendarEvents, planningBoards, canvasElements, boardSnapshots
 } from './schema';
 
 export const errorSchemas = {
@@ -423,6 +423,39 @@ export const api = {
           condition: z.string(),
           impact: z.string(),
         }),
+      },
+    },
+  },
+
+  // Board Snapshots
+  boardSnapshots: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/planning-boards/:boardId/snapshots' as const,
+      responses: {
+        200: z.array(z.custom<typeof boardSnapshots.$inferSelect>()),
+      },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/planning-boards/:boardId/snapshots' as const,
+      input: z.object({ name: z.string().min(1) }),
+      responses: {
+        201: z.custom<typeof boardSnapshots.$inferSelect>(),
+      },
+    },
+    restore: {
+      method: 'POST' as const,
+      path: '/api/board-snapshots/:id/restore' as const,
+      responses: {
+        200: z.object({ success: z.boolean() }),
+      },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/board-snapshots/:id' as const,
+      responses: {
+        200: z.object({ success: z.boolean() }),
       },
     },
   },

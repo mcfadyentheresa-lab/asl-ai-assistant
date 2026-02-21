@@ -22,7 +22,7 @@ import {
   CalendarDays, Milestone, ListChecks, Bell, BellOff,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { usePlanningBoards, useCreatePlanningBoard, useDeletePlanningBoard, useUpdatePlanningBoard, useUploadImage, useUsers, useProjects, useMilestones, useChecklistItems, useCalendarEvents, useUpdateCalendarEvent, useDeleteCalendarEvent, useCreateCalendarEvent, useCreateMilestone, useCreateChecklistItem } from "@/hooks/use-projects";
+import { usePlanningBoards, useCreatePlanningBoard, useDeletePlanningBoard, useUpdatePlanningBoard, useUploadImage, useUsers, useProjects, useMilestones, useChecklistItems, useCalendarEvents, useUpdateCalendarEvent, useDeleteCalendarEvent, useCreateCalendarEvent, useCreateMilestone, useCreateChecklistItem, useBoardSnapshots, useCreateBoardSnapshot, useRestoreBoardSnapshot, useDeleteBoardSnapshot } from "@/hooks/use-projects";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -144,6 +144,10 @@ const ELEMENT_DEFAULTS: Record<string, { width: number; height: number; content:
   color_swatch: { width: 220, height: 220, content: { color: "#1e3a2f", name: "Forest Green", hex: "#1E3A2F" } },
   section_header: { width: 600, height: 40, content: { title: "Section Title" } },
   draw: { width: 400, height: 300, content: { paths: [], color: "#000000", strokeWidth: 2 } },
+  room_zone: { width: 500, height: 400, content: { title: "Room Name", color: "#f0ede8", opacity: 0.5 } },
+  material: { width: 220, height: 180, content: { name: "Material", supplier: "", code: "", imageUrl: "", notes: "" } },
+  callout: { width: 200, height: 80, content: { text: "Add note...", color: "#fef9c3" } },
+  product: { width: 240, height: 120, content: { name: "Product", price: "", supplier: "", url: "" } },
 };
 
 export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
@@ -177,6 +181,8 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   const [newCalendarDate, setNewCalendarDate] = useState("");
   const [renameName, setRenameName] = useState("");
   const [newBoardName, setNewBoardName] = useState("");
+  const [showSnapshotDialog, setShowSnapshotDialog] = useState(false);
+  const [newSnapshotName, setNewSnapshotName] = useState("");
 
   const [draggingId, setDraggingId] = useState<number | null>(null);
   const dragStartRef = useRef<{ x: number; y: number; elX: number; elY: number } | null>(null);
@@ -231,6 +237,10 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   const { data: milestones = [] } = useMilestones(projectId);
   const { data: checklistItems = [] } = useChecklistItems(projectId);
   const { data: calendarEvents = [] } = useCalendarEvents(projectId);
+  const { data: snapshots = [] } = useBoardSnapshots(selectedBoardId);
+  const { mutateAsync: createSnapshot, isPending: isCreatingSnapshot } = useCreateBoardSnapshot();
+  const { mutateAsync: restoreSnapshot, isPending: isRestoringSnapshot } = useRestoreBoardSnapshot();
+  const { mutateAsync: deleteSnapshot } = useDeleteBoardSnapshot();
 
   useEffect(() => {
     if (boards.length > 0 && !selectedBoardId) {
@@ -689,7 +699,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
 
   const assignToColumn = (elementId: number) => {
     const el = elements[elementId];
-    if (!el || el.type === "column" || el.type === "section_header") return;
+    if (!el || el.type === "column" || el.type === "section_header" || el.type === "room_zone") return;
     const cx = el.x + (el.width / 2);
     const cy = el.y + ((el.height || 60) / 2);
     let foundColumn: number | null = null;
@@ -1387,6 +1397,70 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       </div>
     );
 
+    if (el.type === "room_zone") {
+      return (
+        <div
+          key={el.id}
+          className="absolute select-none cursor-grab"
+          style={{
+            left: el.x, top: el.y, width: el.width, height: el.height,
+            zIndex: Math.max(0, effectiveZ - 1000),
+            backgroundColor: c.color || "#f0ede8",
+            opacity: c.opacity ?? 0.5,
+            borderRadius: "12px",
+            border: isSelected ? "2px dashed hsl(var(--primary))" : "1px dashed hsl(var(--border))",
+          }}
+          onMouseDown={(e) => {
+            const tag = (e.target as HTMLElement).tagName.toLowerCase();
+            if (tag === "input" || tag === "button" || (e.target as HTMLElement).closest("button")) return;
+            startDrag(el.id, e);
+          }}
+          onClick={handleClick}
+          onContextMenu={(e) => openContextMenu(e, el.id)}
+          onTouchStart={handleElementTouchStart(el.id)}
+          onTouchEnd={handleLongPressEnd}
+          onTouchCancel={handleLongPressEnd}
+          data-testid={`element-room-zone-${el.id}`}
+        >
+          <div className="p-3">
+            {isSelected ? (
+              <div className="space-y-2">
+                <input
+                  className="w-full bg-transparent border-none text-sm font-serif font-semibold outline-none"
+                  defaultValue={c.title}
+                  placeholder="Room name..."
+                  onBlur={(e) => handleUpdateContent(el.id, { ...c, title: e.target.value })}
+                  autoFocus
+                  data-testid={`input-zone-title-${el.id}`}
+                />
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    defaultValue={c.color || "#f0ede8"}
+                    onChange={(e) => handleUpdateContent(el.id, { ...c, color: e.target.value })}
+                    className="h-6 w-8 border rounded cursor-pointer"
+                    data-testid={`input-zone-color-${el.id}`}
+                  />
+                  <span className="text-[10px] text-muted-foreground">Zone color</span>
+                </div>
+              </div>
+            ) : (
+              <span className="text-sm font-serif font-semibold text-foreground/60" data-testid={`text-zone-title-${el.id}`}>
+                {c.title || "Room"}
+              </span>
+            )}
+          </div>
+          {isSelected && (
+            <div className="absolute -top-8 right-0 flex gap-1">
+              <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleDeleteElement(el.id)} data-testid={`button-delete-${el.id}`}>
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            </div>
+          )}
+        </div>
+      );
+    }
+
     if (el.type === "section_header") {
       return (
         <div
@@ -1736,6 +1810,237 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       );
     }
 
+    if (el.type === "material") {
+      return (
+        <div
+          key={el.id}
+          className={`${cardBase} bg-card border border-border overflow-hidden cursor-grab`}
+          style={{ left: el.x, top: el.y, width: el.width, zIndex: effectiveZ }}
+          onMouseDown={(e) => {
+            const tag = (e.target as HTMLElement).tagName.toLowerCase();
+            if (tag === "input" || tag === "textarea" || tag === "button" || (e.target as HTMLElement).closest("button")) return;
+            startDrag(el.id, e);
+          }}
+          onClick={handleClick}
+          onContextMenu={(e) => openContextMenu(e, el.id)}
+          onTouchStart={handleElementTouchStart(el.id)}
+          onTouchEnd={handleLongPressEnd}
+          onTouchCancel={handleLongPressEnd}
+          data-testid={`element-material-${el.id}`}
+        >
+          {c.imageUrl && (
+            <div className="h-[80px] bg-muted overflow-hidden">
+              <img src={c.imageUrl} alt={c.name} className="w-full h-full object-cover pointer-events-none" />
+            </div>
+          )}
+          <div className="p-3">
+            {isSelected ? (
+              <div className="space-y-1.5">
+                <input
+                  className="w-full bg-transparent border-none text-sm font-medium outline-none"
+                  defaultValue={c.name}
+                  placeholder="Material name"
+                  onBlur={(e) => handleUpdateContent(el.id, { ...c, name: e.target.value })}
+                  data-testid={`input-material-name-${el.id}`}
+                />
+                <input
+                  className="w-full bg-transparent border-none text-xs text-muted-foreground outline-none"
+                  defaultValue={c.supplier}
+                  placeholder="Supplier / Brand"
+                  onBlur={(e) => handleUpdateContent(el.id, { ...c, supplier: e.target.value })}
+                  data-testid={`input-material-supplier-${el.id}`}
+                />
+                <input
+                  className="w-full bg-transparent border-none text-xs font-mono text-muted-foreground outline-none"
+                  defaultValue={c.code}
+                  placeholder="Product code"
+                  onBlur={(e) => handleUpdateContent(el.id, { ...c, code: e.target.value })}
+                  data-testid={`input-material-code-${el.id}`}
+                />
+                <input
+                  className="w-full bg-transparent border-none text-xs text-primary outline-none"
+                  defaultValue={c.imageUrl}
+                  placeholder="Image URL"
+                  onBlur={(e) => handleUpdateContent(el.id, { ...c, imageUrl: e.target.value })}
+                  data-testid={`input-material-image-${el.id}`}
+                />
+                <textarea
+                  className="w-full bg-transparent border border-border/50 rounded text-xs outline-none p-1.5 resize-none"
+                  rows={2}
+                  defaultValue={c.notes}
+                  placeholder="Notes..."
+                  onBlur={(e) => handleUpdateContent(el.id, { ...c, notes: e.target.value })}
+                  data-testid={`input-material-notes-${el.id}`}
+                />
+              </div>
+            ) : (
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <Shapes className="h-3 w-3 text-muted-foreground shrink-0" />
+                  <span className="text-sm font-medium truncate">{c.name || "Material"}</span>
+                </div>
+                {c.supplier && <div className="text-[10px] text-muted-foreground mt-0.5 truncate">{c.supplier}</div>}
+                {c.code && <div className="text-[10px] font-mono text-muted-foreground/70 truncate">{c.code}</div>}
+                {c.notes && <div className="text-[10px] text-muted-foreground mt-1 line-clamp-2">{c.notes}</div>}
+              </div>
+            )}
+          </div>
+          {isSelected && (
+            <div className="absolute -top-8 right-0 flex gap-1">
+              <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleDeleteElement(el.id)} data-testid={`button-delete-${el.id}`}>
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    if (el.type === "callout") {
+      const calloutColor = c.color || "#fef9c3";
+      return (
+        <div
+          key={el.id}
+          className={`${cardBase} cursor-grab`}
+          style={{ left: el.x, top: el.y, width: el.width, zIndex: effectiveZ }}
+          onMouseDown={(e) => {
+            const tag = (e.target as HTMLElement).tagName.toLowerCase();
+            if (tag === "input" || tag === "textarea" || tag === "button" || (e.target as HTMLElement).closest("button")) return;
+            startDrag(el.id, e);
+          }}
+          onClick={handleClick}
+          onContextMenu={(e) => openContextMenu(e, el.id)}
+          onTouchStart={handleElementTouchStart(el.id)}
+          onTouchEnd={handleLongPressEnd}
+          onTouchCancel={handleLongPressEnd}
+          data-testid={`element-callout-${el.id}`}
+        >
+          <div className="rounded-lg shadow-sm border border-black/5 relative" style={{ backgroundColor: calloutColor }}>
+            <div className="absolute -bottom-2 left-5 w-4 h-4 rotate-45" style={{ backgroundColor: calloutColor }} />
+            <div className="p-3 relative">
+              {isSelected ? (
+                <div className="space-y-2">
+                  <textarea
+                    className="w-full bg-transparent border-none text-xs outline-none resize-none"
+                    rows={2}
+                    defaultValue={c.text}
+                    placeholder="Add note..."
+                    onBlur={(e) => handleUpdateContent(el.id, { ...c, text: e.target.value })}
+                    autoFocus
+                    data-testid={`input-callout-text-${el.id}`}
+                  />
+                  <div className="flex gap-1">
+                    {["#fef9c3", "#fce7f3", "#dbeafe", "#dcfce7", "#f3e8ff", "#fff7ed"].map((clr) => (
+                      <button
+                        key={clr}
+                        className={`h-4 w-4 rounded-full border ${calloutColor === clr ? "ring-2 ring-primary ring-offset-1" : "border-black/10"}`}
+                        style={{ backgroundColor: clr }}
+                        onClick={() => handleUpdateContent(el.id, { ...c, color: clr })}
+                        data-testid={`button-callout-color-${clr.replace("#", "")}`}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs leading-relaxed" data-testid={`text-callout-${el.id}`}>
+                  {c.text || "Add note..."}
+                </p>
+              )}
+            </div>
+          </div>
+          {isSelected && (
+            <div className="absolute -top-8 right-0 flex gap-1">
+              <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleDeleteElement(el.id)} data-testid={`button-delete-${el.id}`}>
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    if (el.type === "product") {
+      return (
+        <div
+          key={el.id}
+          className={`${cardBase} bg-card border border-border cursor-grab`}
+          style={{ left: el.x, top: el.y, width: el.width, zIndex: effectiveZ }}
+          onMouseDown={(e) => {
+            const tag = (e.target as HTMLElement).tagName.toLowerCase();
+            if (tag === "input" || tag === "button" || (e.target as HTMLElement).closest("button")) return;
+            startDrag(el.id, e);
+          }}
+          onClick={handleClick}
+          onContextMenu={(e) => openContextMenu(e, el.id)}
+          onTouchStart={handleElementTouchStart(el.id)}
+          onTouchEnd={handleLongPressEnd}
+          onTouchCancel={handleLongPressEnd}
+          data-testid={`element-product-${el.id}`}
+        >
+          <div className="p-3">
+            {isSelected ? (
+              <div className="space-y-1.5">
+                <input
+                  className="w-full bg-transparent border-none text-sm font-medium outline-none"
+                  defaultValue={c.name}
+                  placeholder="Product name"
+                  onBlur={(e) => handleUpdateContent(el.id, { ...c, name: e.target.value })}
+                  data-testid={`input-product-name-${el.id}`}
+                />
+                <input
+                  className="w-full bg-transparent border-none text-xs text-muted-foreground outline-none"
+                  defaultValue={c.price}
+                  placeholder="Price (e.g. $249)"
+                  onBlur={(e) => handleUpdateContent(el.id, { ...c, price: e.target.value })}
+                  data-testid={`input-product-price-${el.id}`}
+                />
+                <input
+                  className="w-full bg-transparent border-none text-xs text-muted-foreground outline-none"
+                  defaultValue={c.supplier}
+                  placeholder="Supplier"
+                  onBlur={(e) => handleUpdateContent(el.id, { ...c, supplier: e.target.value })}
+                  data-testid={`input-product-supplier-${el.id}`}
+                />
+                <input
+                  className="w-full bg-transparent border-none text-xs text-primary outline-none"
+                  defaultValue={c.url}
+                  placeholder="https://product-link..."
+                  onBlur={(e) => handleUpdateContent(el.id, { ...c, url: e.target.value })}
+                  data-testid={`input-product-url-${el.id}`}
+                />
+              </div>
+            ) : (
+              <div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-medium truncate">{c.name || "Product"}</span>
+                  {c.price && <span className="text-xs font-medium text-primary shrink-0">{c.price}</span>}
+                </div>
+                {c.supplier && <div className="text-[10px] text-muted-foreground mt-0.5">{c.supplier}</div>}
+                {c.url && (
+                  <div className="flex items-center gap-1 mt-1">
+                    <ExternalLink className="h-2.5 w-2.5 text-primary shrink-0" />
+                    <span className="text-[10px] text-primary truncate">{c.url}</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          {isSelected && (
+            <div className="absolute -top-8 right-0 flex gap-1">
+              {c.url && (
+                <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => window.open(c.url, "_blank")} data-testid={`button-open-product-${el.id}`}>
+                  <ExternalLink className="h-3 w-3" />
+                </Button>
+              )}
+              <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleDeleteElement(el.id)} data-testid={`button-delete-${el.id}`}>
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            </div>
+          )}
+        </div>
+      );
+    }
+
     if (el.type === "link") {
       return (
         <div
@@ -1937,6 +2242,10 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     { type: "image", icon: ImagePlus, label: "Image" },
     { type: "color_swatch", icon: Palette, label: "Color" },
     { type: "section_header", icon: Type, label: "Header" },
+    { type: "room_zone", icon: Square, label: "Zone" },
+    { type: "material", icon: Shapes, label: "Material" },
+    { type: "callout", icon: Sparkles, label: "Callout" },
+    { type: "product", icon: ExternalLink, label: "Product" },
     { type: "draw", icon: Pencil, label: "Draw" },
   ];
 
@@ -1978,6 +2287,9 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={createWeeklyPlanner} data-testid="menu-weekly-template">
                   <Columns3 className="h-4 w-4 mr-2" /> Add Weekly Planner
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => { setNewSnapshotName(""); setShowSnapshotDialog(true); }} data-testid="menu-snapshots">
+                  <Save className="h-4 w-4 mr-2" /> Versions
                 </DropdownMenuItem>
                 <DropdownMenuItem className="text-destructive" onClick={() => setShowDeleteConfirm(true)} data-testid="menu-delete-board">
                   <Trash2 className="h-4 w-4 mr-2" /> Delete Board
@@ -2659,6 +2971,104 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             <Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>Cancel</Button>
             <Button variant="destructive" onClick={handleDeleteBoard} data-testid="button-confirm-delete-board">Delete</Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showSnapshotDialog} onOpenChange={setShowSnapshotDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Board Versions</DialogTitle>
+            <DialogDescription>Save or restore a snapshot of your board layout.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex gap-2">
+              <Input
+                value={newSnapshotName}
+                onChange={(e) => setNewSnapshotName(e.target.value)}
+                placeholder="Version name (e.g. Initial concept)"
+                className="flex-1 text-sm"
+                data-testid="input-snapshot-name"
+              />
+              <Button
+                size="sm"
+                disabled={!newSnapshotName.trim() || isCreatingSnapshot}
+                onClick={async () => {
+                  if (!selectedBoardId || !newSnapshotName.trim()) return;
+                  try {
+                    await createSnapshot({ boardId: selectedBoardId, name: newSnapshotName.trim() });
+                    setNewSnapshotName("");
+                    toast({ title: "Version saved" });
+                  } catch {
+                    toast({ title: "Error", description: "Failed to save version", variant: "destructive" });
+                  }
+                }}
+                data-testid="button-save-snapshot"
+              >
+                {isCreatingSnapshot ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5 mr-1" />}
+                Save
+              </Button>
+            </div>
+            {snapshots.length === 0 ? (
+              <p className="text-xs text-muted-foreground text-center py-4">No saved versions yet.</p>
+            ) : (
+              <div className="space-y-1 max-h-60 overflow-y-auto">
+                {snapshots.map((snap: any) => (
+                  <div key={snap.id} className="flex items-center justify-between gap-2 p-2 rounded-md hover:bg-muted/50 group" data-testid={`snapshot-${snap.id}`}>
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium truncate">{snap.name}</div>
+                      <div className="text-[10px] text-muted-foreground">
+                        {snap.createdAt ? new Date(snap.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : ""}
+                      </div>
+                    </div>
+                    <div className="flex gap-1 shrink-0">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs"
+                        disabled={isRestoringSnapshot}
+                        onClick={async () => {
+                          if (!selectedBoardId) return;
+                          try {
+                            await restoreSnapshot({ id: snap.id, boardId: selectedBoardId });
+                            setElements([]);
+                            const url = buildUrl(api.canvasElements.list.path, { boardId: selectedBoardId });
+                            const res = await fetch(url, { credentials: "include" });
+                            const els = await res.json();
+                            setElements(els);
+                            toast({ title: "Version restored" });
+                            setShowSnapshotDialog(false);
+                          } catch {
+                            toast({ title: "Error", description: "Failed to restore version", variant: "destructive" });
+                          }
+                        }}
+                        data-testid={`button-restore-snapshot-${snap.id}`}
+                      >
+                        {isRestoringSnapshot ? <Loader2 className="h-3 w-3 animate-spin" /> : <Undo2 className="h-3 w-3 mr-1" />}
+                        Restore
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 opacity-0 group-hover:opacity-100"
+                        onClick={async () => {
+                          if (!selectedBoardId) return;
+                          try {
+                            await deleteSnapshot({ id: snap.id, boardId: selectedBoardId });
+                            toast({ title: "Version deleted" });
+                          } catch {
+                            toast({ title: "Error", description: "Failed to delete version", variant: "destructive" });
+                          }
+                        }}
+                        data-testid={`button-delete-snapshot-${snap.id}`}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
 

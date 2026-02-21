@@ -990,6 +990,80 @@ export async function registerRoutes(
     }
   });
 
+  // Board Snapshots
+  app.get(api.boardSnapshots.list.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const boardId = parseInt(req.params.boardId);
+      const snapshots = await storage.getBoardSnapshots(boardId);
+      res.json(snapshots);
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to list snapshots" });
+    }
+  });
+
+  app.post(api.boardSnapshots.create.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const boardId = parseInt(req.params.boardId);
+      const { name } = api.boardSnapshots.create.input.parse(req.body);
+      const elements = await storage.getCanvasElements(boardId);
+      const snapshot = await storage.createBoardSnapshot({
+        boardId,
+        name,
+        canvasData: elements,
+        createdBy: req.user.id,
+      });
+      res.status(201).json(snapshot);
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to create snapshot" });
+    }
+  });
+
+  app.post(api.boardSnapshots.restore.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const snapshotId = parseInt(req.params.id);
+      const snapshot = await storage.getBoardSnapshot(snapshotId);
+      if (!snapshot) return res.status(404).json({ message: "Snapshot not found" });
+      
+      const currentElements = await storage.getCanvasElements(snapshot.boardId);
+      for (const el of currentElements) {
+        await storage.deleteCanvasElement(el.id);
+      }
+      
+      const snapshotElements = snapshot.canvasData as any[];
+      if (snapshotElements.length > 0) {
+        await storage.createCanvasElements(
+          snapshotElements.map((el: any) => ({
+            boardId: snapshot.boardId,
+            type: el.type,
+            x: el.x,
+            y: el.y,
+            width: el.width,
+            height: el.height,
+            zIndex: el.zIndex || 0,
+            parentColumnId: el.parentColumnId || null,
+            content: el.content,
+            createdBy: el.createdBy,
+          }))
+        );
+      }
+      
+      res.json({ success: true });
+    } catch (err: any) {
+      console.error("Snapshot restore error:", err);
+      res.status(500).json({ message: "Failed to restore snapshot" });
+    }
+  });
+
+  app.delete(api.boardSnapshots.delete.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteBoardSnapshot(id);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to delete snapshot" });
+    }
+  });
+
   // Calendar Events
   app.get(api.calendar.list.path, isAuthenticated, async (req, res) => {
     const events = await storage.getCalendarEvents(Number(req.params.projectId));

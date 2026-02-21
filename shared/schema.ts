@@ -138,6 +138,16 @@ export const canvasElements = pgTable("canvas_elements", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Board Snapshots (version snapshots of a board's canvas state)
+export const boardSnapshots = pgTable("board_snapshots", {
+  id: serial("id").primaryKey(),
+  boardId: integer("board_id").notNull().references(() => planningBoards.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  canvasData: jsonb("canvas_data").notNull(),
+  createdBy: text("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Board Items (moodboard / workboard) - legacy individual items
 export const boardItems = pgTable("board_items", {
   id: serial("id").primaryKey(),
@@ -363,6 +373,7 @@ export const insertPlanningBoardSchema = createInsertSchema(planningBoards).omit
 export const insertCalendarEventSchema = createInsertSchema(calendarEvents).omit({ id: true, createdAt: true });
 export const insertActivityLogSchema = createInsertSchema(activityLog).omit({ id: true, createdAt: true });
 export const insertPaintColorSchema = createInsertSchema(paintColors).omit({ id: true });
+export const insertBoardSnapshotSchema = createInsertSchema(boardSnapshots).omit({ id: true, createdAt: true });
 
 // TYPES
 export type Project = typeof projects.$inferSelect;
@@ -398,3 +409,5 @@ export type SubMilestone = typeof subMilestones.$inferSelect;
 export type InsertSubMilestone = z.infer<typeof insertSubMilestoneSchema>;
 export type QueuedSms = typeof queuedSms.$inferSelect;
 export type InsertQueuedSms = z.infer<typeof insertQueuedSmsSchema>;
+export type BoardSnapshot = typeof boardSnapshots.$inferSelect;
+export type InsertBoardSnapshot = z.infer<typeof insertBoardSnapshotSchema>;

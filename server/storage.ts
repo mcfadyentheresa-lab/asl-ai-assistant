@@ -1,10 +1,10 @@
 import { db } from "./db";
 import { 
-  users, projects, milestones, subMilestones, tasks, photos, documents, timeEntries, messages, checklistItems, boardItems, calendarEvents, planningBoards, canvasElements, activityLog, activityViews, paintColors,
+  users, projects, milestones, subMilestones, tasks, photos, documents, timeEntries, messages, checklistItems, boardItems, calendarEvents, planningBoards, canvasElements, activityLog, activityViews, paintColors, boardSnapshots,
   type Project, type Milestone, type SubMilestone, type Task, type Photo, type Document, type TimeEntry, type Message,
-  type ChecklistItem, type BoardItem, type CalendarEvent, type PlanningBoard, type CanvasElement, type ActivityLog, type PaintColor,
+  type ChecklistItem, type BoardItem, type CalendarEvent, type PlanningBoard, type CanvasElement, type ActivityLog, type PaintColor, type BoardSnapshot,
   type InsertProject, type InsertMilestone, type InsertSubMilestone, type InsertTask, type InsertPhoto, type InsertDocument, 
-  type InsertTimeEntry, type InsertMessage, type InsertChecklistItem, type InsertBoardItem, type InsertCalendarEvent, type InsertPlanningBoard, type InsertCanvasElement, type InsertActivityLog
+  type InsertTimeEntry, type InsertMessage, type InsertChecklistItem, type InsertBoardItem, type InsertCalendarEvent, type InsertPlanningBoard, type InsertCanvasElement, type InsertActivityLog, type InsertBoardSnapshot
 } from "@shared/schema";
 import { type User } from "@shared/models/auth";
 import { eq, desc, and, ilike, or } from "drizzle-orm";
@@ -106,6 +106,12 @@ export interface IStorage {
   updateCanvasElement(id: number, updates: Partial<InsertCanvasElement>): Promise<CanvasElement>;
   updateCanvasElementPositions(boardId: number, updates: { id: number; x: number; y: number; width?: number; height?: number; zIndex?: number; parentColumnId?: number | null }[]): Promise<void>;
   deleteCanvasElement(id: number): Promise<void>;
+
+  // Board Snapshots
+  getBoardSnapshots(boardId: number): Promise<BoardSnapshot[]>;
+  createBoardSnapshot(snapshot: InsertBoardSnapshot): Promise<BoardSnapshot>;
+  getBoardSnapshot(id: number): Promise<BoardSnapshot | undefined>;
+  deleteBoardSnapshot(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -433,6 +439,22 @@ export class DatabaseStorage implements IStorage {
   }
   async deleteCanvasElement(id: number): Promise<void> {
     await db.delete(canvasElements).where(eq(canvasElements.id, id));
+  }
+
+  // Board Snapshots
+  async getBoardSnapshots(boardId: number): Promise<BoardSnapshot[]> {
+    return db.select().from(boardSnapshots).where(eq(boardSnapshots.boardId, boardId)).orderBy(desc(boardSnapshots.createdAt));
+  }
+  async createBoardSnapshot(snapshot: InsertBoardSnapshot): Promise<BoardSnapshot> {
+    const [created] = await db.insert(boardSnapshots).values(snapshot).returning();
+    return created;
+  }
+  async getBoardSnapshot(id: number): Promise<BoardSnapshot | undefined> {
+    const [snap] = await db.select().from(boardSnapshots).where(eq(boardSnapshots.id, id));
+    return snap;
+  }
+  async deleteBoardSnapshot(id: number): Promise<void> {
+    await db.delete(boardSnapshots).where(eq(boardSnapshots.id, id));
   }
 }
 
