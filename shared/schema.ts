@@ -418,6 +418,8 @@ export const estimateItems = pgTable("estimate_items", {
   marketRateId: integer("market_rate_id").references(() => marketRates.id),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
+  crewRateId: integer("crew_rate_id").references(() => crewRates.id),
+  subcontractorId: integer("subcontractor_id").references(() => subcontractors.id),
 });
 
 // Receipts (actual expenses to compare against estimates)
@@ -446,6 +448,39 @@ export const estimateWarnings = pgTable("estimate_warnings", {
   ignoredAt: timestamp("ignored_at"),
 });
 
+// Crew Rates (hourly rates for crew members)
+export const crewRates = pgTable("crew_rates", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").references(() => users.id),
+  name: text("name").notNull(), // display name if no userId linked
+  role: text("role"), // e.g., "Lead Carpenter", "Labourer"
+  payRate: text("pay_rate").notNull(), // hourly rate paid to crew (CAD)
+  billableRate: text("billable_rate").notNull(), // hourly rate charged to client (CAD)
+  isActive: boolean("is_active").default(true),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Subcontractors (subcontractor information and rates)
+export const subcontractors = pgTable("subcontractors", {
+  id: serial("id").primaryKey(),
+  businessName: text("business_name").notNull(),
+  contactName: text("contact_name"),
+  phone: text("phone"),
+  email: text("email"),
+  categoryId: integer("category_id").references(() => costCategories.id),
+  trade: text("trade"), // free text trade type if no category
+  hourlyRate: text("hourly_rate"),
+  dailyRate: text("daily_rate"),
+  unitRate: text("unit_rate"), // per sq ft or per unit rate if applicable
+  unitType: text("unit_type"), // "hour", "day", "sq_ft", "unit"
+  isPreferred: boolean("is_preferred").default(false),
+  isActive: boolean("is_active").default(true),
+  address: text("address"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // SCHEMAS
 export const insertProjectSchema = createInsertSchema(projects).omit({ id: true, createdAt: true });
 export const insertMilestoneSchema = createInsertSchema(milestones).omit({ id: true });
@@ -469,6 +504,8 @@ export const insertProjectEstimateSchema = createInsertSchema(projectEstimates).
 export const insertEstimateItemSchema = createInsertSchema(estimateItems).omit({ id: true, createdAt: true });
 export const insertReceiptSchema = createInsertSchema(receipts).omit({ id: true, createdAt: true });
 export const insertEstimateWarningSchema = createInsertSchema(estimateWarnings).omit({ id: true });
+export const insertCrewRateSchema = createInsertSchema(crewRates).omit({ id: true, createdAt: true });
+export const insertSubcontractorSchema = createInsertSchema(subcontractors).omit({ id: true, createdAt: true });
 
 // TYPES
 export type Project = typeof projects.$inferSelect;
@@ -518,3 +555,7 @@ export type Receipt = typeof receipts.$inferSelect;
 export type InsertReceipt = z.infer<typeof insertReceiptSchema>;
 export type EstimateWarning = typeof estimateWarnings.$inferSelect;
 export type InsertEstimateWarning = z.infer<typeof insertEstimateWarningSchema>;
+export type CrewRate = typeof crewRates.$inferSelect;
+export type InsertCrewRate = z.infer<typeof insertCrewRateSchema>;
+export type Subcontractor = typeof subcontractors.$inferSelect;
+export type InsertSubcontractor = z.infer<typeof insertSubcontractorSchema>;

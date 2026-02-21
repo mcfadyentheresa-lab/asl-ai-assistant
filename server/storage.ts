@@ -1,10 +1,10 @@
 import { db } from "./db";
 import { 
-  users, projects, milestones, subMilestones, tasks, photos, documents, timeEntries, messages, checklistItems, boardItems, calendarEvents, planningBoards, canvasElements, activityLog, activityViews, paintColors, boardSnapshots, costCategories, marketRates, projectEstimates, estimateItems, receipts, estimateWarnings,
+  users, projects, milestones, subMilestones, tasks, photos, documents, timeEntries, messages, checklistItems, boardItems, calendarEvents, planningBoards, canvasElements, activityLog, activityViews, paintColors, boardSnapshots, costCategories, marketRates, projectEstimates, estimateItems, receipts, estimateWarnings, crewRates, subcontractors,
   type Project, type Milestone, type SubMilestone, type Task, type Photo, type Document, type TimeEntry, type Message,
-  type ChecklistItem, type BoardItem, type CalendarEvent, type PlanningBoard, type CanvasElement, type ActivityLog, type PaintColor, type BoardSnapshot, type CostCategory, type MarketRate, type ProjectEstimate, type EstimateItem, type Receipt, type EstimateWarning,
+  type ChecklistItem, type BoardItem, type CalendarEvent, type PlanningBoard, type CanvasElement, type ActivityLog, type PaintColor, type BoardSnapshot, type CostCategory, type MarketRate, type ProjectEstimate, type EstimateItem, type Receipt, type EstimateWarning, type CrewRate, type Subcontractor,
   type InsertProject, type InsertMilestone, type InsertSubMilestone, type InsertTask, type InsertPhoto, type InsertDocument, 
-  type InsertTimeEntry, type InsertMessage, type InsertChecklistItem, type InsertBoardItem, type InsertCalendarEvent, type InsertPlanningBoard, type InsertCanvasElement, type InsertActivityLog, type InsertBoardSnapshot, type InsertCostCategory, type InsertMarketRate, type InsertProjectEstimate, type InsertEstimateItem, type InsertReceipt, type InsertEstimateWarning
+  type InsertTimeEntry, type InsertMessage, type InsertChecklistItem, type InsertBoardItem, type InsertCalendarEvent, type InsertPlanningBoard, type InsertCanvasElement, type InsertActivityLog, type InsertBoardSnapshot, type InsertCostCategory, type InsertMarketRate, type InsertProjectEstimate, type InsertEstimateItem, type InsertReceipt, type InsertEstimateWarning, type InsertCrewRate, type InsertSubcontractor
 } from "@shared/schema";
 import { type User } from "@shared/models/auth";
 import { eq, desc, and, ilike, or, gte, lte, inArray, sql } from "drizzle-orm";
@@ -155,6 +155,20 @@ export interface IStorage {
   createEstimateWarning(warning: InsertEstimateWarning): Promise<EstimateWarning>;
   ignoreWarning(id: number, userId: string): Promise<EstimateWarning>;
   deleteWarningsByItem(estimateItemId: number): Promise<void>;
+
+  // Crew Rates
+  getCrewRates(): Promise<CrewRate[]>;
+  getCrewRate(id: number): Promise<CrewRate | undefined>;
+  createCrewRate(rate: InsertCrewRate): Promise<CrewRate>;
+  updateCrewRate(id: number, updates: Partial<InsertCrewRate>): Promise<CrewRate>;
+  deleteCrewRate(id: number): Promise<void>;
+
+  // Subcontractors
+  getSubcontractors(categoryId?: number): Promise<Subcontractor[]>;
+  getSubcontractor(id: number): Promise<Subcontractor | undefined>;
+  createSubcontractor(sub: InsertSubcontractor): Promise<Subcontractor>;
+  updateSubcontractor(id: number, updates: Partial<InsertSubcontractor>): Promise<Subcontractor>;
+  deleteSubcontractor(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -652,6 +666,49 @@ export class DatabaseStorage implements IStorage {
   }
   async deleteWarningsByItem(estimateItemId: number): Promise<void> {
     await db.delete(estimateWarnings).where(eq(estimateWarnings.estimateItemId, estimateItemId));
+  }
+
+  // Crew Rates
+  async getCrewRates(): Promise<CrewRate[]> {
+    return db.select().from(crewRates).orderBy(crewRates.name);
+  }
+  async getCrewRate(id: number): Promise<CrewRate | undefined> {
+    const [rate] = await db.select().from(crewRates).where(eq(crewRates.id, id));
+    return rate;
+  }
+  async createCrewRate(rate: InsertCrewRate): Promise<CrewRate> {
+    const [created] = await db.insert(crewRates).values(rate).returning();
+    return created;
+  }
+  async updateCrewRate(id: number, updates: Partial<InsertCrewRate>): Promise<CrewRate> {
+    const [updated] = await db.update(crewRates).set(updates).where(eq(crewRates.id, id)).returning();
+    return updated;
+  }
+  async deleteCrewRate(id: number): Promise<void> {
+    await db.delete(crewRates).where(eq(crewRates.id, id));
+  }
+
+  // Subcontractors
+  async getSubcontractors(categoryId?: number): Promise<Subcontractor[]> {
+    if (categoryId) {
+      return db.select().from(subcontractors).where(eq(subcontractors.categoryId, categoryId)).orderBy(subcontractors.businessName);
+    }
+    return db.select().from(subcontractors).orderBy(subcontractors.businessName);
+  }
+  async getSubcontractor(id: number): Promise<Subcontractor | undefined> {
+    const [sub] = await db.select().from(subcontractors).where(eq(subcontractors.id, id));
+    return sub;
+  }
+  async createSubcontractor(sub: InsertSubcontractor): Promise<Subcontractor> {
+    const [created] = await db.insert(subcontractors).values(sub).returning();
+    return created;
+  }
+  async updateSubcontractor(id: number, updates: Partial<InsertSubcontractor>): Promise<Subcontractor> {
+    const [updated] = await db.update(subcontractors).set(updates).where(eq(subcontractors.id, id)).returning();
+    return updated;
+  }
+  async deleteSubcontractor(id: number): Promise<void> {
+    await db.delete(subcontractors).where(eq(subcontractors.id, id));
   }
 }
 

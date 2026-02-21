@@ -30,7 +30,7 @@ import {
   TrendingUp, TrendingDown, Minus, Loader2, Sparkles
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
-import type { CostCategory, MarketRate, ProjectEstimate, EstimateItem, Receipt, EstimateWarning, Project } from "@shared/schema";
+import type { CostCategory, MarketRate, ProjectEstimate, EstimateItem, Receipt, EstimateWarning, Project, CrewRate, Subcontractor } from "@shared/schema";
 
 export default function CostEstimator() {
   const { id } = useParams<{ id: string }>();
@@ -62,6 +62,8 @@ export default function CostEstimator() {
   const { data: categories = [] } = useQuery<CostCategory[]>({ queryKey: ["/api/cost-categories"] });
   const { data: marketRates = [] } = useQuery<MarketRate[]>({ queryKey: ["/api/market-rates"] });
   const { data: estimates = [] } = useQuery<ProjectEstimate[]>({ queryKey: ["/api/projects", projectId, "estimates"] });
+  const { data: crewRates = [] } = useQuery<CrewRate[]>({ queryKey: ["/api/crew-rates"], enabled: canEdit });
+  const { data: subcontractors = [] } = useQuery<Subcontractor[]>({ queryKey: ["/api/subcontractors"], enabled: canEdit });
 
   const activeEstimate = estimates[0];
 
@@ -327,6 +329,10 @@ export default function CostEstimator() {
                   {totalMarkup > 0 && (
                     <div className="text-xs text-muted-foreground">incl. ${totalMarkup.toLocaleString("en-CA", { minimumFractionDigits: 2 })} markup</div>
                   )}
+                  {(() => {
+                    const totalLabor = items.reduce((s, i) => s + (parseFloat(i.laborCost) || 0), 0);
+                    return totalLabor > 0 ? <div className="text-xs text-muted-foreground">Labor: ${totalLabor.toLocaleString("en-CA", { minimumFractionDigits: 2 })}</div> : null;
+                  })()}
                 </CardContent>
               </Card>
               <Card>
@@ -429,20 +435,22 @@ export default function CostEstimator() {
                 ) : (
                   <div className="space-y-2">
                     <div className="hidden md:grid grid-cols-12 gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wide px-2">
-                      <div className="col-span-3">Category</div>
+                      <div className="col-span-2">Category</div>
                       <div className="col-span-1">Type</div>
                       <div className="col-span-2 text-right">Qty</div>
                       <div className="col-span-2 text-right">Unit Cost</div>
-                      <div className="col-span-2 text-right">Material</div>
-                      <div className="col-span-2 text-right">Line Total</div>
+                      <div className="col-span-1 text-right">Material</div>
+                      <div className="col-span-1 text-right">Labor</div>
+                      <div className="col-span-2 text-right">Total</div>
+                      <div className="col-span-1"></div>
                     </div>
                     {filteredItems.map(item => {
                       const itemWarnings = warnings.filter(w => w.estimateItemId === item.id && !w.ignored);
                       return (
                         <div key={item.id} className={`grid grid-cols-2 md:grid-cols-12 gap-2 items-center p-2 rounded-md border ${itemWarnings.length > 0 ? 'border-amber-300 bg-amber-50/50 dark:border-amber-700 dark:bg-amber-950/30' : 'border-border'}`} data-testid={`estimate-item-${item.id}`}>
-                          <div className="col-span-2 md:col-span-3 text-sm font-medium flex items-center gap-1">
+                          <div className="col-span-2 md:col-span-2 text-sm font-medium flex items-center gap-1">
                             {itemWarnings.length > 0 && <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" />}
-                            {item.categoryName}
+                            <span className="truncate">{item.categoryName}</span>
                             {item.isCustomRate && <Badge variant="outline" className="text-[10px] ml-1">Custom</Badge>}
                           </div>
                           <div className="hidden md:block md:col-span-1">
@@ -450,9 +458,12 @@ export default function CostEstimator() {
                           </div>
                           <div className="text-right text-sm md:col-span-2">{parseFloat(item.quantity).toLocaleString()}</div>
                           <div className="text-right text-sm md:col-span-2">${parseFloat(item.unitCost).toFixed(2)}</div>
-                          <div className="text-right text-sm md:col-span-2">${parseFloat(item.materialCost).toFixed(2)}</div>
-                          <div className="text-right text-sm font-medium flex items-center justify-end gap-1 md:col-span-2">
+                          <div className="text-right text-sm md:col-span-1">${parseFloat(item.materialCost).toFixed(2)}</div>
+                          <div className="text-right text-sm md:col-span-1">{parseFloat(item.laborCost) > 0 ? `$${parseFloat(item.laborCost).toFixed(0)}` : '—'}</div>
+                          <div className="text-right text-sm font-medium md:col-span-2">
                             ${item.totalWithMarkup.toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </div>
+                          <div className="text-right md:col-span-1">
                             {canEdit && (
                               <Button variant="ghost" size="sm" className="h-6 w-6 p-0 ml-1" onClick={() => deleteItemMutation.mutate(item.id)} data-testid={`button-delete-item-${item.id}`}>
                                 <Trash2 className="h-3 w-3 text-muted-foreground" />
@@ -597,6 +608,49 @@ export default function CostEstimator() {
             <div>
               <Label>Material Cost ($) <span className="text-muted-foreground text-xs">(for markup calculation)</span></Label>
               <Input type="number" step="0.01" value={newItem.materialCost} onChange={(e) => setNewItem(prev => ({ ...prev, materialCost: e.target.value }))} placeholder="0.00" data-testid="input-material-cost" />
+            </div>
+
+            <div>
+              <Label>Labor Cost ($)</Label>
+              <Input type="number" step="0.01" value={newItem.laborCost} onChange={(e) => setNewItem(prev => ({ ...prev, laborCost: e.target.value }))} placeholder="0.00" data-testid="input-labor-cost" />
+              <div className="flex gap-2 mt-2 flex-wrap">
+                {crewRates.filter(c => c.isActive !== false).length > 0 && (
+                  <Select onValueChange={(v) => {
+                    const crew = crewRates.find(c => c.id === parseInt(v));
+                    if (crew) {
+                      const hours = parseFloat(newItem.quantity) || 8;
+                      setNewItem(prev => ({ ...prev, laborCost: (parseFloat(crew.billableRate) * hours).toFixed(2), notes: prev.notes || `${crew.name} - ${hours}hrs @ $${crew.billableRate}/hr` }));
+                    }
+                  }}>
+                    <SelectTrigger className="text-xs" data-testid="select-crew-rate"><SelectValue placeholder="Fill from crew rate..." /></SelectTrigger>
+                    <SelectContent>
+                      {crewRates.filter(c => c.isActive !== false).map(c => (
+                        <SelectItem key={c.id} value={String(c.id)}>{c.name} — ${c.billableRate}/hr</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                {(() => {
+                  const catSubs = newItem.categoryId ? subcontractors.filter(s => s.categoryId === parseInt(newItem.categoryId) && s.isActive !== false) : [];
+                  return catSubs.length > 0 ? (
+                    <Select onValueChange={(v) => {
+                      const sub = subcontractors.find(s => s.id === parseInt(v));
+                      if (sub) {
+                        const rate = sub.hourlyRate || sub.unitRate || sub.dailyRate || "0";
+                        const qty = parseFloat(newItem.quantity) || 1;
+                        setNewItem(prev => ({ ...prev, laborCost: (parseFloat(rate) * qty).toFixed(2), notes: prev.notes || `${sub.businessName} — $${rate}/${sub.unitType || "unit"}` }));
+                      }
+                    }}>
+                      <SelectTrigger className="text-xs" data-testid="select-sub-rate"><SelectValue placeholder="Fill from subcontractor..." /></SelectTrigger>
+                      <SelectContent>
+                        {catSubs.map(s => (
+                          <SelectItem key={s.id} value={String(s.id)}>{s.businessName} — ${s.hourlyRate || s.unitRate || s.dailyRate}/{s.unitType || "unit"}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : null;
+                })()}
+              </div>
             </div>
 
             <div>

@@ -16,6 +16,7 @@ import Timesheets from "@/pages/Timesheets";
 import Payroll from "@/pages/Payroll";
 import CostEstimator from "@/pages/CostEstimator";
 import MarketRates from "@/pages/MarketRates";
+import LaborRates from "@/pages/LaborRates";
 import NotFound from "@/pages/not-found";
 
 function PresenceTracker() {
@@ -53,6 +54,7 @@ function Router() {
       <Route path="/timesheets" component={Timesheets} />
       <Route path="/payroll" component={Payroll} />
       <Route path="/market-rates" component={MarketRates} />
+      <Route path="/labor-rates" component={LaborRates} />
       <Route component={NotFound} />
     </Switch>
   );

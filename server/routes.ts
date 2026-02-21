@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
-import { insertSubMilestoneSchema, insertTimeEntrySchema, insertCostCategorySchema, insertMarketRateSchema, insertProjectEstimateSchema, insertEstimateItemSchema, insertReceiptSchema } from "@shared/schema";
+import { insertSubMilestoneSchema, insertTimeEntrySchema, insertCostCategorySchema, insertMarketRateSchema, insertProjectEstimateSchema, insertEstimateItemSchema, insertReceiptSchema, insertCrewRateSchema, insertSubcontractorSchema } from "@shared/schema";
 import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
@@ -1904,6 +1904,97 @@ Respond with valid JSON only, no markdown. Format:
     }
   });
 
+  // Crew Rates
+  app.get("/api/crew-rates", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const user = await authStorage.getUser(userId);
+    if (!user || (user.role !== "admin" && user.role !== "crew")) {
+      return res.status(403).json({ message: "Admin or crew only" });
+    }
+    const rates = await storage.getCrewRates();
+    res.json(rates);
+  });
+
+  app.post("/api/crew-rates", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const user = await authStorage.getUser(userId);
+    if (!user || user.role !== "admin") {
+      return res.status(403).json({ message: "Admin only" });
+    }
+    const parsed = insertCrewRateSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: "Invalid data", errors: parsed.error.issues });
+    const created = await storage.createCrewRate(parsed.data);
+    res.json(created);
+  });
+
+  app.patch("/api/crew-rates/:id", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const user = await authStorage.getUser(userId);
+    if (!user || user.role !== "admin") {
+      return res.status(403).json({ message: "Admin only" });
+    }
+    const parsed = insertCrewRateSchema.partial().safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: "Invalid data", errors: parsed.error.issues });
+    const updated = await storage.updateCrewRate(parseInt(req.params.id), parsed.data);
+    res.json(updated);
+  });
+
+  app.delete("/api/crew-rates/:id", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const user = await authStorage.getUser(userId);
+    if (!user || user.role !== "admin") {
+      return res.status(403).json({ message: "Admin only" });
+    }
+    await storage.deleteCrewRate(parseInt(req.params.id));
+    res.json({ success: true });
+  });
+
+  // Subcontractors
+  app.get("/api/subcontractors", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const user = await authStorage.getUser(userId);
+    if (!user || (user.role !== "admin" && user.role !== "crew")) {
+      return res.status(403).json({ message: "Admin or crew only" });
+    }
+    const categoryId = req.query.categoryId ? parseInt(req.query.categoryId as string) : undefined;
+    const subs = await storage.getSubcontractors(categoryId);
+    res.json(subs);
+  });
+
+  app.post("/api/subcontractors", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const user = await authStorage.getUser(userId);
+    if (!user || user.role !== "admin") {
+      return res.status(403).json({ message: "Admin only" });
+    }
+    const parsed = insertSubcontractorSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: "Invalid data", errors: parsed.error.issues });
+    const created = await storage.createSubcontractor(parsed.data);
+    res.json(created);
+  });
+
+  app.patch("/api/subcontractors/:id", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const user = await authStorage.getUser(userId);
+    if (!user || user.role !== "admin") {
+      return res.status(403).json({ message: "Admin only" });
+    }
+    const parsed = insertSubcontractorSchema.partial().safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: "Invalid data", errors: parsed.error.issues });
+    const updated = await storage.updateSubcontractor(parseInt(req.params.id), parsed.data);
+    res.json(updated);
+  });
+
+  app.delete("/api/subcontractors/:id", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const user = await authStorage.getUser(userId);
+    if (!user || user.role !== "admin") {
+      return res.status(403).json({ message: "Admin only" });
+    }
+    await storage.deleteSubcontractor(parseInt(req.params.id));
+    res.json({ success: true });
+  });
+
   // Initialize seed data
   await seedDatabase();
 
@@ -2015,6 +2106,45 @@ async function seedDatabase() {
           notes: "Baseline high-end Muskoka renovation rates",
         });
       }
+    }
+  }
+
+  // Seed Crew Rates
+  const existingCrewRates = await storage.getCrewRates();
+  if (existingCrewRates.length === 0) {
+    const crewSeeds = [
+      { name: "Lead Carpenter", role: "Lead Carpenter", payRate: "45.00", billableRate: "85.00", isActive: true, notes: "Journeyman rate, Muskoka region" },
+      { name: "Apprentice Carpenter", role: "Apprentice Carpenter", payRate: "28.00", billableRate: "55.00", isActive: true, notes: "2nd/3rd year apprentice" },
+      { name: "General Labourer", role: "Labourer", payRate: "22.00", billableRate: "45.00", isActive: true, notes: "Site cleanup, material handling" },
+      { name: "Project Foreman", role: "Foreman", payRate: "55.00", billableRate: "100.00", isActive: true, notes: "On-site project oversight" },
+      { name: "Finish Carpenter", role: "Finish Carpenter", payRate: "50.00", billableRate: "95.00", isActive: true, notes: "Trim, millwork, cabinetry install" },
+      { name: "Painter", role: "Painter", payRate: "32.00", billableRate: "60.00", isActive: true, notes: "Interior/exterior finishing" },
+    ];
+    for (const crew of crewSeeds) {
+      await storage.createCrewRate(crew);
+    }
+  }
+
+  // Seed Subcontractors with realistic Muskoka trades
+  const existingSubs = await storage.getSubcontractors();
+  if (existingSubs.length === 0) {
+    const allCats = await storage.getCostCategories();
+    const catMap = Object.fromEntries(allCats.map(c => [c.name, c.id]));
+
+    const subSeeds = [
+      { businessName: "Muskoka Plumbing & Heating", contactName: "Dave Morrison", phone: "(705) 645-8822", email: "dave@muskokaplumbing.ca", categoryId: catMap["Plumbing"], trade: "Plumbing", hourlyRate: "95.00", dailyRate: "760.00", unitType: "hour", isPreferred: true, isActive: true, address: "Bracebridge, ON", notes: "Licensed master plumber, 20+ yrs Muskoka experience. Handles wells and septic too." },
+      { businessName: "Cottage Country Electric", contactName: "Mike Sullivan", phone: "(705) 789-3344", email: "mike@cottagecountryelectric.ca", categoryId: catMap["Electrical"], trade: "Electrical", hourlyRate: "90.00", dailyRate: "720.00", unitType: "hour", isPreferred: true, isActive: true, address: "Gravenhurst, ON", notes: "ESA licensed, smart home specialist. Panel upgrades, generator hookups." },
+      { businessName: "Northern HVAC Solutions", contactName: "Sarah Chen", phone: "(705) 687-5500", email: "info@northernhvac.ca", categoryId: catMap["HVAC"], trade: "HVAC", hourlyRate: "100.00", dailyRate: "800.00", unitType: "hour", isPreferred: true, isActive: true, address: "Huntsville, ON", notes: "Heat pumps, in-floor radiant, mini-splits. TSSA certified." },
+      { businessName: "Lakeland Roofing Co.", contactName: "Tom Baker", phone: "(705) 645-1199", email: "tom@lakelandroofing.ca", categoryId: catMap["Roofing"], trade: "Roofing", hourlyRate: null, dailyRate: null, unitRate: "14.00", unitType: "sq_ft", isPreferred: false, isActive: true, address: "Bracebridge, ON", notes: "Metal and shingle roofing. Prices per sq ft installed." },
+      { businessName: "Georgian Bay Drywall", contactName: "Pete Lawson", phone: "(705) 746-2288", email: "pete@gbdrywall.ca", categoryId: catMap["Drywall & Taping"], trade: "Drywall", hourlyRate: "65.00", dailyRate: "520.00", unitType: "hour", isPreferred: false, isActive: true, address: "Parry Sound, ON", notes: "Hanging, taping, finishing. Level 5 finish available." },
+      { businessName: "Muskoka Granite & Stone", contactName: "Lisa Park", phone: "(705) 645-7733", email: "lisa@muskokagranite.ca", categoryId: catMap["Countertops"], trade: "Countertops", hourlyRate: null, dailyRate: null, unitRate: "120.00", unitType: "sq_ft", isPreferred: true, isActive: true, address: "Bracebridge, ON", notes: "Fabrication & install. Granite, quartz, marble. Template to install 2-3 weeks." },
+      { businessName: "Kawartha Tile & Bath", contactName: "Ryan Hughes", phone: "(705) 324-5566", email: "ryan@kawarthatile.ca", categoryId: catMap["Tile & Stone"], trade: "Tile", hourlyRate: "75.00", dailyRate: "600.00", unitType: "hour", isPreferred: false, isActive: true, address: "Lindsay, ON", notes: "Custom tile, heated floors, shower systems. Travels to Muskoka." },
+      { businessName: "Shield Septic Services", contactName: "Brian Ward", phone: "(705) 385-2200", email: "brian@shieldseptic.ca", categoryId: catMap["Septic & Well"], trade: "Septic & Well", hourlyRate: null, dailyRate: null, unitRate: "15000.00", unitType: "unit", isPreferred: true, isActive: true, address: "Port Carling, ON", notes: "Full septic install, well drilling, water treatment systems." },
+      { businessName: "Dock Masters Muskoka", contactName: "Jeff Collins", phone: "(705) 765-3399", email: "jeff@dockmasters.ca", categoryId: catMap["Decks & Docks"], trade: "Docks & Decks", hourlyRate: null, dailyRate: null, unitRate: "45.00", unitType: "sq_ft", isPreferred: true, isActive: true, address: "Port Carling, ON", notes: "Floating docks, permanent docks, composite decking. Spring install booking required." },
+      { businessName: "Muskoka Landscapes", contactName: "Anna Reid", phone: "(705) 644-8800", email: "anna@muskokalandscapes.ca", categoryId: catMap["Landscaping"], trade: "Landscaping", hourlyRate: "70.00", dailyRate: "560.00", unitType: "hour", isPreferred: false, isActive: true, address: "Huntsville, ON", notes: "Retaining walls, pathways, planting. Bobcat and excavator available." },
+    ];
+    for (const sub of subSeeds) {
+      await storage.createSubcontractor(sub);
     }
   }
 }
