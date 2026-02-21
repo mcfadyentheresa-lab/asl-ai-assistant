@@ -13,7 +13,7 @@ import {
 import { useOnlineUsers, isUserOnline } from "@/hooks/use-presence";
 import { Navbar } from "@/components/layout/Navbar";
 import SpatialCanvas from "@/components/SpatialCanvas";
-import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, ExternalLink, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, CalendarDays, ChevronLeft, Upload, Download, User, X, Paperclip, ZoomIn, Palette, Shield, Users, Phone, Check, Bell, Eye, EyeOff, Archive, ArchiveRestore, PanelRightOpen, MoreVertical, Flag } from "lucide-react";
+import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, ExternalLink, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, CalendarDays, ChevronLeft, Upload, Download, User, X, Paperclip, ZoomIn, Palette, Shield, Users, Phone, Check, Bell, Eye, EyeOff, Archive, ArchiveRestore, PanelRightOpen, MoreVertical, Flag, DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -826,9 +826,16 @@ export default function ProjectDetails() {
                 {project.description}
               </p>
             </div>
-            <Badge variant="secondary" data-testid="badge-project-status">
-              {statusLabel[project.status] || project.status}
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Link href={`/project/${projectId}/estimate`}>
+                <Button variant="outline" size="sm" data-testid="link-cost-estimator">
+                  <DollarSign className="h-4 w-4 mr-1" /> Cost Estimator
+                </Button>
+              </Link>
+              <Badge variant="secondary" data-testid="badge-project-status">
+                {statusLabel[project.status] || project.status}
+              </Badge>
+            </div>
           </div>
         </div>
       </div>

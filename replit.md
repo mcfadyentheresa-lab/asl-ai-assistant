@@ -52,6 +52,8 @@ Development uses `npm run dev` for HMR, `npm run build` compiles both client and
 *   **Planning Board Designer Tools**: A spatial canvas (`SpatialCanvas.tsx`) supporting various element types for design and collaboration, including notes, links, to-dos, images, color swatches, material swatches, and drawing tools.
 *   **Board Version Snapshots**: Allows users to save and restore named versions of planning boards.
 *   **Text Size Accessibility**: Provides a text zoom feature with multiple scaling options, persistent across sessions.
+*   **Crew Timesheets & Admin Payroll**: Bi-weekly timesheet system (anchored Jan 6, 2025) for crew time tracking with draft/submitted/approved workflow. Admin payroll view with period navigation, crew hour summaries, and bulk approval. Role-gated access (crew sees timesheets, admin sees payroll).
+*   **Cost Estimator**: Per-project cost estimation tool at `/project/:id/estimate` with line items priced per square foot or per board/unit. Features 25% material markup toggle, market rate auto-fill from 20 seeded Muskoka renovation categories, price variance warnings (too low/too high with ignore option), and receipt tracking with actual-vs-estimated variance analysis. Admin market rates page at `/market-rates` for updating baseline pricing. Schema: cost_categories, market_rates, project_estimates, estimate_items, receipts, estimate_warnings.
 
 ## External Dependencies
 

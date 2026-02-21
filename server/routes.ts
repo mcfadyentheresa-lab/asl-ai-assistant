@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
-import { insertSubMilestoneSchema, insertTimeEntrySchema } from "@shared/schema";
+import { insertSubMilestoneSchema, insertTimeEntrySchema, insertCostCategorySchema, insertMarketRateSchema, insertProjectEstimateSchema, insertEstimateItemSchema, insertReceiptSchema } from "@shared/schema";
 import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
@@ -1552,6 +1552,244 @@ export async function registerRoutes(
     }
   });
 
+  // ============ COST ESTIMATOR ROUTES ============
+
+  // Cost Categories
+  app.get("/api/cost-categories", isAuthenticated, async (_req, res) => {
+    const categories = await storage.getCostCategories();
+    res.json(categories);
+  });
+
+  app.post("/api/cost-categories", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const dbUser = await authStorage.getUser(userId);
+    if (dbUser?.role !== "admin") return res.status(403).json({ message: "Admin access required" });
+    const input = insertCostCategorySchema.parse(req.body);
+    const created = await storage.createCostCategory(input);
+    res.status(201).json(created);
+  });
+
+  app.patch("/api/cost-categories/:id", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const dbUser = await authStorage.getUser(userId);
+    if (dbUser?.role !== "admin") return res.status(403).json({ message: "Admin access required" });
+    const id = parseInt(req.params.id);
+    const input = insertCostCategorySchema.partial().parse(req.body);
+    const updated = await storage.updateCostCategory(id, input);
+    res.json(updated);
+  });
+
+  app.delete("/api/cost-categories/:id", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const dbUser = await authStorage.getUser(userId);
+    if (dbUser?.role !== "admin") return res.status(403).json({ message: "Admin access required" });
+    await storage.deleteCostCategory(parseInt(req.params.id));
+    res.json({ message: "Deleted" });
+  });
+
+  // Market Rates
+  app.get("/api/market-rates", isAuthenticated, async (req, res) => {
+    const categoryId = req.query.categoryId ? parseInt(req.query.categoryId as string) : undefined;
+    const activeOnly = req.query.active === "true";
+    const rates = await storage.getMarketRates(categoryId, activeOnly);
+    res.json(rates);
+  });
+
+  app.post("/api/market-rates", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const dbUser = await authStorage.getUser(userId);
+    if (dbUser?.role !== "admin") return res.status(403).json({ message: "Admin access required" });
+    const input = insertMarketRateSchema.parse(req.body);
+    const created = await storage.createMarketRate(input);
+    res.status(201).json(created);
+  });
+
+  app.patch("/api/market-rates/:id", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const dbUser = await authStorage.getUser(userId);
+    if (dbUser?.role !== "admin") return res.status(403).json({ message: "Admin access required" });
+    const input = insertMarketRateSchema.partial().parse(req.body);
+    const updated = await storage.updateMarketRate(parseInt(req.params.id), input);
+    res.json(updated);
+  });
+
+  // Project Estimates
+  app.get("/api/projects/:projectId/estimates", isAuthenticated, async (req, res) => {
+    const projectId = parseInt(req.params.projectId);
+    const estimates = await storage.getProjectEstimates(projectId);
+    res.json(estimates);
+  });
+
+  app.post("/api/projects/:projectId/estimates", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const dbUser = await authStorage.getUser(userId);
+    if (dbUser?.role === "client") return res.status(403).json({ message: "Crew or admin access required" });
+    const projectId = parseInt(req.params.projectId);
+    const input = insertProjectEstimateSchema.parse({ ...req.body, projectId, createdBy: userId });
+    const created = await storage.createEstimate(input);
+    res.status(201).json(created);
+  });
+
+  app.get("/api/estimates/:id", isAuthenticated, async (req, res) => {
+    const estimate = await storage.getEstimate(parseInt(req.params.id));
+    if (!estimate) return res.status(404).json({ message: "Estimate not found" });
+    res.json(estimate);
+  });
+
+  app.patch("/api/estimates/:id", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const dbUser = await authStorage.getUser(userId);
+    if (dbUser?.role === "client") return res.status(403).json({ message: "Crew or admin access required" });
+    const input = insertProjectEstimateSchema.partial().parse(req.body);
+    const updated = await storage.updateEstimate(parseInt(req.params.id), input);
+    res.json(updated);
+  });
+
+  app.delete("/api/estimates/:id", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const dbUser = await authStorage.getUser(userId);
+    if (dbUser?.role !== "admin") return res.status(403).json({ message: "Admin access required" });
+    await storage.deleteEstimate(parseInt(req.params.id));
+    res.json({ message: "Deleted" });
+  });
+
+  // Estimate Items
+  app.get("/api/estimates/:id/items", isAuthenticated, async (req, res) => {
+    const items = await storage.getEstimateItems(parseInt(req.params.id));
+    res.json(items);
+  });
+
+  app.post("/api/estimates/:id/items", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const dbUser = await authStorage.getUser(userId);
+    if (dbUser?.role === "client") return res.status(403).json({ message: "Crew or admin access required" });
+    const estimateId = parseInt(req.params.id);
+    const input = insertEstimateItemSchema.parse({ ...req.body, estimateId });
+    const created = await storage.createEstimateItem(input);
+
+    // Check for pricing warnings against market rates
+    if (input.categoryId && !input.isCustomRate) {
+      const rates = await storage.getMarketRates(input.categoryId, true);
+      if (rates.length > 0) {
+        const latestRate = rates[0];
+        const unitCost = parseFloat(input.unitCost);
+        const low = parseFloat(latestRate.lowRate);
+        const high = parseFloat(latestRate.highRate);
+        const typical = parseFloat(latestRate.typicalRate);
+
+        await storage.deleteWarningsByItem(created.id);
+
+        if (unitCost < low * 0.8) {
+          const pctDiff = (((low - unitCost) / low) * 100).toFixed(1);
+          await storage.createEstimateWarning({
+            estimateItemId: created.id,
+            warningType: "too_low",
+            message: `Unit cost $${unitCost.toFixed(2)} is ${pctDiff}% below market low of $${low.toFixed(2)}/${input.unitType}`,
+            percentDiff: pctDiff,
+          });
+        } else if (unitCost > high * 1.2) {
+          const pctDiff = (((unitCost - high) / high) * 100).toFixed(1);
+          await storage.createEstimateWarning({
+            estimateItemId: created.id,
+            warningType: "too_high",
+            message: `Unit cost $${unitCost.toFixed(2)} is ${pctDiff}% above market high of $${high.toFixed(2)}/${input.unitType}`,
+            percentDiff: pctDiff,
+          });
+        }
+      }
+    }
+
+    res.status(201).json(created);
+  });
+
+  app.patch("/api/estimate-items/:id", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const dbUser = await authStorage.getUser(userId);
+    if (dbUser?.role === "client") return res.status(403).json({ message: "Crew or admin access required" });
+    const id = parseInt(req.params.id);
+    const input = insertEstimateItemSchema.partial().parse(req.body);
+    const updated = await storage.updateEstimateItem(id, input);
+
+    // Re-check warnings after update
+    if (updated.categoryId) {
+      const rates = await storage.getMarketRates(updated.categoryId, true);
+      if (rates.length > 0) {
+        const latestRate = rates[0];
+        const unitCost = parseFloat(updated.unitCost);
+        const low = parseFloat(latestRate.lowRate);
+        const high = parseFloat(latestRate.highRate);
+
+        await storage.deleteWarningsByItem(id);
+
+        if (unitCost < low * 0.8) {
+          const pctDiff = (((low - unitCost) / low) * 100).toFixed(1);
+          await storage.createEstimateWarning({
+            estimateItemId: id,
+            warningType: "too_low",
+            message: `Unit cost $${unitCost.toFixed(2)} is ${pctDiff}% below market low of $${low.toFixed(2)}`,
+            percentDiff: pctDiff,
+          });
+        } else if (unitCost > high * 1.2) {
+          const pctDiff = (((unitCost - high) / high) * 100).toFixed(1);
+          await storage.createEstimateWarning({
+            estimateItemId: id,
+            warningType: "too_high",
+            message: `Unit cost $${unitCost.toFixed(2)} is ${pctDiff}% above market high of $${high.toFixed(2)}`,
+            percentDiff: pctDiff,
+          });
+        }
+      }
+    }
+
+    res.json(updated);
+  });
+
+  app.delete("/api/estimate-items/:id", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const dbUser = await authStorage.getUser(userId);
+    if (dbUser?.role === "client") return res.status(403).json({ message: "Crew or admin access required" });
+    const id = parseInt(req.params.id);
+    await storage.deleteWarningsByItem(id);
+    await storage.deleteEstimateItem(id);
+    res.json({ message: "Deleted" });
+  });
+
+  // Receipts
+  app.get("/api/projects/:projectId/receipts", isAuthenticated, async (req, res) => {
+    const receipts = await storage.getReceipts(parseInt(req.params.projectId));
+    res.json(receipts);
+  });
+
+  app.post("/api/projects/:projectId/receipts", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const dbUser = await authStorage.getUser(userId);
+    if (dbUser?.role === "client") return res.status(403).json({ message: "Crew or admin access required" });
+    const projectId = parseInt(req.params.projectId);
+    const input = insertReceiptSchema.parse({ ...req.body, projectId, createdBy: userId });
+    const created = await storage.createReceipt(input);
+    res.status(201).json(created);
+  });
+
+  app.delete("/api/receipts/:id", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const dbUser = await authStorage.getUser(userId);
+    if (dbUser?.role === "client") return res.status(403).json({ message: "Crew or admin access required" });
+    await storage.deleteReceipt(parseInt(req.params.id));
+    res.json({ message: "Deleted" });
+  });
+
+  // Estimate Warnings
+  app.get("/api/estimates/:id/warnings", isAuthenticated, async (req, res) => {
+    const warnings = await storage.getWarningsByEstimate(parseInt(req.params.id));
+    res.json(warnings);
+  });
+
+  app.post("/api/warnings/:id/ignore", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const updated = await storage.ignoreWarning(parseInt(req.params.id), userId);
+    res.json(updated);
+  });
+
   // Initialize seed data
   await seedDatabase();
 
@@ -1593,5 +1831,76 @@ async function seedDatabase() {
     // Documents
     await storage.createDocument({ projectId, title: "Original Contract", url: "#", type: "contract" });
     await storage.createDocument({ projectId, title: "Site Plan v2", url: "#", type: "plan" });
+  }
+
+  // Seed Cost Categories & Market Rates
+  const categories = await storage.getCostCategories();
+  if (categories.length === 0) {
+    const today = new Date().toISOString().split("T")[0];
+    
+    const cats = [
+      { name: "Demolition & Site Prep", description: "Tear-out, debris removal, site grading", defaultUnitType: "sq_ft", sortOrder: 1 },
+      { name: "Foundation", description: "Footings, slabs, underpinning, waterproofing", defaultUnitType: "sq_ft", sortOrder: 2 },
+      { name: "Framing", description: "Structural framing, beams, trusses", defaultUnitType: "sq_ft", sortOrder: 3 },
+      { name: "Roofing", description: "Shingles, metal roofing, underlayment, flashing", defaultUnitType: "sq_ft", sortOrder: 4 },
+      { name: "Windows & Doors", description: "Premium windows, exterior doors, patio doors", defaultUnitType: "board", sortOrder: 5 },
+      { name: "Insulation", description: "Spray foam, batt, rigid board insulation", defaultUnitType: "sq_ft", sortOrder: 6 },
+      { name: "Electrical", description: "Panel upgrades, wiring, fixtures, smart home", defaultUnitType: "sq_ft", sortOrder: 7 },
+      { name: "Plumbing", description: "Rough-in, fixtures, water heaters, wells", defaultUnitType: "sq_ft", sortOrder: 8 },
+      { name: "HVAC", description: "Furnaces, heat pumps, ductwork, mini-splits", defaultUnitType: "sq_ft", sortOrder: 9 },
+      { name: "Drywall & Taping", description: "Hanging, taping, finishing, textures", defaultUnitType: "sq_ft", sortOrder: 10 },
+      { name: "Interior Trim & Millwork", description: "Crown moulding, baseboards, custom built-ins", defaultUnitType: "sq_ft", sortOrder: 11 },
+      { name: "Cabinetry", description: "Kitchen, bathroom, laundry cabinets", defaultUnitType: "board", sortOrder: 12 },
+      { name: "Countertops", description: "Granite, quartz, marble, butcher block", defaultUnitType: "sq_ft", sortOrder: 13 },
+      { name: "Flooring", description: "Hardwood, tile, luxury vinyl, heated floors", defaultUnitType: "sq_ft", sortOrder: 14 },
+      { name: "Painting & Finishes", description: "Interior/exterior paint, stains, wallpaper", defaultUnitType: "sq_ft", sortOrder: 15 },
+      { name: "Tile & Stone", description: "Backsplash, bathroom tile, natural stone", defaultUnitType: "sq_ft", sortOrder: 16 },
+      { name: "Exterior Cladding", description: "Siding, stone veneer, board and batten", defaultUnitType: "sq_ft", sortOrder: 17 },
+      { name: "Decks & Docks", description: "Composite decking, docks, railings, pergolas", defaultUnitType: "sq_ft", sortOrder: 18 },
+      { name: "Landscaping", description: "Grading, planting, retaining walls, pathways", defaultUnitType: "sq_ft", sortOrder: 19 },
+      { name: "Septic & Well", description: "Septic systems, well drilling, water treatment", defaultUnitType: "board", sortOrder: 20 },
+    ];
+
+    for (const cat of cats) {
+      const created = await storage.createCostCategory(cat);
+      
+      // Seed market rates - high-end Muskoka pricing (CAD per sq_ft or per unit)
+      const rateMap: Record<string, { low: string; typical: string; high: string }> = {
+        "Demolition & Site Prep": { low: "3.50", typical: "5.00", high: "8.00" },
+        "Foundation": { low: "25.00", typical: "35.00", high: "55.00" },
+        "Framing": { low: "18.00", typical: "28.00", high: "42.00" },
+        "Roofing": { low: "8.00", typical: "14.00", high: "25.00" },
+        "Windows & Doors": { low: "800.00", typical: "1500.00", high: "3500.00" },
+        "Insulation": { low: "4.50", typical: "7.00", high: "12.00" },
+        "Electrical": { low: "12.00", typical: "18.00", high: "30.00" },
+        "Plumbing": { low: "14.00", typical: "22.00", high: "35.00" },
+        "HVAC": { low: "10.00", typical: "16.00", high: "28.00" },
+        "Drywall & Taping": { low: "4.00", typical: "6.50", high: "10.00" },
+        "Interior Trim & Millwork": { low: "8.00", typical: "15.00", high: "30.00" },
+        "Cabinetry": { low: "5000.00", typical: "12000.00", high: "35000.00" },
+        "Countertops": { low: "65.00", typical: "120.00", high: "250.00" },
+        "Flooring": { low: "8.00", typical: "16.00", high: "35.00" },
+        "Painting & Finishes": { low: "3.00", typical: "5.50", high: "10.00" },
+        "Tile & Stone": { low: "15.00", typical: "28.00", high: "55.00" },
+        "Exterior Cladding": { low: "12.00", typical: "22.00", high: "45.00" },
+        "Decks & Docks": { low: "25.00", typical: "45.00", high: "85.00" },
+        "Landscaping": { low: "8.00", typical: "18.00", high: "40.00" },
+        "Septic & Well": { low: "8000.00", typical: "15000.00", high: "30000.00" },
+      };
+
+      const rates = rateMap[cat.name];
+      if (rates) {
+        await storage.createMarketRate({
+          categoryId: created.id,
+          unitType: cat.defaultUnitType,
+          lowRate: rates.low,
+          typicalRate: rates.typical,
+          highRate: rates.high,
+          effectiveDate: today,
+          isActive: true,
+          notes: "Baseline high-end Muskoka renovation rates",
+        });
+      }
+    }
   }
 }

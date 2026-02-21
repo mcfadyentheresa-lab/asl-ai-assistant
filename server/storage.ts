@@ -1,10 +1,10 @@
 import { db } from "./db";
 import { 
-  users, projects, milestones, subMilestones, tasks, photos, documents, timeEntries, messages, checklistItems, boardItems, calendarEvents, planningBoards, canvasElements, activityLog, activityViews, paintColors, boardSnapshots,
+  users, projects, milestones, subMilestones, tasks, photos, documents, timeEntries, messages, checklistItems, boardItems, calendarEvents, planningBoards, canvasElements, activityLog, activityViews, paintColors, boardSnapshots, costCategories, marketRates, projectEstimates, estimateItems, receipts, estimateWarnings,
   type Project, type Milestone, type SubMilestone, type Task, type Photo, type Document, type TimeEntry, type Message,
-  type ChecklistItem, type BoardItem, type CalendarEvent, type PlanningBoard, type CanvasElement, type ActivityLog, type PaintColor, type BoardSnapshot,
+  type ChecklistItem, type BoardItem, type CalendarEvent, type PlanningBoard, type CanvasElement, type ActivityLog, type PaintColor, type BoardSnapshot, type CostCategory, type MarketRate, type ProjectEstimate, type EstimateItem, type Receipt, type EstimateWarning,
   type InsertProject, type InsertMilestone, type InsertSubMilestone, type InsertTask, type InsertPhoto, type InsertDocument, 
-  type InsertTimeEntry, type InsertMessage, type InsertChecklistItem, type InsertBoardItem, type InsertCalendarEvent, type InsertPlanningBoard, type InsertCanvasElement, type InsertActivityLog, type InsertBoardSnapshot
+  type InsertTimeEntry, type InsertMessage, type InsertChecklistItem, type InsertBoardItem, type InsertCalendarEvent, type InsertPlanningBoard, type InsertCanvasElement, type InsertActivityLog, type InsertBoardSnapshot, type InsertCostCategory, type InsertMarketRate, type InsertProjectEstimate, type InsertEstimateItem, type InsertReceipt, type InsertEstimateWarning
 } from "@shared/schema";
 import { type User } from "@shared/models/auth";
 import { eq, desc, and, ilike, or, gte, lte, inArray, sql } from "drizzle-orm";
@@ -118,6 +118,42 @@ export interface IStorage {
   createBoardSnapshot(snapshot: InsertBoardSnapshot): Promise<BoardSnapshot>;
   getBoardSnapshot(id: number): Promise<BoardSnapshot | undefined>;
   deleteBoardSnapshot(id: number): Promise<void>;
+
+  // Cost Categories
+  getCostCategories(): Promise<CostCategory[]>;
+  createCostCategory(cat: InsertCostCategory): Promise<CostCategory>;
+  updateCostCategory(id: number, updates: Partial<InsertCostCategory>): Promise<CostCategory>;
+  deleteCostCategory(id: number): Promise<void>;
+
+  // Market Rates
+  getMarketRates(categoryId?: number, activeOnly?: boolean): Promise<MarketRate[]>;
+  createMarketRate(rate: InsertMarketRate): Promise<MarketRate>;
+  updateMarketRate(id: number, updates: Partial<InsertMarketRate>): Promise<MarketRate>;
+  
+  // Project Estimates
+  getProjectEstimates(projectId: number): Promise<ProjectEstimate[]>;
+  getEstimate(id: number): Promise<ProjectEstimate | undefined>;
+  createEstimate(estimate: InsertProjectEstimate): Promise<ProjectEstimate>;
+  updateEstimate(id: number, updates: Partial<InsertProjectEstimate>): Promise<ProjectEstimate>;
+  deleteEstimate(id: number): Promise<void>;
+
+  // Estimate Items
+  getEstimateItems(estimateId: number): Promise<EstimateItem[]>;
+  createEstimateItem(item: InsertEstimateItem): Promise<EstimateItem>;
+  updateEstimateItem(id: number, updates: Partial<InsertEstimateItem>): Promise<EstimateItem>;
+  deleteEstimateItem(id: number): Promise<void>;
+
+  // Receipts
+  getReceipts(projectId: number): Promise<Receipt[]>;
+  createReceipt(receipt: InsertReceipt): Promise<Receipt>;
+  deleteReceipt(id: number): Promise<void>;
+
+  // Estimate Warnings
+  getEstimateWarnings(estimateItemId: number): Promise<EstimateWarning[]>;
+  getWarningsByEstimate(estimateId: number): Promise<EstimateWarning[]>;
+  createEstimateWarning(warning: InsertEstimateWarning): Promise<EstimateWarning>;
+  ignoreWarning(id: number, userId: string): Promise<EstimateWarning>;
+  deleteWarningsByItem(estimateItemId: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -290,6 +326,17 @@ export class DatabaseStorage implements IStorage {
     await db.delete(checklistItems).where(eq(checklistItems.projectId, id));
     await db.delete(boardItems).where(eq(boardItems.projectId, id));
     await db.delete(messages).where(eq(messages.projectId, id));
+    // Clean up cost estimator data
+    const estimates = await db.select().from(projectEstimates).where(eq(projectEstimates.projectId, id));
+    for (const est of estimates) {
+      const items = await db.select().from(estimateItems).where(eq(estimateItems.estimateId, est.id));
+      for (const item of items) {
+        await db.delete(estimateWarnings).where(eq(estimateWarnings.estimateItemId, item.id));
+      }
+      await db.delete(estimateItems).where(eq(estimateItems.estimateId, est.id));
+    }
+    await db.delete(projectEstimates).where(eq(projectEstimates.projectId, id));
+    await db.delete(receipts).where(eq(receipts.projectId, id));
     await db.delete(timeEntries).where(eq(timeEntries.projectId, id));
     await db.delete(documents).where(eq(documents.projectId, id));
     await db.delete(photos).where(eq(photos.projectId, id));
@@ -496,6 +543,111 @@ export class DatabaseStorage implements IStorage {
   }
   async deleteBoardSnapshot(id: number): Promise<void> {
     await db.delete(boardSnapshots).where(eq(boardSnapshots.id, id));
+  }
+
+  // Cost Categories
+  async getCostCategories(): Promise<CostCategory[]> {
+    return db.select().from(costCategories).orderBy(costCategories.sortOrder);
+  }
+  async createCostCategory(cat: InsertCostCategory): Promise<CostCategory> {
+    const [created] = await db.insert(costCategories).values(cat).returning();
+    return created;
+  }
+  async updateCostCategory(id: number, updates: Partial<InsertCostCategory>): Promise<CostCategory> {
+    const [updated] = await db.update(costCategories).set(updates).where(eq(costCategories.id, id)).returning();
+    return updated;
+  }
+  async deleteCostCategory(id: number): Promise<void> {
+    await db.delete(costCategories).where(eq(costCategories.id, id));
+  }
+
+  // Market Rates
+  async getMarketRates(categoryId?: number, activeOnly?: boolean): Promise<MarketRate[]> {
+    const conditions: any[] = [];
+    if (categoryId) conditions.push(eq(marketRates.categoryId, categoryId));
+    if (activeOnly) conditions.push(eq(marketRates.isActive, true));
+    if (conditions.length > 0) {
+      return db.select().from(marketRates).where(and(...conditions)).orderBy(desc(marketRates.effectiveDate));
+    }
+    return db.select().from(marketRates).orderBy(desc(marketRates.effectiveDate));
+  }
+  async createMarketRate(rate: InsertMarketRate): Promise<MarketRate> {
+    const [created] = await db.insert(marketRates).values(rate).returning();
+    return created;
+  }
+  async updateMarketRate(id: number, updates: Partial<InsertMarketRate>): Promise<MarketRate> {
+    const [updated] = await db.update(marketRates).set(updates).where(eq(marketRates.id, id)).returning();
+    return updated;
+  }
+
+  // Project Estimates
+  async getProjectEstimates(projectId: number): Promise<ProjectEstimate[]> {
+    return db.select().from(projectEstimates).where(eq(projectEstimates.projectId, projectId)).orderBy(desc(projectEstimates.createdAt));
+  }
+  async getEstimate(id: number): Promise<ProjectEstimate | undefined> {
+    const [est] = await db.select().from(projectEstimates).where(eq(projectEstimates.id, id));
+    return est;
+  }
+  async createEstimate(estimate: InsertProjectEstimate): Promise<ProjectEstimate> {
+    const [created] = await db.insert(projectEstimates).values(estimate).returning();
+    return created;
+  }
+  async updateEstimate(id: number, updates: Partial<InsertProjectEstimate>): Promise<ProjectEstimate> {
+    const [updated] = await db.update(projectEstimates).set(updates).where(eq(projectEstimates.id, id)).returning();
+    return updated;
+  }
+  async deleteEstimate(id: number): Promise<void> {
+    await db.delete(projectEstimates).where(eq(projectEstimates.id, id));
+  }
+
+  // Estimate Items
+  async getEstimateItems(estimateId: number): Promise<EstimateItem[]> {
+    return db.select().from(estimateItems).where(eq(estimateItems.estimateId, estimateId)).orderBy(estimateItems.createdAt);
+  }
+  async createEstimateItem(item: InsertEstimateItem): Promise<EstimateItem> {
+    const [created] = await db.insert(estimateItems).values(item).returning();
+    return created;
+  }
+  async updateEstimateItem(id: number, updates: Partial<InsertEstimateItem>): Promise<EstimateItem> {
+    const [updated] = await db.update(estimateItems).set(updates).where(eq(estimateItems.id, id)).returning();
+    return updated;
+  }
+  async deleteEstimateItem(id: number): Promise<void> {
+    await db.delete(estimateItems).where(eq(estimateItems.id, id));
+  }
+
+  // Receipts
+  async getReceipts(projectId: number): Promise<Receipt[]> {
+    return db.select().from(receipts).where(eq(receipts.projectId, projectId)).orderBy(desc(receipts.date));
+  }
+  async createReceipt(receipt: InsertReceipt): Promise<Receipt> {
+    const [created] = await db.insert(receipts).values(receipt).returning();
+    return created;
+  }
+  async deleteReceipt(id: number): Promise<void> {
+    await db.delete(receipts).where(eq(receipts.id, id));
+  }
+
+  // Estimate Warnings
+  async getEstimateWarnings(estimateItemId: number): Promise<EstimateWarning[]> {
+    return db.select().from(estimateWarnings).where(eq(estimateWarnings.estimateItemId, estimateItemId));
+  }
+  async getWarningsByEstimate(estimateId: number): Promise<EstimateWarning[]> {
+    const items = await this.getEstimateItems(estimateId);
+    if (items.length === 0) return [];
+    const itemIds = items.map(i => i.id);
+    return db.select().from(estimateWarnings).where(inArray(estimateWarnings.estimateItemId, itemIds));
+  }
+  async createEstimateWarning(warning: InsertEstimateWarning): Promise<EstimateWarning> {
+    const [created] = await db.insert(estimateWarnings).values(warning).returning();
+    return created;
+  }
+  async ignoreWarning(id: number, userId: string): Promise<EstimateWarning> {
+    const [updated] = await db.update(estimateWarnings).set({ ignored: true, ignoredBy: userId, ignoredAt: new Date() }).where(eq(estimateWarnings.id, id)).returning();
+    return updated;
+  }
+  async deleteWarningsByItem(estimateItemId: number): Promise<void> {
+    await db.delete(estimateWarnings).where(eq(estimateWarnings.estimateItemId, estimateItemId));
   }
 }
 
