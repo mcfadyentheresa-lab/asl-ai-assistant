@@ -1951,6 +1951,159 @@ Respond with valid JSON only, no markdown. Format:
     }
   });
 
+  // Suggest Material Alternatives
+  app.post("/api/estimates/:id/suggest-alternatives", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await authStorage.getUser(userId);
+      if (!user || (user.role !== "admin" && user.role !== "crew")) {
+        return res.status(403).json({ message: "Admin or crew only" });
+      }
+
+      const estimateId = Number(req.params.id);
+      const { budget } = req.body;
+
+      if (!budget) {
+        return res.status(400).json({ message: "Budget is required" });
+      }
+
+      const budgetNum = parseFloat(budget);
+      if (isNaN(budgetNum)) {
+        return res.status(400).json({ message: "Invalid budget value" });
+      }
+
+      // Fetch estimate and items
+      const estimate = await storage.getEstimate(estimateId);
+      if (!estimate) {
+        return res.status(404).json({ message: "Estimate not found" });
+      }
+
+      const items = await storage.getEstimateItems(estimateId);
+      const categories = await storage.getCostCategories();
+      const marketRates = await storage.getAllMarketRates();
+
+      // Calculate current total and prepare item details
+      const markupRate = parseFloat(estimate.markupPercent || "25") / 100;
+      let currentTotal = 0;
+      const itemDetails: any[] = [];
+
+      for (const item of items) {
+        const qty = parseFloat(item.quantity || "0");
+        const unitCost = parseFloat(item.unitCost || "0");
+        const materialCost = parseFloat(item.materialCost || "0");
+        
+        const lineTotal = qty * unitCost + (estimate.markupEnabled ? materialCost * markupRate : 0);
+        currentTotal += lineTotal;
+
+        const category = categories.find(c => c.id === item.categoryId);
+        itemDetails.push({
+          id: item.id,
+          categoryName: category?.name || item.customCategory || "Unknown",
+          quantity: qty,
+          unitType: item.unitType,
+          unitCost: unitCost,
+          materialCost: materialCost,
+          lineTotal: lineTotal,
+          notes: item.notes,
+        });
+      }
+
+      // Sort by line total descending to identify expensive items
+      const sortedItems = [...itemDetails].sort((a, b) => b.lineTotal - a.lineTotal);
+
+      // Build context for AI
+      const categoryInfo = categories.map(c => `- ${c.name}: ${c.description}`).join("\n");
+      const itemsInfo = sortedItems.map((item, idx) => 
+        `${idx + 1}. [ID: ${item.id}] ${item.categoryName} (${item.quantity} ${item.unitType} @ $${item.unitCost}/unit): $${item.lineTotal.toFixed(2)}`
+      ).join("\n");
+
+      const OpenAI = (await import("openai")).default;
+      const openai = new OpenAI({
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+      });
+
+      const systemPrompt = `You are an expert construction estimator specializing in high-end Muskoka, Ontario cottage renovations.
+You help clients reduce project costs by suggesting more affordable material alternatives while maintaining quality.
+
+Available renovation categories (for context):
+${categoryInfo}
+
+Current estimate details:
+- Current total cost: $${currentTotal.toFixed(2)} CAD
+- Client budget: $${budgetNum.toFixed(2)} CAD
+- Over budget by: $${Math.max(0, currentTotal - budgetNum).toFixed(2)} CAD
+
+Current line items (ordered by cost):
+${itemsInfo}
+
+Your task: Suggest material/specification alternatives for 2-4 of the most expensive items that could reduce costs while maintaining reasonable quality standards for a Muskoka cottage renovation. 
+
+For each suggestion:
+- Target items that have the most significant cost impact
+- Suggest realistic downgrade options (e.g., standard instead of premium materials, fewer units, different finish)
+- Provide specific cost savings and tradeoffs
+
+Respond with valid JSON only, no markdown:
+{
+  "suggestions": [
+    {
+      "itemId": <number - ID of item to replace>,
+      "alternativeName": "<string - name of alternative>",
+      "alternativeDescription": "<string - detailed description>",
+      "estimatedCost": "<string number - new unit cost>",
+      "estimatedSavings": "<string number - total savings for this line>",
+      "tradeoffs": "<string - brief explanation of quality/appearance tradeoffs>"
+    }
+  ],
+  "totalPotentialSavings": "<string number>",
+  "summary": "<string - brief summary of all suggestions and final estimated total>"
+}`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-5-mini",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: "Please analyze the estimate and suggest cost-saving alternatives." },
+        ],
+        response_format: { type: "json_object" },
+      });
+
+      const content = response.choices[0]?.message?.content;
+      if (!content) {
+        return res.status(500).json({ message: "No response from AI" });
+      }
+
+      const parsed = JSON.parse(content);
+
+      if (!parsed.suggestions || !Array.isArray(parsed.suggestions)) {
+        return res.status(422).json({ message: "AI returned invalid format" });
+      }
+
+      const validSuggestions = parsed.suggestions
+        .filter((s: any) => s.itemId && s.alternativeName && s.estimatedCost && s.estimatedSavings)
+        .map((s: any) => ({
+          itemId: Number(s.itemId),
+          alternativeName: String(s.alternativeName),
+          alternativeDescription: String(s.alternativeDescription || ""),
+          estimatedCost: String(parseFloat(s.estimatedCost) || 0),
+          estimatedSavings: String(parseFloat(s.estimatedSavings) || 0),
+          tradeoffs: String(s.tradeoffs || ""),
+        }));
+
+      const totalSavings = validSuggestions.reduce((sum: number, s: any) => sum + parseFloat(s.estimatedSavings), 0);
+
+      res.json({
+        suggestions: validSuggestions,
+        totalPotentialSavings: String(totalSavings.toFixed(2)),
+        summary: String(parsed.summary || ""),
+      });
+    } catch (error: any) {
+      console.error("Suggest alternatives error:", error);
+      res.status(500).json({ message: "Failed to suggest alternatives" });
+    }
+  });
+
   // Crew Rates
   app.get("/api/crew-rates", isAuthenticated, async (req: any, res) => {
     const userId = req.user.claims.sub;

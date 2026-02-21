@@ -27,8 +27,10 @@ import {
 import {
   Calculator, Plus, Trash2, AlertTriangle, CheckCircle2,
   DollarSign, ArrowLeft, Receipt as ReceiptIcon, EyeOff,
-  TrendingUp, TrendingDown, Minus, Loader2, Sparkles, Shapes, ChevronDown, ChevronRight
+  TrendingUp, TrendingDown, Minus, Loader2, Sparkles, Shapes, ChevronDown, ChevronRight,
+  Wallet, Lightbulb, ArrowDownRight
 } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import type { CostCategory, MarketRate, ProjectEstimate, EstimateItem, Receipt, EstimateWarning, Project, CrewRate, Subcontractor } from "@shared/schema";
 
@@ -50,6 +52,10 @@ export default function CostEstimator() {
   const [expandedBoards, setExpandedBoards] = useState<Set<number>>(new Set());
   const [aiDescription, setAiDescription] = useState("");
   const [aiResults, setAiResults] = useState<any>(null);
+  const [showAlternatives, setShowAlternatives] = useState(false);
+  const [alternativesResults, setAlternativesResults] = useState<any>(null);
+  const [editingBudget, setEditingBudget] = useState(false);
+  const [budgetInput, setBudgetInput] = useState("");
 
   const [newItem, setNewItem] = useState({
     categoryId: "", customCategory: "", unitType: "sq_ft",
@@ -160,6 +166,20 @@ export default function CostEstimator() {
     },
     onError: () => {
       toast({ title: "Analysis failed", description: "Could not analyze project scope", variant: "destructive" });
+    },
+  });
+
+  const suggestAlternativesMutation = useMutation({
+    mutationFn: async (budget: string) => {
+      const res = await apiRequest("POST", `/api/estimates/${activeEstimate?.id}/suggest-alternatives`, { budget });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setAlternativesResults(data);
+      toast({ title: "Suggestions ready", description: data.summary });
+    },
+    onError: () => {
+      toast({ title: "Could not generate suggestions", description: "Please try again", variant: "destructive" });
     },
   });
 
@@ -374,6 +394,109 @@ export default function CostEstimator() {
                 </CardContent>
               </Card>
             </div>
+
+            {(() => {
+              const budget = parseFloat(activeEstimate.budget || "0");
+              const hasBudget = budget > 0;
+              const budgetUsedPercent = hasBudget ? Math.min((grandTotalWithMarkup / budget) * 100, 100) : 0;
+              const overBudget = hasBudget && grandTotalWithMarkup > budget;
+              const budgetRemaining = hasBudget ? budget - grandTotalWithMarkup : 0;
+              return (
+                <Card data-testid="card-budget">
+                  <CardContent className="pt-4 pb-4 space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <Wallet className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm font-medium">Client Budget</span>
+                      </div>
+                      {canEdit && !editingBudget && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => { setBudgetInput(activeEstimate.budget || ""); setEditingBudget(true); }}
+                          data-testid="button-edit-budget"
+                        >
+                          {hasBudget ? "Edit" : "Set Budget"}
+                        </Button>
+                      )}
+                    </div>
+                    {editingBudget && (
+                      <div className="flex items-center gap-2">
+                        <div className="relative flex-1">
+                          <DollarSign className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            type="number"
+                            step="1000"
+                            className="pl-8"
+                            value={budgetInput}
+                            onChange={(e) => setBudgetInput(e.target.value)}
+                            placeholder="e.g., 150000"
+                            autoFocus
+                            data-testid="input-budget"
+                          />
+                        </div>
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            updateEstimateMutation.mutate({ budget: budgetInput || null });
+                            setEditingBudget(false);
+                          }}
+                          data-testid="button-save-budget"
+                        >
+                          Save
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => setEditingBudget(false)} data-testid="button-cancel-budget">
+                          Cancel
+                        </Button>
+                      </div>
+                    )}
+                    {hasBudget && !editingBudget && (
+                      <>
+                        <div className="flex items-baseline justify-between gap-2">
+                          <span className="text-2xl font-semibold" data-testid="text-budget-amount">
+                            ${budget.toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                          <span className={`text-sm font-medium ${overBudget ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`} data-testid="text-budget-remaining">
+                            {overBudget
+                              ? `$${Math.abs(budgetRemaining).toLocaleString("en-CA", { minimumFractionDigits: 2 })} over budget`
+                              : `$${budgetRemaining.toLocaleString("en-CA", { minimumFractionDigits: 2 })} remaining`}
+                          </span>
+                        </div>
+                        <Progress
+                          value={budgetUsedPercent}
+                          className={`h-2 ${overBudget ? "[&>div]:bg-red-500" : ""}`}
+                          data-testid="progress-budget"
+                        />
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span>{budgetUsedPercent.toFixed(0)}% of budget used</span>
+                          <span>Estimate: ${grandTotalWithMarkup.toLocaleString("en-CA", { minimumFractionDigits: 2 })}</span>
+                        </div>
+                        {overBudget && canEdit && items.length > 0 && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400 dark:hover:bg-amber-950"
+                            onClick={() => {
+                              setAlternativesResults(null);
+                              setShowAlternatives(true);
+                              suggestAlternativesMutation.mutate(activeEstimate.budget!);
+                            }}
+                            disabled={suggestAlternativesMutation.isPending}
+                            data-testid="button-suggest-alternatives"
+                          >
+                            {suggestAlternativesMutation.isPending ? (
+                              <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Finding alternatives...</>
+                            ) : (
+                              <><Lightbulb className="h-4 w-4 mr-2" /> Suggest Cost-Saving Alternatives</>
+                            )}
+                          </Button>
+                        )}
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })()}
 
             {canEdit && (
               <div className="flex gap-2 flex-wrap">
@@ -813,6 +936,91 @@ export default function CostEstimator() {
                   </div>
                 ))}
               </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showAlternatives} onOpenChange={(open) => { setShowAlternatives(open); if (!open) setAlternativesResults(null); }}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Lightbulb className="h-5 w-5" /> Cost-Saving Alternatives
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {suggestAlternativesMutation.isPending && !alternativesResults && (
+              <div className="flex flex-col items-center justify-center py-8 gap-3">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">Analyzing your estimate and finding alternatives...</p>
+              </div>
+            )}
+            {alternativesResults && (
+              <>
+                <div className="p-3 rounded-lg bg-muted/50 text-sm" data-testid="text-alternatives-summary">
+                  {alternativesResults.summary}
+                </div>
+                {parseFloat(alternativesResults.totalPotentialSavings) > 0 && (
+                  <div className="flex items-center gap-2 p-3 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800">
+                    <ArrowDownRight className="h-4 w-4 text-green-600" />
+                    <span className="text-sm font-medium text-green-700 dark:text-green-400" data-testid="text-total-savings">
+                      Potential savings: up to ${parseFloat(alternativesResults.totalPotentialSavings).toLocaleString("en-CA", { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                )}
+                <div className="max-h-80 overflow-y-auto space-y-3">
+                  {alternativesResults.suggestions?.map((sug: any, idx: number) => {
+                    const linkedItem = itemTotals.find(i => i.id === sug.itemId);
+                    return (
+                      <div key={idx} className="p-3 rounded-lg border space-y-2" data-testid={`alternative-${idx}`}>
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <div className="text-sm font-medium">{sug.alternativeName}</div>
+                            {linkedItem && (
+                              <div className="text-xs text-muted-foreground">
+                                Replaces: {linkedItem.categoryName}
+                              </div>
+                            )}
+                          </div>
+                          {parseFloat(sug.estimatedSavings) > 0 && (
+                            <Badge variant="outline" className="text-green-600 border-green-300 shrink-0">
+                              Save ${parseFloat(sug.estimatedSavings).toLocaleString("en-CA", { minimumFractionDigits: 2 })}
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-sm text-muted-foreground">{sug.alternativeDescription}</p>
+                        {sug.estimatedCost && (
+                          <div className="text-xs text-muted-foreground">
+                            Estimated unit cost: ${parseFloat(sug.estimatedCost).toFixed(2)}
+                            {linkedItem && ` (current: $${parseFloat(linkedItem.unitCost).toFixed(2)})`}
+                          </div>
+                        )}
+                        {sug.tradeoffs && (
+                          <div className="text-xs p-2 rounded bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400">
+                            <strong>Trade-offs:</strong> {sug.tradeoffs}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setAlternativesResults(null);
+                    suggestAlternativesMutation.mutate(activeEstimate!.budget!);
+                  }}
+                  disabled={suggestAlternativesMutation.isPending}
+                  className="w-full"
+                  data-testid="button-regenerate-alternatives"
+                >
+                  {suggestAlternativesMutation.isPending ? (
+                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Regenerating...</>
+                  ) : (
+                    <><Sparkles className="h-4 w-4 mr-2" /> Generate New Suggestions</>
+                  )}
+                </Button>
+              </>
             )}
           </div>
         </DialogContent>
