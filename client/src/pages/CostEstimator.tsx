@@ -236,7 +236,7 @@ export default function CostEstimator() {
           </Link>
           <div className="flex-1 min-w-0">
             <h1 className="text-2xl font-semibold tracking-tight" data-testid="text-page-title">Cost Estimator</h1>
-            <p className="text-sm text-muted-foreground" data-testid="text-project-name">{project.name}</p>
+            <p className="text-sm text-muted-foreground" data-testid="text-project-name">{project.name} <span className="text-xs ml-1">All pricing in CAD</span></p>
           </div>
           <div className="flex items-center gap-2">
             <Label className="text-sm">View:</Label>

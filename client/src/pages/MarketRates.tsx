@@ -128,7 +128,7 @@ export default function MarketRates() {
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight" data-testid="text-page-title">Market Rates</h1>
-            <p className="text-sm text-muted-foreground">Manage baseline pricing for high-end Muskoka renovations</p>
+            <p className="text-sm text-muted-foreground">Manage baseline pricing for high-end Muskoka renovations (CAD)</p>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={() => setShowAddCategory(true)} data-testid="button-add-category">
