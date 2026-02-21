@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { setupWebSocket } from "./websocket";
+import { startSmsQueueProcessor } from "./sms";
 
 const app = express();
 const httpServer = createServer(app);
@@ -102,6 +103,8 @@ app.use((req, res, next) => {
     },
     () => {
       log(`serving on port ${port}`);
+
+      startSmsQueueProcessor();
 
       storage.cleanupOldActivity(7).then((count) => {
         if (count > 0) log(`Cleaned up ${count} activity entries older than 7 days`);

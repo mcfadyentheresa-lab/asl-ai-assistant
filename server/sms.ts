@@ -1,6 +1,9 @@
 import twilio from "twilio";
 import { authStorage } from "./replit_integrations/auth/storage";
 import type { User } from "@shared/models/auth";
+import { db } from "./db";
+import { queuedSms } from "@shared/schema";
+import { eq } from "drizzle-orm";
 
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
@@ -15,6 +18,9 @@ const APP_URL = process.env.REPLIT_DEPLOYMENT_URL
     : "https://asterandspruce.com";
 
 const SMS_FOOTER = `\n\nDo not reply to this number. Log in for updates: ${APP_URL}`;
+
+const TIMEZONE = "America/Toronto";
+const BUSINESS_HOURS_NOTE = "\n(Texts are sent Mon-Thu 8am-5pm, Fri 8am-12pm ET. Messages outside these hours are held until the next business day.)";
 
 function getClient(): twilio.Twilio | null {
   if (!accountSid || !authToken || !fromNumber) {
@@ -35,12 +41,26 @@ function formatPhone(phone: string): string {
   return `+${digits}`;
 }
 
-async function sendSms(to: string, body: string, includeFooter = true): Promise<boolean> {
+function getETNow(): { day: number; hour: number; minute: number; date: Date } {
+  const str = new Date().toLocaleString("en-US", { timeZone: TIMEZONE });
+  const d = new Date(str);
+  return { day: d.getDay(), hour: d.getHours(), minute: d.getMinutes(), date: d };
+}
+
+function isWithinBusinessHours(): boolean {
+  const { day, hour, minute } = getETNow();
+  const t = hour + minute / 60;
+  if (day === 0 || day === 6) return false;
+  if (day === 5) return t >= 8 && t < 12;
+  return t >= 8 && t < 17;
+}
+
+async function sendSmsNow(to: string, body: string): Promise<boolean> {
   const tw = getClient();
   if (!tw) return false;
   try {
     await tw.messages.create({
-      body: includeFooter ? body + SMS_FOOTER : body,
+      body,
       from: fromNumber,
       to: formatPhone(to),
     });
@@ -50,6 +70,60 @@ async function sendSms(to: string, body: string, includeFooter = true): Promise<
     console.error("SMS send error:", err.message || err);
     return false;
   }
+}
+
+async function sendSms(to: string, body: string, bypassHours = false): Promise<boolean> {
+  const fullBody = body + SMS_FOOTER + BUSINESS_HOURS_NOTE;
+
+  if (bypassHours || isWithinBusinessHours()) {
+    return sendSmsNow(to, fullBody);
+  }
+
+  try {
+    await db.insert(queuedSms).values({
+      toPhone: formatPhone(to),
+      body: fullBody,
+      sent: false,
+    });
+    console.log(`SMS queued for ${to.slice(0, 3)}*** (outside business hours)`);
+    return true;
+  } catch (err: any) {
+    console.error("SMS queue error:", err.message || err);
+    return false;
+  }
+}
+
+async function processQueuedSms(): Promise<void> {
+  if (!isWithinBusinessHours()) return;
+
+  try {
+    const pending = await db
+      .select()
+      .from(queuedSms)
+      .where(eq(queuedSms.sent, false))
+      .limit(20);
+
+    for (const msg of pending) {
+      const success = await sendSmsNow(msg.toPhone, msg.body);
+      if (success) {
+        await db.update(queuedSms).set({ sent: true, sentAt: new Date() }).where(eq(queuedSms.id, msg.id));
+      } else {
+        await db.update(queuedSms).set({ error: "Send failed" }).where(eq(queuedSms.id, msg.id));
+      }
+    }
+
+    if (pending.length > 0) {
+      console.log(`Processed ${pending.length} queued SMS messages`);
+    }
+  } catch (err: any) {
+    console.error("Queue processing error:", err.message || err);
+  }
+}
+
+export function startSmsQueueProcessor(): void {
+  processQueuedSms();
+  setInterval(processQueuedSms, 5 * 60 * 1000);
+  console.log("SMS queue processor started (checks every 5 minutes)");
 }
 
 async function getUsersWithPhones(userIds?: string[]): Promise<User[]> {
@@ -242,7 +316,7 @@ export async function notifyBoardLinked(
 export async function sendTestSms(toPhone: string): Promise<boolean> {
   return sendSms(
     toPhone,
-    `Aster & Spruce Connect: This is a test notification. Your SMS alerts are working!\n\nDo not reply to this number. Log in for updates: ${APP_URL}`,
-    false
+    `Aster & Spruce Connect: This is a test notification. Your SMS alerts are working!`,
+    true
   );
 }

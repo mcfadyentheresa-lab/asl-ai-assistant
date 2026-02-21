@@ -124,6 +124,17 @@ Path aliases are configured:
 - Recipients are determined by role: admins and crew always receive notifications; clients only for their assigned projects
 - The sender of an action is excluded from receiving that notification
 
+### Business Hours & SMS Queuing
+- SMS notifications are only sent during business hours (Eastern Time):
+  - Monday–Thursday: 8:00 AM – 5:00 PM ET
+  - Friday: 8:00 AM – 12:00 PM (noon) ET
+  - No notifications on weekends
+- Messages triggered outside business hours are stored in the `queued_sms` database table
+- A background queue processor runs every 5 minutes and sends queued messages when business hours resume
+- Every SMS includes a footer note explaining the business hours policy
+- Admin test SMS (`sendTestSms`) bypasses business hours and sends immediately
+- Queue table schema: id, toPhone, body, createdAt, scheduledFor, sent, sentAt, error
+
 ### SMS Notification Triggers
 - **New message** — All project participants (except sender) notified
 - **Task created** (with assignee) — Assigned user notified

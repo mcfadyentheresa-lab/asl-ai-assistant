@@ -314,6 +314,20 @@ export const activityViews = pgTable("activity_views", {
   viewedAt: timestamp("viewed_at").defaultNow(),
 }, (table) => []);
 
+// Queued SMS (business-hours queue)
+export const queuedSms = pgTable("queued_sms", {
+  id: serial("id").primaryKey(),
+  toPhone: text("to_phone").notNull(),
+  body: text("body").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  scheduledFor: timestamp("scheduled_for"),
+  sent: boolean("sent").default(false),
+  sentAt: timestamp("sent_at"),
+  error: text("error"),
+});
+
+export const insertQueuedSmsSchema = createInsertSchema(queuedSms).omit({ id: true, sentAt: true, error: true });
+
 // SCHEMAS
 export const insertProjectSchema = createInsertSchema(projects).omit({ id: true, createdAt: true });
 export const insertMilestoneSchema = createInsertSchema(milestones).omit({ id: true });
@@ -360,3 +374,5 @@ export type ActivityLog = typeof activityLog.$inferSelect;
 export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;
 export type PaintColor = typeof paintColors.$inferSelect;
 export type InsertPaintColor = z.infer<typeof insertPaintColorSchema>;
+export type QueuedSms = typeof queuedSms.$inferSelect;
+export type InsertQueuedSms = z.infer<typeof insertQueuedSmsSchema>;
