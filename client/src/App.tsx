@@ -17,6 +17,7 @@ import Payroll from "@/pages/Payroll";
 import CostEstimator from "@/pages/CostEstimator";
 import MarketRates from "@/pages/MarketRates";
 import LaborRates from "@/pages/LaborRates";
+import TradeContacts from "@/pages/TradeContacts";
 import NotFound from "@/pages/not-found";
 
 function PresenceTracker() {
@@ -55,6 +56,7 @@ function Router() {
       <Route path="/payroll" component={Payroll} />
       <Route path="/market-rates" component={MarketRates} />
       <Route path="/labor-rates" component={LaborRates} />
+      <Route path="/trade-contacts" component={TradeContacts} />
       <Route component={NotFound} />
     </Switch>
   );
