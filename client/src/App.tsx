@@ -12,6 +12,8 @@ import Dashboard from "@/pages/Dashboard";
 import ProjectDetails from "@/pages/ProjectDetails";
 import Profile from "@/pages/Profile";
 import ColorPortfolio from "@/pages/ColorPortfolio";
+import Timesheets from "@/pages/Timesheets";
+import Payroll from "@/pages/Payroll";
 import NotFound from "@/pages/not-found";
 
 function PresenceTracker() {
@@ -45,6 +47,8 @@ function Router() {
       <Route path="/profile" component={Profile} />
       <Route path="/project/:id" component={ProjectDetails} />
       <Route path="/colors" component={ColorPortfolio} />
+      <Route path="/timesheets" component={Timesheets} />
+      <Route path="/payroll" component={Payroll} />
       <Route component={NotFound} />
     </Switch>
   );

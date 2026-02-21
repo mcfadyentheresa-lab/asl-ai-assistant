@@ -7,7 +7,7 @@ import {
   type InsertTimeEntry, type InsertMessage, type InsertChecklistItem, type InsertBoardItem, type InsertCalendarEvent, type InsertPlanningBoard, type InsertCanvasElement, type InsertActivityLog, type InsertBoardSnapshot
 } from "@shared/schema";
 import { type User } from "@shared/models/auth";
-import { eq, desc, and, ilike, or } from "drizzle-orm";
+import { eq, desc, and, ilike, or, gte, lte, inArray, sql } from "drizzle-orm";
 
 export interface IStorage {
   // Projects
@@ -50,9 +50,15 @@ export interface IStorage {
   getMessages(projectId: number): Promise<(Message & { sender: User | null })[]>;
   createMessage(message: InsertMessage): Promise<Message>;
 
-  // Time Entries
+  // Time Entries / Timesheets
   getTimeEntries(projectId: number): Promise<TimeEntry[]>;
+  getTimeEntriesByUser(userId: string, startDate?: string, endDate?: string): Promise<TimeEntry[]>;
+  getTimeEntriesByPeriod(startDate: string, endDate: string): Promise<TimeEntry[]>;
   createTimeEntry(entry: InsertTimeEntry): Promise<TimeEntry>;
+  updateTimeEntry(id: number, updates: Partial<InsertTimeEntry>): Promise<TimeEntry>;
+  deleteTimeEntry(id: number): Promise<void>;
+  bulkCreateTimeEntries(entries: InsertTimeEntry[]): Promise<TimeEntry[]>;
+  approveTimeEntries(ids: number[], approvedBy: string): Promise<TimeEntry[]>;
 
   // Projects - archive & delete
   deleteProject(id: number): Promise<void>;
@@ -236,6 +242,41 @@ export class DatabaseStorage implements IStorage {
   async createTimeEntry(entry: InsertTimeEntry): Promise<TimeEntry> {
     const [newEntry] = await db.insert(timeEntries).values(entry).returning();
     return newEntry;
+  }
+
+  async getTimeEntriesByUser(userId: string, startDate?: string, endDate?: string): Promise<TimeEntry[]> {
+    const conditions = [eq(timeEntries.userId, userId)];
+    if (startDate) conditions.push(gte(timeEntries.date, startDate));
+    if (endDate) conditions.push(lte(timeEntries.date, endDate));
+    return await db.select().from(timeEntries).where(and(...conditions)).orderBy(desc(timeEntries.date));
+  }
+
+  async getTimeEntriesByPeriod(startDate: string, endDate: string): Promise<TimeEntry[]> {
+    return await db.select().from(timeEntries)
+      .where(and(gte(timeEntries.date, startDate), lte(timeEntries.date, endDate)))
+      .orderBy(desc(timeEntries.date));
+  }
+
+  async updateTimeEntry(id: number, updates: Partial<InsertTimeEntry>): Promise<TimeEntry> {
+    const [updated] = await db.update(timeEntries).set(updates).where(eq(timeEntries.id, id)).returning();
+    return updated;
+  }
+
+  async deleteTimeEntry(id: number): Promise<void> {
+    await db.delete(timeEntries).where(eq(timeEntries.id, id));
+  }
+
+  async bulkCreateTimeEntries(entries: InsertTimeEntry[]): Promise<TimeEntry[]> {
+    if (entries.length === 0) return [];
+    return await db.insert(timeEntries).values(entries).returning();
+  }
+
+  async approveTimeEntries(ids: number[], approvedBy: string): Promise<TimeEntry[]> {
+    const now = new Date();
+    return await db.update(timeEntries)
+      .set({ status: "approved", approvedBy, approvedAt: now })
+      .where(inArray(timeEntries.id, ids))
+      .returning();
   }
 
   // Delete project (cascading deletes handled by cleaning up related data)

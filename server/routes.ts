@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
-import { insertSubMilestoneSchema } from "@shared/schema";
+import { insertSubMilestoneSchema, insertTimeEntrySchema } from "@shared/schema";
 import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
@@ -1376,6 +1376,180 @@ export async function registerRoutes(
     const color = await storage.getPaintColor(Number(req.params.id));
     if (!color) return res.status(404).json({ error: "Color not found" });
     res.json(color);
+  });
+
+  // ── Timesheets / Time Entries ──────────────────────────────
+
+  app.get("/api/time-entries", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { startDate, endDate } = req.query;
+      const entries = await storage.getTimeEntriesByUser(userId, startDate as string, endDate as string);
+      res.json(entries);
+    } catch (error) {
+      console.error("Error fetching time entries:", error);
+      res.status(500).json({ message: "Failed to fetch time entries" });
+    }
+  });
+
+  app.get("/api/time-entries/period", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const dbUser = await authStorage.getUser(userId);
+      if (dbUser?.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      const { startDate, endDate } = req.query;
+      if (!startDate || !endDate) {
+        return res.status(400).json({ message: "startDate and endDate are required" });
+      }
+      const entries = await storage.getTimeEntriesByPeriod(startDate as string, endDate as string);
+      res.json(entries);
+    } catch (error) {
+      console.error("Error fetching period entries:", error);
+      res.status(500).json({ message: "Failed to fetch period entries" });
+    }
+  });
+
+  app.post("/api/time-entries", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const parsed = insertTimeEntrySchema.safeParse({ ...req.body, userId });
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid input", errors: parsed.error.flatten().fieldErrors });
+      }
+      const entry = await storage.createTimeEntry(parsed.data);
+      res.status(201).json(entry);
+    } catch (error) {
+      console.error("Error creating time entry:", error);
+      res.status(500).json({ message: "Failed to create time entry" });
+    }
+  });
+
+  app.post("/api/time-entries/bulk", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { entries: rawEntries } = req.body;
+      if (!Array.isArray(rawEntries) || rawEntries.length === 0) {
+        return res.status(400).json({ message: "entries array is required" });
+      }
+      const parsed = rawEntries.map((e: any) => {
+        const result = insertTimeEntrySchema.safeParse({ ...e, userId });
+        if (!result.success) throw new Error("Invalid entry data");
+        return result.data;
+      });
+      const entries = await storage.bulkCreateTimeEntries(parsed);
+      res.status(201).json(entries);
+    } catch (error) {
+      console.error("Error bulk creating time entries:", error);
+      res.status(500).json({ message: "Failed to create time entries" });
+    }
+  });
+
+  app.patch("/api/time-entries/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+      const dbUser = await authStorage.getUser(userId);
+      const isAdmin = dbUser?.role === "admin";
+      
+      if (!isAdmin) {
+        const userEntries = await storage.getTimeEntriesByUser(userId);
+        const existing = userEntries.find(e => e.id === id);
+        if (!existing) {
+          return res.status(404).json({ message: "Time entry not found" });
+        }
+        if (existing.status !== "draft") {
+          return res.status(403).json({ message: "Can only edit draft entries" });
+        }
+        const { status, userId: _, approvedBy, approvedAt, submittedAt, ...safeUpdates } = req.body;
+        const updated = await storage.updateTimeEntry(id, safeUpdates);
+        return res.json(updated);
+      }
+      
+      const updated = await storage.updateTimeEntry(id, req.body);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating time entry:", error);
+      res.status(500).json({ message: "Failed to update time entry" });
+    }
+  });
+
+  app.delete("/api/time-entries/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+      const dbUser = await authStorage.getUser(userId);
+      const isAdmin = dbUser?.role === "admin";
+      
+      if (!isAdmin) {
+        const userEntries = await storage.getTimeEntriesByUser(userId);
+        const existing = userEntries.find(e => e.id === id);
+        if (!existing) {
+          return res.status(404).json({ message: "Time entry not found" });
+        }
+        if (existing.status !== "draft") {
+          return res.status(403).json({ message: "Can only delete draft entries" });
+        }
+      }
+      
+      await storage.deleteTimeEntry(id);
+      res.json({ message: "Deleted" });
+    } catch (error) {
+      console.error("Error deleting time entry:", error);
+      res.status(500).json({ message: "Failed to delete time entry" });
+    }
+  });
+
+  app.post("/api/time-entries/submit", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { ids } = req.body;
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ message: "ids array is required" });
+      }
+      const userEntries = await storage.getTimeEntriesByUser(userId);
+      const userEntryIds = new Set(userEntries.filter(e => e.status === "draft").map(e => e.id));
+      const validIds = ids.filter((id: number) => userEntryIds.has(id));
+      if (validIds.length === 0) {
+        return res.status(400).json({ message: "No valid draft entries found to submit" });
+      }
+      const now = new Date();
+      const results: any[] = [];
+      for (const id of validIds) {
+        const updated = await storage.updateTimeEntry(id, { status: "submitted", submittedAt: now });
+        results.push(updated);
+      }
+      res.json(results);
+    } catch (error) {
+      console.error("Error submitting time entries:", error);
+      res.status(500).json({ message: "Failed to submit time entries" });
+    }
+  });
+
+  app.post("/api/time-entries/approve", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const dbUser = await authStorage.getUser(userId);
+      if (dbUser?.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      const { ids } = req.body;
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ message: "ids array is required" });
+      }
+      const allEntries = await storage.getTimeEntriesByPeriod("2000-01-01", "2099-12-31");
+      const submittedIds = new Set(allEntries.filter(e => e.status === "submitted").map(e => e.id));
+      const validIds = ids.filter((id: number) => submittedIds.has(id));
+      if (validIds.length === 0) {
+        return res.status(400).json({ message: "No submitted entries found to approve" });
+      }
+      const approved = await storage.approveTimeEntries(validIds, userId);
+      res.json(approved);
+    } catch (error) {
+      console.error("Error approving time entries:", error);
+      res.status(500).json({ message: "Failed to approve time entries" });
+    }
   });
 
   // Initialize seed data

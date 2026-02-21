@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
-import { LogOut, UserCog, Eye, EyeOff, User, Palette, ZoomIn } from "lucide-react";
+import { LogOut, UserCog, Eye, EyeOff, User, Palette, ZoomIn, Clock, DollarSign } from "lucide-react";
 import { useTextZoom } from "@/hooks/use-text-zoom";
 import { Link } from "wouter";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -139,6 +139,22 @@ export function Navbar() {
                 Color Portfolio
               </DropdownMenuItem>
             </Link>
+            {(user.role === "crew" || user.role === "admin") && (
+              <Link href="/timesheets">
+                <DropdownMenuItem data-testid="link-timesheets">
+                  <Clock className="mr-2 h-4 w-4" />
+                  Timesheets
+                </DropdownMenuItem>
+              </Link>
+            )}
+            {user.role === "admin" && (
+              <Link href="/payroll">
+                <DropdownMenuItem data-testid="link-payroll">
+                  <DollarSign className="mr-2 h-4 w-4" />
+                  Payroll
+                </DropdownMenuItem>
+              </Link>
+            )}
             <DropdownMenuItem
               onClick={(e) => {
                 e.preventDefault();
