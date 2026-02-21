@@ -2233,20 +2233,40 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     return null;
   };
 
-  const sidebarTools = [
-    { type: "note", icon: StickyNote, label: "Note" },
-    { type: "link", icon: Link2, label: "Link" },
-    { type: "todo", icon: CheckSquare, label: "To-do" },
-    { type: "column", icon: Columns3, label: "Column" },
-    { type: "board_link", icon: LayoutGrid, label: "Board" },
-    { type: "image", icon: ImagePlus, label: "Image" },
-    { type: "color_swatch", icon: Palette, label: "Color" },
-    { type: "section_header", icon: Type, label: "Header" },
-    { type: "room_zone", icon: Square, label: "Zone" },
-    { type: "material", icon: Shapes, label: "Material" },
-    { type: "callout", icon: Sparkles, label: "Callout" },
-    { type: "product", icon: ExternalLink, label: "Product" },
-    { type: "draw", icon: Pencil, label: "Draw" },
+  const sidebarToolGroups = [
+    {
+      label: "Content",
+      tools: [
+        { type: "note", icon: StickyNote, label: "Note" },
+        { type: "link", icon: Link2, label: "Link" },
+        { type: "todo", icon: CheckSquare, label: "To-do" },
+        { type: "image", icon: ImagePlus, label: "Image" },
+      ],
+    },
+    {
+      label: "Layout",
+      tools: [
+        { type: "column", icon: Columns3, label: "Column" },
+        { type: "board_link", icon: LayoutGrid, label: "Board" },
+        { type: "section_header", icon: Type, label: "Header" },
+        { type: "room_zone", icon: Square, label: "Zone" },
+      ],
+    },
+    {
+      label: "Design",
+      tools: [
+        { type: "color_swatch", icon: Palette, label: "Color" },
+        { type: "material", icon: Shapes, label: "Material" },
+        { type: "callout", icon: Sparkles, label: "Callout" },
+        { type: "product", icon: ExternalLink, label: "Product" },
+      ],
+    },
+    {
+      label: "Tools",
+      tools: [
+        { type: "draw", icon: Pencil, label: "Draw" },
+      ],
+    },
   ];
 
   return (
@@ -2472,46 +2492,50 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
 
       {boards.length > 0 && selectedBoardId && (
         <div className="flex flex-1 gap-0 min-h-0">
-          {/* Left sidebar */}
-          <div className="w-14 sm:w-16 mobile-landscape:w-12 shrink-0 border-r flex flex-col items-center py-1 sm:py-2 gap-0 sm:gap-0.5 bg-muted/20 overflow-y-auto" data-testid="canvas-sidebar">
-            {sidebarTools.map((t) => (
-              <Tooltip key={t.type}>
-                <TooltipTrigger asChild>
-                  <button
-                    className="w-11 sm:w-12 h-10 sm:h-11 mobile-landscape:h-8 flex flex-col items-center justify-center rounded-md text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors gap-0.5 cursor-grab active:cursor-grabbing shrink-0"
-                    draggable
-                    onDragStart={(e) => {
-                      e.dataTransfer.setData("tool-type", t.type);
-                      e.dataTransfer.effectAllowed = "copy";
-                    }}
-                    onClick={() => t.type === "image" ? setShowImagePopup(!showImagePopup) : t.type === "draw" ? (() => { setDrawingMode(true); setDrawTool("pen"); setDrawingPaths([]); drawPathsRef.current = []; setDrawUndoStack([]); setEditingId(null); })() : createElement(t.type)}
-                    data-testid={`sidebar-tool-${t.type}`}
-                  >
-                    <t.icon className="h-4 w-4 sm:h-5 sm:w-5" />
-                    <span className="text-[9px] leading-none mobile-landscape:hidden">{t.label}</span>
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="right" className="text-xs">{t.label}</TooltipContent>
-              </Tooltip>
+          {/* Left sidebar — modern toolbar */}
+          <div className="w-10 shrink-0 border-r border-border/50 flex flex-col items-center py-2 bg-background overflow-y-auto" data-testid="canvas-sidebar">
+            {sidebarToolGroups.map((group, gi) => (
+              <div key={group.label} className="w-full flex flex-col items-center">
+                {gi > 0 && <div className="w-5 h-px bg-border/60 my-1.5" />}
+                <span className="text-[8px] uppercase tracking-[0.08em] text-muted-foreground/50 font-medium mb-0.5 select-none">{group.label}</span>
+                {group.tools.map((t) => (
+                  <Tooltip key={t.type}>
+                    <TooltipTrigger asChild>
+                      <button
+                        className="w-8 h-8 flex items-center justify-center rounded text-muted-foreground/70 hover:text-foreground hover:bg-muted/50 transition-all duration-150 cursor-grab active:cursor-grabbing active:scale-95 shrink-0"
+                        draggable
+                        onDragStart={(e) => {
+                          e.dataTransfer.setData("tool-type", t.type);
+                          e.dataTransfer.effectAllowed = "copy";
+                        }}
+                        onClick={() => t.type === "image" ? setShowImagePopup(!showImagePopup) : t.type === "draw" ? (() => { setDrawingMode(true); setDrawTool("pen"); setDrawingPaths([]); drawPathsRef.current = []; setDrawUndoStack([]); setEditingId(null); })() : createElement(t.type)}
+                        data-testid={`sidebar-tool-${t.type}`}
+                      >
+                        <t.icon className="h-4 w-4" strokeWidth={1.5} />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="right" sideOffset={8} className="text-xs font-medium">{t.label}</TooltipContent>
+                  </Tooltip>
+                ))}
+              </div>
             ))}
-            <Separator className="my-1 w-8" />
+            <div className="w-5 h-px bg-border/60 my-1.5" />
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
-                  className="w-11 sm:w-12 h-10 sm:h-11 mobile-landscape:h-8 flex flex-col items-center justify-center rounded-md text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors gap-0.5 shrink-0"
+                  className="w-8 h-8 flex items-center justify-center rounded text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 transition-all duration-150 shrink-0"
                   onClick={() => { if (editingId) handleDeleteElement(editingId); }}
                   data-testid="sidebar-tool-delete"
                 >
-                  <Trash2 className="h-4 w-4 sm:h-5 sm:w-5" />
-                  <span className="text-[9px] leading-none mobile-landscape:hidden">Delete</span>
+                  <Trash2 className="h-4 w-4" strokeWidth={1.5} />
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="right" className="text-xs">Delete Selected</TooltipContent>
+              <TooltipContent side="right" sideOffset={8} className="text-xs font-medium">Delete Selected</TooltipContent>
             </Tooltip>
           </div>
 
           {showImagePopup && (
-            <div className="absolute left-[72px] top-1/3 z-50 bg-card border border-border rounded-md shadow-lg w-64" data-testid="image-popup-panel">
+            <div className="absolute left-[48px] top-1/3 z-50 bg-card border border-border rounded-md shadow-lg w-64" data-testid="image-popup-panel">
               <div className="flex items-center justify-between p-3 border-b border-border">
                 <span className="text-sm font-semibold">Add Image</span>
                 <button className="p-0.5 rounded hover:bg-muted transition-colors" onClick={() => setShowImagePopup(false)} data-testid="image-popup-close"><X className="h-4 w-4" /></button>
