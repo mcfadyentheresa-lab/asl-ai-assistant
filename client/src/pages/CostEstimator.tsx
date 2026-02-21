@@ -60,6 +60,7 @@ export default function CostEstimator() {
   const [newItem, setNewItem] = useState({
     categoryId: "", customCategory: "", unitType: "sq_ft",
     quantity: "", unitCost: "", materialCost: "", laborCost: "", notes: "", isCustomRate: false,
+    length: "", width: "",
   });
 
   const [newReceipt, setNewReceipt] = useState({
@@ -116,7 +117,7 @@ export default function CostEstimator() {
       queryClient.invalidateQueries({ queryKey: ["/api/estimates", activeEstimate?.id, "items"] });
       queryClient.invalidateQueries({ queryKey: ["/api/estimates", activeEstimate?.id, "warnings"] });
       setShowAddItem(false);
-      setNewItem({ categoryId: "", customCategory: "", unitType: "sq_ft", quantity: "", unitCost: "", materialCost: "", laborCost: "", notes: "", isCustomRate: false });
+      setNewItem({ categoryId: "", customCategory: "", unitType: "sq_ft", quantity: "", unitCost: "", materialCost: "", laborCost: "", notes: "", isCustomRate: false, length: "", width: "" });
       toast({ title: "Line item added" });
     },
   });
@@ -720,22 +721,90 @@ export default function CostEstimator() {
               </Select>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>Quantity ({newItem.unitType === "sq_ft" ? "sq ft" : "units"})</Label>
-                <Input type="number" value={newItem.quantity} onChange={(e) => setNewItem(prev => ({ ...prev, quantity: e.target.value }))} placeholder="0" data-testid="input-quantity" />
+            {newItem.unitType === "sq_ft" ? (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Length (ft)</Label>
+                    <Input
+                      type="number"
+                      step="0.1"
+                      value={newItem.length}
+                      onChange={(e) => {
+                        const len = e.target.value;
+                        const w = parseFloat(newItem.width) || 0;
+                        const l = parseFloat(len) || 0;
+                        const sqft = l > 0 && w > 0 ? (l * w).toFixed(1) : "";
+                        setNewItem(prev => ({ ...prev, length: len, quantity: sqft || prev.quantity }));
+                      }}
+                      placeholder="0"
+                      data-testid="input-length"
+                    />
+                  </div>
+                  <div>
+                    <Label>Width (ft)</Label>
+                    <Input
+                      type="number"
+                      step="0.1"
+                      value={newItem.width}
+                      onChange={(e) => {
+                        const wid = e.target.value;
+                        const l = parseFloat(newItem.length) || 0;
+                        const w = parseFloat(wid) || 0;
+                        const sqft = l > 0 && w > 0 ? (l * w).toFixed(1) : "";
+                        setNewItem(prev => ({ ...prev, width: wid, quantity: sqft || prev.quantity }));
+                      }}
+                      placeholder="0"
+                      data-testid="input-width"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Total Sq Ft</Label>
+                    <Input
+                      type="number"
+                      value={newItem.quantity}
+                      onChange={(e) => setNewItem(prev => ({ ...prev, quantity: e.target.value }))}
+                      placeholder="0"
+                      data-testid="input-quantity"
+                    />
+                    {parseFloat(newItem.length) > 0 && parseFloat(newItem.width) > 0 && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {newItem.length} × {newItem.width} = {(parseFloat(newItem.length) * parseFloat(newItem.width)).toFixed(1)} sq ft
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <Label>Cost per Sq Ft ($)</Label>
+                    <Input type="number" step="0.01" value={newItem.unitCost} onChange={(e) => setNewItem(prev => ({ ...prev, unitCost: e.target.value }))} placeholder="0.00" data-testid="input-unit-cost" />
+                    {!newItem.isCustomRate && newItem.categoryId && (() => {
+                      const rate = marketRates.find(r => r.categoryId === parseInt(newItem.categoryId) && r.isActive);
+                      return rate ? (
+                        <p className="text-xs text-muted-foreground mt-1">Market: ${rate.lowRate} - ${rate.highRate} / sq ft</p>
+                      ) : null;
+                    })()}
+                  </div>
+                </div>
               </div>
-              <div>
-                <Label>Unit Cost ($)</Label>
-                <Input type="number" step="0.01" value={newItem.unitCost} onChange={(e) => setNewItem(prev => ({ ...prev, unitCost: e.target.value }))} placeholder="0.00" data-testid="input-unit-cost" />
-                {!newItem.isCustomRate && newItem.categoryId && (() => {
-                  const rate = marketRates.find(r => r.categoryId === parseInt(newItem.categoryId) && r.isActive);
-                  return rate ? (
-                    <p className="text-xs text-muted-foreground mt-1">Market: ${rate.lowRate} - ${rate.highRate} / {newItem.unitType === "sq_ft" ? "sq ft" : "unit"}</p>
-                  ) : null;
-                })()}
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Quantity (units)</Label>
+                  <Input type="number" value={newItem.quantity} onChange={(e) => setNewItem(prev => ({ ...prev, quantity: e.target.value }))} placeholder="0" data-testid="input-quantity" />
+                </div>
+                <div>
+                  <Label>Unit Cost ($)</Label>
+                  <Input type="number" step="0.01" value={newItem.unitCost} onChange={(e) => setNewItem(prev => ({ ...prev, unitCost: e.target.value }))} placeholder="0.00" data-testid="input-unit-cost" />
+                  {!newItem.isCustomRate && newItem.categoryId && (() => {
+                    const rate = marketRates.find(r => r.categoryId === parseInt(newItem.categoryId) && r.isActive);
+                    return rate ? (
+                      <p className="text-xs text-muted-foreground mt-1">Market: ${rate.lowRate} - ${rate.highRate} / unit</p>
+                    ) : null;
+                  })()}
+                </div>
               </div>
-            </div>
+            )}
 
             <div>
               <Label>Material Cost ($) <span className="text-muted-foreground text-xs">(for markup calculation)</span></Label>
