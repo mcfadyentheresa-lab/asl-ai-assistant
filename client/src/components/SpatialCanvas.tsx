@@ -194,6 +194,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
 
   const [draggingId, setDraggingId] = useState<number | null>(null);
   const dragStartRef = useRef<{ x: number; y: number; elX: number; elY: number } | null>(null);
+  const zoneChildrenRef = useRef<{ id: number; offsetX: number; offsetY: number }[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [maxZ, setMaxZ] = useState(1);
 
@@ -671,6 +672,11 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           }
         });
       }
+      if (draggedEl?.type === "room_zone") {
+        zoneChildrenRef.current.forEach((zc) => {
+          moveElement(zc.id, newX + zc.offsetX, newY + zc.offsetY);
+        });
+      }
     } else if (isPanning && panStartRef.current && e.touches.length === 1) {
       const dx = touch.clientX - panStartRef.current.x;
       const dy = touch.clientY - panStartRef.current.y;
@@ -694,6 +700,15 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
         }
         moveElement(draggingId, snappedX, snappedY);
         sendElementMove(draggingId, snappedX, snappedY);
+        if (el.type === "room_zone") {
+          zoneChildrenRef.current.forEach((zc) => {
+            const cx = Math.round((snappedX + zc.offsetX) / GRID_SIZE) * GRID_SIZE;
+            const cy = Math.round((snappedY + zc.offsetY) / GRID_SIZE) * GRID_SIZE;
+            moveElement(zc.id, cx, cy);
+            sendElementMove(zc.id, cx, cy);
+          });
+          zoneChildrenRef.current = [];
+        }
         if (el.type !== "column") {
           assignToColumn(draggingId);
         }
@@ -944,6 +959,11 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           }
         });
       }
+      if (draggedEl?.type === "room_zone") {
+        zoneChildrenRef.current.forEach((zc) => {
+          moveElement(zc.id, newX + zc.offsetX, newY + zc.offsetY);
+        });
+      }
     }
   };
 
@@ -963,6 +983,15 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
         }
         moveElement(draggingId, snappedX, snappedY);
         sendElementMove(draggingId, snappedX, snappedY);
+        if (el.type === "room_zone") {
+          zoneChildrenRef.current.forEach((zc) => {
+            const cx = Math.round((snappedX + zc.offsetX) / GRID_SIZE) * GRID_SIZE;
+            const cy = Math.round((snappedY + zc.offsetY) / GRID_SIZE) * GRID_SIZE;
+            moveElement(zc.id, cx, cy);
+            sendElementMove(zc.id, cx, cy);
+          });
+          zoneChildrenRef.current = [];
+        }
         if (el.type !== "column") {
           assignToColumn(draggingId);
         }
@@ -1058,6 +1087,15 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     setDraggingId(id);
     setEditingId(id);
     dragStartRef.current = { x: e.clientX, y: e.clientY, elX: el.x, elY: el.y };
+    if (el.type === "room_zone") {
+      const zoneRight = el.x + (el.width || 500);
+      const zoneBottom = el.y + (el.height || 400);
+      zoneChildrenRef.current = Object.values(elements)
+        .filter((child) => child.id !== id && child.type !== "room_zone" && child.x >= el.x && child.y >= el.y && child.x < zoneRight && child.y < zoneBottom)
+        .map((child) => ({ id: child.id, offsetX: child.x - el.x, offsetY: child.y - el.y }));
+    } else {
+      zoneChildrenRef.current = [];
+    }
   };
 
 
