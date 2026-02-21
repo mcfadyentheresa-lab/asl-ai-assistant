@@ -399,6 +399,7 @@ export const projectEstimates = pgTable("project_estimates", {
   status: text("status").notNull().default("draft"),
   markupEnabled: boolean("markup_enabled").default(true),
   markupPercent: text("markup_percent").notNull().default("25"),
+  budget: text("budget"),
   createdBy: text("created_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
 });
