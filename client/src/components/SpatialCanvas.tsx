@@ -150,6 +150,14 @@ const ELEMENT_DEFAULTS: Record<string, { width: number; height: number; content:
   product: { width: 240, height: 120, content: { name: "Product", price: "", supplier: "", url: "" } },
 };
 
+function getContrastColor(hex: string): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.55 ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.8)";
+}
+
 export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -1427,6 +1435,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
               <div className="space-y-2">
                 <input
                   className="w-full bg-transparent border-none text-sm font-serif font-semibold outline-none"
+                  style={{ color: getContrastColor(c.color || "#f0ede8") }}
                   defaultValue={c.title}
                   placeholder="Room name..."
                   onBlur={(e) => handleUpdateContent(el.id, { ...c, title: e.target.value })}
@@ -1441,11 +1450,11 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                     className="h-6 w-8 border rounded cursor-pointer"
                     data-testid={`input-zone-color-${el.id}`}
                   />
-                  <span className="text-[10px] text-muted-foreground">Zone color</span>
+                  <span className="text-[10px]" style={{ color: getContrastColor(c.color || "#f0ede8") }}>Zone color</span>
                 </div>
               </div>
             ) : (
-              <span className="text-sm font-serif font-semibold text-foreground/60" data-testid={`text-zone-title-${el.id}`}>
+              <span className="text-sm font-serif font-semibold" style={{ color: getContrastColor(c.color || "#f0ede8") }} data-testid={`text-zone-title-${el.id}`}>
                 {c.title || "Room"}
               </span>
             )}
