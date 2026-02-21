@@ -3144,50 +3144,52 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       </Dialog>
 
       <Dialog open={showLinkDialog} onOpenChange={setShowLinkDialog}>
-        <DialogContent className="max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Link Board To...</DialogTitle>
+        <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-md">
+          <DialogHeader className="pb-0">
+            <DialogTitle className="text-base">Link Board</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="space-y-3 pt-1">
             <div>
-              <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
-                <label className="text-sm font-medium">Collaborators</label>
-                <label className="flex items-center gap-1.5 cursor-pointer" data-testid="toggle-notify-on-link">
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Collaborators</label>
+                <label className="flex items-center gap-1 cursor-pointer" data-testid="toggle-notify-on-link">
                   <Checkbox
                     checked={notifyOnLink}
                     onCheckedChange={(v) => setNotifyOnLink(!!v)}
+                    className="h-3.5 w-3.5"
                   />
-                  {notifyOnLink ? <Bell className="h-3.5 w-3.5 text-muted-foreground" /> : <BellOff className="h-3.5 w-3.5 text-muted-foreground" />}
-                  <span className="text-xs text-muted-foreground">Alert via text</span>
+                  {notifyOnLink ? <Bell className="h-3 w-3 text-muted-foreground" /> : <BellOff className="h-3 w-3 text-muted-foreground" />}
+                  <span className="text-[11px] text-muted-foreground">SMS alert</span>
                 </label>
               </div>
-              <div className="space-y-1 max-h-40 overflow-y-auto rounded border p-2" data-testid="link-people-list">
+              <div className="space-y-0.5 max-h-32 overflow-y-auto rounded border p-1.5" data-testid="link-people-list">
                 {allUsers.length === 0 && (
-                  <p className="text-xs text-muted-foreground">No team members found</p>
+                  <p className="text-xs text-muted-foreground py-1 px-1">No team members found</p>
                 )}
                 {allUsers.map((u: any) => {
                   const isLinked = (selectedBoard?.linkedUserIds || []).includes(u.id);
                   return (
                     <label
                       key={u.id}
-                      className="flex items-center gap-2 p-1.5 rounded hover-elevate cursor-pointer"
+                      className="flex items-center gap-1.5 py-1 px-1 rounded hover:bg-muted/50 cursor-pointer"
                       data-testid={`link-person-${u.id}`}
                     >
                       <Checkbox
                         checked={isLinked}
                         onCheckedChange={() => toggleLinkedUser(u.id)}
+                        className="h-3.5 w-3.5"
                         data-testid={`checkbox-person-${u.id}`}
                       />
-                      <Avatar className="h-6 w-6">
+                      <Avatar className="h-5 w-5">
                         <AvatarImage src={u.profileImageUrl || undefined} />
-                        <AvatarFallback className="text-[10px]">
+                        <AvatarFallback className="text-[9px]">
                           {(u.firstName?.[0] || "").toUpperCase()}{(u.lastName?.[0] || "").toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
-                      <span className="text-sm truncate">
+                      <span className="text-xs truncate">
                         {u.firstName} {u.lastName}
                       </span>
-                      <Badge variant="outline" className="ml-auto text-[10px]">{u.role}</Badge>
+                      <Badge variant="outline" className="ml-auto text-[9px] h-4 px-1">{u.role}</Badge>
                     </label>
                   );
                 })}
@@ -3195,188 +3197,192 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             </div>
 
             <div>
-              <label className="text-sm font-medium mb-2 block">Projects</label>
-              <div className="space-y-1 max-h-40 overflow-y-auto rounded border p-2" data-testid="link-projects-list">
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1 block">Projects</label>
+              <div className="space-y-0.5 max-h-32 overflow-y-auto rounded border p-1.5" data-testid="link-projects-list">
                 {allProjects.filter((p: any) => p.id !== projectId).length === 0 && (
-                  <p className="text-xs text-muted-foreground">No other projects available</p>
+                  <p className="text-xs text-muted-foreground py-1 px-1">No other projects available</p>
                 )}
                 {allProjects.filter((p: any) => p.id !== projectId).map((p: any) => {
                   const isLinked = (selectedBoard?.linkedProjectIds || []).includes(p.id);
                   return (
                     <label
                       key={p.id}
-                      className="flex items-center gap-2 p-1.5 rounded hover-elevate cursor-pointer"
+                      className="flex items-center gap-1.5 py-1 px-1 rounded hover:bg-muted/50 cursor-pointer"
                       data-testid={`link-project-${p.id}`}
                     >
                       <Checkbox
                         checked={isLinked}
                         onCheckedChange={() => toggleLinkedProject(p.id)}
+                        className="h-3.5 w-3.5"
                         data-testid={`checkbox-project-${p.id}`}
                       />
-                      <span className="text-sm truncate">{p.name}</span>
-                      <Badge variant="outline" className="ml-auto text-[10px]">{p.status}</Badge>
+                      <span className="text-xs truncate">{p.name}</span>
+                      <Badge variant="outline" className="ml-auto text-[9px] h-4 px-1">{p.status}</Badge>
                     </label>
                   );
                 })}
               </div>
             </div>
 
-            <Separator />
+            <div className="h-px bg-border" />
 
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-sm font-medium">Milestone</label>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 text-xs gap-1"
-                  onClick={() => setLinkCreateMode(m => ({ ...m, milestone: !m.milestone }))}
-                  data-testid="button-toggle-create-milestone"
-                >
-                  {linkCreateMode.milestone ? "Select Existing" : <><Plus className="h-3 w-3" /> Create New</>}
-                </Button>
-              </div>
-              {linkCreateMode.milestone ? (
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Milestone title..."
-                    value={newMilestoneTitle}
-                    onChange={(e) => setNewMilestoneTitle(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleCreateAndLinkMilestone()}
-                    data-testid="input-new-milestone-title"
-                  />
-                  <Button
-                    size="sm"
-                    onClick={handleCreateAndLinkMilestone}
-                    disabled={!newMilestoneTitle.trim()}
-                    data-testid="button-create-link-milestone"
+            <div className="grid grid-cols-1 gap-2">
+              <div>
+                <div className="flex items-center justify-between mb-0.5">
+                  <label className="text-xs font-medium">Milestone</label>
+                  <button
+                    className="text-[11px] text-muted-foreground hover:text-foreground transition-colors flex items-center gap-0.5"
+                    onClick={() => setLinkCreateMode(m => ({ ...m, milestone: !m.milestone }))}
+                    data-testid="button-toggle-create-milestone"
                   >
-                    Create
-                  </Button>
+                    {linkCreateMode.milestone ? "Select" : <><Plus className="h-3 w-3" /> New</>}
+                  </button>
                 </div>
-              ) : (
-                <Select
-                  value={selectedBoard?.linkedMilestoneId?.toString() || "none"}
-                  onValueChange={(v) => handleLinkUpdate("linkedMilestoneId", v === "none" ? null : Number(v))}
-                >
-                  <SelectTrigger data-testid="select-link-milestone">
-                    <SelectValue placeholder="None" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">None</SelectItem>
-                    {milestones.map((m: any) => (
-                      <SelectItem key={m.id} value={m.id.toString()}>{m.title}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-sm font-medium">Checklist Item</label>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 text-xs gap-1"
-                  onClick={() => setLinkCreateMode(m => ({ ...m, checklist: !m.checklist }))}
-                  data-testid="button-toggle-create-checklist"
-                >
-                  {linkCreateMode.checklist ? "Select Existing" : <><Plus className="h-3 w-3" /> Create New</>}
-                </Button>
-              </div>
-              {linkCreateMode.checklist ? (
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Checklist item title..."
-                    value={newChecklistTitle}
-                    onChange={(e) => setNewChecklistTitle(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleCreateAndLinkChecklist()}
-                    data-testid="input-new-checklist-title"
-                  />
-                  <Button
-                    size="sm"
-                    onClick={handleCreateAndLinkChecklist}
-                    disabled={!newChecklistTitle.trim()}
-                    data-testid="button-create-link-checklist"
-                  >
-                    Create
-                  </Button>
-                </div>
-              ) : (
-                <Select
-                  value={selectedBoard?.linkedChecklistItemId?.toString() || "none"}
-                  onValueChange={(v) => handleLinkUpdate("linkedChecklistItemId", v === "none" ? null : Number(v))}
-                >
-                  <SelectTrigger data-testid="select-link-checklist">
-                    <SelectValue placeholder="None" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">None</SelectItem>
-                    {checklistItems.map((c: any) => (
-                      <SelectItem key={c.id} value={c.id.toString()}>{c.title}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-sm font-medium">Calendar Event</label>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 text-xs gap-1"
-                  onClick={() => setLinkCreateMode(m => ({ ...m, calendar: !m.calendar }))}
-                  data-testid="button-toggle-create-calendar"
-                >
-                  {linkCreateMode.calendar ? "Select Existing" : <><Plus className="h-3 w-3" /> Create New</>}
-                </Button>
-              </div>
-              {linkCreateMode.calendar ? (
-                <div className="space-y-2">
-                  <Input
-                    placeholder="Event title..."
-                    value={newCalendarTitle}
-                    onChange={(e) => setNewCalendarTitle(e.target.value)}
-                    data-testid="input-new-calendar-title"
-                  />
-                  <div className="flex gap-2">
+                {linkCreateMode.milestone ? (
+                  <div className="flex gap-1.5">
                     <Input
-                      type="date"
-                      value={newCalendarDate}
-                      onChange={(e) => setNewCalendarDate(e.target.value)}
-                      data-testid="input-new-calendar-date"
+                      placeholder="Title..."
+                      className="h-8 text-xs"
+                      value={newMilestoneTitle}
+                      onChange={(e) => setNewMilestoneTitle(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleCreateAndLinkMilestone()}
+                      data-testid="input-new-milestone-title"
                     />
                     <Button
                       size="sm"
-                      onClick={handleCreateAndLinkCalendar}
-                      disabled={!newCalendarTitle.trim() || !newCalendarDate}
-                      data-testid="button-create-link-calendar"
+                      className="h-8 px-2.5 text-xs"
+                      onClick={handleCreateAndLinkMilestone}
+                      disabled={!newMilestoneTitle.trim()}
+                      data-testid="button-create-link-milestone"
                     >
-                      Create
+                      Add
                     </Button>
                   </div>
+                ) : (
+                  <Select
+                    value={selectedBoard?.linkedMilestoneId?.toString() || "none"}
+                    onValueChange={(v) => handleLinkUpdate("linkedMilestoneId", v === "none" ? null : Number(v))}
+                  >
+                    <SelectTrigger className="h-8 text-xs" data-testid="select-link-milestone">
+                      <SelectValue placeholder="None" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      {milestones.map((m: any) => (
+                        <SelectItem key={m.id} value={m.id.toString()}>{m.title}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-0.5">
+                  <label className="text-xs font-medium">Checklist Item</label>
+                  <button
+                    className="text-[11px] text-muted-foreground hover:text-foreground transition-colors flex items-center gap-0.5"
+                    onClick={() => setLinkCreateMode(m => ({ ...m, checklist: !m.checklist }))}
+                    data-testid="button-toggle-create-checklist"
+                  >
+                    {linkCreateMode.checklist ? "Select" : <><Plus className="h-3 w-3" /> New</>}
+                  </button>
                 </div>
-              ) : (
-                <Select
-                  value={selectedBoard?.linkedCalendarEventId?.toString() || "none"}
-                  onValueChange={(v) => handleLinkUpdate("linkedCalendarEventId", v === "none" ? null : Number(v))}
-                >
-                  <SelectTrigger data-testid="select-link-event">
-                    <SelectValue placeholder="None" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">None</SelectItem>
-                    {calendarEvents.map((e: any) => (
-                      <SelectItem key={e.id} value={e.id.toString()}>{e.title}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
+                {linkCreateMode.checklist ? (
+                  <div className="flex gap-1.5">
+                    <Input
+                      placeholder="Title..."
+                      className="h-8 text-xs"
+                      value={newChecklistTitle}
+                      onChange={(e) => setNewChecklistTitle(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleCreateAndLinkChecklist()}
+                      data-testid="input-new-checklist-title"
+                    />
+                    <Button
+                      size="sm"
+                      className="h-8 px-2.5 text-xs"
+                      onClick={handleCreateAndLinkChecklist}
+                      disabled={!newChecklistTitle.trim()}
+                      data-testid="button-create-link-checklist"
+                    >
+                      Add
+                    </Button>
+                  </div>
+                ) : (
+                  <Select
+                    value={selectedBoard?.linkedChecklistItemId?.toString() || "none"}
+                    onValueChange={(v) => handleLinkUpdate("linkedChecklistItemId", v === "none" ? null : Number(v))}
+                  >
+                    <SelectTrigger className="h-8 text-xs" data-testid="select-link-checklist">
+                      <SelectValue placeholder="None" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      {checklistItems.map((c: any) => (
+                        <SelectItem key={c.id} value={c.id.toString()}>{c.title}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-0.5">
+                  <label className="text-xs font-medium">Calendar Event</label>
+                  <button
+                    className="text-[11px] text-muted-foreground hover:text-foreground transition-colors flex items-center gap-0.5"
+                    onClick={() => setLinkCreateMode(m => ({ ...m, calendar: !m.calendar }))}
+                    data-testid="button-toggle-create-calendar"
+                  >
+                    {linkCreateMode.calendar ? "Select" : <><Plus className="h-3 w-3" /> New</>}
+                  </button>
+                </div>
+                {linkCreateMode.calendar ? (
+                  <div className="space-y-1.5">
+                    <Input
+                      placeholder="Event title..."
+                      className="h-8 text-xs"
+                      value={newCalendarTitle}
+                      onChange={(e) => setNewCalendarTitle(e.target.value)}
+                      data-testid="input-new-calendar-title"
+                    />
+                    <div className="flex gap-1.5">
+                      <Input
+                        type="date"
+                        className="h-8 text-xs"
+                        value={newCalendarDate}
+                        onChange={(e) => setNewCalendarDate(e.target.value)}
+                        data-testid="input-new-calendar-date"
+                      />
+                      <Button
+                        size="sm"
+                        className="h-8 px-2.5 text-xs"
+                        onClick={handleCreateAndLinkCalendar}
+                        disabled={!newCalendarTitle.trim() || !newCalendarDate}
+                        data-testid="button-create-link-calendar"
+                      >
+                        Add
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <Select
+                    value={selectedBoard?.linkedCalendarEventId?.toString() || "none"}
+                    onValueChange={(v) => handleLinkUpdate("linkedCalendarEventId", v === "none" ? null : Number(v))}
+                  >
+                    <SelectTrigger className="h-8 text-xs" data-testid="select-link-event">
+                      <SelectValue placeholder="None" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      {calendarEvents.map((e: any) => (
+                        <SelectItem key={e.id} value={e.id.toString()}>{e.title}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
             </div>
           </div>
-          <DialogFooter>
-            <Button onClick={() => setShowLinkDialog(false)} data-testid="button-close-link-dialog">Done</Button>
+          <DialogFooter className="pt-2">
+            <Button size="sm" onClick={() => setShowLinkDialog(false)} data-testid="button-close-link-dialog">Done</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
