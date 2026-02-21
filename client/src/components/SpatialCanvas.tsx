@@ -2540,16 +2540,16 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       {boards.length > 0 && selectedBoardId && (
         <div className="flex flex-1 gap-0 min-h-0">
           {/* Left sidebar — modern toolbar */}
-          <div className="w-10 shrink-0 border-r border-border/50 flex flex-col items-center py-2 bg-background overflow-y-auto" data-testid="canvas-sidebar">
+          <div className="w-14 shrink-0 border-r border-border/40 flex flex-col items-center py-3 bg-background overflow-y-auto" data-testid="canvas-sidebar">
             {sidebarToolGroups.map((group, gi) => (
               <div key={group.label} className="w-full flex flex-col items-center">
-                {gi > 0 && <div className="w-5 h-px bg-border/60 my-1.5" />}
-                <span className="text-[8px] uppercase tracking-[0.08em] text-muted-foreground/50 font-medium mb-0.5 select-none">{group.label}</span>
+                {gi > 0 && <div className="w-7 h-px bg-border/40 my-2.5" />}
+                <span className="text-[9px] uppercase tracking-[0.12em] text-foreground/30 font-semibold mb-1 select-none">{group.label}</span>
                 {group.tools.map((t) => (
                   <Tooltip key={t.type}>
                     <TooltipTrigger asChild>
                       <button
-                        className="w-8 h-8 flex items-center justify-center rounded text-muted-foreground/70 hover:text-foreground hover:bg-muted/50 transition-all duration-150 cursor-grab active:cursor-grabbing active:scale-95 shrink-0"
+                        className="w-10 h-10 flex items-center justify-center rounded-md text-foreground/50 hover:text-foreground hover:bg-foreground/[0.06] transition-all duration-200 cursor-grab active:cursor-grabbing active:scale-[0.92] shrink-0"
                         draggable
                         onDragStart={(e) => {
                           e.dataTransfer.setData("tool-type", t.type);
@@ -2558,31 +2558,31 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                         onClick={() => t.type === "image" ? setShowImagePopup(!showImagePopup) : t.type === "draw" ? (() => { setDrawingMode(true); setDrawTool("pen"); setDrawingPaths([]); drawPathsRef.current = []; setDrawUndoStack([]); setEditingId(null); })() : createElement(t.type)}
                         data-testid={`sidebar-tool-${t.type}`}
                       >
-                        <t.icon className="h-4 w-4" strokeWidth={1.5} />
+                        <t.icon className="h-[18px] w-[18px]" strokeWidth={1.5} />
                       </button>
                     </TooltipTrigger>
-                    <TooltipContent side="right" sideOffset={8} className="text-xs font-medium">{t.label}</TooltipContent>
+                    <TooltipContent side="right" sideOffset={6} className="text-xs font-medium tracking-wide">{t.label}</TooltipContent>
                   </Tooltip>
                 ))}
               </div>
             ))}
-            <div className="w-5 h-px bg-border/60 my-1.5" />
+            <div className="w-7 h-px bg-border/40 my-2.5" />
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
-                  className="w-8 h-8 flex items-center justify-center rounded text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 transition-all duration-150 shrink-0"
+                  className="w-10 h-10 flex items-center justify-center rounded-md text-foreground/30 hover:text-destructive hover:bg-destructive/[0.06] transition-all duration-200 shrink-0"
                   onClick={() => { if (editingId) handleDeleteElement(editingId); }}
                   data-testid="sidebar-tool-delete"
                 >
-                  <Trash2 className="h-4 w-4" strokeWidth={1.5} />
+                  <Trash2 className="h-[18px] w-[18px]" strokeWidth={1.5} />
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="right" sideOffset={8} className="text-xs font-medium">Delete Selected</TooltipContent>
+              <TooltipContent side="right" sideOffset={6} className="text-xs font-medium tracking-wide">Delete Selected</TooltipContent>
             </Tooltip>
           </div>
 
           {showImagePopup && (
-            <div className="absolute left-[48px] top-1/3 z-50 bg-card border border-border rounded-md shadow-lg w-64" data-testid="image-popup-panel">
+            <div className="absolute left-[60px] top-1/3 z-50 bg-card border border-border rounded-md shadow-lg w-64" data-testid="image-popup-panel">
               <div className="flex items-center justify-between p-3 border-b border-border">
                 <span className="text-sm font-semibold">Add Image</span>
                 <button className="p-0.5 rounded hover:bg-muted transition-colors" onClick={() => setShowImagePopup(false)} data-testid="image-popup-close"><X className="h-4 w-4" /></button>
