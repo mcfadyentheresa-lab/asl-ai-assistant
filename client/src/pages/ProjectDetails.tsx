@@ -913,26 +913,26 @@ export default function ProjectDetails() {
                             >
                               <div className="flex items-start justify-between gap-2 flex-wrap">
                                 <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-1.5">
-                                    <button
-                                      onClick={() => toggleMilestoneExpand(milestone.id)}
-                                      className="shrink-0 text-muted-foreground/60 transition-colors"
-                                      data-testid={`button-expand-milestone-${milestone.id}`}
-                                    >
+                                  <button
+                                    onClick={() => toggleMilestoneExpand(milestone.id)}
+                                    className="flex items-center gap-1.5 w-full text-left group/expand"
+                                    data-testid={`button-expand-milestone-${milestone.id}`}
+                                  >
+                                    <span className="shrink-0 text-muted-foreground transition-colors group-hover/expand:text-foreground">
                                       {expandedMilestones.has(milestone.id) ? (
                                         <ChevronDown className="h-4 w-4" />
                                       ) : (
                                         <ChevronRight className="h-4 w-4" />
                                       )}
-                                    </button>
+                                    </span>
                                     <p
                                       className={`font-medium text-[15px] leading-snug overflow-hidden text-ellipsis ${milestone.completed ? "line-through text-muted-foreground" : "text-foreground"}`}
                                       data-testid={`text-milestone-title-${milestone.id}`}
                                     >
                                       {milestone.title}
                                     </p>
-                                  </div>
-                                  <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                                  </button>
+                                  <div className="flex items-center gap-2 mt-1.5 ml-5.5 flex-wrap">
                                     {milestone.date && (
                                       <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
                                         <CalendarDays className="h-3 w-3" />
@@ -982,6 +982,19 @@ export default function ProjectDetails() {
                                       >
                                         <Check className="h-4 w-4 mr-2" />
                                         {milestone.completed ? "Mark Incomplete" : "Mark Complete"}
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem
+                                        data-testid={`button-milestone-subtasks-${milestone.id}`}
+                                        onClick={() => {
+                                          setExpandedMilestones(prev => {
+                                            const next = new Set(prev);
+                                            next.add(milestone.id);
+                                            return next;
+                                          });
+                                        }}
+                                      >
+                                        <CheckSquare className="h-4 w-4 mr-2" />
+                                        Sub-tasks
                                       </DropdownMenuItem>
                                       <DropdownMenuItem
                                         data-testid={`button-milestone-edit-${milestone.id}`}
