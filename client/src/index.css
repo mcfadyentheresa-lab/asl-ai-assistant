@@ -24,43 +24,43 @@ html {
   --popover-foreground: 160 15% 15%;
   --popover-border: 40 12% 90%;
 
-  --primary: 152 30% 18%;
+  --primary: 160 30% 12%;
   --primary-foreground: 40 30% 96%;
 
-  --secondary: 35 22% 94%;
-  --secondary-foreground: 152 30% 18%;
+  --secondary: 160 10% 92%;
+  --secondary-foreground: 160 30% 12%;
 
-  --muted: 35 22% 94%;
-  --muted-foreground: 25.71deg 3.08% 55.49%;
+  --muted: 160 10% 92%;
+  --muted-foreground: 160 10% 40%;
 
-  --accent: 25 35% 45%;
+  --accent: 25 20% 40%;
   --accent-foreground: 40 30% 96%;
 
   --destructive: 0 60% 50%;
   --destructive-foreground: 0 0% 98%;
 
-  --sidebar: 152 25% 14%;
+  --sidebar: 160 25% 10%;
   --sidebar-foreground: 40 20% 92%;
-  --sidebar-border: 152 20% 20%;
+  --sidebar-border: 160 20% 15%;
   --sidebar-primary: 40 30% 96%;
-  --sidebar-primary-foreground: 152 30% 14%;
-  --sidebar-accent: 152 20% 20%;
+  --sidebar-primary-foreground: 160 30% 10%;
+  --sidebar-accent: 160 20% 15%;
   --sidebar-accent-foreground: 40 20% 92%;
   --sidebar-ring: 40 30% 96%;
 
-  --chart-1: 152 30% 30%;
+  --chart-1: 160 30% 30%;
   --chart-2: 25 35% 45%;
-  --chart-3: 45.79deg 17.92% 58.43%;
+  --chart-3: 45 15% 55%;
   --chart-4: 0 60% 50%;
   --chart-5: 200 30% 45%;
 
   --font-sans: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
-  --font-serif: 'Inter', sans-serif;
+  --font-serif: 'DM Sans', sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
 
-  --radius: 0.625rem;
+  --radius: 0.125rem;
   --spacing: 0.25rem;
-  --tracking-normal: 0em;
+  --tracking-normal: -0.015em;
 
   --button-outline: hsl(var(--border));
   --badge-outline: hsl(var(--border));
@@ -226,8 +226,8 @@ html {
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: var(--font-serif);
-    @apply font-semibold tracking-tight;
+    font-family: var(--font-sans);
+    @apply font-bold tracking-tight uppercase;
   }
   h1 { @apply text-4xl; }
   h2 { @apply text-3xl; }
