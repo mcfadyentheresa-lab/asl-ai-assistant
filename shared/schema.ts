@@ -400,6 +400,7 @@ export const projectEstimates = pgTable("project_estimates", {
   markupEnabled: boolean("markup_enabled").default(true),
   markupPercent: text("markup_percent").notNull().default("25"),
   budget: text("budget"),
+  contingencyPercent: text("contingency_percent").default("0"),
   createdBy: text("created_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -410,6 +411,8 @@ export const estimateItems = pgTable("estimate_items", {
   estimateId: integer("estimate_id").notNull().references(() => projectEstimates.id, { onDelete: "cascade" }),
   categoryId: integer("category_id").references(() => costCategories.id),
   customCategory: text("custom_category"),
+  room: text("room"),
+  productUrl: text("product_url"),
   unitType: text("unit_type").notNull().default("sq_ft"),
   quantity: text("quantity").notNull(),
   unitCost: text("unit_cost").notNull(),
