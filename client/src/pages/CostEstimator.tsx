@@ -184,6 +184,39 @@ export default function CostEstimator() {
     },
   });
 
+  const updateItemMutation = useMutation({
+    mutationFn: async ({ id, ...data }: any) => {
+      const res = await apiRequest("PATCH", `/api/estimate-items/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/estimates", activeEstimate?.id, "items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/estimates", activeEstimate?.id, "warnings"] });
+      toast({ title: "Line item updated" });
+    },
+  });
+
+  const [applyingAlt, setApplyingAlt] = useState<number | null>(null);
+
+  async function applyAlternative(suggestion: any) {
+    setApplyingAlt(suggestion.itemId);
+    try {
+      await updateItemMutation.mutateAsync({
+        id: suggestion.itemId,
+        unitCost: suggestion.estimatedCost,
+        notes: suggestion.alternativeName + ": " + suggestion.alternativeDescription
+      });
+      setAlternativesResults((prev: any) => ({
+        ...prev,
+        suggestions: prev.suggestions.filter((s: any) => s.itemId !== suggestion.itemId)
+      }));
+    } catch (error) {
+      toast({ title: "Failed to apply alternative", variant: "destructive" });
+    } finally {
+      setApplyingAlt(null);
+    }
+  }
+
   const [applyingAi, setApplyingAi] = useState(false);
 
   async function applyAiResults() {
@@ -1097,6 +1130,19 @@ export default function CostEstimator() {
                             <strong>Trade-offs:</strong> {sug.tradeoffs}
                           </div>
                         )}
+                        <Button 
+                          size="sm" 
+                          className="w-full mt-2" 
+                          onClick={() => applyAlternative(sug)}
+                          disabled={applyingAlt === sug.itemId}
+                          data-testid={`button-apply-alternative-${idx}`}
+                        >
+                          {applyingAlt === sug.itemId ? (
+                            <><Loader2 className="h-3 w-3 mr-2 animate-spin" /> Applying...</>
+                          ) : (
+                            <><CheckCircle2 className="h-3 w-3 mr-2" /> Apply Suggestion</>
+                          )}
+                        </Button>
                       </div>
                     );
                   })}
