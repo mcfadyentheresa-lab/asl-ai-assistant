@@ -300,8 +300,11 @@ export default function CostEstimator() {
   const grandTotal = itemTotals.reduce((sum, i) => sum + i.lineTotal, 0);
   const totalMarkup = itemTotals.reduce((sum, i) => sum + i.materialMarkup, 0);
   const grandTotalWithMarkup = grandTotal + totalMarkup;
+  const hstRate = 0.13;
+  const hstAmount = grandTotalWithMarkup * hstRate;
+  const grandTotalWithHST = grandTotalWithMarkup + hstAmount;
   const totalReceipts = receipts.reduce((sum, r) => sum + (parseFloat(r.amount) || 0), 0);
-  const variance = grandTotalWithMarkup > 0 ? ((totalReceipts - grandTotalWithMarkup) / grandTotalWithMarkup) * 100 : 0;
+  const variance = grandTotalWithHST > 0 ? ((totalReceipts - grandTotalWithHST) / grandTotalWithHST) * 100 : 0;
   const activeWarnings = warnings.filter(w => !w.ignored);
 
   function getVarianceStatus() {
@@ -440,11 +443,12 @@ export default function CostEstimator() {
                 <CardContent className="pt-4 pb-3">
                   <div className="text-xs text-muted-foreground uppercase tracking-wide">Estimated Total</div>
                   <div className="text-2xl font-semibold mt-1" data-testid="text-grand-total">
-                    ${grandTotalWithMarkup.toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    ${grandTotalWithHST.toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
                   {totalMarkup > 0 && (
                     <div className="text-xs text-muted-foreground">incl. ${totalMarkup.toLocaleString("en-CA", { minimumFractionDigits: 2 })} markup</div>
                   )}
+                  <div className="text-xs text-muted-foreground">incl. ${hstAmount.toLocaleString("en-CA", { minimumFractionDigits: 2 })} HST (13%)</div>
                   {(() => {
                     const totalLabor = items.reduce((s, i) => s + (parseFloat(i.laborCost) || 0), 0);
                     return totalLabor > 0 ? <div className="text-xs text-muted-foreground">Labor: ${totalLabor.toLocaleString("en-CA", { minimumFractionDigits: 2 })}</div> : null;
@@ -488,9 +492,9 @@ export default function CostEstimator() {
             {(() => {
               const budget = parseFloat(activeEstimate.budget || "0");
               const hasBudget = budget > 0;
-              const budgetUsedPercent = hasBudget ? Math.min((grandTotalWithMarkup / budget) * 100, 100) : 0;
-              const overBudget = hasBudget && grandTotalWithMarkup > budget;
-              const budgetRemaining = hasBudget ? budget - grandTotalWithMarkup : 0;
+              const budgetUsedPercent = hasBudget ? Math.min((grandTotalWithHST / budget) * 100, 100) : 0;
+              const overBudget = hasBudget && grandTotalWithHST > budget;
+              const budgetRemaining = hasBudget ? budget - grandTotalWithHST : 0;
               return (
                 <Card data-testid="card-budget">
                   <CardContent className="pt-4 pb-4 space-y-3">
@@ -559,7 +563,7 @@ export default function CostEstimator() {
                         />
                         <div className="flex items-center justify-between text-xs text-muted-foreground">
                           <span>{budgetUsedPercent.toFixed(0)}% of budget used</span>
-                          <span>Estimate: ${grandTotalWithMarkup.toLocaleString("en-CA", { minimumFractionDigits: 2 })}</span>
+                          <span>Estimate: ${grandTotalWithHST.toLocaleString("en-CA", { minimumFractionDigits: 2 })} (incl. HST)</span>
                         </div>
                         {overBudget && canEdit && items.length > 0 && (
                           <Button
@@ -770,10 +774,22 @@ export default function CostEstimator() {
                         </div>
                       </div>
                     )}
-                    <div className="grid grid-cols-2 md:grid-cols-12 gap-2 px-2 pb-1">
+                    <div className="grid grid-cols-2 md:grid-cols-12 gap-2 px-2">
+                      <div className="md:col-span-8 text-sm font-semibold">Pre-Tax Total</div>
+                      <div className="md:col-span-4 text-right text-sm font-semibold" data-testid="text-pretax-total">
+                        ${grandTotalWithMarkup.toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-12 gap-2 px-2">
+                      <div className="md:col-span-8 text-sm text-muted-foreground">HST (13%)</div>
+                      <div className="md:col-span-4 text-right text-sm text-muted-foreground" data-testid="text-hst-amount">
+                        +${hstAmount.toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-12 gap-2 px-2 pb-1 pt-1 border-t">
                       <div className="md:col-span-8 text-base font-bold">Grand Total</div>
                       <div className="md:col-span-4 text-right text-base font-bold" data-testid="text-grand-total-bottom">
-                        ${grandTotalWithMarkup.toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        ${grandTotalWithHST.toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </div>
                     </div>
                   </div>
