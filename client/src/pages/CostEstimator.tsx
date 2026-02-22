@@ -60,7 +60,7 @@ export default function CostEstimator() {
   const [newItem, setNewItem] = useState({
     categoryId: "", customCategory: "", unitType: "sq_ft",
     quantity: "", unitCost: "", materialCost: "", laborCost: "", notes: "", isCustomRate: false,
-    length: "", width: "",
+    length: "", width: "", crewCount: "1",
   });
 
   const [newReceipt, setNewReceipt] = useState({
@@ -117,7 +117,7 @@ export default function CostEstimator() {
       queryClient.invalidateQueries({ queryKey: ["/api/estimates", activeEstimate?.id, "items"] });
       queryClient.invalidateQueries({ queryKey: ["/api/estimates", activeEstimate?.id, "warnings"] });
       setShowAddItem(false);
-      setNewItem({ categoryId: "", customCategory: "", unitType: "sq_ft", quantity: "", unitCost: "", materialCost: "", laborCost: "", notes: "", isCustomRate: false, length: "", width: "" });
+      setNewItem({ categoryId: "", customCategory: "", unitType: "sq_ft", quantity: "", unitCost: "", materialCost: "", laborCost: "", notes: "", isCustomRate: false, length: "", width: "", crewCount: "1" });
       toast({ title: "Line item added" });
     },
   });
@@ -818,13 +818,22 @@ export default function CostEstimator() {
             <div>
               <div className="flex items-center justify-between mb-2">
                 <Label>Labor Cost ($)</Label>
-                {isAdmin && (
-                  <Link href="/labor-rates">
-                    <Button variant="link" size="sm" className="h-auto p-0 text-xs">
-                      Manage Labor Rates
-                    </Button>
-                  </Link>
-                )}
+                <div className="flex items-center gap-2">
+                  <Label className="text-[10px] text-muted-foreground">Crew Count:</Label>
+                  <Input 
+                    type="number" 
+                    className="h-6 w-12 text-xs px-1" 
+                    value={newItem.crewCount} 
+                    onChange={(e) => setNewItem(prev => ({ ...prev, crewCount: e.target.value }))}
+                  />
+                  {isAdmin && (
+                    <Link href="/labor-rates">
+                      <Button variant="link" size="sm" className="h-auto p-0 text-xs">
+                        Manage Labor Rates
+                      </Button>
+                    </Link>
+                  )}
+                </div>
               </div>
               <Input type="number" step="0.01" value={newItem.laborCost} onChange={(e) => setNewItem(prev => ({ ...prev, laborCost: e.target.value }))} placeholder="0.00" data-testid="input-labor-cost" />
               <div className="flex gap-2 mt-2 flex-wrap">
@@ -833,7 +842,13 @@ export default function CostEstimator() {
                     const crew = crewRates.find(c => c.id === parseInt(v));
                     if (crew) {
                       const hours = parseFloat(newItem.quantity) || 8;
-                      setNewItem(prev => ({ ...prev, laborCost: (parseFloat(crew.billableRate) * hours).toFixed(2), notes: prev.notes || `${crew.name} - ${hours}hrs @ $${crew.billableRate}/hr` }));
+                      const count = parseInt(newItem.crewCount) || 1;
+                      const totalLabor = (parseFloat(crew.billableRate) * hours * count).toFixed(2);
+                      setNewItem(prev => ({ 
+                        ...prev, 
+                        laborCost: totalLabor, 
+                        notes: prev.notes || `${crew.name} (${count} crew) - ${hours}hrs @ $${crew.billableRate}/hr` 
+                      }));
                     }
                   }}>
                     <SelectTrigger className="text-xs" data-testid="select-crew-rate"><SelectValue placeholder="Fill from crew rate..." /></SelectTrigger>
