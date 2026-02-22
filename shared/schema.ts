@@ -485,6 +485,37 @@ export const subcontractors = pgTable("subcontractors", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Suppliers (material suppliers / vendors)
+export const suppliers = pgTable("suppliers", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  phone: text("phone"),
+  email: text("email"),
+  address: text("address"),
+  website: text("website"),
+  isPreferred: boolean("is_preferred").default(false),
+  isActive: boolean("is_active").default(true),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Supplier Prices (price book built from receipts)
+export const supplierPrices = pgTable("supplier_prices", {
+  id: serial("id").primaryKey(),
+  supplierId: integer("supplier_id").notNull().references(() => suppliers.id, { onDelete: "cascade" }),
+  productName: text("product_name").notNull(),
+  categoryId: integer("category_id").references(() => costCategories.id),
+  unitPrice: text("unit_price").notNull(),
+  unitType: text("unit_type").notNull().default("unit"),
+  productCode: text("product_code"),
+  productUrl: text("product_url"),
+  sourceReceiptId: integer("source_receipt_id").references(() => receipts.id),
+  notes: text("notes"),
+  lastUpdated: timestamp("last_updated").defaultNow(),
+  createdBy: text("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // SCHEMAS
 export const insertProjectSchema = createInsertSchema(projects).omit({ id: true, createdAt: true });
 export const insertMilestoneSchema = createInsertSchema(milestones).omit({ id: true });
@@ -510,6 +541,8 @@ export const insertReceiptSchema = createInsertSchema(receipts).omit({ id: true,
 export const insertEstimateWarningSchema = createInsertSchema(estimateWarnings).omit({ id: true });
 export const insertCrewRateSchema = createInsertSchema(crewRates).omit({ id: true, createdAt: true });
 export const insertSubcontractorSchema = createInsertSchema(subcontractors).omit({ id: true, createdAt: true });
+export const insertSupplierSchema = createInsertSchema(suppliers).omit({ id: true, createdAt: true });
+export const insertSupplierPriceSchema = createInsertSchema(supplierPrices).omit({ id: true, createdAt: true, lastUpdated: true });
 
 // TYPES
 export type Project = typeof projects.$inferSelect;
@@ -563,3 +596,7 @@ export type CrewRate = typeof crewRates.$inferSelect;
 export type InsertCrewRate = z.infer<typeof insertCrewRateSchema>;
 export type Subcontractor = typeof subcontractors.$inferSelect;
 export type InsertSubcontractor = z.infer<typeof insertSubcontractorSchema>;
+export type Supplier = typeof suppliers.$inferSelect;
+export type InsertSupplier = z.infer<typeof insertSupplierSchema>;
+export type SupplierPrice = typeof supplierPrices.$inferSelect;
+export type InsertSupplierPrice = z.infer<typeof insertSupplierPriceSchema>;

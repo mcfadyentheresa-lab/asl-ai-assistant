@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
-import { LogOut, UserCog, Eye, EyeOff, User, Palette, ZoomIn, Clock, DollarSign, Calculator, Users, BookUser } from "lucide-react";
+import { LogOut, UserCog, Eye, EyeOff, User, Palette, ZoomIn, Clock, DollarSign, Calculator, Users, BookUser, Store } from "lucide-react";
 import { useTextZoom } from "@/hooks/use-text-zoom";
 import { Link } from "wouter";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -176,6 +176,14 @@ export function Navbar() {
                 <DropdownMenuItem data-testid="link-trade-contacts">
                   <BookUser className="mr-2 h-4 w-4" />
                   Trade Contacts
+                </DropdownMenuItem>
+              </Link>
+            )}
+            {user.role === "admin" && (
+              <Link href="/supplier-prices">
+                <DropdownMenuItem data-testid="link-supplier-prices">
+                  <Store className="mr-2 h-4 w-4" />
+                  Supplier Prices
                 </DropdownMenuItem>
               </Link>
             )}

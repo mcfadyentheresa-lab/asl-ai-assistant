@@ -1,10 +1,10 @@
 import { db } from "./db";
 import { 
-  users, projects, milestones, subMilestones, tasks, photos, documents, timeEntries, messages, checklistItems, boardItems, calendarEvents, planningBoards, canvasElements, activityLog, activityViews, paintColors, boardSnapshots, costCategories, marketRates, projectEstimates, estimateItems, receipts, estimateWarnings, crewRates, subcontractors,
+  users, projects, milestones, subMilestones, tasks, photos, documents, timeEntries, messages, checklistItems, boardItems, calendarEvents, planningBoards, canvasElements, activityLog, activityViews, paintColors, boardSnapshots, costCategories, marketRates, projectEstimates, estimateItems, receipts, estimateWarnings, crewRates, subcontractors, suppliers, supplierPrices,
   type Project, type Milestone, type SubMilestone, type Task, type Photo, type Document, type TimeEntry, type Message,
   type ChecklistItem, type BoardItem, type CalendarEvent, type PlanningBoard, type CanvasElement, type ActivityLog, type PaintColor, type BoardSnapshot, type CostCategory, type MarketRate, type ProjectEstimate, type EstimateItem, type Receipt, type EstimateWarning, type CrewRate, type Subcontractor,
   type InsertProject, type InsertMilestone, type InsertSubMilestone, type InsertTask, type InsertPhoto, type InsertDocument, 
-  type InsertTimeEntry, type InsertMessage, type InsertChecklistItem, type InsertBoardItem, type InsertCalendarEvent, type InsertPlanningBoard, type InsertCanvasElement, type InsertActivityLog, type InsertBoardSnapshot, type InsertCostCategory, type InsertMarketRate, type InsertProjectEstimate, type InsertEstimateItem, type InsertReceipt, type InsertEstimateWarning, type InsertCrewRate, type InsertSubcontractor
+  type InsertTimeEntry, type InsertMessage, type InsertChecklistItem, type InsertBoardItem, type InsertCalendarEvent, type InsertPlanningBoard, type InsertCanvasElement, type InsertActivityLog, type InsertBoardSnapshot, type InsertCostCategory, type InsertMarketRate, type InsertProjectEstimate, type InsertEstimateItem, type InsertReceipt, type InsertEstimateWarning, type InsertCrewRate, type InsertSubcontractor, type Supplier, type SupplierPrice, type InsertSupplier, type InsertSupplierPrice
 } from "@shared/schema";
 import { type User } from "@shared/models/auth";
 import { eq, desc, and, ilike, or, gte, lte, inArray, sql } from "drizzle-orm";
@@ -169,6 +169,20 @@ export interface IStorage {
   createSubcontractor(sub: InsertSubcontractor): Promise<Subcontractor>;
   updateSubcontractor(id: number, updates: Partial<InsertSubcontractor>): Promise<Subcontractor>;
   deleteSubcontractor(id: number): Promise<void>;
+
+  // Suppliers
+  getSuppliers(): Promise<Supplier[]>;
+  getSupplier(id: number): Promise<Supplier | undefined>;
+  createSupplier(supplier: InsertSupplier): Promise<Supplier>;
+  updateSupplier(id: number, updates: Partial<InsertSupplier>): Promise<Supplier>;
+  deleteSupplier(id: number): Promise<void>;
+
+  // Supplier Prices
+  getSupplierPrices(supplierId?: number): Promise<SupplierPrice[]>;
+  getSupplierPrice(id: number): Promise<SupplierPrice | undefined>;
+  createSupplierPrice(price: InsertSupplierPrice): Promise<SupplierPrice>;
+  updateSupplierPrice(id: number, updates: Partial<InsertSupplierPrice>): Promise<SupplierPrice>;
+  deleteSupplierPrice(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -709,6 +723,49 @@ export class DatabaseStorage implements IStorage {
   }
   async deleteSubcontractor(id: number): Promise<void> {
     await db.delete(subcontractors).where(eq(subcontractors.id, id));
+  }
+
+  // Suppliers
+  async getSuppliers(): Promise<Supplier[]> {
+    return db.select().from(suppliers).orderBy(suppliers.name);
+  }
+  async getSupplier(id: number): Promise<Supplier | undefined> {
+    const [supplier] = await db.select().from(suppliers).where(eq(suppliers.id, id));
+    return supplier;
+  }
+  async createSupplier(supplier: InsertSupplier): Promise<Supplier> {
+    const [created] = await db.insert(suppliers).values(supplier).returning();
+    return created;
+  }
+  async updateSupplier(id: number, updates: Partial<InsertSupplier>): Promise<Supplier> {
+    const [updated] = await db.update(suppliers).set(updates).where(eq(suppliers.id, id)).returning();
+    return updated;
+  }
+  async deleteSupplier(id: number): Promise<void> {
+    await db.delete(suppliers).where(eq(suppliers.id, id));
+  }
+
+  // Supplier Prices
+  async getSupplierPrices(supplierId?: number): Promise<SupplierPrice[]> {
+    if (supplierId) {
+      return db.select().from(supplierPrices).where(eq(supplierPrices.supplierId, supplierId)).orderBy(supplierPrices.productName);
+    }
+    return db.select().from(supplierPrices).orderBy(supplierPrices.productName);
+  }
+  async getSupplierPrice(id: number): Promise<SupplierPrice | undefined> {
+    const [price] = await db.select().from(supplierPrices).where(eq(supplierPrices.id, id));
+    return price;
+  }
+  async createSupplierPrice(price: InsertSupplierPrice): Promise<SupplierPrice> {
+    const [created] = await db.insert(supplierPrices).values(price).returning();
+    return created;
+  }
+  async updateSupplierPrice(id: number, updates: Partial<InsertSupplierPrice>): Promise<SupplierPrice> {
+    const [updated] = await db.update(supplierPrices).set({ ...updates, lastUpdated: new Date() }).where(eq(supplierPrices.id, id)).returning();
+    return updated;
+  }
+  async deleteSupplierPrice(id: number): Promise<void> {
+    await db.delete(supplierPrices).where(eq(supplierPrices.id, id));
   }
 }
 

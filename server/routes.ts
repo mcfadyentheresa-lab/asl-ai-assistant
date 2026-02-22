@@ -2250,6 +2250,89 @@ Respond with valid JSON only, no markdown:
     res.json({ success: true });
   });
 
+  // === Suppliers ===
+  app.get("/api/suppliers", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const user = await authStorage.getUser(userId);
+    if (!user || (user.role !== "admin" && user.role !== "crew")) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    const suppliers = await storage.getSuppliers();
+    res.json(suppliers);
+  });
+
+  app.post("/api/suppliers", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const user = await authStorage.getUser(userId);
+    if (!user || user.role !== "admin") {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+    const supplier = await storage.createSupplier(req.body);
+    res.status(201).json(supplier);
+  });
+
+  app.patch("/api/suppliers/:id", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const user = await authStorage.getUser(userId);
+    if (!user || user.role !== "admin") {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+    const supplier = await storage.updateSupplier(parseInt(req.params.id), req.body);
+    res.json(supplier);
+  });
+
+  app.delete("/api/suppliers/:id", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const user = await authStorage.getUser(userId);
+    if (!user || user.role !== "admin") {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+    await storage.deleteSupplier(parseInt(req.params.id));
+    res.json({ message: "Supplier deleted" });
+  });
+
+  // === Supplier Prices ===
+  app.get("/api/supplier-prices", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const user = await authStorage.getUser(userId);
+    if (!user || (user.role !== "admin" && user.role !== "crew")) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    const supplierId = req.query.supplierId ? parseInt(req.query.supplierId as string) : undefined;
+    const prices = await storage.getSupplierPrices(supplierId);
+    res.json(prices);
+  });
+
+  app.post("/api/supplier-prices", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const user = await authStorage.getUser(userId);
+    if (!user || user.role !== "admin") {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+    const price = await storage.createSupplierPrice({ ...req.body, createdBy: userId });
+    res.status(201).json(price);
+  });
+
+  app.patch("/api/supplier-prices/:id", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const user = await authStorage.getUser(userId);
+    if (!user || user.role !== "admin") {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+    const price = await storage.updateSupplierPrice(parseInt(req.params.id), req.body);
+    res.json(price);
+  });
+
+  app.delete("/api/supplier-prices/:id", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const user = await authStorage.getUser(userId);
+    if (!user || user.role !== "admin") {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+    await storage.deleteSupplierPrice(parseInt(req.params.id));
+    res.json({ message: "Supplier price deleted" });
+  });
+
   // Initialize seed data
   await seedDatabase();
 
@@ -2401,5 +2484,20 @@ async function seedDatabase() {
     for (const sub of subSeeds) {
       await storage.createSubcontractor(sub);
     }
+  }
+
+  // Seed default suppliers
+  const existingSuppliers = await storage.getSuppliers();
+  if (existingSuppliers.length === 0) {
+    await storage.createSupplier({
+      name: "Muskoka Lumber",
+      phone: "(705) 645-2231",
+      email: "sales@muskokalumber.com",
+      address: "Bracebridge, ON",
+      website: "https://www.muskokalumber.com",
+      isPreferred: true,
+      isActive: true,
+      notes: "Primary material supplier. Full lumber yard, hardware, plumbing, electrical supplies. Contractor pricing available.",
+    });
   }
 }
