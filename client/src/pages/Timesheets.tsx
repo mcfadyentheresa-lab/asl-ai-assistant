@@ -52,10 +52,22 @@ export default function Timesheets() {
 
   const [selectedDate, setSelectedDate] = useState(todayStr);
   const [selectedProjectId, setSelectedProjectId] = useState("");
-  const [hours, setHours] = useState("");
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
   const [description, setDescription] = useState("");
   const [selectedMilestoneId, setSelectedMilestoneId] = useState("");
   const [selectedCalendarEventId, setSelectedCalendarEventId] = useState("");
+
+  function calcHours(start: string, end: string): number {
+    if (!start || !end) return 0;
+    const [sh, sm] = start.split(":").map(Number);
+    const [eh, em] = end.split(":").map(Number);
+    let diff = (eh * 60 + em) - (sh * 60 + sm);
+    if (diff <= 0) diff += 24 * 60;
+    return Math.round((diff / 60) * 100) / 100;
+  }
+
+  const calculatedHours = calcHours(startTime, endTime);
 
   const entriesQueryKey = `/api/time-entries?startDate=${period.start}&endDate=${period.end}`;
 
@@ -88,7 +100,8 @@ export default function Timesheets() {
       toast({ title: "Entry added", description: "Time entry saved as draft." });
       queryClient.invalidateQueries({ queryKey: [entriesQueryKey] });
       setTimeout(() => {
-        setHours("");
+        setStartTime("");
+        setEndTime("");
         setDescription("");
         setSelectedMilestoneId("");
         setSelectedCalendarEventId("");
@@ -127,14 +140,20 @@ export default function Timesheets() {
   });
 
   const handleAddEntry = () => {
-    if (!selectedProjectId || !hours || !selectedDate || !description.trim()) {
-      toast({ title: "Missing fields", description: "Please fill in project, date, hours, and details.", variant: "destructive" });
+    if (!selectedProjectId || !startTime || !endTime || !selectedDate || !description.trim()) {
+      toast({ title: "Missing fields", description: "Please fill in all required fields.", variant: "destructive" });
+      return;
+    }
+    if (calculatedHours <= 0) {
+      toast({ title: "Invalid times", description: "End time must be after start time.", variant: "destructive" });
       return;
     }
     const body: Record<string, unknown> = {
       projectId: parseInt(selectedProjectId),
       date: selectedDate,
-      hours: hours,
+      hours: calculatedHours.toFixed(2),
+      startTime: new Date(`${selectedDate}T${startTime}:00`).toISOString(),
+      endTime: new Date(`${selectedDate}T${endTime}:00`).toISOString(),
       description: description.trim(),
       status: "draft",
       payPeriodStart: period.start,
@@ -191,7 +210,7 @@ export default function Timesheets() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <Label htmlFor="entry-date">Date <span className="text-destructive">*</span></Label>
                 <Input
@@ -204,21 +223,35 @@ export default function Timesheets() {
                 />
               </div>
               <div>
-                <Label htmlFor="entry-hours">Hours <span className="text-destructive">*</span></Label>
+                <Label htmlFor="entry-start-time">Start Time <span className="text-destructive">*</span></Label>
                 <Input
-                  id="entry-hours"
-                  type="number"
-                  step="0.25"
-                  min="0"
-                  max="24"
-                  placeholder="8"
-                  value={hours}
-                  onChange={(e) => setHours(e.target.value)}
-                  data-testid="input-hours"
+                  id="entry-start-time"
+                  type="time"
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                  data-testid="input-start-time"
+                  className="mt-1.5"
+                />
+              </div>
+              <div>
+                <Label htmlFor="entry-end-time">End Time <span className="text-destructive">*</span></Label>
+                <Input
+                  id="entry-end-time"
+                  type="time"
+                  value={endTime}
+                  onChange={(e) => setEndTime(e.target.value)}
+                  data-testid="input-end-time"
                   className="mt-1.5"
                 />
               </div>
             </div>
+            {startTime && endTime && calculatedHours > 0 && (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-muted/50 border">
+                <Clock className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Total Hours: {calculatedHours.toFixed(2)}h</span>
+                <span className="text-xs text-muted-foreground">({startTime} — {endTime})</span>
+              </div>
+            )}
 
             <div>
               <Label>Project <span className="text-destructive">*</span></Label>
@@ -294,7 +327,7 @@ export default function Timesheets() {
             <div className="flex justify-end pt-2">
               <Button
                 onClick={handleAddEntry}
-                disabled={createEntry.isPending || !selectedProjectId || !hours || !selectedDate || !description.trim()}
+                disabled={createEntry.isPending || !selectedProjectId || !startTime || !endTime || !selectedDate || !description.trim() || calculatedHours <= 0}
                 data-testid="button-add-entry"
               >
                 {createEntry.isPending ? (
@@ -444,6 +477,9 @@ function EntryRow({
   const [y, m, d] = (entry.date || "").split("-").map(Number);
   const dateLabel = entry.date ? format(new Date(y, m - 1, d), "EEE, MMM d") : "";
 
+  const startLabel = entry.startTime ? new Date(entry.startTime).toLocaleTimeString("en-CA", { hour: "numeric", minute: "2-digit", hour12: true }) : null;
+  const endLabel = entry.endTime ? new Date(entry.endTime).toLocaleTimeString("en-CA", { hour: "numeric", minute: "2-digit", hour12: true }) : null;
+
   return (
     <Card data-testid={`entry-row-${entry.id}`}>
       <CardContent className="py-3 flex items-center gap-4 flex-wrap">
@@ -453,6 +489,12 @@ function EntryRow({
             <span className="text-xs text-muted-foreground">&middot;</span>
             <span className="text-sm text-muted-foreground">{projectName}</span>
           </div>
+          {startLabel && endLabel && (
+            <div className="flex items-center gap-1 mt-0.5">
+              <Clock className="h-3 w-3 text-muted-foreground" />
+              <span className="text-xs text-muted-foreground">{startLabel} — {endLabel}</span>
+            </div>
+          )}
           {entry.description && (
             <p className="text-xs text-muted-foreground mt-0.5 truncate">{entry.description}</p>
           )}
