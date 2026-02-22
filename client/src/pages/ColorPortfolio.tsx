@@ -53,6 +53,13 @@ const SUB_FAMILIES: Record<string, string[]> = {
   "Muted Hues": ["Gray", "Brown", "Black"],
 };
 
+const PAINT_BRANDS = [
+  { id: "Benjamin Moore", short: "BM", color: "#0066B3", label: "Benjamin Moore" },
+  { id: "Sherwin-Williams", short: "SW", color: "#EF4135", label: "Sherwin-Williams" },
+  { id: "Farrow & Ball", short: "F&B", color: "#31353D", label: "Farrow & Ball" },
+  { id: "Para Paints", short: "PP", color: "#CC0033", label: "Para Paints" },
+];
+
 function ColorSwatch({
   color,
   onClick,
@@ -354,7 +361,7 @@ function ColorDetail({ color, onClose, onLinkToBoard }: { color: PaintColor; onC
         </div>
 
         <div className="text-[10px] text-muted-foreground pt-2 border-t border-border">
-          Benjamin Moore & Co. All color names, codes, and formulations are trademarks of Benjamin Moore & Co. Colors shown are approximate digital representations.
+          {color.brand}<sup>&reg;</sup>. All color names, codes, and formulations are trademarks of {color.brand}. Colors shown are approximate digital representations.
         </div>
       </div>
     </DialogContent>
@@ -408,12 +415,13 @@ export default function ColorPortfolio() {
   const [showPopularOnly, setShowPopularOnly] = useState(false);
   const [selectedColor, setSelectedColor] = useState<PaintColor | null>(null);
   const [linkColor, setLinkColor] = useState<PaintColor | null>(null);
+  const [activeBrand, setActiveBrand] = useState("Benjamin Moore");
   const { toast } = useToast();
 
   const { data: allColors, isLoading } = useQuery<PaintColor[]>({
-    queryKey: ["/api/paint-colors", "all-portfolio"],
+    queryKey: ["/api/paint-colors", "all-portfolio", activeBrand],
     queryFn: async () => {
-      const res = await fetch("/api/paint-colors?brand=Benjamin+Moore", {
+      const res = await fetch(`/api/paint-colors?brand=${encodeURIComponent(activeBrand)}`, {
         credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to fetch colors");
@@ -503,17 +511,30 @@ export default function ColorPortfolio() {
             <h1 className="font-serif text-xl sm:text-2xl md:text-3xl font-bold text-foreground leading-tight" data-testid="text-page-title">
               Color Portfolio
             </h1>
-            <div className="flex items-center gap-2 mt-1 sm:mt-1.5">
-              <div className="h-px flex-1 max-w-[40px] sm:max-w-[60px] bg-primary/30" />
-              <p className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap" data-testid="text-brand-attribution">
-                curated by{" "}
-                <span className="font-semibold tracking-wide text-foreground">
-                  Benjamin Moore
-                </span>
-                <sup className="text-[8px] sm:text-[9px]">&reg;</sup>
-                <span className="hidden sm:inline"> & Co.</span>
-              </p>
-              <div className="h-px flex-1 max-w-[40px] sm:max-w-[60px] bg-primary/30" />
+            <div className="flex items-center gap-2 mt-1.5 sm:mt-2">
+              {PAINT_BRANDS.map((brand) => {
+                const isActive = activeBrand === brand.id;
+                return (
+                  <button
+                    key={brand.id}
+                    onClick={() => setActiveBrand(brand.id)}
+                    className={`relative flex items-center justify-center rounded-full text-[10px] sm:text-[11px] font-bold tracking-tight transition-colors px-2.5 py-1.5 sm:px-3 sm:py-2 ${
+                      isActive
+                        ? "ring-2 ring-offset-2 ring-offset-background text-white shadow-md"
+                        : "opacity-60 hover:opacity-90 text-white"
+                    }`}
+                    style={{
+                      backgroundColor: brand.color,
+                      ringColor: isActive ? brand.color : undefined,
+                      ...(isActive ? { boxShadow: `0 0 0 2px var(--background), 0 0 0 4px ${brand.color}` } : {}),
+                    }}
+                    title={brand.label}
+                    data-testid={`brand-selector-${brand.short.toLowerCase()}`}
+                  >
+                    {brand.short}
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -629,7 +650,11 @@ export default function ColorPortfolio() {
             </p>
           )}
           <p className="text-[10px] sm:text-xs text-muted-foreground/70 max-w-md mx-auto leading-relaxed">
-            Benjamin Moore<sup>&reg;</sup> and all color names are registered trademarks of Benjamin Moore & Co. Colors shown are approximate digital representations.
+            {activeBrand === "Benjamin Moore" && <>Benjamin Moore<sup>&reg;</sup> and all color names are registered trademarks of Benjamin Moore & Co.</>}
+            {activeBrand === "Sherwin-Williams" && <>Sherwin-Williams<sup>&reg;</sup> and all color names are registered trademarks of The Sherwin-Williams Company.</>}
+            {activeBrand === "Farrow & Ball" && <>Farrow & Ball<sup>&reg;</sup> and all colour names are registered trademarks of Farrow & Ball Ltd.</>}
+            {activeBrand === "Para Paints" && <>Para Paints<sup>&reg;</sup> and all color names are registered trademarks of Para Paints.</>}
+            {" "}Colors shown are approximate digital representations.
           </p>
         </div>
       </div>

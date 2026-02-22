@@ -37,6 +37,13 @@ const SUB_FAMILIES: Record<string, string[]> = {
   "Muted Hues": ["Gray", "Brown", "Black"],
 };
 
+const PAINT_BRANDS = [
+  { id: "Benjamin Moore", short: "BM", color: "#0066B3", label: "Benjamin Moore" },
+  { id: "Sherwin-Williams", short: "SW", color: "#EF4135", label: "Sherwin-Williams" },
+  { id: "Farrow & Ball", short: "F&B", color: "#31353D", label: "Farrow & Ball" },
+  { id: "Para Paints", short: "PP", color: "#CC0033", label: "Para Paints" },
+];
+
 interface ColorPalettePickerProps {
   selectedColorId: number | null;
   onSelect: (colorId: number | null, color?: PaintColor | null) => void;
@@ -61,7 +68,7 @@ export function ColorPalettePicker({
         <DialogContent className="sm:max-w-lg max-h-[80vh] flex flex-col p-0">
           <DialogHeader className="px-4 pt-4 pb-0">
             <DialogTitle className="font-serif text-lg">Color Palette</DialogTitle>
-            <DialogDescription>Select a Benjamin Moore color to tag this item</DialogDescription>
+            <DialogDescription>Select a paint color to tag this item</DialogDescription>
           </DialogHeader>
           <PaletteContent
             selectedColorId={selectedColorId}
@@ -133,11 +140,12 @@ function PaletteContent({
   const [activeTab, setActiveTab] = useState("Colors");
   const [activeSubFamily, setActiveSubFamily] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [activeBrand, setActiveBrand] = useState("Benjamin Moore");
 
   const { data: allColors, isLoading } = useQuery<PaintColor[]>({
-    queryKey: ["/api/paint-colors", "all-for-picker"],
+    queryKey: ["/api/paint-colors", "all-for-picker", activeBrand],
     queryFn: async () => {
-      const res = await fetch("/api/paint-colors?brand=Benjamin+Moore", { credentials: "include" });
+      const res = await fetch(`/api/paint-colors?brand=${encodeURIComponent(activeBrand)}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch colors");
       return res.json();
     },
@@ -172,6 +180,30 @@ function PaletteContent({
 
   return (
     <div className="flex flex-col min-h-0" data-testid="color-palette-picker">
+      <div className="flex items-center gap-1.5 px-3 pt-3 pb-1">
+        {PAINT_BRANDS.map((brand) => {
+          const isActive = activeBrand === brand.id;
+          return (
+            <button
+              key={brand.id}
+              onClick={() => setActiveBrand(brand.id)}
+              className={`flex items-center justify-center rounded-full text-[8px] font-bold tracking-tight transition-colors px-1.5 py-1 ${
+                isActive
+                  ? "ring-2 ring-offset-1 ring-offset-background text-white"
+                  : "opacity-50 hover:opacity-80 text-white"
+              }`}
+              style={{
+                backgroundColor: brand.color,
+                ...(isActive ? { boxShadow: `0 0 0 1px var(--background), 0 0 0 3px ${brand.color}` } : {}),
+              }}
+              title={brand.label}
+              data-testid={`picker-brand-${brand.short.toLowerCase()}`}
+            >
+              {brand.short}
+            </button>
+          );
+        })}
+      </div>
       <div className="px-3 pt-3 pb-2">
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
@@ -288,7 +320,7 @@ function PaletteContent({
       </div>
 
       <div className="px-3 py-1.5 border-t border-border text-[10px] text-muted-foreground text-center">
-        {filteredColors.length} colors · Benjamin Moore
+        {filteredColors.length} colors · {activeBrand}
       </div>
     </div>
   );
