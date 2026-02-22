@@ -325,6 +325,42 @@ export default function CostEstimator() {
     });
   }
 
+  const [scanning, setScanning] = useState(false);
+
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setScanning(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      
+      const uploadRes = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+      
+      if (!uploadRes.ok) throw new Error("Upload failed");
+      const { url } = await uploadRes.json();
+
+      const scanRes = await apiRequest("POST", `/api/projects/${projectId}/receipts/scan`, { imageUrl: url });
+      const data = await scanRes.json();
+
+      setNewReceipt(prev => ({
+        ...prev,
+        vendor: data.vendor || "",
+        amount: data.amount?.toString() || "",
+        date: data.date || prev.date,
+      }));
+      toast({ title: "Receipt scanned successfully" });
+    } catch (error) {
+      toast({ title: "Failed to scan receipt", variant: "destructive" });
+    } finally {
+      setScanning(false);
+    }
+  }
+
   if (!project) {
     return (
       <div className="min-h-screen bg-background">
@@ -933,7 +969,33 @@ export default function CostEstimator() {
           <DialogHeader>
             <DialogTitle>Add Receipt</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="space-y-4 pt-4">
+            <div className="p-4 border-2 border-dashed rounded-lg text-center bg-muted/30">
+              <Input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                id="receipt-upload"
+                onChange={handleFileUpload}
+                disabled={scanning}
+              />
+              <Label
+                htmlFor="receipt-upload"
+                className="cursor-pointer flex flex-col items-center gap-2"
+              >
+                {scanning ? (
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                ) : (
+                  <ReceiptIcon className="h-8 w-8 text-muted-foreground" />
+                )}
+                <span className="text-sm font-medium">
+                  {scanning ? "Analyzing Receipt..." : "Click to Scan Receipt Image"}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  AI will automatically extract vendor, date, and amount
+                </span>
+              </Label>
+            </div>
             <div>
               <Label>Vendor</Label>
               <Input value={newReceipt.vendor} onChange={(e) => setNewReceipt(prev => ({ ...prev, vendor: e.target.value }))} placeholder="e.g., Home Hardware" data-testid="input-receipt-vendor" />

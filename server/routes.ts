@@ -2156,6 +2156,45 @@ Respond with valid JSON only, no markdown:
     res.json({ success: true });
   });
 
+  // Receipt Scanning with OpenAI Vision
+  app.post("/api/projects/:id/receipts/scan", isAuthenticated, async (req: any, res) => {
+    try {
+      const { imageUrl } = req.body;
+      if (!imageUrl) return res.status(400).json({ message: "Image URL is required" });
+
+      const OpenAI = (await import("openai")).default;
+      const openai = new OpenAI({
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+      });
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-5.2",
+        messages: [
+          {
+            role: "system",
+            content: "You are a receipt parsing assistant. Extract vendor name, total amount, and date from the receipt image. Respond with valid JSON only: { \"vendor\": \"string\", \"amount\": \"number\", \"date\": \"YYYY-MM-DD\" }"
+          },
+          {
+            role: "user",
+            content: [
+              { type: "text", text: "Parse this receipt:" },
+              { type: "image_url", image_url: { url: imageUrl } }
+            ]
+          }
+        ],
+        response_format: { type: "json_object" }
+      });
+
+      const content = response.choices[0]?.message?.content;
+      if (!content) return res.status(500).json({ message: "No response from AI" });
+      res.json(JSON.parse(content));
+    } catch (error) {
+      console.error("Receipt scan error:", error);
+      res.status(500).json({ message: "Failed to scan receipt" });
+    }
+  });
+
   // Subcontractors
   app.get("/api/subcontractors", isAuthenticated, async (req: any, res) => {
     const userId = req.user.claims.sub;
