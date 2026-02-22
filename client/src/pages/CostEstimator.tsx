@@ -317,19 +317,20 @@ export default function CostEstimator() {
             <h1 className="text-2xl font-semibold tracking-tight" data-testid="text-page-title">Cost Estimator</h1>
             <p className="text-sm text-muted-foreground" data-testid="text-project-name">{project.name} <span className="text-xs ml-1">All pricing in CAD</span></p>
           </div>
-          <div className="flex items-center gap-2">
-            <Label className="text-sm">View:</Label>
-            <Select value={viewMode} onValueChange={(v: any) => setViewMode(v)}>
-              <SelectTrigger className="w-[140px]" data-testid="select-view-mode">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Items</SelectItem>
-                <SelectItem value="sq_ft">Per Sq Ft</SelectItem>
-                <SelectItem value="board">Per Board/Unit</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+            <div className="flex items-center gap-2">
+              <Label className="text-sm">View:</Label>
+              <Select value={viewMode} onValueChange={(v: any) => setViewMode(v)}>
+                <SelectTrigger className="w-[140px]" data-testid="select-view-mode">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Items</SelectItem>
+                  <SelectItem value="sq_ft">Per Sq Ft</SelectItem>
+                  <SelectItem value="hour">Per Hour</SelectItem>
+                  <SelectItem value="board">Per Board/Unit</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
         </div>
 
         {!activeEstimate && canEdit && (
@@ -587,7 +588,9 @@ export default function CostEstimator() {
                             {item.isCustomRate && <Badge variant="outline" className="text-[10px] ml-1">Custom</Badge>}
                           </div>
                           <div className="hidden md:block md:col-span-1">
-                            <Badge variant="outline" className="text-[10px]">{item.unitType === "sq_ft" ? "sq ft" : "unit"}</Badge>
+                            <Badge variant="outline" className="text-[10px]">
+                              {item.unitType === "sq_ft" ? "sq ft" : item.unitType === "hour" ? "hr" : "unit"}
+                            </Badge>
                           </div>
                           <div className="text-right text-sm md:col-span-2">{parseFloat(item.quantity).toLocaleString()}</div>
                           <div className="text-right text-sm md:col-span-2">${parseFloat(item.unitCost).toFixed(2)}</div>
@@ -716,6 +719,7 @@ export default function CostEstimator() {
                 <SelectTrigger data-testid="select-unit-type"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="sq_ft">Per Square Foot</SelectItem>
+                  <SelectItem value="hour">Per Hour</SelectItem>
                   <SelectItem value="board">Per Board / Unit</SelectItem>
                 </SelectContent>
               </Select>
@@ -789,20 +793,20 @@ export default function CostEstimator() {
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label>Quantity (units)</Label>
-                  <Input type="number" value={newItem.quantity} onChange={(e) => setNewItem(prev => ({ ...prev, quantity: e.target.value }))} placeholder="0" data-testid="input-quantity" />
-                </div>
-                <div>
-                  <Label>Unit Cost ($)</Label>
-                  <Input type="number" step="0.01" value={newItem.unitCost} onChange={(e) => setNewItem(prev => ({ ...prev, unitCost: e.target.value }))} placeholder="0.00" data-testid="input-unit-cost" />
-                  {!newItem.isCustomRate && newItem.categoryId && (() => {
-                    const rate = marketRates.find(r => r.categoryId === parseInt(newItem.categoryId) && r.isActive);
-                    return rate ? (
-                      <p className="text-xs text-muted-foreground mt-1">Market: ${rate.lowRate} - ${rate.highRate} / unit</p>
-                    ) : null;
-                  })()}
-                </div>
+                  <div>
+                    <Label>Quantity ({newItem.unitType === "sq_ft" ? "sq ft" : newItem.unitType === "hour" ? "hours" : "units"})</Label>
+                    <Input type="number" value={newItem.quantity} onChange={(e) => setNewItem(prev => ({ ...prev, quantity: e.target.value }))} placeholder="0" data-testid="input-quantity" />
+                  </div>
+                  <div>
+                    <Label>Cost per {newItem.unitType === "sq_ft" ? "Sq Ft" : newItem.unitType === "hour" ? "Hour" : "Unit"} ($)</Label>
+                    <Input type="number" step="0.01" value={newItem.unitCost} onChange={(e) => setNewItem(prev => ({ ...prev, unitCost: e.target.value }))} placeholder="0.00" data-testid="input-unit-cost" />
+                    {!newItem.isCustomRate && newItem.categoryId && (() => {
+                      const rate = marketRates.find(r => r.categoryId === parseInt(newItem.categoryId) && r.isActive);
+                      return rate ? (
+                        <p className="text-xs text-muted-foreground mt-1">Market: ${rate.lowRate} - ${rate.highRate} / {newItem.unitType === "sq_ft" ? "sq ft" : newItem.unitType === "hour" ? "hr" : "unit"}</p>
+                      ) : null;
+                    })()}
+                  </div>
               </div>
             )}
 

@@ -31,7 +31,7 @@ html {
   --secondary-foreground: 152 30% 18%;
 
   --muted: 35 22% 94%;
-  --muted-foreground: 25 10% 46%;
+  --muted-foreground: 25.71deg 3.08% 55.49%;
 
   --accent: 25 35% 45%;
   --accent-foreground: 40 30% 96%;
@@ -50,12 +50,12 @@ html {
 
   --chart-1: 152 30% 30%;
   --chart-2: 25 35% 45%;
-  --chart-3: 35 22% 60%;
+  --chart-3: 45.79deg 17.92% 58.43%;
   --chart-4: 0 60% 50%;
   --chart-5: 200 30% 45%;
 
   --font-sans: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
-  --font-serif: 'Playfair Display', ui-serif, Georgia, serif;
+  --font-serif: 'Inter', sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
 
   --radius: 0.625rem;
