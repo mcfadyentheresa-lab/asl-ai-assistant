@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   Calculator, Plus, Trash2, AlertTriangle, CheckCircle2,
-  DollarSign, ArrowLeft, Receipt as ReceiptIcon, EyeOff,
+  DollarSign, ArrowLeft, Receipt as ReceiptIcon, EyeOff, Pencil,
   TrendingUp, TrendingDown, Minus, Loader2, Sparkles, Shapes, ChevronDown, ChevronRight,
   Wallet, Lightbulb, ArrowDownRight
 } from "lucide-react";
@@ -214,6 +214,8 @@ export default function CostEstimator() {
   });
 
   const [applyingAlt, setApplyingAlt] = useState<number | null>(null);
+  const [editingWarningItem, setEditingWarningItem] = useState<number | null>(null);
+  const [warningEditCost, setWarningEditCost] = useState("");
 
   async function applyAlternative(suggestion: any) {
     setApplyingAlt(suggestion.itemId);
@@ -626,15 +628,74 @@ export default function CostEstimator() {
 
             {activeWarnings.length > 0 && (
               <div className="space-y-2">
-                {activeWarnings.map(w => (
-                  <div key={w.id} className="flex items-center gap-3 p-3 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950" data-testid={`warning-${w.id}`}>
-                    <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
-                    <span className="text-sm flex-1">{w.message}</span>
-                    <Button variant="ghost" size="sm" onClick={() => ignoreWarningMutation.mutate(w.id)} data-testid={`button-ignore-warning-${w.id}`}>
-                      <EyeOff className="h-3 w-3 mr-1" /> Ignore
-                    </Button>
-                  </div>
-                ))}
+                {activeWarnings.map(w => {
+                  const linkedItem = items.find(i => i.id === w.estimateItemId);
+                  const marketRate = linkedItem?.categoryId ? marketRates.find(r => r.categoryId === linkedItem.categoryId && r.isActive) : null;
+                  const isEditing = editingWarningItem === w.estimateItemId;
+                  return (
+                    <div key={w.id} className="p-3 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950" data-testid={`warning-${w.id}`}>
+                      <div className="flex items-center gap-3">
+                        <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+                        <span className="text-sm flex-1">{w.message}</span>
+                      </div>
+                      {isEditing ? (
+                        <div className="flex items-center gap-2 mt-2 ml-7">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            className="h-8 w-32"
+                            value={warningEditCost}
+                            onChange={(e) => setWarningEditCost(e.target.value)}
+                            placeholder="New unit cost"
+                            autoFocus
+                            data-testid={`input-warning-edit-${w.id}`}
+                          />
+                          <Button size="sm" className="h-8"
+                            disabled={!warningEditCost || updateItemMutation.isPending}
+                            onClick={async () => {
+                              await updateItemMutation.mutateAsync({ id: w.estimateItemId, unitCost: warningEditCost });
+                              setEditingWarningItem(null);
+                              setWarningEditCost("");
+                            }}
+                            data-testid={`button-save-warning-edit-${w.id}`}
+                          >
+                            {updateItemMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Save"}
+                          </Button>
+                          <Button variant="ghost" size="sm" className="h-8" onClick={() => { setEditingWarningItem(null); setWarningEditCost(""); }}>
+                            Cancel
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 mt-2 ml-7 flex-wrap">
+                          {marketRate && (
+                            <Button variant="default" size="sm" className="h-7 text-xs"
+                              disabled={updateItemMutation.isPending}
+                              onClick={async () => {
+                                await updateItemMutation.mutateAsync({ id: w.estimateItemId, unitCost: marketRate.typicalRate });
+                                toast({ title: "Unit cost updated to market rate" });
+                              }}
+                              data-testid={`button-apply-market-${w.id}`}
+                            >
+                              <CheckCircle2 className="h-3 w-3 mr-1" /> Apply Market Rate (${marketRate.typicalRate})
+                            </Button>
+                          )}
+                          <Button variant="outline" size="sm" className="h-7 text-xs"
+                            onClick={() => {
+                              setEditingWarningItem(w.estimateItemId);
+                              setWarningEditCost(linkedItem ? linkedItem.unitCost : "");
+                            }}
+                            data-testid={`button-edit-warning-${w.id}`}
+                          >
+                            <Pencil className="h-3 w-3 mr-1" /> Edit Cost
+                          </Button>
+                          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => ignoreWarningMutation.mutate(w.id)} data-testid={`button-ignore-warning-${w.id}`}>
+                            <EyeOff className="h-3 w-3 mr-1" /> Ignore
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
 
