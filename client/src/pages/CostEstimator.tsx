@@ -28,7 +28,7 @@ import {
   Calculator, Plus, Trash2, AlertTriangle, CheckCircle2,
   DollarSign, ArrowLeft, Receipt as ReceiptIcon, EyeOff, Pencil,
   TrendingUp, TrendingDown, Minus, Loader2, Sparkles, Shapes, ChevronDown, ChevronRight,
-  Wallet, Lightbulb, ArrowDownRight
+  Wallet, Lightbulb, ArrowDownRight, ExternalLink, Home
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
@@ -63,7 +63,7 @@ export default function CostEstimator() {
 
   const [showAddItem, setShowAddItem] = useState(false);
   const [showAddReceipt, setShowAddReceipt] = useState(false);
-  const [viewMode, setViewMode] = useState<"all" | "sq_ft" | "board">("all");
+  const [viewMode, setViewMode] = useState<"all" | "sq_ft" | "board" | "room">("all");
   const [showAiAnalyzer, setShowAiAnalyzer] = useState(false);
   const [showBoardImport, setShowBoardImport] = useState(false);
   const [expandedBoards, setExpandedBoards] = useState<Set<number>>(new Set());
@@ -73,11 +73,13 @@ export default function CostEstimator() {
   const [alternativesResults, setAlternativesResults] = useState<any>(null);
   const [editingBudget, setEditingBudget] = useState(false);
   const [budgetInput, setBudgetInput] = useState("");
+  const [editingContingency, setEditingContingency] = useState(false);
+  const [contingencyInput, setContingencyInput] = useState("");
 
   const [newItem, setNewItem] = useState({
     categoryId: "", customCategory: "", unitType: "sq_ft",
     quantity: "", unitCost: "", materialCost: "", laborCost: "", notes: "", isCustomRate: false,
-    length: "", width: "", crewCount: "1",
+    length: "", width: "", crewCount: "1", room: "", productUrl: "",
   });
 
   const [newReceipt, setNewReceipt] = useState({
@@ -134,7 +136,7 @@ export default function CostEstimator() {
       queryClient.invalidateQueries({ queryKey: ["/api/estimates", activeEstimate?.id, "items"] });
       queryClient.invalidateQueries({ queryKey: ["/api/estimates", activeEstimate?.id, "warnings"] });
       setShowAddItem(false);
-      setNewItem({ categoryId: "", customCategory: "", unitType: "sq_ft", quantity: "", unitCost: "", materialCost: "", laborCost: "", notes: "", isCustomRate: false, length: "", width: "", crewCount: "1" });
+      setNewItem({ categoryId: "", customCategory: "", unitType: "sq_ft", quantity: "", unitCost: "", materialCost: "", laborCost: "", notes: "", isCustomRate: false, length: "", width: "", crewCount: "1", room: "", productUrl: "" });
       toast({ title: "Line item added" });
     },
   });
@@ -306,13 +308,15 @@ export default function CostEstimator() {
     };
   });
 
-  const filteredItems = viewMode === "all" ? itemTotals : itemTotals.filter(i => i.unitType === viewMode);
+  const filteredItems = viewMode === "all" || viewMode === "room" ? itemTotals : itemTotals.filter(i => i.unitType === viewMode);
   const grandTotal = itemTotals.reduce((sum, i) => sum + i.lineTotal, 0);
   const totalMarkup = itemTotals.reduce((sum, i) => sum + i.materialMarkup, 0);
   const grandTotalWithMarkup = grandTotal + totalMarkup;
+  const contingencyRate = parseFloat(activeEstimate?.contingencyPercent || "0") / 100;
+  const contingencyAmount = grandTotalWithMarkup * contingencyRate;
   const hstRate = 0.13;
-  const hstAmount = grandTotalWithMarkup * hstRate;
-  const grandTotalWithHST = grandTotalWithMarkup + hstAmount;
+  const hstAmount = (grandTotalWithMarkup + contingencyAmount) * hstRate;
+  const grandTotalWithHST = (grandTotalWithMarkup + contingencyAmount) + hstAmount;
   const totalReceipts = receipts.reduce((sum, r) => sum + (parseFloat(r.amount) || 0), 0);
   const variance = grandTotalWithHST > 0 ? ((totalReceipts - grandTotalWithHST) / grandTotalWithHST) * 100 : 0;
   const activeWarnings = warnings.filter(w => !w.ignored);
@@ -340,6 +344,8 @@ export default function CostEstimator() {
       laborCost: newItem.laborCost || "0",
       notes: newItem.notes || null,
       isCustomRate: newItem.isCustomRate,
+      room: newItem.room || null,
+      productUrl: newItem.productUrl || null,
     });
   }
 
@@ -426,6 +432,7 @@ export default function CostEstimator() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Items</SelectItem>
+                  <SelectItem value="room">By Room</SelectItem>
                   <SelectItem value="sq_ft">Per Sq Ft</SelectItem>
                   <SelectItem value="hour">Per Hour</SelectItem>
                   <SelectItem value="board">Per Board/Unit</SelectItem>
@@ -457,6 +464,9 @@ export default function CostEstimator() {
                   </div>
                   {totalMarkup > 0 && (
                     <div className="text-xs text-muted-foreground">incl. ${totalMarkup.toLocaleString("en-CA", { minimumFractionDigits: 2 })} markup</div>
+                  )}
+                  {contingencyAmount > 0 && (
+                    <div className="text-xs text-muted-foreground">incl. ${contingencyAmount.toLocaleString("en-CA", { minimumFractionDigits: 2 })} contingency</div>
                   )}
                   <div className="text-xs text-muted-foreground">incl. ${hstAmount.toLocaleString("en-CA", { minimumFractionDigits: 2 })} HST (13%)</div>
                   {(() => {
@@ -640,6 +650,45 @@ export default function CostEstimator() {
               </Card>
             )}
 
+            {canEdit && (
+              <Card data-testid="card-contingency">
+                <CardContent className="py-3 flex items-center justify-between flex-wrap gap-3">
+                  <div className="flex items-center gap-3">
+                    <Label>Contingency Allowance ({activeEstimate.contingencyPercent || "0"}%)</Label>
+                  </div>
+                  {editingContingency ? (
+                    <div className="flex items-center gap-2">
+                      <Label className="text-sm">Contingency %:</Label>
+                      <Input
+                        type="number"
+                        className="w-20"
+                        min="0"
+                        max="25"
+                        value={contingencyInput}
+                        onChange={(e) => setContingencyInput(e.target.value)}
+                        autoFocus
+                        data-testid="input-contingency-percent"
+                      />
+                      <Button size="sm" onClick={() => {
+                        const val = Math.min(25, Math.max(0, parseFloat(contingencyInput) || 0));
+                        updateEstimateMutation.mutate({ contingencyPercent: String(val) });
+                        setEditingContingency(false);
+                      }} data-testid="button-save-contingency">
+                        Save
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => setEditingContingency(false)} data-testid="button-cancel-contingency">
+                        Cancel
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button variant="outline" size="sm" onClick={() => { setContingencyInput(activeEstimate.contingencyPercent || "0"); setEditingContingency(true); }} data-testid="button-edit-contingency">
+                      <Pencil className="h-3 w-3 mr-1" /> Edit
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
             {activeWarnings.length > 0 && (
               <div className="space-y-2">
                 {activeWarnings.map(w => {
@@ -739,37 +788,72 @@ export default function CostEstimator() {
                       <div className="col-span-2 text-right">Total</div>
                       <div className="col-span-1"></div>
                     </div>
-                    {filteredItems.map(item => {
-                      const itemWarnings = warnings.filter(w => w.estimateItemId === item.id && !w.ignored);
-                      return (
-                        <div key={item.id} className={`grid grid-cols-2 md:grid-cols-12 gap-2 items-center p-2 rounded-md border ${itemWarnings.length > 0 ? 'border-amber-300 bg-amber-50/50 dark:border-amber-700 dark:bg-amber-950/30' : 'border-border'}`} data-testid={`estimate-item-${item.id}`}>
-                          <div className="col-span-2 md:col-span-2 text-sm font-medium flex items-center gap-1">
-                            {itemWarnings.length > 0 && <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" />}
-                            <span className="truncate">{item.categoryName}</span>
-                            {item.isCustomRate && <Badge variant="outline" className="text-[10px] ml-1">Custom</Badge>}
+                    {(() => {
+                      const renderItem = (item: typeof filteredItems[0]) => {
+                        const itemWarnings = warnings.filter(w => w.estimateItemId === item.id && !w.ignored);
+                        return (
+                          <div key={item.id} className={`grid grid-cols-2 md:grid-cols-12 gap-2 items-center p-2 rounded-md border ${itemWarnings.length > 0 ? 'border-amber-300 bg-amber-50/50 dark:border-amber-700 dark:bg-amber-950/30' : 'border-border'}`} data-testid={`estimate-item-${item.id}`}>
+                            <div className="col-span-2 md:col-span-2 text-sm font-medium flex items-center gap-1 flex-wrap">
+                              {itemWarnings.length > 0 && <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" />}
+                              <span className="truncate">{item.categoryName}</span>
+                              {item.isCustomRate && <Badge variant="outline" className="text-[10px] ml-1">Custom</Badge>}
+                              {item.room && <Badge variant="outline" className="text-[10px] ml-1" data-testid={`badge-room-${item.id}`}><Home className="h-2.5 w-2.5 mr-0.5" />{item.room}</Badge>}
+                              {item.productUrl && (
+                                <a href={item.productUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} data-testid={`link-product-${item.id}`}>
+                                  <ExternalLink className="h-3 w-3 text-muted-foreground" />
+                                </a>
+                              )}
+                            </div>
+                            <div className="hidden md:block md:col-span-1">
+                              <Badge variant="outline" className="text-[10px]">
+                                {item.unitType === "sq_ft" ? "sq ft" : item.unitType === "hour" ? "hr" : "unit"}
+                              </Badge>
+                            </div>
+                            <div className="text-right text-sm md:col-span-2">{parseFloat(item.quantity).toLocaleString()}</div>
+                            <div className="text-right text-sm md:col-span-2">${parseFloat(item.unitCost).toFixed(2)}</div>
+                            <div className="text-right text-sm md:col-span-1">${parseFloat(item.materialCost).toFixed(2)}</div>
+                            <div className="text-right text-sm md:col-span-1">{parseFloat(item.laborCost) > 0 ? `$${parseFloat(item.laborCost).toFixed(0)}` : '—'}</div>
+                            <div className="text-right text-sm font-medium md:col-span-2">
+                              ${item.totalWithMarkup.toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </div>
+                            <div className="text-right md:col-span-1">
+                              {canEdit && (
+                                <Button variant="ghost" size="sm" className="h-6 w-6 p-0 ml-1" onClick={() => deleteItemMutation.mutate(item.id)} data-testid={`button-delete-item-${item.id}`}>
+                                  <Trash2 className="h-3 w-3 text-muted-foreground" />
+                                </Button>
+                              )}
+                            </div>
                           </div>
-                          <div className="hidden md:block md:col-span-1">
-                            <Badge variant="outline" className="text-[10px]">
-                              {item.unitType === "sq_ft" ? "sq ft" : item.unitType === "hour" ? "hr" : "unit"}
-                            </Badge>
-                          </div>
-                          <div className="text-right text-sm md:col-span-2">{parseFloat(item.quantity).toLocaleString()}</div>
-                          <div className="text-right text-sm md:col-span-2">${parseFloat(item.unitCost).toFixed(2)}</div>
-                          <div className="text-right text-sm md:col-span-1">${parseFloat(item.materialCost).toFixed(2)}</div>
-                          <div className="text-right text-sm md:col-span-1">{parseFloat(item.laborCost) > 0 ? `$${parseFloat(item.laborCost).toFixed(0)}` : '—'}</div>
-                          <div className="text-right text-sm font-medium md:col-span-2">
-                            ${item.totalWithMarkup.toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </div>
-                          <div className="text-right md:col-span-1">
-                            {canEdit && (
-                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0 ml-1" onClick={() => deleteItemMutation.mutate(item.id)} data-testid={`button-delete-item-${item.id}`}>
-                                <Trash2 className="h-3 w-3 text-muted-foreground" />
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      };
+
+                      if (viewMode === "room") {
+                        const roomGroups = filteredItems.reduce<Record<string, typeof filteredItems>>((acc, item) => {
+                          const roomName = item.room || "Unassigned";
+                          if (!acc[roomName]) acc[roomName] = [];
+                          acc[roomName].push(item);
+                          return acc;
+                        }, {});
+                        return Object.entries(roomGroups).map(([roomName, roomItems]) => {
+                          const roomSubtotal = roomItems.reduce((sum, i) => sum + i.totalWithMarkup, 0);
+                          return (
+                            <div key={roomName} className="space-y-1" data-testid={`room-group-${roomName}`}>
+                              <div className="flex items-center justify-between gap-3 px-2 py-1.5 rounded-md bg-muted/50">
+                                <div className="flex items-center gap-2 text-sm font-semibold">
+                                  <Home className="h-3.5 w-3.5" />
+                                  {roomName}
+                                </div>
+                                <div className="text-sm font-semibold" data-testid={`text-room-subtotal-${roomName}`}>
+                                  ${roomSubtotal.toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </div>
+                              </div>
+                              {roomItems.map(renderItem)}
+                            </div>
+                          );
+                        });
+                      }
+                      return filteredItems.map(renderItem);
+                    })()}
                     <div className="grid grid-cols-2 md:grid-cols-12 gap-2 pt-3 mt-2 border-t px-2">
                       <div className="md:col-span-8 text-sm font-semibold">Subtotal</div>
                       <div className="md:col-span-4 text-right text-sm font-semibold" data-testid="text-subtotal">
@@ -790,6 +874,14 @@ export default function CostEstimator() {
                         ${grandTotalWithMarkup.toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </div>
                     </div>
+                    {contingencyAmount > 0 && (
+                      <div className="grid grid-cols-2 md:grid-cols-12 gap-2 px-2">
+                        <div className="md:col-span-8 text-sm text-muted-foreground">Contingency ({activeEstimate.contingencyPercent || "0"}%)</div>
+                        <div className="md:col-span-4 text-right text-sm text-muted-foreground" data-testid="text-contingency-amount">
+                          +${contingencyAmount.toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </div>
+                      </div>
+                    )}
                     <div className="grid grid-cols-2 md:grid-cols-12 gap-2 px-2">
                       <div className="md:col-span-8 text-sm text-muted-foreground">HST (13%)</div>
                       <div className="md:col-span-4 text-right text-sm text-muted-foreground" data-testid="text-hst-amount">
@@ -862,6 +954,42 @@ export default function CostEstimator() {
             <DialogTitle>Add Estimate Line Item</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            {(() => {
+              const predefinedRooms = ["Kitchen", "Bathroom", "Primary Bedroom", "Bedroom", "Living Room", "Dining Room", "Hallway", "Mudroom", "Laundry Room", "Garage", "Exterior", "Deck", "Dock", "Basement", "Attic", "Office"];
+              const isCustomRoom = newItem.room !== "" && !predefinedRooms.includes(newItem.room);
+              const selectVal = isCustomRoom ? "__other__" : newItem.room;
+              return (
+                <div>
+                  <Label>Room</Label>
+                  <Select value={selectVal} onValueChange={(v) => {
+                    if (v === "__other__") {
+                      setNewItem(prev => ({ ...prev, room: " " }));
+                      setTimeout(() => setNewItem(prev => ({ ...prev, room: prev.room.trim() })), 0);
+                    } else {
+                      setNewItem(prev => ({ ...prev, room: v }));
+                    }
+                  }}>
+                    <SelectTrigger data-testid="select-room"><SelectValue placeholder="Select room..." /></SelectTrigger>
+                    <SelectContent>
+                      {predefinedRooms.map(r => (
+                        <SelectItem key={r} value={r}>{r}</SelectItem>
+                      ))}
+                      <SelectItem value="__other__">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {(selectVal === "__other__" || isCustomRoom) && (
+                    <Input
+                      value={newItem.room}
+                      onChange={(e) => setNewItem(prev => ({ ...prev, room: e.target.value }))}
+                      placeholder="Enter custom room name..."
+                      className="mt-2"
+                      data-testid="input-custom-room"
+                    />
+                  )}
+                </div>
+              );
+            })()}
+
             <div className="flex items-center gap-2">
               <Switch checked={newItem.isCustomRate} onCheckedChange={(checked) => setNewItem(prev => ({ ...prev, isCustomRate: checked }))} data-testid="switch-custom-rate" />
               <Label>Use custom pricing</Label>
@@ -1065,6 +1193,11 @@ export default function CostEstimator() {
             <div>
               <Label>Notes</Label>
               <Input value={newItem.notes} onChange={(e) => setNewItem(prev => ({ ...prev, notes: e.target.value }))} placeholder="Optional notes..." data-testid="input-item-notes" />
+            </div>
+
+            <div>
+              <Label>Product Link</Label>
+              <Input value={newItem.productUrl} onChange={(e) => setNewItem(prev => ({ ...prev, productUrl: e.target.value }))} placeholder="https://..." data-testid="input-product-url" />
             </div>
 
             <Button className="w-full" onClick={handleAddItem} disabled={addItemMutation.isPending} data-testid="button-submit-item">
