@@ -17,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Clock, Calendar, Briefcase, Send, Trash2, Plus, CheckCircle2, Loader2 } from "lucide-react";
+import { Clock, Calendar, Briefcase, Send, Trash2, Plus, CheckCircle2, Loader2, User } from "lucide-react";
 import { format } from "date-fns";
 import type { Project, Milestone, CalendarEvent, TimeEntry } from "@shared/schema";
 
@@ -127,15 +127,15 @@ export default function Timesheets() {
   });
 
   const handleAddEntry = () => {
-    if (!selectedProjectId || !hours || !selectedDate) {
-      toast({ title: "Missing fields", description: "Please fill in project, date, and hours.", variant: "destructive" });
+    if (!selectedProjectId || !hours || !selectedDate || !description.trim()) {
+      toast({ title: "Missing fields", description: "Please fill in project, date, hours, and details.", variant: "destructive" });
       return;
     }
     const body: Record<string, unknown> = {
       projectId: parseInt(selectedProjectId),
       date: selectedDate,
       hours: hours,
-      description: description || null,
+      description: description.trim(),
       status: "draft",
       payPeriodStart: period.start,
       payPeriodEnd: period.end,
@@ -170,7 +170,12 @@ export default function Timesheets() {
 
         <Card className="mb-6">
           <CardContent className="py-4 flex items-center gap-3 flex-wrap">
-            <Calendar className="h-5 w-5 text-muted-foreground" />
+            <User className="h-5 w-5 text-muted-foreground" />
+            <span className="text-sm font-medium text-foreground" data-testid="text-crew-name">
+              {user?.firstName || user?.lastName ? `${user?.firstName || ""} ${user?.lastName || ""}`.trim() : user?.email || "Unknown"}
+            </span>
+            <span className="text-xs text-muted-foreground">&middot;</span>
+            <Calendar className="h-4 w-4 text-muted-foreground" />
             <span className="text-sm text-muted-foreground">Pay Period:</span>
             <span className="text-sm font-medium text-foreground">
               {formatPeriodDate(period.start)} &mdash; {formatPeriodDate(period.end)}
@@ -274,7 +279,7 @@ export default function Timesheets() {
             )}
 
             <div>
-              <Label htmlFor="entry-details">Details</Label>
+              <Label htmlFor="entry-details">Details <span className="text-destructive">*</span></Label>
               <Textarea
                 id="entry-details"
                 placeholder="What did you work on today?"
@@ -289,7 +294,7 @@ export default function Timesheets() {
             <div className="flex justify-end pt-2">
               <Button
                 onClick={handleAddEntry}
-                disabled={createEntry.isPending || !selectedProjectId || !hours || !selectedDate}
+                disabled={createEntry.isPending || !selectedProjectId || !hours || !selectedDate || !description.trim()}
                 data-testid="button-add-entry"
               >
                 {createEntry.isPending ? (
