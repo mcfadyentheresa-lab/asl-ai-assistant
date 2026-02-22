@@ -1614,7 +1614,10 @@ export async function registerRoutes(
   });
 
   // Project Estimates
-  app.get("/api/projects/:projectId/estimates", isAuthenticated, async (req, res) => {
+  app.get("/api/projects/:projectId/estimates", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const dbUser = await authStorage.getUser(userId);
+    if (dbUser?.role !== "admin") return res.status(403).json({ message: "Admin access required" });
     const projectId = parseInt(req.params.projectId);
     const estimates = await storage.getProjectEstimates(projectId);
     res.json(estimates);
@@ -1631,7 +1634,10 @@ export async function registerRoutes(
     res.status(201).json(created);
   });
 
-  app.get("/api/estimates/:id", isAuthenticated, async (req, res) => {
+  app.get("/api/estimates/:id", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const dbUser = await authStorage.getUser(userId);
+    if (dbUser?.role !== "admin") return res.status(403).json({ message: "Admin access required" });
     const estimate = await storage.getEstimate(parseInt(req.params.id));
     if (!estimate) return res.status(404).json({ message: "Estimate not found" });
     res.json(estimate);
@@ -1656,7 +1662,10 @@ export async function registerRoutes(
   });
 
   // Estimate Items
-  app.get("/api/estimates/:id/items", isAuthenticated, async (req, res) => {
+  app.get("/api/estimates/:id/items", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const dbUser = await authStorage.getUser(userId);
+    if (dbUser?.role !== "admin") return res.status(403).json({ message: "Admin access required" });
     const items = await storage.getEstimateItems(parseInt(req.params.id));
     res.json(items);
   });
