@@ -56,9 +56,14 @@ export default function Timesheets() {
   const period = getPayPeriod(today);
   const todayStr = today.toISOString().split("T")[0];
 
+  const nowHour = today.getHours();
+  const nowMin = today.getMinutes();
+  const roundedMin = Math.round(nowMin / 15) * 15;
+  const defaultTime = `${String(roundedMin >= 60 ? nowHour + 1 : nowHour).padStart(2, "0")}:${String(roundedMin % 60).padStart(2, "0")}`;
+
   const [selectedDate, setSelectedDate] = useState(todayStr);
   const [selectedProjectId, setSelectedProjectId] = useState("");
-  const [startTime, setStartTime] = useState("");
+  const [startTime, setStartTime] = useState(defaultTime);
   const [endTime, setEndTime] = useState("");
   const [description, setDescription] = useState("");
   const [selectedMilestoneId, setSelectedMilestoneId] = useState("");
@@ -277,46 +282,34 @@ export default function Timesheets() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <Label htmlFor="entry-date">Date <span className="text-destructive">*</span></Label>
+              <Input
+                id="entry-date"
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                data-testid="input-date"
+                className="mt-1.5"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="entry-date">Date <span className="text-destructive">*</span></Label>
-                <Input
-                  id="entry-date"
-                  type="date"
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  data-testid="input-date"
-                  className="mt-1.5"
-                />
+                <Label>Time In <span className="text-destructive">*</span></Label>
+                <TimePicker value={startTime} onChange={setStartTime} testId="start-time" />
               </div>
               <div>
-                <Label htmlFor="entry-start-time">Start Time <span className="text-destructive">*</span></Label>
-                <Input
-                  id="entry-start-time"
-                  type="time"
-                  value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                  data-testid="input-start-time"
-                  className="mt-1.5"
-                />
-              </div>
-              <div>
-                <Label htmlFor="entry-end-time">End Time <span className="text-destructive">*</span></Label>
-                <Input
-                  id="entry-end-time"
-                  type="time"
-                  value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
-                  data-testid="input-end-time"
-                  className="mt-1.5"
-                />
+                <Label>Time Out <span className="text-destructive">*</span></Label>
+                <TimePicker value={endTime} onChange={setEndTime} testId="end-time" />
               </div>
             </div>
             {startTime && endTime && calculatedHours > 0 && (
-              <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-muted/50 border">
-                <Clock className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium">Total Hours: {calculatedHours.toFixed(2)}h</span>
-                <span className="text-xs text-muted-foreground">({startTime} — {endTime})</span>
+              <div className="flex items-center justify-between px-3 py-2.5 rounded-md bg-primary/5 border border-primary/20">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-medium text-foreground">Total Hours</span>
+                </div>
+                <span className="text-lg font-bold text-foreground">{calculatedHours.toFixed(2)}h</span>
               </div>
             )}
 
@@ -524,24 +517,27 @@ export default function Timesheets() {
               <DialogTitle>Edit Time Entry</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 pt-2">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <Label>Date <span className="text-destructive">*</span></Label>
+                <Input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} className="mt-1.5" data-testid="input-edit-date" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label>Date <span className="text-destructive">*</span></Label>
-                  <Input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} className="mt-1.5" data-testid="input-edit-date" />
+                  <Label>Time In <span className="text-destructive">*</span></Label>
+                  <TimePicker value={editStartTime} onChange={setEditStartTime} testId="edit-start" />
                 </div>
                 <div>
-                  <Label>Start Time <span className="text-destructive">*</span></Label>
-                  <Input type="time" value={editStartTime} onChange={(e) => setEditStartTime(e.target.value)} className="mt-1.5" data-testid="input-edit-start" />
-                </div>
-                <div>
-                  <Label>End Time <span className="text-destructive">*</span></Label>
-                  <Input type="time" value={editEndTime} onChange={(e) => setEditEndTime(e.target.value)} className="mt-1.5" data-testid="input-edit-end" />
+                  <Label>Time Out <span className="text-destructive">*</span></Label>
+                  <TimePicker value={editEndTime} onChange={setEditEndTime} testId="edit-end" />
                 </div>
               </div>
               {editStartTime && editEndTime && editCalcHours > 0 && (
-                <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-muted/50 border">
-                  <Clock className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-medium">Total Hours: {editCalcHours.toFixed(2)}h</span>
+                <div className="flex items-center justify-between px-3 py-2.5 rounded-md bg-primary/5 border border-primary/20">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-primary" />
+                    <span className="text-sm font-medium text-foreground">Total Hours</span>
+                  </div>
+                  <span className="text-lg font-bold text-foreground">{editCalcHours.toFixed(2)}h</span>
                 </div>
               )}
               <div>
@@ -576,6 +572,58 @@ export default function Timesheets() {
           </DialogContent>
         </Dialog>
       </main>
+    </div>
+  );
+}
+
+function TimePicker({ value, onChange, testId }: { value: string; onChange: (v: string) => void; testId: string }) {
+  const [h, m] = value ? value.split(":").map(Number) : [0, 0];
+  const hour12 = value ? (h === 0 ? 12 : h > 12 ? h - 12 : h) : 0;
+  const ampm = value ? (h >= 12 ? "PM" : "AM") : "AM";
+  const minute = value ? m : 0;
+
+  function update(newH12: number, newM: number, newAmpm: string) {
+    let h24 = newH12;
+    if (newAmpm === "AM") {
+      h24 = newH12 === 12 ? 0 : newH12;
+    } else {
+      h24 = newH12 === 12 ? 12 : newH12 + 12;
+    }
+    onChange(`${String(h24).padStart(2, "0")}:${String(newM).padStart(2, "0")}`);
+  }
+
+  return (
+    <div className="flex items-center gap-1.5 mt-1.5" data-testid={`timepicker-${testId}`}>
+      <Select value={value ? String(hour12) : ""} onValueChange={(v) => update(parseInt(v), minute, ampm)}>
+        <SelectTrigger className="w-[70px]" data-testid={`select-${testId}-hour`}>
+          <SelectValue placeholder="Hr" />
+        </SelectTrigger>
+        <SelectContent>
+          {[12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((hr) => (
+            <SelectItem key={hr} value={String(hr)}>{hr}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <span className="text-muted-foreground font-bold">:</span>
+      <Select value={value ? String(minute) : ""} onValueChange={(v) => update(hour12 || 12, parseInt(v), ampm)}>
+        <SelectTrigger className="w-[70px]" data-testid={`select-${testId}-min`}>
+          <SelectValue placeholder="Min" />
+        </SelectTrigger>
+        <SelectContent>
+          {[0, 15, 30, 45].map((min) => (
+            <SelectItem key={min} value={String(min)}>{String(min).padStart(2, "0")}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Select value={value ? ampm : ""} onValueChange={(v) => update(hour12 || 12, minute, v)}>
+        <SelectTrigger className="w-[72px]" data-testid={`select-${testId}-ampm`}>
+          <SelectValue placeholder="AM" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="AM">AM</SelectItem>
+          <SelectItem value="PM">PM</SelectItem>
+        </SelectContent>
+      </Select>
     </div>
   );
 }
