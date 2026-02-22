@@ -827,11 +827,13 @@ export default function ProjectDetails() {
               </p>
             </div>
             <div className="flex items-center gap-2">
+            {user?.role === "admin" && (
               <Link href={`/project/${projectId}/estimate`}>
                 <Button variant="outline" size="sm" data-testid="link-cost-estimator">
                   <DollarSign className="h-4 w-4 mr-1" /> Cost Estimator
                 </Button>
               </Link>
+            )}
               <Badge variant="secondary" data-testid="badge-project-status">
                 {statusLabel[project.status] || project.status}
               </Badge>
