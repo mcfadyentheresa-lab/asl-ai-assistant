@@ -1621,9 +1621,10 @@ export async function registerRoutes(
   });
 
   app.post("/api/projects/:projectId/estimates", isAuthenticated, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+    const userId = req.user.claims.sub as string;
     const dbUser = await authStorage.getUser(userId);
-    if (dbUser?.role === "client") return res.status(403).json({ message: "Crew or admin access required" });
+    if (!dbUser) return res.status(404).json({ message: "User not found" });
+    if (dbUser.role === "client") return res.status(403).json({ message: "Crew or admin access required" });
     const projectId = parseInt(req.params.projectId);
     const input = insertProjectEstimateSchema.parse({ ...req.body, projectId, createdBy: userId });
     const created = await storage.createEstimate(input);
@@ -1637,9 +1638,10 @@ export async function registerRoutes(
   });
 
   app.patch("/api/estimates/:id", isAuthenticated, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+    const userId = req.user.claims.sub as string;
     const dbUser = await authStorage.getUser(userId);
-    if (dbUser?.role === "client") return res.status(403).json({ message: "Crew or admin access required" });
+    if (!dbUser) return res.status(404).json({ message: "User not found" });
+    if (dbUser.role === "client") return res.status(403).json({ message: "Crew or admin access required" });
     const input = insertProjectEstimateSchema.partial().parse(req.body);
     const updated = await storage.updateEstimate(parseInt(req.params.id), input);
     res.json(updated);
@@ -1660,9 +1662,10 @@ export async function registerRoutes(
   });
 
   app.post("/api/estimates/:id/items", isAuthenticated, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+    const userId = req.user.claims.sub as string;
     const dbUser = await authStorage.getUser(userId);
-    if (dbUser?.role === "client") return res.status(403).json({ message: "Crew or admin access required" });
+    if (!dbUser) return res.status(404).json({ message: "User not found" });
+    if (dbUser.role === "client") return res.status(403).json({ message: "Crew or admin access required" });
     const estimateId = parseInt(req.params.id);
     const input = insertEstimateItemSchema.parse({ ...req.body, estimateId });
     const created = await storage.createEstimateItem(input);
@@ -1703,9 +1706,10 @@ export async function registerRoutes(
   });
 
   app.patch("/api/estimate-items/:id", isAuthenticated, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+    const userId = req.user.claims.sub as string;
     const dbUser = await authStorage.getUser(userId);
-    if (dbUser?.role === "client") return res.status(403).json({ message: "Crew or admin access required" });
+    if (!dbUser) return res.status(404).json({ message: "User not found" });
+    if (dbUser.role === "client") return res.status(403).json({ message: "Crew or admin access required" });
     const id = parseInt(req.params.id);
     const input = insertEstimateItemSchema.partial().parse(req.body);
     const updated = await storage.updateEstimateItem(id, input);
@@ -1745,9 +1749,10 @@ export async function registerRoutes(
   });
 
   app.delete("/api/estimate-items/:id", isAuthenticated, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+    const userId = req.user.claims.sub as string;
     const dbUser = await authStorage.getUser(userId);
-    if (dbUser?.role === "client") return res.status(403).json({ message: "Crew or admin access required" });
+    if (!dbUser) return res.status(404).json({ message: "User not found" });
+    if (dbUser.role === "client") return res.status(403).json({ message: "Crew or admin access required" });
     const id = parseInt(req.params.id);
     await storage.deleteWarningsByItem(id);
     await storage.deleteEstimateItem(id);
@@ -1761,9 +1766,10 @@ export async function registerRoutes(
   });
 
   app.post("/api/projects/:projectId/receipts", isAuthenticated, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+    const userId = req.user.claims.sub as string;
     const dbUser = await authStorage.getUser(userId);
-    if (dbUser?.role === "client") return res.status(403).json({ message: "Crew or admin access required" });
+    if (!dbUser) return res.status(404).json({ message: "User not found" });
+    if (dbUser.role === "client") return res.status(403).json({ message: "Crew or admin access required" });
     const projectId = parseInt(req.params.projectId);
     const input = insertReceiptSchema.parse({ ...req.body, projectId, createdBy: userId });
     const created = await storage.createReceipt(input);
@@ -1771,9 +1777,10 @@ export async function registerRoutes(
   });
 
   app.delete("/api/receipts/:id", isAuthenticated, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+    const userId = req.user.claims.sub as string;
     const dbUser = await authStorage.getUser(userId);
-    if (dbUser?.role === "client") return res.status(403).json({ message: "Crew or admin access required" });
+    if (!dbUser) return res.status(404).json({ message: "User not found" });
+    if (dbUser.role === "client") return res.status(403).json({ message: "Crew or admin access required" });
     await storage.deleteReceipt(parseInt(req.params.id));
     res.json({ message: "Deleted" });
   });

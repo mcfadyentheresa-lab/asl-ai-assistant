@@ -812,7 +812,16 @@ export default function CostEstimator() {
             </div>
 
             <div>
-              <Label>Labor Cost ($)</Label>
+              <div className="flex items-center justify-between mb-2">
+                <Label>Labor Cost ($)</Label>
+                {isAdmin && (
+                  <Link href="/labor-rates">
+                    <Button variant="link" size="sm" className="h-auto p-0 text-xs">
+                      Manage Labor Rates
+                    </Button>
+                  </Link>
+                )}
+              </div>
               <Input type="number" step="0.01" value={newItem.laborCost} onChange={(e) => setNewItem(prev => ({ ...prev, laborCost: e.target.value }))} placeholder="0.00" data-testid="input-labor-cost" />
               <div className="flex gap-2 mt-2 flex-wrap">
                 {crewRates.filter(c => c.isActive !== false).length > 0 && (

@@ -243,11 +243,37 @@ export default function LaborRates() {
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2">
                             <div>
                               <div className="text-xs text-muted-foreground">Pay Rate</div>
-                              <div className="font-medium text-red-600" data-testid={`text-crew-pay-${crew.id}`}>${parseFloat(crew.payRate).toFixed(2)}/hr</div>
+                              <div className="flex items-center gap-1">
+                                <div className="font-medium text-red-600" data-testid={`text-crew-pay-${crew.id}`}>${parseFloat(crew.payRate).toFixed(2)}/hr</div>
+                                {isAdmin && (
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="h-4 w-4" 
+                                    onClick={() => setEditingCrew(crew)}
+                                    title="Edit rates"
+                                  >
+                                    <Pencil className="h-3 w-3" />
+                                  </Button>
+                                )}
+                              </div>
                             </div>
                             <div>
                               <div className="text-xs text-muted-foreground">Bill Rate</div>
-                              <div className="font-medium text-green-600" data-testid={`text-crew-bill-${crew.id}`}>${parseFloat(crew.billableRate).toFixed(2)}/hr</div>
+                              <div className="flex items-center gap-1">
+                                <div className="font-medium text-green-600" data-testid={`text-crew-bill-${crew.id}`}>${parseFloat(crew.billableRate).toFixed(2)}/hr</div>
+                                {isAdmin && (
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="h-4 w-4" 
+                                    onClick={() => setEditingCrew(crew)}
+                                    title="Edit rates"
+                                  >
+                                    <Pencil className="h-3 w-3" />
+                                  </Button>
+                                )}
+                              </div>
                             </div>
                             <div>
                               <div className="text-xs text-muted-foreground">Margin</div>
