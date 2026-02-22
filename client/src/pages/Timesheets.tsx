@@ -193,7 +193,7 @@ export default function Timesheets() {
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="entry-date">Date</Label>
+                <Label htmlFor="entry-date">Date <span className="text-destructive">*</span></Label>
                 <Input
                   id="entry-date"
                   type="date"
@@ -204,7 +204,7 @@ export default function Timesheets() {
                 />
               </div>
               <div>
-                <Label htmlFor="entry-hours">Hours</Label>
+                <Label htmlFor="entry-hours">Hours <span className="text-destructive">*</span></Label>
                 <Input
                   id="entry-hours"
                   type="number"
@@ -221,7 +221,7 @@ export default function Timesheets() {
             </div>
 
             <div>
-              <Label>Project</Label>
+              <Label>Project <span className="text-destructive">*</span></Label>
               <Select value={selectedProjectId} onValueChange={(v) => {
                 setSelectedProjectId(v);
                 setSelectedMilestoneId("");
