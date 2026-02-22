@@ -269,11 +269,21 @@ export default function CostEstimator() {
   }
 
   function onCategoryChange(catId: string) {
+    if (catId === "other") {
+      setNewItem(prev => ({
+        ...prev,
+        categoryId: "other",
+        customCategory: prev.customCategory || "",
+        unitCost: "",
+      }));
+      return;
+    }
     const cat = categories.find(c => c.id === parseInt(catId));
     const rate = marketRates.find(r => r.categoryId === parseInt(catId) && r.isActive);
     setNewItem(prev => ({
       ...prev,
       categoryId: catId,
+      customCategory: "",
       unitType: cat?.defaultUnitType || "sq_ft",
       unitCost: rate ? rate.typicalRate : prev.unitCost,
     }));
@@ -321,8 +331,8 @@ export default function CostEstimator() {
       return;
     }
     addItemMutation.mutate({
-      categoryId: newItem.categoryId ? parseInt(newItem.categoryId) : null,
-      customCategory: newItem.customCategory || null,
+      categoryId: newItem.categoryId && newItem.categoryId !== "other" ? parseInt(newItem.categoryId) : null,
+      customCategory: newItem.categoryId === "other" ? (newItem.customCategory || "Other") : (newItem.customCategory || null),
       unitType: newItem.unitType,
       quantity: newItem.quantity,
       unitCost: newItem.unitCost,
@@ -866,8 +876,12 @@ export default function CostEstimator() {
                     {categories.map(c => (
                       <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
                     ))}
+                    <SelectItem value="other">Other</SelectItem>
                   </SelectContent>
                 </Select>
+                {newItem.categoryId === "other" && (
+                  <Input value={newItem.customCategory} onChange={(e) => setNewItem(prev => ({ ...prev, customCategory: e.target.value }))} placeholder="Enter category name..." className="mt-2" data-testid="input-other-category" />
+                )}
               </div>
             ) : (
               <div>
@@ -945,7 +959,7 @@ export default function CostEstimator() {
                   <div>
                     <Label>Cost per Sq Ft ($)</Label>
                     <Input type="number" step="0.01" value={newItem.unitCost} onChange={(e) => setNewItem(prev => ({ ...prev, unitCost: e.target.value }))} placeholder="0.00" data-testid="input-unit-cost" />
-                    {!newItem.isCustomRate && newItem.categoryId && (() => {
+                    {!newItem.isCustomRate && newItem.categoryId && newItem.categoryId !== "other" && (() => {
                       const rate = marketRates.find(r => r.categoryId === parseInt(newItem.categoryId) && r.isActive);
                       return rate ? (
                         <p className="text-xs text-muted-foreground mt-1">Market: ${rate.lowRate} - ${rate.highRate} / sq ft</p>
@@ -963,11 +977,14 @@ export default function CostEstimator() {
                   <div>
                     <Label>Cost per {newItem.unitType === "sq_ft" ? "Sq Ft" : newItem.unitType === "hour" ? "Hour" : "Unit"} ($)</Label>
                     <Input type="number" step="0.01" value={newItem.unitCost} onChange={(e) => setNewItem(prev => ({ ...prev, unitCost: e.target.value }))} placeholder="0.00" data-testid="input-unit-cost" />
-                    {!newItem.isCustomRate && newItem.categoryId && (() => {
+                    {!newItem.isCustomRate && newItem.categoryId && newItem.categoryId !== "other" && (() => {
                       const rate = marketRates.find(r => r.categoryId === parseInt(newItem.categoryId) && r.isActive);
-                      return rate ? (
+                      if (!rate) return null;
+                      const rateUnitType = rate.unitType || "sq_ft";
+                      if (rateUnitType !== newItem.unitType) return null;
+                      return (
                         <p className="text-xs text-muted-foreground mt-1">Market: ${rate.lowRate} - ${rate.highRate} / {newItem.unitType === "sq_ft" ? "sq ft" : newItem.unitType === "hour" ? "hr" : "unit"}</p>
-                      ) : null;
+                      );
                     })()}
                   </div>
               </div>
