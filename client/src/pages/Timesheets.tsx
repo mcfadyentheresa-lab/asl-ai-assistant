@@ -17,7 +17,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Clock, Calendar, Briefcase, Send, Trash2, Plus, CheckCircle2, Loader2, User } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Clock, Calendar, Briefcase, Send, Trash2, Plus, CheckCircle2, Loader2, User, Pencil } from "lucide-react";
 import { format } from "date-fns";
 import type { Project, Milestone, CalendarEvent, TimeEntry } from "@shared/schema";
 
@@ -124,6 +130,67 @@ export default function Timesheets() {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
+
+  const updateEntry = useMutation({
+    mutationFn: async ({ id, ...data }: Record<string, unknown>) => {
+      const res = await apiRequest("PATCH", `/api/time-entries/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Updated", description: "Time entry updated." });
+      queryClient.invalidateQueries({ queryKey: [entriesQueryKey] });
+      setEditingEntry(null);
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const [editingEntry, setEditingEntry] = useState<TimeEntry | null>(null);
+  const [editStartTime, setEditStartTime] = useState("");
+  const [editEndTime, setEditEndTime] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editDate, setEditDate] = useState("");
+  const [editProjectId, setEditProjectId] = useState("");
+
+  function openEditDialog(entry: TimeEntry) {
+    setEditingEntry(entry);
+    setEditDate(entry.date || "");
+    setEditDescription(entry.description || "");
+    setEditProjectId(String(entry.projectId));
+    if (entry.startTime) {
+      const st = new Date(entry.startTime);
+      setEditStartTime(`${String(st.getHours()).padStart(2,"0")}:${String(st.getMinutes()).padStart(2,"0")}`);
+    } else {
+      setEditStartTime("");
+    }
+    if (entry.endTime) {
+      const et = new Date(entry.endTime);
+      setEditEndTime(`${String(et.getHours()).padStart(2,"0")}:${String(et.getMinutes()).padStart(2,"0")}`);
+    } else {
+      setEditEndTime("");
+    }
+  }
+
+  const editCalcHours = calcHours(editStartTime, editEndTime);
+
+  function handleSaveEdit() {
+    if (!editingEntry || !editStartTime || !editEndTime || !editDescription.trim() || !editDate || !editProjectId) return;
+    if (editCalcHours <= 0) return;
+    updateEntry.mutate({
+      id: editingEntry.id,
+      projectId: parseInt(editProjectId),
+      date: editDate,
+      hours: editCalcHours.toFixed(2),
+      startTime: new Date(`${editDate}T${editStartTime}:00`).toISOString(),
+      endTime: new Date(`${editDate}T${editEndTime}:00`).toISOString(),
+      description: editDescription.trim(),
+    });
+  }
+
+  const isAdmin = user?.role === "admin";
+  const canEditEntry = (entry: TimeEntry) => isAdmin || entry.status === "draft";
+  const canDeleteEntry = (entry: TimeEntry) => isAdmin || entry.status === "draft";
 
   const submitDrafts = useMutation({
     mutationFn: async (ids: number[]) => {
@@ -394,7 +461,8 @@ export default function Timesheets() {
                       key={entry.id}
                       entry={entry}
                       projectName={projectMap.get(entry.projectId) || "Unknown"}
-                      onDelete={() => deleteEntry.mutate(entry.id)}
+                      onDelete={canDeleteEntry(entry) ? () => deleteEntry.mutate(entry.id) : undefined}
+                      onEdit={canEditEntry(entry) ? () => openEditDialog(entry) : undefined}
                       deleting={deleteEntry.isPending}
                     />
                   ))}
@@ -413,6 +481,9 @@ export default function Timesheets() {
                       key={entry.id}
                       entry={entry}
                       projectName={projectMap.get(entry.projectId) || "Unknown"}
+                      onDelete={canDeleteEntry(entry) ? () => deleteEntry.mutate(entry.id) : undefined}
+                      onEdit={canEditEntry(entry) ? () => openEditDialog(entry) : undefined}
+                      deleting={deleteEntry.isPending}
                     />
                   ))}
                 </div>
@@ -430,6 +501,9 @@ export default function Timesheets() {
                       key={entry.id}
                       entry={entry}
                       projectName={projectMap.get(entry.projectId) || "Unknown"}
+                      onDelete={canDeleteEntry(entry) ? () => deleteEntry.mutate(entry.id) : undefined}
+                      onEdit={canEditEntry(entry) ? () => openEditDialog(entry) : undefined}
+                      deleting={deleteEntry.isPending}
                     />
                   ))}
                 </div>
@@ -444,6 +518,63 @@ export default function Timesheets() {
             )}
           </div>
         )}
+        <Dialog open={!!editingEntry} onOpenChange={(open) => { if (!open) setEditingEntry(null); }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit Time Entry</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 pt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <Label>Date <span className="text-destructive">*</span></Label>
+                  <Input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} className="mt-1.5" data-testid="input-edit-date" />
+                </div>
+                <div>
+                  <Label>Start Time <span className="text-destructive">*</span></Label>
+                  <Input type="time" value={editStartTime} onChange={(e) => setEditStartTime(e.target.value)} className="mt-1.5" data-testid="input-edit-start" />
+                </div>
+                <div>
+                  <Label>End Time <span className="text-destructive">*</span></Label>
+                  <Input type="time" value={editEndTime} onChange={(e) => setEditEndTime(e.target.value)} className="mt-1.5" data-testid="input-edit-end" />
+                </div>
+              </div>
+              {editStartTime && editEndTime && editCalcHours > 0 && (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-muted/50 border">
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">Total Hours: {editCalcHours.toFixed(2)}h</span>
+                </div>
+              )}
+              <div>
+                <Label>Project <span className="text-destructive">*</span></Label>
+                <Select value={editProjectId} onValueChange={setEditProjectId}>
+                  <SelectTrigger className="mt-1.5" data-testid="select-edit-project">
+                    <SelectValue placeholder="Select a project..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {projects?.map((p) => (
+                      <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Details <span className="text-destructive">*</span></Label>
+                <Textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} className="mt-1.5 resize-none" rows={3} data-testid="textarea-edit-details" />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setEditingEntry(null)}>Cancel</Button>
+                <Button
+                  onClick={handleSaveEdit}
+                  disabled={updateEntry.isPending || !editStartTime || !editEndTime || !editDescription.trim() || !editDate || !editProjectId || editCalcHours <= 0}
+                  data-testid="button-save-edit"
+                >
+                  {updateEntry.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  Save Changes
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );
@@ -453,11 +584,13 @@ function EntryRow({
   entry,
   projectName,
   onDelete,
+  onEdit,
   deleting,
 }: {
   entry: TimeEntry;
   projectName: string;
   onDelete?: () => void;
+  onEdit?: () => void;
   deleting?: boolean;
 }) {
   const statusVariant =
@@ -509,7 +642,17 @@ function EntryRow({
           {statusLabel === "Approved" && <CheckCircle2 className="h-3 w-3 mr-1" />}
           {statusLabel}
         </Badge>
-        {entry.status === "draft" && onDelete && (
+        {onEdit && (
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={onEdit}
+            data-testid={`button-edit-${entry.id}`}
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
+        )}
+        {onDelete && (
           <Button
             size="icon"
             variant="ghost"
