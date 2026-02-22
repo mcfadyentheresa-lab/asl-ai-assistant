@@ -26,6 +26,7 @@ import {
   notifyBoardLinked,
 } from "./sms";
 import { heartbeat, getOnlineUsers, setVisibility, getVisibility } from "./presence";
+import { broadcastProjectChange } from "./websocket";
 
 const uploadDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadDir)) {
@@ -378,19 +379,21 @@ export async function registerRoutes(
     }
   });
 
-  app.put(api.projects.update.path, isAuthenticated, async (req, res) => {
+  app.put(api.projects.update.path, isAuthenticated, async (req: any, res) => {
     const existing = await storage.getProject(Number(req.params.id));
     if (!existing) return res.status(404).json({ message: "Project not found" });
     const input = api.projects.update.input.parse(req.body);
     const project = await storage.updateProject(Number(req.params.id), input);
     res.json(project);
+    broadcastProjectChange(Number(req.params.id), ["project"], "updated", undefined, req.user.claims.sub);
   });
 
-  app.delete("/api/projects/:id", isAuthenticated, async (req, res) => {
+  app.delete("/api/projects/:id", isAuthenticated, async (req: any, res) => {
     const project = await storage.getProject(Number(req.params.id));
     if (!project) return res.status(404).json({ message: "Project not found" });
     await storage.deleteProject(Number(req.params.id));
     res.json({ success: true });
+    broadcastProjectChange(Number(req.params.id), ["project"], "deleted", undefined, req.user.claims.sub);
   });
 
   // Tasks
@@ -404,6 +407,7 @@ export async function registerRoutes(
     const projectId = Number(req.params.projectId);
     const task = await storage.createTask({ ...input, projectId });
     res.status(201).json(task);
+    broadcastProjectChange(task.projectId, ["tasks"], "created", task.id, req.user.claims.sub);
 
     const project = await storage.getProject(projectId);
     if (project && input.assignedTo) {
@@ -415,6 +419,7 @@ export async function registerRoutes(
     const taskId = Number(req.params.id);
     const task = await storage.updateTask(taskId, req.body);
     res.json(task);
+    broadcastProjectChange(task.projectId, ["tasks"], "updated", task.id, req.user.claims.sub);
 
     if (req.body.status && task.projectId) {
       const project = await storage.getProject(task.projectId);
@@ -431,11 +436,12 @@ export async function registerRoutes(
     res.json(milestones);
   });
 
-  app.post(api.milestones.create.path, isAuthenticated, async (req, res) => {
+  app.post(api.milestones.create.path, isAuthenticated, async (req: any, res) => {
     const input = api.milestones.create.input.parse(req.body);
     const projectId = Number(req.params.projectId);
     const milestone = await storage.createMilestone({ ...input, projectId });
     res.status(201).json(milestone);
+    broadcastProjectChange(projectId, ["milestones"], "created", milestone.id, req.user.claims.sub);
 
     if (milestone.date) {
       storage.createCalendarEvent({
@@ -523,6 +529,7 @@ export async function registerRoutes(
       }
 
       res.json(updated);
+      broadcastProjectChange(updated.projectId, ["milestones"], "updated", updated.id, userId);
     } catch (error) {
       res.status(500).json({ message: "Failed to update milestone" });
     }
@@ -558,6 +565,7 @@ export async function registerRoutes(
 
       await storage.deleteMilestone(id);
       res.json({ ok: true });
+      broadcastProjectChange(milestone.projectId, ["milestones"], "deleted", id, userId);
     } catch (error) {
       res.status(500).json({ message: "Failed to delete milestone" });
     }
@@ -569,18 +577,30 @@ export async function registerRoutes(
     res.json(subs);
   });
 
-  app.post("/api/milestones/:milestoneId/sub-milestones", isAuthenticated, async (req, res) => {
+  app.post("/api/milestones/:milestoneId/sub-milestones", isAuthenticated, async (req: any, res) => {
     const milestoneId = Number(req.params.milestoneId);
+    const userId = req.user.claims.sub;
     const input = insertSubMilestoneSchema.parse({ ...req.body, milestoneId });
     const sub = await storage.createSubMilestone(input);
     res.status(201).json(sub);
+    const parentMilestone = await storage.getMilestone(milestoneId);
+    if (parentMilestone) {
+      broadcastProjectChange(parentMilestone.projectId, ["milestones"], "created", sub.id, userId);
+    }
   });
 
-  app.patch("/api/sub-milestones/:id", isAuthenticated, async (req, res) => {
+  app.patch("/api/sub-milestones/:id", isAuthenticated, async (req: any, res) => {
     try {
+      const userId = req.user.claims.sub;
       const parsed = insertSubMilestoneSchema.partial().parse(req.body);
       const updated = await storage.updateSubMilestone(Number(req.params.id), parsed);
       res.json(updated);
+      if (updated.milestoneId) {
+        const parentMilestone = await storage.getMilestone(updated.milestoneId);
+        if (parentMilestone) {
+          broadcastProjectChange(parentMilestone.projectId, ["milestones"], "updated", updated.id, userId);
+        }
+      }
     } catch (e) {
       res.status(500).json({ message: "Failed to update sub-milestone" });
     }
@@ -606,6 +626,7 @@ export async function registerRoutes(
     const projectId = Number(req.params.projectId);
     const photo = await storage.createPhoto({ ...input, projectId });
     res.status(201).json(photo);
+    broadcastProjectChange(photo.projectId, ["photos"], "created", photo.id, req.user.claims.sub);
 
     const userId = req.user.claims.sub;
     const project = await storage.getProject(projectId);
@@ -664,6 +685,7 @@ export async function registerRoutes(
           projectId,
         });
         res.status(201).json(doc);
+        broadcastProjectChange(parseInt(req.params.projectId), ["documents"], "created", undefined, req.user.claims.sub);
 
         const userId = req.user.claims.sub;
         const project = await storage.getProject(projectId);
@@ -702,6 +724,7 @@ export async function registerRoutes(
       senderId: userId 
     });
     res.status(201).json(message);
+    broadcastProjectChange(message.projectId, ["messages"], "created", message.id, userId);
 
     const project = await storage.getProject(Number(req.params.projectId));
     if (project) {
@@ -744,13 +767,18 @@ export async function registerRoutes(
       createdBy: userId,
     });
     res.status(201).json(item);
+    broadcastProjectChange(Number(req.params.projectId), ["checklist"], "created", item.id, userId);
   });
 
-  app.put("/api/checklist/:id", isAuthenticated, async (req, res) => {
+  app.put("/api/checklist/:id", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
     const input = api.checklist.update.input.parse(req.body);
     const item = await storage.updateChecklistItem(Number(req.params.id), input);
     if (!item) return res.status(404).json({ message: "Checklist item not found" });
     res.json(item);
+    if (item.projectId) {
+      broadcastProjectChange(item.projectId, ["checklist"], "updated", item.id, userId);
+    }
   });
 
   app.delete("/api/checklist/:id", isAuthenticated, async (req, res) => {
@@ -773,13 +801,18 @@ export async function registerRoutes(
       createdBy: userId,
     });
     res.status(201).json(item);
+    broadcastProjectChange(Number(req.params.projectId), ["board"], "created", item.id, userId);
   });
 
-  app.put("/api/board/:id", isAuthenticated, async (req, res) => {
+  app.put("/api/board/:id", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
     const input = api.board.update.input.parse(req.body);
     const item = await storage.updateBoardItem(Number(req.params.id), input);
     if (!item) return res.status(404).json({ message: "Board item not found" });
     res.json(item);
+    if (item.projectId) {
+      broadcastProjectChange(item.projectId, ["board"], "updated", item.id, userId);
+    }
   });
 
   app.delete("/api/board/:id", isAuthenticated, async (req, res) => {
@@ -1080,6 +1113,7 @@ export async function registerRoutes(
       createdBy: userId,
     });
     res.status(201).json(event);
+    broadcastProjectChange(projectId, ["calendar"], "created", event.id, userId);
 
     const project = await storage.getProject(projectId);
     if (project) {
@@ -1093,6 +1127,9 @@ export async function registerRoutes(
     const event = await storage.updateCalendarEvent(Number(req.params.id), input);
     if (!event) return res.status(404).json({ message: "Calendar event not found" });
     res.json(event);
+    if (event.projectId) {
+      broadcastProjectChange(event.projectId, ["calendar"], "updated", event.id, req.user?.claims?.sub);
+    }
 
     const userId = req.user?.claims?.sub;
     if (event.projectId && userId) {
@@ -1120,9 +1157,13 @@ export async function registerRoutes(
       if (!req.file) return res.status(400).json({ message: "No image file provided" });
       const url = `/uploads/${req.file.filename}`;
       try {
+        const userId = (req as any).user?.claims?.sub;
         const event = await storage.updateCalendarEvent(Number(req.params.id), { imageUrl: url });
         if (!event) return res.status(404).json({ message: "Calendar event not found" });
         res.json(event);
+        if (event.projectId) {
+          broadcastProjectChange(event.projectId, ["calendar"], "updated", event.id, userId);
+        }
       } catch (error) {
         console.error("Error uploading calendar event image:", error);
         res.status(500).json({ message: "Failed to upload image" });
@@ -1130,7 +1171,8 @@ export async function registerRoutes(
     });
   });
 
-  app.delete("/api/calendar/:id", isAuthenticated, async (req, res) => {
+  app.delete("/api/calendar/:id", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
     const eventId = Number(req.params.id);
     const event = await storage.getCalendarEvent(eventId);
     if (event) {
@@ -1138,6 +1180,9 @@ export async function registerRoutes(
     }
     await storage.deleteCalendarEvent(eventId);
     res.json({ success: true });
+    if (event?.projectId) {
+      broadcastProjectChange(event.projectId, ["calendar"], "deleted", eventId, userId);
+    }
   });
 
   // Weather & PDF Reports Stubs
@@ -1326,6 +1371,7 @@ export async function registerRoutes(
 
   app.patch("/api/projects/:id/color-tag", isAuthenticated, async (req: any, res) => {
     try {
+      const userId = req.user.claims.sub;
       const id = Number(req.params.id);
       const existing = await storage.getProject(id);
       if (!existing) return res.status(404).json({ message: "Project not found" });
@@ -1333,6 +1379,7 @@ export async function registerRoutes(
       if (!parsed.success) return res.status(400).json({ message: "Invalid input" });
       const project = await storage.updateProject(id, { colorTagId: parsed.data.colorTagId });
       res.json(project);
+      broadcastProjectChange(parseInt(req.params.id), ["project"], "updated", undefined, userId);
     } catch (error) {
       console.error("Error updating project color tag:", error);
       res.status(500).json({ message: "Failed to update color tag" });
@@ -1632,6 +1679,7 @@ export async function registerRoutes(
     const input = insertProjectEstimateSchema.parse({ ...req.body, projectId, createdBy: userId });
     const created = await storage.createEstimate(input);
     res.status(201).json(created);
+    broadcastProjectChange(parseInt(req.params.projectId), ["estimates"], "created", undefined, userId);
   });
 
   app.get("/api/estimates/:id", isAuthenticated, async (req: any, res) => {
@@ -1651,6 +1699,9 @@ export async function registerRoutes(
     const input = insertProjectEstimateSchema.partial().parse(req.body);
     const updated = await storage.updateEstimate(parseInt(req.params.id), input);
     res.json(updated);
+    if (updated.projectId) {
+      broadcastProjectChange(updated.projectId, ["estimates"], "updated", updated.id, userId);
+    }
   });
 
   app.delete("/api/estimates/:id", isAuthenticated, async (req: any, res) => {
@@ -1678,6 +1729,10 @@ export async function registerRoutes(
     const estimateId = parseInt(req.params.id);
     const input = insertEstimateItemSchema.parse({ ...req.body, estimateId });
     const created = await storage.createEstimateItem(input);
+    const estimateForBroadcast = await storage.getEstimate(estimateId);
+    if (estimateForBroadcast?.projectId) {
+      broadcastProjectChange(estimateForBroadcast.projectId, ["estimates", "estimate-items"], "created", created.id, userId);
+    }
 
     // Check for pricing warnings against market rates
     if (input.categoryId && !input.isCustomRate) {
@@ -1755,6 +1810,12 @@ export async function registerRoutes(
     }
 
     res.json(updated);
+    if (updated.estimateId) {
+      const estimateForBroadcast = await storage.getEstimate(updated.estimateId);
+      if (estimateForBroadcast?.projectId) {
+        broadcastProjectChange(estimateForBroadcast.projectId, ["estimates", "estimate-items"], "updated", updated.id, userId);
+      }
+    }
   });
 
   app.delete("/api/estimate-items/:id", isAuthenticated, async (req: any, res) => {
@@ -1783,6 +1844,7 @@ export async function registerRoutes(
     const input = insertReceiptSchema.parse({ ...req.body, projectId, createdBy: userId });
     const created = await storage.createReceipt(input);
     res.status(201).json(created);
+    broadcastProjectChange(parseInt(req.params.projectId), ["receipts"], "created", undefined, userId);
   });
 
   app.delete("/api/receipts/:id", isAuthenticated, async (req: any, res) => {

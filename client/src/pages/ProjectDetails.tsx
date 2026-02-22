@@ -11,6 +11,7 @@ import {
   useActivityLog, useCreateMilestone, useUpdateMilestone, useDeleteMilestone,
 } from "@/hooks/use-projects";
 import { useOnlineUsers, isUserOnline } from "@/hooks/use-presence";
+import { useProjectRealtime } from "@/hooks/use-project-realtime";
 import { Navbar } from "@/components/layout/Navbar";
 import SpatialCanvas from "@/components/SpatialCanvas";
 import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, ExternalLink, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, CalendarDays, ChevronLeft, Upload, Download, User, X, Paperclip, ZoomIn, Palette, Shield, Users, Phone, Check, Bell, Eye, EyeOff, Archive, ArchiveRestore, PanelRightOpen, MoreVertical, Flag, DollarSign } from "lucide-react";
@@ -672,6 +673,7 @@ export default function ProjectDetails() {
   const { mutate: sendTestSms, isPending: sendingTestSms } = useSendTestSms();
   const { mutate: notifyTeam, isPending: sendingNotification } = useNotifyTeam();
   const { data: onlineUsers } = useOnlineUsers();
+  const { viewers } = useProjectRealtime(projectId, user);
   const { toast } = useToast();
 
   const [activeTab, setActiveTab] = useState(() => {
@@ -819,9 +821,27 @@ export default function ProjectDetails() {
           </Link>
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-3">
             <div>
-              <h1 className="font-serif text-3xl md:text-4xl font-bold text-foreground mb-1" data-testid="text-project-title">
-                {project.name}
-              </h1>
+              <div className="flex items-center flex-wrap gap-2">
+                <h1 className="font-serif text-3xl md:text-4xl font-bold text-foreground mb-1" data-testid="text-project-title">
+                  {project.name}
+                </h1>
+                {viewers.length > 0 && (
+                  <div className="flex items-center gap-1 ml-3" data-testid="active-viewers">
+                    <div className="flex -space-x-2">
+                      {viewers.map(v => (
+                        <div key={v.userId} className="w-7 h-7 rounded-full bg-primary/20 border-2 border-background flex items-center justify-center text-xs font-medium" title={`${v.firstName} ${v.lastName}`} data-testid={`viewer-avatar-${v.userId}`}>
+                          {v.profileImageUrl ? (
+                            <img src={v.profileImageUrl} className="w-full h-full rounded-full object-cover" alt={`${v.firstName} ${v.lastName}`} />
+                          ) : (
+                            <span>{(v.firstName?.[0] || '') + (v.lastName?.[0] || '')}</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    <span className="text-xs text-muted-foreground" data-testid="text-viewer-count">{viewers.length} viewing</span>
+                  </div>
+                )}
+              </div>
               <p className="text-muted-foreground max-w-2xl text-sm" data-testid="text-project-desc">
                 {project.description}
               </p>
