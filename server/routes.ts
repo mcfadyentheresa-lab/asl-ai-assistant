@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
-import { insertSubMilestoneSchema, insertTimeEntrySchema, insertCostCategorySchema, insertMarketRateSchema, insertProjectEstimateSchema, insertEstimateItemSchema, insertReceiptSchema, insertCrewRateSchema, insertSubcontractorSchema } from "@shared/schema";
+import { insertSubMilestoneSchema, insertTimeEntrySchema, insertCostCategorySchema, insertMarketRateSchema, insertProjectEstimateSchema, insertEstimateItemSchema, insertReceiptSchema, insertCrewRateSchema, insertSubcontractorSchema, insertSupplierSchema, insertSupplierPriceSchema } from "@shared/schema";
 import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
@@ -2267,7 +2267,9 @@ Respond with valid JSON only, no markdown:
     if (!user || user.role !== "admin") {
       return res.status(403).json({ message: "Admin access required" });
     }
-    const supplier = await storage.createSupplier(req.body);
+    const parsed = insertSupplierSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: "Invalid supplier data", errors: parsed.error.errors });
+    const supplier = await storage.createSupplier(parsed.data);
     res.status(201).json(supplier);
   });
 
@@ -2277,7 +2279,9 @@ Respond with valid JSON only, no markdown:
     if (!user || user.role !== "admin") {
       return res.status(403).json({ message: "Admin access required" });
     }
-    const supplier = await storage.updateSupplier(parseInt(req.params.id), req.body);
+    const parsed = insertSupplierSchema.partial().safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: "Invalid supplier data", errors: parsed.error.errors });
+    const supplier = await storage.updateSupplier(parseInt(req.params.id), parsed.data);
     res.json(supplier);
   });
 
@@ -2309,7 +2313,9 @@ Respond with valid JSON only, no markdown:
     if (!user || user.role !== "admin") {
       return res.status(403).json({ message: "Admin access required" });
     }
-    const price = await storage.createSupplierPrice({ ...req.body, createdBy: userId });
+    const parsed = insertSupplierPriceSchema.safeParse({ ...req.body, createdBy: userId });
+    if (!parsed.success) return res.status(400).json({ message: "Invalid price data", errors: parsed.error.errors });
+    const price = await storage.createSupplierPrice(parsed.data);
     res.status(201).json(price);
   });
 
@@ -2319,7 +2325,9 @@ Respond with valid JSON only, no markdown:
     if (!user || user.role !== "admin") {
       return res.status(403).json({ message: "Admin access required" });
     }
-    const price = await storage.updateSupplierPrice(parseInt(req.params.id), req.body);
+    const parsed = insertSupplierPriceSchema.partial().safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: "Invalid price data", errors: parsed.error.errors });
+    const price = await storage.updateSupplierPrice(parseInt(req.params.id), parsed.data);
     res.json(price);
   });
 

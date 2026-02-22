@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Navbar } from "@/components/layout/Navbar";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -39,16 +39,11 @@ export default function SupplierPrices() {
     queryKey: ["/api/suppliers"],
   });
 
+  const priceQueryPath = selectedSupplierId
+    ? `/api/supplier-prices?supplierId=${selectedSupplierId}`
+    : "/api/supplier-prices";
   const { data: prices = [], isLoading: loadingPrices } = useQuery<SupplierPrice[]>({
-    queryKey: ["/api/supplier-prices", selectedSupplierId],
-    queryFn: async () => {
-      const url = selectedSupplierId
-        ? `/api/supplier-prices?supplierId=${selectedSupplierId}`
-        : "/api/supplier-prices";
-      const res = await fetch(url, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch prices");
-      return res.json();
-    },
+    queryKey: [priceQueryPath],
   });
 
   const { data: categories = [] } = useQuery<CostCategory[]>({
@@ -59,14 +54,12 @@ export default function SupplierPrices() {
 
   const activeSupplier = suppliersList.find(s => s.id === selectedSupplierId) || null;
 
-  if (selectedSupplierId === null && suppliersList.length > 0) {
-    const preferred = suppliersList.find(s => s.isPreferred);
-    if (preferred) {
-      setSelectedSupplierId(preferred.id);
-    } else {
-      setSelectedSupplierId(suppliersList[0].id);
+  useEffect(() => {
+    if (selectedSupplierId === null && suppliersList.length > 0) {
+      const preferred = suppliersList.find(s => s.isPreferred);
+      setSelectedSupplierId(preferred ? preferred.id : suppliersList[0].id);
     }
-  }
+  }, [suppliersList, selectedSupplierId]);
 
   const filteredPrices = prices.filter(p => {
     if (!search) return true;
@@ -83,7 +76,7 @@ export default function SupplierPrices() {
       await apiRequest("DELETE", `/api/supplier-prices/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/supplier-prices"] });
+      queryClient.invalidateQueries({ queryKey: [priceQueryPath] });
       toast({ title: "Price deleted" });
       setDeletePrice(null);
     },
@@ -578,7 +571,7 @@ function PriceFormDialog({
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/supplier-prices"] });
+      queryClient.invalidateQueries({ queryKey: [priceQueryPath] });
       toast({ title: price ? "Price updated" : "Price added" });
       onClose();
     },
@@ -702,7 +695,7 @@ function AddFromReceiptDialog({
       await apiRequest("POST", "/api/supplier-prices", data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/supplier-prices"] });
+      queryClient.invalidateQueries({ queryKey: [priceQueryPath] });
       toast({ title: "Price added from receipt" });
       onClose();
     },

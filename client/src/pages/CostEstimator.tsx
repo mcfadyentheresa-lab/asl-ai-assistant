@@ -28,11 +28,11 @@ import {
   Calculator, Plus, Trash2, AlertTriangle, CheckCircle2,
   DollarSign, ArrowLeft, Receipt as ReceiptIcon, EyeOff, Pencil,
   TrendingUp, TrendingDown, Minus, Loader2, Sparkles, Shapes, ChevronDown, ChevronRight,
-  Wallet, Lightbulb, ArrowDownRight, ExternalLink, Home
+  Wallet, Lightbulb, ArrowDownRight, ExternalLink, Home, Store
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
-import type { CostCategory, MarketRate, ProjectEstimate, EstimateItem, Receipt, EstimateWarning, Project, CrewRate, Subcontractor } from "@shared/schema";
+import type { CostCategory, MarketRate, ProjectEstimate, EstimateItem, Receipt, EstimateWarning, Project, CrewRate, Subcontractor, Supplier, SupplierPrice } from "@shared/schema";
 
 export default function CostEstimator() {
   const { id } = useParams<{ id: string }>();
@@ -92,6 +92,8 @@ export default function CostEstimator() {
   const { data: estimates = [] } = useQuery<ProjectEstimate[]>({ queryKey: ["/api/projects", projectId, "estimates"] });
   const { data: crewRates = [] } = useQuery<CrewRate[]>({ queryKey: ["/api/crew-rates"], enabled: canEdit });
   const { data: subcontractors = [] } = useQuery<Subcontractor[]>({ queryKey: ["/api/subcontractors"], enabled: canEdit });
+  const { data: priceBookSuppliers = [] } = useQuery<Supplier[]>({ queryKey: ["/api/suppliers"], enabled: canEdit });
+  const { data: supplierPrices = [] } = useQuery<SupplierPrice[]>({ queryKey: ["/api/supplier-prices"], enabled: canEdit });
   const { data: boardMaterials = [], isLoading: boardMaterialsLoading } = useQuery<any[]>({
     queryKey: ["/api/projects", projectId, "board-materials"],
     enabled: showBoardImport,
@@ -1115,6 +1117,39 @@ export default function CostEstimator() {
                       );
                     })()}
                   </div>
+              </div>
+            )}
+
+            {supplierPrices.length > 0 && (
+              <div>
+                <Label className="flex items-center gap-1"><Store className="h-3 w-3" /> Fill from Price Book</Label>
+                <Select onValueChange={(v) => {
+                  const sp = supplierPrices.find(p => p.id === parseInt(v));
+                  if (sp) {
+                    const supplier = priceBookSuppliers.find(s => s.id === sp.supplierId);
+                    setNewItem(prev => ({
+                      ...prev,
+                      unitCost: sp.unitPrice,
+                      unitType: sp.unitType === "sq_ft" ? "sq_ft" : sp.unitType === "hour" ? "hour" : "board",
+                      materialCost: sp.unitPrice,
+                      productUrl: sp.productUrl || prev.productUrl,
+                      notes: prev.notes || `${sp.productName}${supplier ? ` — ${supplier.name}` : ""}${sp.productCode ? ` (${sp.productCode})` : ""}`,
+                    }));
+                  }
+                }}>
+                  <SelectTrigger className="text-xs" data-testid="select-supplier-price"><SelectValue placeholder="Auto-fill from supplier price book..." /></SelectTrigger>
+                  <SelectContent>
+                    {priceBookSuppliers.map(supplier => {
+                      const prices = supplierPrices.filter(p => p.supplierId === supplier.id);
+                      if (prices.length === 0) return null;
+                      return prices.map(p => (
+                        <SelectItem key={p.id} value={String(p.id)}>
+                          {supplier.name} — {p.productName} — ${p.unitPrice}/{p.unitType === "sq_ft" ? "sq ft" : p.unitType}
+                        </SelectItem>
+                      ));
+                    })}
+                  </SelectContent>
+                </Select>
               </div>
             )}
 
