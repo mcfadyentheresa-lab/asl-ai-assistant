@@ -29,7 +29,8 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
-import { Users, Building2, Plus, Pencil, Trash2, DollarSign, Loader2, Phone, Mail, MapPin, Star } from "lucide-react";
+import { Users, Building2, Plus, Pencil, Trash2, DollarSign, Loader2, Phone, Mail, MapPin, Star, ArrowLeft } from "lucide-react";
+import { Link } from "wouter";
 import { Textarea } from "@/components/ui/textarea";
 import type { CostCategory } from "@shared/schema";
 

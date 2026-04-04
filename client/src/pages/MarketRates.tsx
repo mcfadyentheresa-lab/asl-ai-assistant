@@ -22,7 +22,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { TrendingUp, Plus, Pencil, DollarSign, Loader2, Calendar } from "lucide-react";
+import { TrendingUp, Plus, Pencil, DollarSign, Loader2, Calendar, ArrowLeft } from "lucide-react";
+import { Link } from "wouter";
 import type { CostCategory, MarketRate } from "@shared/schema";
 
 export default function MarketRates() {

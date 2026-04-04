@@ -23,7 +23,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Clock, Calendar, Briefcase, Send, Trash2, Plus, CheckCircle2, Loader2, User, Pencil } from "lucide-react";
+import { Clock, Calendar, Briefcase, Send, Trash2, Plus, CheckCircle2, Loader2, User, Pencil, ArrowLeft } from "lucide-react";
+import { Link } from "wouter";
 import { format } from "date-fns";
 import type { Project, Milestone, CalendarEvent, TimeEntry } from "@shared/schema";
 
