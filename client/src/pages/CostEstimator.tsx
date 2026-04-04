@@ -42,24 +42,7 @@ export default function CostEstimator() {
   const queryClient = useQueryClient();
   const isAdmin = (user as any)?.role === "admin";
   const isCrew = (user as any)?.role === "crew";
-  
-  if (!isAdmin) {
-    return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
-        <AlertTriangle className="h-12 w-12 text-destructive mb-4" />
-        <h1 className="text-2xl font-bold mb-2">Access Denied</h1>
-        <p className="text-muted-foreground text-center max-w-md mb-6">
-          The Cost Estimator is restricted to administrative personnel only. 
-          Please contact your project manager if you believe this is an error.
-        </p>
-        <Link href="/">
-          <Button variant="outline">Return to Dashboard</Button>
-        </Link>
-      </div>
-    );
-  }
-
-  const canEdit = isAdmin; // Simplified since only admin can access now
+  const canEdit = isAdmin;
 
   const [showAddItem, setShowAddItem] = useState(false);
   const [showAddReceipt, setShowAddReceipt] = useState(false);
@@ -408,6 +391,22 @@ export default function CostEstimator() {
         <div className="flex items-center justify-center py-20">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
+        <AlertTriangle className="h-12 w-12 text-destructive mb-4" />
+        <h1 className="text-2xl font-bold mb-2">Access Denied</h1>
+        <p className="text-muted-foreground text-center max-w-md mb-6">
+          The Cost Estimator is restricted to administrative personnel only. 
+          Please contact your project manager if you believe this is an error.
+        </p>
+        <Link href="/">
+          <Button variant="outline">Return to Dashboard</Button>
+        </Link>
       </div>
     );
   }
