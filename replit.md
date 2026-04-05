@@ -85,3 +85,7 @@ Development uses `npm run dev` for HMR, `npm run build` compiles both client and
 *   `TWILIO_ACCOUNT_SID`
 *   `TWILIO_AUTH_TOKEN`
 *   `TWILIO_PHONE_NUMBER`
+
+### Feature Specifications (continued)
+
+*   **Client Onboarding System**: Admin-initiated client invite flow via SMS. Schema: `client_invites` table (token, projectId, firstName/lastName/email/phone, userId, createdBy, expiresAt, acceptedAt, status). `onboardingCompleted` field on `users` table. API: `POST /api/projects/:id/invite-client` (admin-only, creates user + invite, sends SMS via Twilio), `GET /api/invites/:token/validate` (public, returns project name + invite status), `POST /api/invites/:token/accept` (authenticated, email-verified, marks accepted, links user to project), `POST /api/auth/complete-onboarding` (authenticated, Zod-validated profile completion), `GET /api/projects/:id/invites` (admin-only invite list). Frontend: `InviteAccept.tsx` at `/invite/:token` (validates + accepts invites, handles expired/accepted/invalid states), `Welcome.tsx` at `/welcome` (profile completion for new clients). Invite UI in ProjectDetails sidebar with invite dialog and status badges (pending/accepted/expired). Auth `returnTo` redirect support for post-login invite acceptance. Landing page button changed from "Team Login" to "Log In".

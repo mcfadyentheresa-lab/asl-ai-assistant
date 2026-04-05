@@ -397,6 +397,194 @@ export async function registerRoutes(
     broadcastProjectChange(Number(req.params.id), ["project"], "deleted", undefined, req.user.claims.sub);
   });
 
+  // Client Invites
+  const inviteClientSchema = z.object({
+    firstName: z.string().min(1).max(100),
+    lastName: z.string().min(1).max(100),
+    email: z.string().email().max(255),
+    phone: z.string().min(7).max(30),
+  });
+
+  app.post("/api/projects/:id/invite-client", isAuthenticated, async (req: any, res) => {
+    try {
+      const requesterId = req.user.claims.sub;
+      const requester = await authStorage.getUser(requesterId);
+      if (requester?.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can invite clients" });
+      }
+      const projectId = Number(req.params.id);
+      const project = await storage.getProject(projectId);
+      if (!project) return res.status(404).json({ message: "Project not found" });
+
+      const parsed = inviteClientSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid input", errors: parsed.error.flatten().fieldErrors });
+      }
+
+      const token = randomUUID();
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+      let userId: string | null = null;
+      const existingUsers = await authStorage.getUsers();
+      const existingUser = existingUsers.find(u => u.email === parsed.data.email);
+      if (existingUser) {
+        userId = existingUser.id;
+      } else {
+        const newId = `invite-${randomUUID().slice(0, 8)}`;
+        const newUser = await authStorage.upsertUser({
+          id: newId,
+          email: parsed.data.email,
+          firstName: parsed.data.firstName,
+          lastName: parsed.data.lastName,
+          phone: parsed.data.phone,
+          role: "client",
+        });
+        userId = newUser.id;
+      }
+
+      if (userId && !project.clientId) {
+        await storage.updateProject(projectId, { clientId: userId });
+      }
+
+      const invite = await storage.createClientInvite({
+        token,
+        projectId,
+        firstName: parsed.data.firstName,
+        lastName: parsed.data.lastName,
+        email: parsed.data.email,
+        phone: parsed.data.phone,
+        userId,
+        createdBy: requesterId,
+        expiresAt,
+        status: "pending",
+      });
+
+      const { sendClientInviteSms } = await import("./sms");
+      sendClientInviteSms(parsed.data.phone, parsed.data.firstName, project.name, token).catch(() => {});
+
+      res.status(201).json(invite);
+    } catch (error: any) {
+      console.error("Error creating client invite:", error);
+      res.status(500).json({ message: "Failed to create invite" });
+    }
+  });
+
+  app.get("/api/invites/:token/validate", async (req: any, res) => {
+    try {
+      const invite = await storage.getClientInviteByToken(req.params.token);
+      if (!invite) return res.status(404).json({ message: "Invite not found" });
+
+      const project = await storage.getProject(invite.projectId);
+      const isExpired = new Date() > invite.expiresAt;
+      const isAccepted = invite.status === "accepted";
+
+      res.json({
+        valid: !isExpired && !isAccepted,
+        expired: isExpired,
+        accepted: isAccepted,
+        projectName: project?.name || "Unknown Project",
+        firstName: invite.firstName,
+        lastName: invite.lastName,
+        email: invite.email,
+      });
+    } catch (error) {
+      console.error("Error validating invite:", error);
+      res.status(500).json({ message: "Failed to validate invite" });
+    }
+  });
+
+  app.post("/api/invites/:token/accept", isAuthenticated, async (req: any, res) => {
+    try {
+      const invite = await storage.getClientInviteByToken(req.params.token);
+      if (!invite) return res.status(404).json({ message: "Invite not found" });
+
+      if (new Date() > invite.expiresAt) {
+        return res.status(410).json({ message: "This invite has expired" });
+      }
+      if (invite.status === "accepted") {
+        return res.status(409).json({ message: "This invite has already been accepted" });
+      }
+
+      const userId = req.user.claims.sub;
+      const currentUser = await authStorage.getUser(userId);
+      const userEmail = currentUser?.email?.toLowerCase().trim();
+      const inviteEmail = invite.email?.toLowerCase().trim();
+
+      if (invite.userId && invite.userId !== userId) {
+        if (!userEmail || !inviteEmail || userEmail !== inviteEmail) {
+          return res.status(403).json({ message: "This invite was sent to a different email address. Please log in with the correct account." });
+        }
+      }
+
+      await storage.updateClientInvite(invite.id, {
+        status: "accepted",
+        acceptedAt: new Date(),
+        userId,
+      } as any);
+
+      const project = await storage.getProject(invite.projectId);
+      if (project && !project.clientId) {
+        await storage.updateProject(invite.projectId, { clientId: userId });
+      }
+
+      await authStorage.updateUserProfile(userId, {
+        firstName: invite.firstName,
+        lastName: invite.lastName,
+        phone: invite.phone || undefined,
+      });
+
+      broadcastProjectChange(invite.projectId, ["invites", "project"], "invite_accepted", undefined, userId);
+
+      res.json({ success: true, projectId: invite.projectId });
+    } catch (error) {
+      console.error("Error accepting invite:", error);
+      res.status(500).json({ message: "Failed to accept invite" });
+    }
+  });
+
+  const onboardingSchema = z.object({
+    firstName: z.string().min(1).max(100),
+    lastName: z.string().min(1).max(100),
+    phone: z.string().max(30).nullable().optional(),
+  });
+
+  app.post("/api/auth/complete-onboarding", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const parsed = onboardingSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid input", errors: parsed.error.flatten().fieldErrors });
+      }
+
+      const updates: any = { onboardingCompleted: new Date() };
+      updates.firstName = parsed.data.firstName;
+      updates.lastName = parsed.data.lastName;
+      if (parsed.data.phone !== undefined) updates.phone = parsed.data.phone;
+
+      const user = await authStorage.updateUserProfile(userId, updates);
+      if (!user) return res.status(404).json({ message: "User not found" });
+      res.json(user);
+    } catch (error) {
+      console.error("Error completing onboarding:", error);
+      res.status(500).json({ message: "Failed to complete onboarding" });
+    }
+  });
+
+  app.get("/api/projects/:id/invites", isAuthenticated, async (req: any, res) => {
+    try {
+      const requesterId = req.user.claims.sub;
+      const requester = await authStorage.getUser(requesterId);
+      if (requester?.role === "client") {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      const invites = await storage.getClientInvitesByProject(Number(req.params.id));
+      res.json(invites);
+    } catch (error) {
+      console.error("Error fetching invites:", error);
+      res.status(500).json({ message: "Failed to fetch invites" });
+    }
+  });
+
   app.get("/api/projects/:id/budget-summary", isAuthenticated, async (req: any, res) => {
     try {
       const projectId = Number(req.params.id);

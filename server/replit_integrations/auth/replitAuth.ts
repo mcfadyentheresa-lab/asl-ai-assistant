@@ -106,6 +106,9 @@ export async function setupAuth(app: Express) {
 
   app.get("/api/login", (req, res, next) => {
     ensureStrategy(req.hostname);
+    if (req.query.returnTo && typeof req.query.returnTo === "string") {
+      (req.session as any).returnTo = req.query.returnTo;
+    }
     console.log("Login: starting auth, session id:", req.sessionID);
     passport.authenticate(`replitauth:${req.hostname}`, {
       prompt: "login consent",
@@ -134,7 +137,11 @@ export async function setupAuth(app: Express) {
           if (saveErr) {
             console.error("Session save error after login:", saveErr);
           }
-          return res.redirect("/");
+          const returnTo = (req.session as any).returnTo;
+          delete (req.session as any).returnTo;
+          const isSafePath = returnTo && typeof returnTo === "string" && /^\/[a-zA-Z0-9/_\-?=&%.]+$/.test(returnTo) && !returnTo.startsWith("//");
+          const redirectUrl = isSafePath ? returnTo : "/";
+          return res.redirect(redirectUrl);
         });
       });
     })(req, res, next);

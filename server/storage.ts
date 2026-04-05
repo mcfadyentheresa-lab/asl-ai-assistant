@@ -1,10 +1,11 @@
 import { db } from "./db";
 import { 
-  users, projects, milestones, subMilestones, tasks, photos, documents, timeEntries, messages, checklistItems, boardItems, calendarEvents, planningBoards, canvasElements, activityLog, activityViews, paintColors, boardSnapshots, costCategories, marketRates, projectEstimates, estimateItems, receipts, estimateWarnings, crewRates, subcontractors, suppliers, supplierPrices,
+  users, projects, milestones, subMilestones, tasks, photos, documents, timeEntries, messages, checklistItems, boardItems, calendarEvents, planningBoards, canvasElements, activityLog, activityViews, paintColors, boardSnapshots, costCategories, marketRates, projectEstimates, estimateItems, receipts, estimateWarnings, crewRates, subcontractors, suppliers, supplierPrices, clientInvites,
   type Project, type Milestone, type SubMilestone, type Task, type Photo, type Document, type TimeEntry, type Message,
   type ChecklistItem, type BoardItem, type CalendarEvent, type PlanningBoard, type CanvasElement, type ActivityLog, type PaintColor, type BoardSnapshot, type CostCategory, type MarketRate, type ProjectEstimate, type EstimateItem, type Receipt, type EstimateWarning, type CrewRate, type Subcontractor,
   type InsertProject, type InsertMilestone, type InsertSubMilestone, type InsertTask, type InsertPhoto, type InsertDocument, 
-  type InsertTimeEntry, type InsertMessage, type InsertChecklistItem, type InsertBoardItem, type InsertCalendarEvent, type InsertPlanningBoard, type InsertCanvasElement, type InsertActivityLog, type InsertBoardSnapshot, type InsertCostCategory, type InsertMarketRate, type InsertProjectEstimate, type InsertEstimateItem, type InsertReceipt, type InsertEstimateWarning, type InsertCrewRate, type InsertSubcontractor, type Supplier, type SupplierPrice, type InsertSupplier, type InsertSupplierPrice
+  type InsertTimeEntry, type InsertMessage, type InsertChecklistItem, type InsertBoardItem, type InsertCalendarEvent, type InsertPlanningBoard, type InsertCanvasElement, type InsertActivityLog, type InsertBoardSnapshot, type InsertCostCategory, type InsertMarketRate, type InsertProjectEstimate, type InsertEstimateItem, type InsertReceipt, type InsertEstimateWarning, type InsertCrewRate, type InsertSubcontractor, type Supplier, type SupplierPrice, type InsertSupplier, type InsertSupplierPrice,
+  type ClientInvite, type InsertClientInvite
 } from "@shared/schema";
 import { type User } from "@shared/models/auth";
 import { eq, desc, and, ilike, or, gte, lte, inArray, sql } from "drizzle-orm";
@@ -183,6 +184,12 @@ export interface IStorage {
   createSupplierPrice(price: InsertSupplierPrice): Promise<SupplierPrice>;
   updateSupplierPrice(id: number, updates: Partial<InsertSupplierPrice>): Promise<SupplierPrice>;
   deleteSupplierPrice(id: number): Promise<void>;
+
+  // Client Invites
+  createClientInvite(invite: InsertClientInvite): Promise<ClientInvite>;
+  getClientInviteByToken(token: string): Promise<ClientInvite | undefined>;
+  getClientInvitesByProject(projectId: number): Promise<ClientInvite[]>;
+  updateClientInvite(id: number, updates: Partial<InsertClientInvite>): Promise<ClientInvite>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -766,6 +773,23 @@ export class DatabaseStorage implements IStorage {
   }
   async deleteSupplierPrice(id: number): Promise<void> {
     await db.delete(supplierPrices).where(eq(supplierPrices.id, id));
+  }
+
+  // Client Invites
+  async createClientInvite(invite: InsertClientInvite): Promise<ClientInvite> {
+    const [created] = await db.insert(clientInvites).values(invite).returning();
+    return created;
+  }
+  async getClientInviteByToken(token: string): Promise<ClientInvite | undefined> {
+    const [invite] = await db.select().from(clientInvites).where(eq(clientInvites.token, token));
+    return invite;
+  }
+  async getClientInvitesByProject(projectId: number): Promise<ClientInvite[]> {
+    return db.select().from(clientInvites).where(eq(clientInvites.projectId, projectId)).orderBy(desc(clientInvites.createdAt));
+  }
+  async updateClientInvite(id: number, updates: Partial<InsertClientInvite>): Promise<ClientInvite> {
+    const [updated] = await db.update(clientInvites).set(updates).where(eq(clientInvites.id, id)).returning();
+    return updated;
   }
 }
 

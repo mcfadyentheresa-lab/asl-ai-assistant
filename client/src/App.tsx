@@ -19,6 +19,8 @@ import MarketRates from "@/pages/MarketRates";
 import LaborRates from "@/pages/LaborRates";
 import TradeContacts from "@/pages/TradeContacts";
 import SupplierPrices from "@/pages/SupplierPrices";
+import InviteAccept from "@/pages/InviteAccept";
+import Welcome from "@/pages/Welcome";
 import NotFound from "@/pages/not-found";
 
 function PresenceTracker() {
@@ -41,7 +43,8 @@ function Router() {
     return (
       <Switch>
         <Route path="/" component={LandingPage} />
-        <Route component={LandingPage} /> {/* Catch-all for non-logged in users redirects to Landing */}
+        <Route path="/invite/:token" component={InviteAccept} />
+        <Route component={LandingPage} />
       </Switch>
     );
   }
@@ -49,6 +52,8 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
+      <Route path="/welcome" component={Welcome} />
+      <Route path="/invite/:token" component={InviteAccept} />
       <Route path="/profile" component={Profile} />
       <Route path="/project/:id/estimate" component={CostEstimator} />
       <Route path="/project/:id" component={ProjectDetails} />

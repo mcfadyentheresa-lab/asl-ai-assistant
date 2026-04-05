@@ -500,6 +500,23 @@ export const suppliers = pgTable("suppliers", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Client Invites (secure onboarding tokens)
+export const clientInvites = pgTable("client_invites", {
+  id: serial("id").primaryKey(),
+  token: text("token").notNull().unique(),
+  projectId: integer("project_id").notNull().references(() => projects.id),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
+  email: text("email").notNull(),
+  phone: text("phone"),
+  userId: text("user_id").references(() => users.id),
+  createdBy: text("created_by").notNull().references(() => users.id),
+  expiresAt: timestamp("expires_at").notNull(),
+  acceptedAt: timestamp("accepted_at"),
+  status: text("status").notNull().default("pending"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Supplier Prices (price book built from receipts)
 export const supplierPrices = pgTable("supplier_prices", {
   id: serial("id").primaryKey(),
@@ -543,6 +560,7 @@ export const insertEstimateWarningSchema = createInsertSchema(estimateWarnings).
 export const insertCrewRateSchema = createInsertSchema(crewRates).omit({ id: true, createdAt: true });
 export const insertSubcontractorSchema = createInsertSchema(subcontractors).omit({ id: true, createdAt: true });
 export const insertSupplierSchema = createInsertSchema(suppliers).omit({ id: true, createdAt: true });
+export const insertClientInviteSchema = createInsertSchema(clientInvites).omit({ id: true, createdAt: true });
 export const insertSupplierPriceSchema = createInsertSchema(supplierPrices).omit({ id: true, createdAt: true, lastUpdated: true });
 
 // TYPES
@@ -601,3 +619,5 @@ export type Supplier = typeof suppliers.$inferSelect;
 export type InsertSupplier = z.infer<typeof insertSupplierSchema>;
 export type SupplierPrice = typeof supplierPrices.$inferSelect;
 export type InsertSupplierPrice = z.infer<typeof insertSupplierPriceSchema>;
+export type ClientInvite = typeof clientInvites.$inferSelect;
+export type InsertClientInvite = z.infer<typeof insertClientInviteSchema>;

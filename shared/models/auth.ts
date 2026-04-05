@@ -23,6 +23,7 @@ export const users = pgTable("users", {
   phone: varchar("phone"),
   profileImageUrl: varchar("profile_image_url"),
   role: varchar("role").default("client").notNull(),
+  onboardingCompleted: timestamp("onboarding_completed"),
   archivedAt: timestamp("archived_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

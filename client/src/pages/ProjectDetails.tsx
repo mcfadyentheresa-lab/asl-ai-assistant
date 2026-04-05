@@ -59,9 +59,11 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient as qc } from "@/lib/queryClient";
+import { UserPlus, Mail } from "lucide-react";
+import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths, isSameDay, isSameMonth, parseISO, formatDistanceToNow } from "date-fns";
@@ -257,6 +259,36 @@ function SidebarCards({
   ) || [] : [];
   const allClients = [...clients, ...boardInvitedClients];
 
+  const [showInviteDialog, setShowInviteDialog] = useState(false);
+  const [inviteForm, setInviteForm] = useState({ firstName: "", lastName: "", email: "", phone: "" });
+
+  const { data: projectInvites } = useQuery({
+    queryKey: ["/api/projects", projectId, "invites"],
+    queryFn: async () => {
+      const res = await fetch(`/api/projects/${projectId}/invites`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: userRole === "admin",
+  });
+
+  const inviteClientMutation = useMutation({
+    mutationFn: async (data: typeof inviteForm) => {
+      const res = await apiRequest("POST", `/api/projects/${projectId}/invite-client`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Invite sent", description: "Client will receive an SMS with their portal link." });
+      setShowInviteDialog(false);
+      setInviteForm({ firstName: "", lastName: "", email: "", phone: "" });
+      qc.invalidateQueries({ queryKey: ["/api/projects", projectId, "invites"] });
+      qc.invalidateQueries({ queryKey: ["/api/users"] });
+    },
+    onError: () => {
+      toast({ title: "Failed to send invite", variant: "destructive" });
+    },
+  });
+
   const renderUserRow = (u: any, badge?: string) => (
     <div key={u.id} className={`space-y-1 ${u.archivedAt ? "opacity-50" : ""}`} data-testid={`access-user-${u.id}`}>
       <div className="flex items-center gap-2">
@@ -385,6 +417,69 @@ function SidebarCards({
             </div>
           ) : (
             <p className="text-muted-foreground text-sm" data-testid="text-no-client">No client assigned</p>
+          )}
+
+          {userRole === "admin" && (
+            <div className="mt-4 space-y-3">
+              <Dialog open={showInviteDialog} onOpenChange={setShowInviteDialog}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="w-full" data-testid="button-invite-client">
+                    <UserPlus className="h-3.5 w-3.5 mr-2" />
+                    Invite New Client
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Invite Client to Project</DialogTitle>
+                    <DialogDescription>
+                      The client will receive an SMS with a link to access their project portal.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 pt-2">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <Label htmlFor="invite-first">First Name</Label>
+                        <Input id="invite-first" value={inviteForm.firstName} onChange={(e) => setInviteForm(f => ({ ...f, firstName: e.target.value }))} placeholder="First name" data-testid="input-invite-first" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="invite-last">Last Name</Label>
+                        <Input id="invite-last" value={inviteForm.lastName} onChange={(e) => setInviteForm(f => ({ ...f, lastName: e.target.value }))} placeholder="Last name" data-testid="input-invite-last" />
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="invite-email">Email</Label>
+                      <Input id="invite-email" type="email" value={inviteForm.email} onChange={(e) => setInviteForm(f => ({ ...f, email: e.target.value }))} placeholder="client@example.com" data-testid="input-invite-email" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="invite-phone">Phone Number</Label>
+                      <Input id="invite-phone" value={inviteForm.phone} onChange={(e) => setInviteForm(f => ({ ...f, phone: e.target.value }))} placeholder="(705) 555-0123" data-testid="input-invite-phone" />
+                    </div>
+                    <Button
+                      className="w-full"
+                      onClick={() => inviteClientMutation.mutate(inviteForm)}
+                      disabled={inviteClientMutation.isPending || !inviteForm.firstName.trim() || !inviteForm.lastName.trim() || !inviteForm.email.trim() || !inviteForm.phone.trim()}
+                      data-testid="button-send-invite"
+                    >
+                      {inviteClientMutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Sending...</> : <><Mail className="mr-2 h-4 w-4" />Send Invite</>}
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+
+              {Array.isArray(projectInvites) && projectInvites.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Invites</p>
+                  {projectInvites.map((inv: any) => (
+                    <div key={inv.id} className="flex items-center justify-between text-sm" data-testid={`invite-row-${inv.id}`}>
+                      <span className="truncate">{inv.firstName} {inv.lastName}</span>
+                      <Badge variant={inv.status === "accepted" ? "default" : inv.status === "pending" && new Date() > new Date(inv.expiresAt) ? "destructive" : "secondary"} className="text-[10px] ml-2">
+                        {inv.status === "accepted" ? "Accepted" : new Date() > new Date(inv.expiresAt) ? "Expired" : "Pending"}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
         </CardContent>
       </Card>

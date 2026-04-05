@@ -31,7 +31,7 @@ export default function LandingPage() {
             className="bg-white/10 backdrop-blur-md text-white border-white/20"
             data-testid="button-login"
           >
-            Team Login
+            Log In
           </Button>
         </nav>
 

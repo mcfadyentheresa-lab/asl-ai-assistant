@@ -313,6 +313,17 @@ export async function notifyBoardLinked(
   );
 }
 
+export async function sendClientInviteSms(
+  toPhone: string,
+  clientFirstName: string,
+  projectName: string,
+  inviteToken: string
+): Promise<boolean> {
+  const inviteLink = `${APP_URL}/invite/${inviteToken}`;
+  const body = `Hi ${clientFirstName}, welcome to Aster & Spruce! You've been invited to your project portal for "${projectName}". Access your portal here: ${inviteLink}`;
+  return sendSms(toPhone, body, true);
+}
+
 export async function sendTestSms(toPhone: string): Promise<boolean> {
   return sendSms(
     toPhone,
