@@ -612,7 +612,14 @@ export async function registerRoutes(
         reconciled++;
       }
 
-      res.json({ reconciled, projectId: firstProjectId });
+      let linkedProjectId = firstProjectId;
+      if (!linkedProjectId && !currentUser.onboardingCompleted) {
+        const allInvites = await storage.getClientInvitesByEmail(currentUser.email);
+        const accepted = allInvites.find(i => i.status === "accepted");
+        if (accepted) linkedProjectId = accepted.projectId;
+      }
+
+      res.json({ reconciled, projectId: linkedProjectId, needsOnboarding: !currentUser.onboardingCompleted && linkedProjectId !== null });
     } catch (error) {
       console.error("Error reconciling invites:", error);
       res.json({ reconciled: 0 });

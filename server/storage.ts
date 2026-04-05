@@ -190,6 +190,7 @@ export interface IStorage {
   getClientInviteByToken(token: string): Promise<ClientInvite | undefined>;
   getClientInvitesByProject(projectId: number): Promise<ClientInvite[]>;
   getPendingInvitesByEmail(email: string): Promise<ClientInvite[]>;
+  getClientInvitesByEmail(email: string): Promise<ClientInvite[]>;
   updateClientInvite(id: number, updates: Partial<InsertClientInvite>): Promise<ClientInvite>;
 }
 
@@ -790,6 +791,9 @@ export class DatabaseStorage implements IStorage {
   }
   async getPendingInvitesByEmail(email: string): Promise<ClientInvite[]> {
     return db.select().from(clientInvites).where(and(eq(clientInvites.email, email), eq(clientInvites.status, "pending")));
+  }
+  async getClientInvitesByEmail(email: string): Promise<ClientInvite[]> {
+    return db.select().from(clientInvites).where(eq(clientInvites.email, email));
   }
   async updateClientInvite(id: number, updates: Partial<InsertClientInvite>): Promise<ClientInvite> {
     const [updated] = await db.update(clientInvites).set(updates).where(eq(clientInvites.id, id)).returning();

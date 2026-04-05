@@ -46,9 +46,9 @@ function OnboardingGuard() {
         .then(data => {
           if (data.reconciled > 0) {
             queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-            if (data.projectId && !user.onboardingCompleted) {
-              navigate(`/welcome?project=${data.projectId}`);
-            }
+          }
+          if (data.needsOnboarding && data.projectId) {
+            navigate(`/welcome?project=${data.projectId}`);
           }
         })
         .catch(() => {});
