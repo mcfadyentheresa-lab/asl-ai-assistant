@@ -1895,16 +1895,16 @@ function ProgressTab({ projectId, milestones, tasks, userRole }: { projectId: nu
 
   return (
     <div className="space-y-4" data-testid="progress-tab">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div>
+      <div className="flex items-end justify-between gap-2 flex-wrap">
+        <div className="space-y-0.5">
           <h2 className="font-serif text-lg font-semibold uppercase tracking-wide text-foreground" data-testid="text-progress-heading">
             Progress
           </h2>
-          <p className="text-sm text-muted-foreground">Choose a view</p>
+          <p className="text-xs text-muted-foreground">Choose a view</p>
         </div>
-        <div className="w-full sm:w-auto sm:min-w-56">
+        <div className="w-full sm:w-auto sm:min-w-48">
           <Select value={subTab} onValueChange={(value) => setSubTab(value as "gantt" | "checklist" | "calendar")}>
-            <SelectTrigger className="h-10 w-full sm:w-56" data-testid="select-progress-view">
+            <SelectTrigger className="h-9 w-full sm:w-48" data-testid="select-progress-view">
               <SelectValue placeholder="Select view" />
             </SelectTrigger>
             <SelectContent>
