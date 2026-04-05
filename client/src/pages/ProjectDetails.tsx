@@ -1087,14 +1087,14 @@ export default function ProjectDetails() {
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/50 to-transparent" />
 
-        <div className="absolute bottom-0 left-0 right-0 container px-6 md:px-10 pb-6">
-          <Link href="/" className="inline-flex items-center text-sm text-muted-foreground mb-3 transition-colors" data-testid="link-back">
+        <div className="absolute bottom-0 left-0 right-0 container px-5 md:px-8 pb-4">
+          <Link href="/" className="inline-flex items-center text-xs text-muted-foreground mb-2 transition-colors" data-testid="link-back">
             <ArrowLeft className="mr-1 h-4 w-4" /> Back to Dashboard
           </Link>
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-3">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-2">
             <div>
               <div className="flex items-center flex-wrap gap-2">
-                <h1 className="font-serif text-3xl md:text-4xl font-bold text-foreground mb-1" data-testid="text-project-title">
+                <h1 className="font-serif text-2xl md:text-3xl font-bold text-foreground mb-0.5 leading-tight" data-testid="text-project-title">
                   {project.name}
                 </h1>
                 {viewers.length > 0 && (
@@ -1114,14 +1114,14 @@ export default function ProjectDetails() {
                   </div>
                 )}
               </div>
-              <p className="text-muted-foreground max-w-2xl text-sm" data-testid="text-project-desc">
+              <p className="text-muted-foreground max-w-2xl text-xs md:text-sm" data-testid="text-project-desc">
                 {project.description}
               </p>
             </div>
             <div className="flex items-center gap-2">
             {user?.role === "admin" && (
               <Link href={`/project/${projectId}/estimate`}>
-                <Button variant="outline" size="sm" data-testid="link-cost-estimator">
+                <Button variant="outline" size="sm" className="h-8 px-3 text-xs" data-testid="link-cost-estimator">
                   <DollarSign className="h-4 w-4 mr-1" /> Cost Estimator
                 </Button>
               </Link>
@@ -1134,13 +1134,13 @@ export default function ProjectDetails() {
         </div>
       </div>
 
-      <main className={`container px-6 md:px-10 ${safeActiveTab === "board" ? "mt-1 flex flex-col flex-1 min-h-0" : "mt-8"}`} id="project-main">
-        <Tabs value={safeActiveTab} onValueChange={setActiveTab} className={safeActiveTab === "board" ? "space-y-2 flex flex-col flex-1 min-h-0" : "space-y-8"}>
+      <main className={`container px-5 md:px-8 ${safeActiveTab === "board" ? "mt-0 flex flex-col flex-1 min-h-0" : "mt-6"}`} id="project-main">
+        <Tabs value={safeActiveTab} onValueChange={setActiveTab} className={safeActiveTab === "board" ? "space-y-1.5 flex flex-col flex-1 min-h-0" : "space-y-6"}>
           <div className={`overflow-x-auto -mx-6 px-6 md:mx-0 md:px-0 ${safeActiveTab === "board" ? "mobile-landscape:hidden" : ""}`}>
-            <TabsList className="w-max md:w-auto" data-testid="tabs-list">
+            <TabsList className="w-max md:w-auto h-9 px-1" data-testid="tabs-list">
               {visibleTabs.map((tab) => (
-                <TabsTrigger key={tab.id} value={tab.id} data-testid={`tab-${tab.id}`}>
-                  <tab.icon className="h-4 w-4 md:mr-2" />
+                <TabsTrigger key={tab.id} value={tab.id} className="h-8 px-3 text-xs md:text-sm" data-testid={`tab-${tab.id}`}>
+                  <tab.icon className="h-3.5 w-3.5 md:mr-2" />
                   <span className="hidden md:inline">{tab.label}</span>
                 </TabsTrigger>
               ))}
