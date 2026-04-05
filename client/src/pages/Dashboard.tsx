@@ -151,17 +151,15 @@ export default function Dashboard() {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
-            {(isAdmin || isCrew) && filteredProjects && filteredProjects.length > 0 && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowArchived(!showArchived)}
-                data-testid="button-toggle-archived"
-              >
-                {showArchived ? <EyeOff className="mr-2 h-3.5 w-3.5" /> : <Eye className="mr-2 h-3.5 w-3.5" />}
-                {showArchived ? "Hide Archived" : "Show Archived"}
-              </Button>
-            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowArchived(!showArchived)}
+              data-testid="button-toggle-archived"
+            >
+              {showArchived ? <EyeOff className="mr-2 h-3.5 w-3.5" /> : <Eye className="mr-2 h-3.5 w-3.5" />}
+              {showArchived ? "Hide Archived" : "Show Archived"}
+            </Button>
             {user?.role !== "client" && <CreateProjectDialog />}
           </div>
         </div>

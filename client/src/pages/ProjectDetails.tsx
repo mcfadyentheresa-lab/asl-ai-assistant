@@ -1089,7 +1089,7 @@ export default function ProjectDetails() {
 
         <div className="absolute bottom-0 left-0 right-0 container px-5 md:px-8 pb-3">
           <Link href="/" className="inline-flex items-center text-[11px] text-muted-foreground mb-1.5 transition-colors hover:text-foreground" onClick={() => window.sessionStorage.setItem("aster-spruce:last-planning-board", String(projectId))} data-testid="link-back">
-            <ArrowLeft className="mr-1 h-3.5 w-3.5" /> Dashboard
+            <ArrowLeft className="mr-1 h-3.5 w-3.5" /> Back to Dashboard
           </Link>
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-1.5">
             <div>
