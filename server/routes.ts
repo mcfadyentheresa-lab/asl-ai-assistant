@@ -728,6 +728,9 @@ export async function registerRoutes(
       if (input.milestoneId && section.milestoneId !== input.milestoneId) {
         return res.status(400).json({ message: "Section does not belong to the specified phase" });
       }
+      if (!input.milestoneId) {
+        input.milestoneId = section.milestoneId;
+      }
     }
 
     const task = await storage.createTask({ ...input, projectId });
@@ -753,6 +756,9 @@ export async function registerRoutes(
         const effectiveMilestoneId = req.body.milestoneId ?? existingTask.milestoneId;
         if (effectiveMilestoneId && section.milestoneId !== effectiveMilestoneId) {
           return res.status(400).json({ message: "Section does not belong to the specified phase" });
+        }
+        if (!effectiveMilestoneId) {
+          req.body.milestoneId = section.milestoneId;
         }
       }
     }
