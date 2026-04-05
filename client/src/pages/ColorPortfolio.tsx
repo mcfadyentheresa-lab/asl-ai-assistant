@@ -33,6 +33,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useProjects } from "@/hooks/use-projects";
 import type { PaintColor } from "@shared/schema";
 
+const LAST_BOARD_KEY = "aster-spruce:last-planning-board";
+
 function getContrastColor(hex: string): string {
   const r = parseInt(hex.slice(1, 3), 16);
   const g = parseInt(hex.slice(3, 5), 16);
@@ -481,6 +483,15 @@ export default function ColorPortfolio() {
     toast({ title: "Copied", description: `${color.name} info copied to clipboard` });
   };
 
+  const handleBack = () => {
+    const lastBoardId = window.sessionStorage.getItem(LAST_BOARD_KEY);
+    if (lastBoardId) {
+      window.location.href = `/project/${lastBoardId}?tab=board`;
+      return;
+    }
+    window.location.href = "/";
+  };
+
   const renderSwatch = (color: PaintColor) => (
     <ColorSwatch
       key={color.id}
@@ -503,11 +514,9 @@ export default function ColorPortfolio() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-6 space-y-4 sm:space-y-5">
         <div className="flex items-start gap-3 sm:gap-4">
-          <Link href="/">
-            <Button variant="ghost" size="icon" className="mt-1 shrink-0" data-testid="button-back-dashboard">
+          <Button variant="ghost" size="icon" className="mt-1 shrink-0" onClick={handleBack} data-testid="button-back-dashboard">
               <ArrowLeft className="w-4 h-4" />
-            </Button>
-          </Link>
+          </Button>
           <div className="flex-1 min-w-0">
             <h1 className="font-serif text-xl sm:text-2xl md:text-3xl font-bold text-foreground leading-tight" data-testid="text-page-title">
               Color Portfolio
@@ -652,10 +661,10 @@ export default function ColorPortfolio() {
             </p>
           )}
           <p className="text-[10px] sm:text-xs text-muted-foreground/70 max-w-md mx-auto leading-relaxed">
-            {activeBrand === "Benjamin Moore" && <>Benjamin Moore<sup>&reg;</sup> and all color names are registered trademarks of Benjamin Moore & Co.</>}
-            {activeBrand === "Sherwin-Williams" && <>Sherwin-Williams<sup>&reg;</sup> and all color names are registered trademarks of The Sherwin-Williams Company.</>}
+            {activeBrand === "Benjamin Moore" && <>Benjamin Moore<sup>&reg;</sup> and all colour names are registered trademarks of Benjamin Moore & Co.</>}
+            {activeBrand === "Sherwin-Williams" && <>Sherwin-Williams<sup>&reg;</sup> and all colour names are registered trademarks of The Sherwin-Williams Company.</>}
             {activeBrand === "Farrow & Ball" && <>Farrow & Ball<sup>&reg;</sup> and all colour names are registered trademarks of Farrow & Ball Ltd.</>}
-            {activeBrand === "Para Paints" && <>Para Paints<sup>&reg;</sup> and all color names are registered trademarks of Para Paints.</>}
+            {activeBrand === "Para Paints" && <>Para Paints<sup>&reg;</sup> and all colour names are registered trademarks of Para Paints.</>}
             {" "}Colors shown are approximate digital representations.
           </p>
         </div>
