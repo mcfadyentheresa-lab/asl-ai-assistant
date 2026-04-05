@@ -71,9 +71,19 @@ function formatCurrency(amount: number): string {
   return new Intl.NumberFormat("en-CA", { style: "currency", currency: "CAD", minimumFractionDigits: 2 }).format(amount);
 }
 
+interface BudgetSummaryResponse {
+  hidden: boolean;
+  budget?: number;
+  estimatedTotal?: number;
+  totalSpent?: number;
+  status?: "no_budget" | "on_track" | "under_budget" | "over_budget";
+  variancePercent?: number;
+  budgetVisibleToClient?: boolean;
+}
+
 function BudgetSnapshot({ projectId, userRole }: { projectId: number; userRole: string }) {
   const { toast } = useToast();
-  const { data, isLoading } = useQuery<any>({
+  const { data, isLoading } = useQuery<BudgetSummaryResponse>({
     queryKey: ["/api/projects", projectId, "budget-summary"],
     queryFn: async () => {
       const res = await fetch(`/api/projects/${projectId}/budget-summary`, { credentials: "include" });
@@ -106,7 +116,11 @@ function BudgetSnapshot({ projectId, userRole }: { projectId: number; userRole: 
 
   if (!data || data.hidden) return null;
 
-  const { budget, totalSpent, status, variancePercent, budgetVisibleToClient } = data;
+  const budget = data.budget ?? 0;
+  const totalSpent = data.totalSpent ?? 0;
+  const status = data.status ?? "no_budget";
+  const variancePercent = data.variancePercent ?? 0;
+  const budgetVisibleToClient = data.budgetVisibleToClient ?? false;
 
   if (budget === 0 && totalSpent === 0) {
     return (
@@ -147,7 +161,7 @@ function BudgetSnapshot({ projectId, userRole }: { projectId: number; userRole: 
 
   const usedPercent = budget > 0 ? Math.min((totalSpent / budget) * 100, 100) : 0;
 
-  const statusConfig: Record<string, { label: string; color: string; icon: any; barColor: string }> = {
+  const statusConfig: Record<string, { label: string; color: string; icon: typeof Check; barColor: string }> = {
     on_track: { label: "On Track", color: "text-green-600", icon: Check, barColor: "bg-green-500" },
     under_budget: { label: "Under Budget", color: "text-green-600", icon: TrendingDown, barColor: "bg-green-500" },
     over_budget: { label: "Over Budget", color: "text-red-600", icon: TrendingUp, barColor: "bg-red-500" },
