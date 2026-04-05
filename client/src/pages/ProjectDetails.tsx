@@ -1616,53 +1616,28 @@ const EDITED_TEXT_COLOR = "#b45309";
 
 function ProgressTab({ projectId, milestones, tasks, userRole }: { projectId: number; milestones: any[]; tasks: any[]; userRole: string }) {
   const [subTab, setSubTab] = useState<"gantt" | "checklist" | "calendar">("gantt");
-  const isAdminOrCrew = userRole === "admin" || userRole === "crew";
 
   return (
     <div className="space-y-4" data-testid="progress-tab">
-      <div className="flex items-center gap-1 border-b border-border/50 pb-0">
-        <button
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-            subTab === "gantt"
-              ? "border-[hsl(var(--primary))] text-foreground"
-              : "border-transparent text-muted-foreground hover:text-foreground"
-          }`}
-          onClick={() => setSubTab("gantt")}
-          data-testid="button-subtab-gantt"
-        >
-          <span className="flex items-center gap-1.5">
-            <BarChart3 className="h-3.5 w-3.5" />
-            Timeline
-          </span>
-        </button>
-        <button
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-            subTab === "checklist"
-              ? "border-[hsl(var(--primary))] text-foreground"
-              : "border-transparent text-muted-foreground hover:text-foreground"
-          }`}
-          onClick={() => setSubTab("checklist")}
-          data-testid="button-subtab-checklist"
-        >
-          <span className="flex items-center gap-1.5">
-            <CheckSquare className="h-3.5 w-3.5" />
-            Checklist
-          </span>
-        </button>
-        <button
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-            subTab === "calendar"
-              ? "border-[hsl(var(--primary))] text-foreground"
-              : "border-transparent text-muted-foreground hover:text-foreground"
-          }`}
-          onClick={() => setSubTab("calendar")}
-          data-testid="button-subtab-calendar"
-        >
-          <span className="flex items-center gap-1.5">
-            <CalendarDays className="h-3.5 w-3.5" />
-            Calendar
-          </span>
-        </button>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <h2 className="font-serif text-lg font-semibold uppercase tracking-wide text-foreground" data-testid="text-progress-heading">
+            Progress
+          </h2>
+          <p className="text-sm text-muted-foreground">Choose a view</p>
+        </div>
+        <div className="w-full sm:w-auto sm:min-w-56">
+          <Select value={subTab} onValueChange={(value) => setSubTab(value as "gantt" | "checklist" | "calendar")}>
+            <SelectTrigger className="h-10 w-full sm:w-56" data-testid="select-progress-view">
+              <SelectValue placeholder="Select view" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="gantt">Timeline</SelectItem>
+              <SelectItem value="checklist">Checklist</SelectItem>
+              <SelectItem value="calendar">Calendar</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {subTab === "gantt" && (
