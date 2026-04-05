@@ -52,6 +52,7 @@ interface Task {
   dueDate: string | null;
   milestoneId: number | null;
   sectionId: number | null;
+  order: number | null;
 }
 
 interface GanttChartProps {
@@ -1190,9 +1191,37 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                         <span className="text-[10px] text-muted-foreground/70">Due {format(task.endDate, "MMM d")}</span>
                       )}
                     </div>
-                    <Badge variant={isDone ? "secondary" : "outline"} className="text-[10px] px-1.5 py-0 h-4 shrink-0 capitalize mr-2" data-testid={`badge-task-status-${task.id}`}>
+                    <Badge variant={isDone ? "secondary" : "outline"} className="text-[10px] px-1.5 py-0 h-4 shrink-0 capitalize" data-testid={`badge-task-status-${task.id}`}>
                       {isDone ? "Done" : (task.status || "To-do")}
                     </Badge>
+                    {isAdmin && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button size="icon" variant="ghost" className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity mr-1.5 shrink-0" data-testid={`button-task-menu-${task.id}`}>
+                            <MoreVertical className="h-3 w-3" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {selectedPhaseId && sections.filter(s => s.milestoneId === selectedPhaseId && s.id !== selectedSectionId).map(s => (
+                            <DropdownMenuItem
+                              key={s.id}
+                              onClick={() => {
+                                updateTask({ id: task.id, sectionId: s.id }, {
+                                  onSuccess: () => toast({ title: `Moved to ${s.title}` }),
+                                  onError: () => toast({ title: "Failed to move task", variant: "destructive" }),
+                                });
+                              }}
+                              data-testid={`button-move-task-${task.id}-to-${s.id}`}
+                            >
+                              Move to {s.title}
+                            </DropdownMenuItem>
+                          ))}
+                          {selectedPhaseId && sections.filter(s => s.milestoneId === selectedPhaseId && s.id !== selectedSectionId).length === 0 && (
+                            <DropdownMenuItem disabled>No other work categories</DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
                   </div>
                 );
               })}
