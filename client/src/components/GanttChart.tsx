@@ -17,13 +17,6 @@ import { useCreateSection, useUpdateSection, useDeleteSection, useCreateMileston
 import { useToast } from "@/hooks/use-toast";
 import type { InsertMilestone } from "@shared/schema";
 import { ListPlus } from "lucide-react";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
 
@@ -436,7 +429,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
     }
   };
 
-  const renderBar = (row: BarItem, rowIndex: number) => {
+  const renderBar = (row: BarItem) => {
     if (!row.startDate || !row.endDate) return null;
     const { left, width } = getBarPosition(row.startDate, row.endDate);
 
@@ -501,12 +494,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
     );
   };
 
-  const breadcrumbLabel = useMemo(() => {
-    if (drillLevel === "phases") return null;
-    if (drillLevel === "sections" && selectedPhase) return selectedPhase.title;
-    if (drillLevel === "tasks" && selectedPhase && selectedSection) return `${selectedPhase.title} › ${selectedSection.title}`;
-    return null;
-  }, [drillLevel, selectedPhase, selectedSection]);
+  const showBreadcrumb = drillLevel !== "phases";
 
   const currentProgress = useMemo(() => {
     if (drillLevel === "tasks" && selectedSection) return selectedSection.progress;
@@ -574,7 +562,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
         </div>
       </div>
 
-      {breadcrumbLabel && (
+      {showBreadcrumb && (
         <div className="flex items-center gap-2 text-sm">
           <button onClick={goBack} className="text-muted-foreground hover:text-foreground transition-colors underline-offset-2 hover:underline" data-testid="button-breadcrumb-back">
             {drillLevel === "tasks" && selectedPhase ? selectedPhase.title : "All Phases"}
@@ -843,7 +831,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                         const offset = differenceInDays(month, timelineStart) * dayWidth;
                         return <div key={month.toISOString()} className="absolute top-0 h-full border-l border-border/10" style={{ left: offset }} />;
                       })}
-                      {renderBar(row, idx)}
+                      {renderBar(row)}
                     </div>
                   ))}
                 </div>
