@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ChevronDown, ChevronRight, ZoomIn, ZoomOut, Plus, Trash2, Pencil, FolderPlus, Check, X, MoreVertical } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 
 interface Milestone {
   id: number;
@@ -111,6 +113,28 @@ type RowItem = PhaseRow | SectionRow | TaskRow;
 
 function isGroupRow(row: RowItem): row is PhaseRow | SectionRow {
   return row.type === "phase" || row.type === "section";
+}
+
+function DatePopover({ value, onChange, placeholder, testId }: { value: string; onChange: (value: string) => void; placeholder: string; testId: string }) {
+  const selectedDate = value ? parseISO(value) : undefined;
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="outline" className="h-9 justify-start text-left font-normal" data-testid={testId}>
+          {value ? format(selectedDate!, "MMM d, yyyy") : placeholder}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="start">
+        <CalendarPicker
+          mode="single"
+          selected={selectedDate}
+          onSelect={(date) => onChange(date ? format(date, "yyyy-MM-dd") : "")}
+          initialFocus
+        />
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 export default function GanttChart({ projectId, milestones, sections, tasks, userRole }: GanttChartProps) {
@@ -500,20 +524,8 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
             data-testid="input-phase-title"
             onKeyDown={e => { if (e.key === "Enter") handleAddPhase(); }}
           />
-          <Input
-            type="date"
-            value={newPhaseStart}
-            onChange={e => setNewPhaseStart(e.target.value)}
-            className="w-36"
-            data-testid="input-phase-start-date"
-          />
-          <Input
-            type="date"
-            value={newPhaseEnd}
-            onChange={e => setNewPhaseEnd(e.target.value)}
-            className="w-36"
-            data-testid="input-phase-end-date"
-          />
+          <DatePopover value={newPhaseStart} onChange={setNewPhaseStart} placeholder="Start date" testId="button-phase-start-date" />
+          <DatePopover value={newPhaseEnd} onChange={setNewPhaseEnd} placeholder="End date" testId="button-phase-end-date" />
           <div className="flex gap-1">
             <Button size="sm" onClick={handleAddPhase} disabled={creatingMilestone || !newPhaseTitle.trim()} data-testid="button-confirm-add-phase">
               <Check className="h-3.5 w-3.5" />
@@ -536,19 +548,17 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
             data-testid="input-edit-section-title"
             onKeyDown={e => { if (e.key === "Enter") handleEditSection(); }}
           />
-          <Input
-            type="date"
+          <DatePopover
             value={editSectionForm.startDate}
-            onChange={e => setEditSectionForm({ ...editSectionForm, startDate: e.target.value })}
-            className="w-36"
-            data-testid="input-edit-section-start"
+            onChange={(value) => setEditSectionForm({ ...editSectionForm, startDate: value })}
+            placeholder="Start date"
+            testId="button-edit-section-start"
           />
-          <Input
-            type="date"
+          <DatePopover
             value={editSectionForm.endDate}
-            onChange={e => setEditSectionForm({ ...editSectionForm, endDate: e.target.value })}
-            className="w-36"
-            data-testid="input-edit-section-end"
+            onChange={(value) => setEditSectionForm({ ...editSectionForm, endDate: value })}
+            placeholder="End date"
+            testId="button-edit-section-end"
           />
           <div className="flex gap-1">
             <Button size="sm" onClick={handleEditSection} disabled={updatingSection || !editSectionForm.title.trim()} data-testid="button-save-section">
@@ -693,20 +703,8 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                     data-testid="input-section-title"
                     onKeyDown={e => { if (e.key === "Enter") handleAddSection(addingSectionFor); }}
                   />
-                  <Input
-                    type="date"
-                    value={newSectionStart}
-                    onChange={e => setNewSectionStart(e.target.value)}
-                    className="h-7 text-xs w-28"
-                    data-testid="input-section-start-date"
-                  />
-                  <Input
-                    type="date"
-                    value={newSectionEnd}
-                    onChange={e => setNewSectionEnd(e.target.value)}
-                    className="h-7 text-xs w-28"
-                    data-testid="input-section-end-date"
-                  />
+                  <DatePopover value={newSectionStart} onChange={setNewSectionStart} placeholder="Start" testId="button-section-start-date" />
+                  <DatePopover value={newSectionEnd} onChange={setNewSectionEnd} placeholder="End" testId="button-section-end-date" />
                   <Button size="icon" className="h-6 w-6" onClick={() => handleAddSection(addingSectionFor)} disabled={creatingSection || !newSectionTitle.trim()} data-testid="button-confirm-add-section">
                     <Check className="h-3 w-3" />
                   </Button>
@@ -727,13 +725,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                     data-testid="input-task-title"
                     onKeyDown={e => { if (e.key === "Enter") handleAddTask(); }}
                   />
-                  <Input
-                    type="date"
-                    value={newTaskDueDate}
-                    onChange={e => setNewTaskDueDate(e.target.value)}
-                    className="h-7 text-xs w-28"
-                    data-testid="input-task-due-date"
-                  />
+                  <DatePopover value={newTaskDueDate} onChange={setNewTaskDueDate} placeholder="Due date" testId="button-task-due-date" />
                   {addingTask.sectionId === null && sections.filter(s => s.milestoneId === addingTask.milestoneId).length > 0 && (
                     <Select
                       value={addingTask.sectionId !== null ? String(addingTask.sectionId) : "__none__"}
