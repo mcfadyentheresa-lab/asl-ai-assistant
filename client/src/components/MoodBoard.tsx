@@ -328,7 +328,7 @@ export default function MoodBoard({ projectId }: MoodBoardProps) {
     const text = new fabric.IText("Type here", {
       left: Math.max(50, w / 2 - 50),
       top: Math.max(50, h / 2 - 15),
-      fontFamily: "DM Sans, sans-serif",
+      fontFamily: "Inter, sans-serif",
       fontSize: 20,
       fill: "#1a1a1a",
     });
@@ -385,7 +385,7 @@ export default function MoodBoard({ projectId }: MoodBoardProps) {
       shadow: new fabric.Shadow({ color: "rgba(0,0,0,0.12)", blur: 8, offsetX: 2, offsetY: 2 }),
     });
     const label = new fabric.IText("Note", {
-      fontFamily: "DM Sans, sans-serif",
+      fontFamily: "Inter, sans-serif",
       fontSize: 14,
       fill: "#1a1a1a",
       left: 12,

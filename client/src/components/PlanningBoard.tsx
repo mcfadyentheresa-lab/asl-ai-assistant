@@ -630,7 +630,7 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
     const text = new fabric.IText("Type here", {
       left: c.x - 50,
       top: c.y - 15,
-      fontFamily: "DM Sans, sans-serif",
+      fontFamily: "Inter, sans-serif",
       fontSize: 20,
       fill: "#1a1a1a",
     });
@@ -685,7 +685,7 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
       left: c.x - 90,
       top: c.y - 70,
       width: 180,
-      fontFamily: "DM Sans, sans-serif",
+      fontFamily: "Inter, sans-serif",
       fontSize: 14,
       fill: "#1a1a1a",
       backgroundColor: stickyColor,
@@ -713,7 +713,7 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
       const ITEM_GAP = 12;
 
       const titleText = new fabric.Textbox(title, {
-        fontFamily: "'Playfair Display', Georgia, serif",
+        fontFamily: "'Inter Tight', Inter, sans-serif",
         fontSize: 18,
         fontWeight: "bold",
         fill: "#1a1a1a",
@@ -724,7 +724,7 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
       });
 
       const countText = new fabric.Text(`${items.length} card${items.length !== 1 ? "s" : ""}`, {
-        fontFamily: "DM Sans, sans-serif",
+        fontFamily: "Inter, sans-serif",
         fontSize: 12,
         fill: "#9ca3af",
         left: CARD_PAD,
@@ -748,7 +748,7 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
             strokeWidth: 1,
           });
           const itemText = new fabric.Textbox(item.text || "Note", {
-            fontFamily: "DM Sans, sans-serif",
+            fontFamily: "Inter, sans-serif",
             fontSize: 14,
             fill: "#374151",
             width: INNER_W - 20,
@@ -782,14 +782,14 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
             ry: 4,
           });
           const hexLabel = new fabric.Text(item.color?.toUpperCase() || "#EE96E7", {
-            fontFamily: "DM Sans, sans-serif",
+            fontFamily: "Inter, sans-serif",
             fontSize: 12,
             fill: "#ffffff",
             left: CARD_PAD + 18,
             top: yPos + 18,
           });
           const nameLabel = new fabric.Textbox(item.colorName || "Color", {
-            fontFamily: "DM Sans, sans-serif",
+            fontFamily: "Inter, sans-serif",
             fontSize: 13,
             fill: "#374151",
             width: INNER_W - 20,
@@ -833,7 +833,7 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
               scaleY: scale,
             });
             const captionText = new fabric.Textbox(item.imageCaption || "", {
-              fontFamily: "DM Sans, sans-serif",
+              fontFamily: "Inter, sans-serif",
               fontSize: 12,
               fill: "#6b7280",
               width: INNER_W - 20,
@@ -848,7 +848,7 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
             yPos += 10 + imgEl.height * scale + 8 + captionH + 10 + ITEM_GAP;
           } catch {
             const errText = new fabric.Text("(Image failed to load)", {
-              fontFamily: "DM Sans, sans-serif",
+              fontFamily: "Inter, sans-serif",
               fontSize: 12,
               fill: "#9ca3af",
               left: CARD_PAD + 10,
