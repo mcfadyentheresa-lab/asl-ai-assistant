@@ -310,9 +310,21 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
 
   const { timelineStart, timelineEnd, months, dayWidth } = useMemo(() => {
     if (rowsWithDates.length === 0) {
+      let fallbackStart: Date | null = null;
+      let fallbackEnd: Date | null = null;
+      if (drillLevel === "tasks" && selectedSection && selectedSection.startDate) {
+        fallbackStart = selectedSection.startDate;
+        fallbackEnd = selectedSection.endDate || addDays(selectedSection.startDate, 30);
+      } else if (drillLevel === "tasks" && selectedPhase && selectedPhase.startDate) {
+        fallbackStart = selectedPhase.startDate;
+        fallbackEnd = selectedPhase.endDate || addDays(selectedPhase.startDate, 60);
+      } else if (drillLevel === "sections" && selectedPhase && selectedPhase.startDate) {
+        fallbackStart = selectedPhase.startDate;
+        fallbackEnd = selectedPhase.endDate || addDays(selectedPhase.startDate, 60);
+      }
       const now = new Date();
-      const s = startOfMonth(now);
-      const e = endOfMonth(addDays(now, 90));
+      const s = startOfMonth(fallbackStart || now);
+      const e = endOfMonth(fallbackEnd || addDays(now, 90));
       return { timelineStart: s, timelineEnd: e, months: eachMonthOfInterval({ start: s, end: e }), dayWidth: 4 * zoomLevel };
     }
 
@@ -324,7 +336,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
     const e = endOfMonth(addDays(latest, 30));
 
     return { timelineStart: s, timelineEnd: e, months: eachMonthOfInterval({ start: s, end: e }), dayWidth: 4 * zoomLevel };
-  }, [rowsWithDates, zoomLevel]);
+  }, [rowsWithDates, zoomLevel, drillLevel, selectedPhase, selectedSection]);
 
   const totalDays = differenceInDays(timelineEnd, timelineStart);
   const totalWidth = totalDays * dayWidth;
