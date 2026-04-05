@@ -499,6 +499,8 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
       return [];
     }
 
+    filteredTasks = [...filteredTasks].sort((a, b) => (a.order || 0) - (b.order || 0));
+
     return filteredTasks.map(t => {
       const taskDate = t.dueDate ? parseISO(t.dueDate) : null;
       return {
