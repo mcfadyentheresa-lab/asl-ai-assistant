@@ -137,6 +137,15 @@ function DatePopover({ value, onChange, placeholder, testId }: { value: string; 
   );
 }
 
+function DateField({ label, value, onChange, placeholder, testId }: { label: string; value: string; onChange: (value: string) => void; placeholder: string; testId: string }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <DatePopover value={value} onChange={onChange} placeholder={placeholder} testId={testId} />
+      {value ? <span className="text-[10px] text-muted-foreground" data-testid={`status-${testId}`}>{label} selected</span> : <span className="text-[10px] text-muted-foreground"> </span>}
+    </div>
+  );
+}
+
 export default function GanttChart({ projectId, milestones, sections, tasks, userRole }: GanttChartProps) {
   const [zoomLevel, setZoomLevel] = useState(1);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -524,8 +533,8 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
             data-testid="input-phase-title"
             onKeyDown={e => { if (e.key === "Enter") handleAddPhase(); }}
           />
-          <DatePopover value={newPhaseStart} onChange={setNewPhaseStart} placeholder="Start date" testId="button-phase-start-date" />
-          <DatePopover value={newPhaseEnd} onChange={setNewPhaseEnd} placeholder="End date" testId="button-phase-end-date" />
+          <DateField label="Start date" value={newPhaseStart} onChange={setNewPhaseStart} placeholder="Start date" testId="button-phase-start-date" />
+          <DateField label="End date" value={newPhaseEnd} onChange={setNewPhaseEnd} placeholder="End date" testId="button-phase-end-date" />
           <div className="flex gap-1">
             <Button size="sm" onClick={handleAddPhase} disabled={creatingMilestone || !newPhaseTitle.trim()} data-testid="button-confirm-add-phase">
               <Check className="h-3.5 w-3.5" />
@@ -548,13 +557,15 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
             data-testid="input-edit-section-title"
             onKeyDown={e => { if (e.key === "Enter") handleEditSection(); }}
           />
-          <DatePopover
+          <DateField
+            label="Start date"
             value={editSectionForm.startDate}
             onChange={(value) => setEditSectionForm({ ...editSectionForm, startDate: value })}
             placeholder="Start date"
             testId="button-edit-section-start"
           />
-          <DatePopover
+          <DateField
+            label="End date"
             value={editSectionForm.endDate}
             onChange={(value) => setEditSectionForm({ ...editSectionForm, endDate: value })}
             placeholder="End date"
@@ -703,8 +714,8 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                     data-testid="input-section-title"
                     onKeyDown={e => { if (e.key === "Enter") handleAddSection(addingSectionFor); }}
                   />
-                  <DatePopover value={newSectionStart} onChange={setNewSectionStart} placeholder="Start" testId="button-section-start-date" />
-                  <DatePopover value={newSectionEnd} onChange={setNewSectionEnd} placeholder="End" testId="button-section-end-date" />
+                  <DateField label="Start" value={newSectionStart} onChange={setNewSectionStart} placeholder="Start" testId="button-section-start-date" />
+                  <DateField label="End" value={newSectionEnd} onChange={setNewSectionEnd} placeholder="End" testId="button-section-end-date" />
                   <Button size="icon" className="h-6 w-6" onClick={() => handleAddSection(addingSectionFor)} disabled={creatingSection || !newSectionTitle.trim()} data-testid="button-confirm-add-section">
                     <Check className="h-3 w-3" />
                   </Button>
@@ -725,7 +736,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                     data-testid="input-task-title"
                     onKeyDown={e => { if (e.key === "Enter") handleAddTask(); }}
                   />
-                  <DatePopover value={newTaskDueDate} onChange={setNewTaskDueDate} placeholder="Due date" testId="button-task-due-date" />
+                  <DateField label="Due date" value={newTaskDueDate} onChange={setNewTaskDueDate} placeholder="Due date" testId="button-task-due-date" />
                   {addingTask.sectionId === null && sections.filter(s => s.milestoneId === addingTask.milestoneId).length > 0 && (
                     <Select
                       value={addingTask.sectionId !== null ? String(addingTask.sectionId) : "__none__"}
