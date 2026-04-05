@@ -109,7 +109,6 @@ function BudgetSnapshot({ projectId, userRole }: { projectId: number; userRole: 
   const { budget, totalSpent, status, variancePercent, budgetVisibleToClient } = data;
 
   if (budget === 0 && totalSpent === 0) {
-    if (userRole === "client") return null;
     return (
       <Card data-testid="card-budget-snapshot-empty">
         <CardHeader className="pb-2">
@@ -117,7 +116,7 @@ function BudgetSnapshot({ projectId, userRole }: { projectId: number; userRole: 
             <DollarSign className="h-4 w-4" /> Budget Snapshot
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">No budget set yet.</p>
           {userRole === "admin" && (
             <Link href={`/project/${projectId}/estimate`}>
@@ -125,6 +124,21 @@ function BudgetSnapshot({ projectId, userRole }: { projectId: number; userRole: 
                 Set up in Cost Estimator
               </Button>
             </Link>
+          )}
+          {(userRole === "admin" || userRole === "crew") && (
+            <div className="flex items-center justify-between pt-2 border-t border-border/60">
+              <label htmlFor="budget-visibility-toggle-empty" className="text-xs text-muted-foreground flex items-center gap-1.5">
+                {budgetVisibleToClient ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+                Visible to client
+              </label>
+              <Switch
+                id="budget-visibility-toggle-empty"
+                checked={budgetVisibleToClient}
+                onCheckedChange={(checked) => toggleVisibility.mutate(checked)}
+                disabled={toggleVisibility.isPending}
+                data-testid="switch-budget-visibility-empty"
+              />
+            </div>
           )}
         </CardContent>
       </Card>

@@ -383,7 +383,7 @@ export async function registerRoutes(
     const existing = await storage.getProject(Number(req.params.id));
     if (!existing) return res.status(404).json({ message: "Project not found" });
     const input = api.projects.update.input.parse(req.body);
-    const { budgetVisibleToClient, ...safeInput } = input as any;
+    const { budgetVisibleToClient: _stripped, ...safeInput } = input;
     const project = await storage.updateProject(Number(req.params.id), safeInput);
     res.json(project);
     broadcastProjectChange(Number(req.params.id), ["project"], "updated", undefined, req.user.claims.sub);
@@ -479,7 +479,7 @@ export async function registerRoutes(
       if (typeof visible !== "boolean") {
         return res.status(400).json({ message: "visible must be a boolean" });
       }
-      const project = await storage.updateProject(projectId, { budgetVisibleToClient: visible } as any);
+      const project = await storage.updateProject(projectId, { budgetVisibleToClient: visible });
       res.json({ budgetVisibleToClient: project.budgetVisibleToClient });
       broadcastProjectChange(projectId, ["project", "budget"], "updated", undefined, userId);
     } catch (error) {
