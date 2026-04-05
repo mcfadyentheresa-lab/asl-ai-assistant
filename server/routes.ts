@@ -426,24 +426,12 @@ export async function registerRoutes(
 
       let userId: string | null = null;
       const existingUsers = await authStorage.getUsers();
-      const existingUser = existingUsers.find(u => u.email === parsed.data.email);
+      const existingUser = existingUsers.find(u => u.email?.toLowerCase() === parsed.data.email.toLowerCase());
       if (existingUser) {
         userId = existingUser.id;
-      } else {
-        const newId = `invite-${randomUUID().slice(0, 8)}`;
-        const newUser = await authStorage.upsertUser({
-          id: newId,
-          email: parsed.data.email,
-          firstName: parsed.data.firstName,
-          lastName: parsed.data.lastName,
-          phone: parsed.data.phone,
-          role: "client",
-        });
-        userId = newUser.id;
-      }
-
-      if (userId && !project.clientId) {
-        await storage.updateProject(projectId, { clientId: userId });
+        if (!project.clientId) {
+          await storage.updateProject(projectId, { clientId: userId });
+        }
       }
 
       const invite = await storage.createClientInvite({
@@ -523,15 +511,20 @@ export async function registerRoutes(
       } as any);
 
       const project = await storage.getProject(invite.projectId);
-      if (project && !project.clientId) {
-        await storage.updateProject(invite.projectId, { clientId: userId });
+      if (project) {
+        if (!project.clientId || project.clientId === invite.userId) {
+          await storage.updateProject(invite.projectId, { clientId: userId });
+        }
       }
 
-      await authStorage.updateUserProfile(userId, {
-        firstName: invite.firstName,
-        lastName: invite.lastName,
-        phone: invite.phone || undefined,
-      });
+      const currentUserData = await authStorage.getUser(userId);
+      const profileUpdates: any = {};
+      if (!currentUserData?.firstName) profileUpdates.firstName = invite.firstName;
+      if (!currentUserData?.lastName) profileUpdates.lastName = invite.lastName;
+      if (!currentUserData?.phone && invite.phone) profileUpdates.phone = invite.phone;
+      if (Object.keys(profileUpdates).length > 0) {
+        await authStorage.updateUserProfile(userId, profileUpdates);
+      }
 
       broadcastProjectChange(invite.projectId, ["invites", "project"], "invite_accepted", undefined, userId);
 

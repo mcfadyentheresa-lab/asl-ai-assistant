@@ -3,7 +3,9 @@ import { useProjects, useDeleteProject, useArchiveProject, useUsers } from "@/ho
 import { Navbar } from "@/components/layout/Navbar";
 import { ProjectCard } from "@/components/project/ProjectCard";
 import { Button } from "@/components/ui/button";
-import { Plus, Loader2, Eye, EyeOff, Upload, X } from "lucide-react";
+import { Plus, Loader2, Eye, EyeOff, Upload, X, UserPlus, Mail } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { apiRequest, queryClient as qc } from "@/lib/queryClient";
 import { motion } from "framer-motion";
 import {
   Dialog,
@@ -199,6 +201,9 @@ function CreateProjectDialog() {
   const [uploading, setUploading] = useState(false);
   const [selectedClient, setSelectedClient] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showInviteForm, setShowInviteForm] = useState(false);
+  const [inviteForm, setInviteForm] = useState({ firstName: "", lastName: "", email: "", phone: "" });
+  const [sendingInvite, setSendingInvite] = useState(false);
 
   const form = useForm<InsertProject>({
     resolver: zodResolver(insertProjectSchema),
@@ -250,12 +255,26 @@ function CreateProjectDialog() {
 
     const clientId = selectedClient && selectedClient !== "none" ? selectedClient : null;
     mutate({ ...data, thumbnailUrl: thumbnailUrl || null, clientId }, {
-      onSuccess: () => {
-        toast({ title: "Success", description: "Project created successfully." });
+      onSuccess: async (newProject: any) => {
+        if (showInviteForm && inviteForm.firstName && inviteForm.email && inviteForm.phone) {
+          try {
+            setSendingInvite(true);
+            await apiRequest("POST", `/api/projects/${newProject.id}/invite-client`, inviteForm);
+            toast({ title: "Success", description: "Project created and invite sent!" });
+          } catch {
+            toast({ title: "Project created", description: "But invite failed to send. You can invite the client from the project page." });
+          } finally {
+            setSendingInvite(false);
+          }
+        } else {
+          toast({ title: "Success", description: "Project created successfully." });
+        }
         setOpen(false);
         form.reset();
         removeImage();
         setSelectedClient("");
+        setShowInviteForm(false);
+        setInviteForm({ firstName: "", lastName: "", email: "", phone: "" });
       },
       onError: (error) => {
         toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -382,13 +401,48 @@ function CreateProjectDialog() {
               </Select>
             </div>
 
+            <div className="border-t pt-4">
+              <button
+                type="button"
+                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                onClick={() => setShowInviteForm(!showInviteForm)}
+                data-testid="button-toggle-invite-form"
+              >
+                <UserPlus className="h-4 w-4" />
+                {showInviteForm ? "Hide invite form" : "Invite a new client via SMS"}
+              </button>
+              {showInviteForm && (
+                <div className="mt-3 space-y-3 p-3 bg-muted/30 rounded-lg border">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label htmlFor="create-invite-first" className="text-xs">First Name</Label>
+                      <Input id="create-invite-first" value={inviteForm.firstName} onChange={(e) => setInviteForm(f => ({ ...f, firstName: e.target.value }))} placeholder="First name" data-testid="input-create-invite-first" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="create-invite-last" className="text-xs">Last Name</Label>
+                      <Input id="create-invite-last" value={inviteForm.lastName} onChange={(e) => setInviteForm(f => ({ ...f, lastName: e.target.value }))} placeholder="Last name" data-testid="input-create-invite-last" />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="create-invite-email" className="text-xs">Email</Label>
+                    <Input id="create-invite-email" type="email" value={inviteForm.email} onChange={(e) => setInviteForm(f => ({ ...f, email: e.target.value }))} placeholder="client@example.com" data-testid="input-create-invite-email" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="create-invite-phone" className="text-xs">Phone</Label>
+                    <Input id="create-invite-phone" value={inviteForm.phone} onChange={(e) => setInviteForm(f => ({ ...f, phone: e.target.value }))} placeholder="(705) 555-0123" data-testid="input-create-invite-phone" />
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">Client will receive an SMS with a link to access their portal after the project is created.</p>
+                </div>
+              )}
+            </div>
+
             <div className="flex justify-end gap-3 pt-2">
               <Button type="button" variant="outline" onClick={() => setOpen(false)} data-testid="button-cancel">
                 Cancel
               </Button>
-              <Button type="submit" disabled={isPending || uploading} data-testid="button-create">
-                {(isPending || uploading) ? <Loader2 className="mr-2 animate-spin" /> : null}
-                Create Project
+              <Button type="submit" disabled={isPending || uploading || sendingInvite} data-testid="button-create">
+                {(isPending || uploading || sendingInvite) ? <Loader2 className="mr-2 animate-spin" /> : null}
+                {sendingInvite ? "Sending Invite..." : "Create Project"}
               </Button>
             </div>
           </form>

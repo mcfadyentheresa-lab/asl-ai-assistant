@@ -1,10 +1,11 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/use-auth";
 import { usePresenceHeartbeat } from "@/hooks/use-presence";
+import { useEffect } from "react";
 import { Loader2 } from "lucide-react";
 
 import LandingPage from "@/pages/LandingPage";
@@ -25,6 +26,25 @@ import NotFound from "@/pages/not-found";
 
 function PresenceTracker() {
   usePresenceHeartbeat();
+  return null;
+}
+
+function OnboardingGuard() {
+  const { user } = useAuth();
+  const [location, navigate] = useLocation();
+
+  useEffect(() => {
+    if (
+      user &&
+      user.role === "client" &&
+      !(user as any).onboardingCompleted &&
+      location !== "/welcome" &&
+      !location.startsWith("/invite/")
+    ) {
+      navigate("/welcome");
+    }
+  }, [user, location, navigate]);
+
   return null;
 }
 
@@ -50,22 +70,25 @@ function Router() {
   }
 
   return (
-    <Switch>
-      <Route path="/" component={Dashboard} />
-      <Route path="/welcome" component={Welcome} />
-      <Route path="/invite/:token" component={InviteAccept} />
-      <Route path="/profile" component={Profile} />
-      <Route path="/project/:id/estimate" component={CostEstimator} />
-      <Route path="/project/:id" component={ProjectDetails} />
-      <Route path="/colors" component={ColorPortfolio} />
-      <Route path="/timesheets" component={Timesheets} />
-      <Route path="/payroll" component={Payroll} />
-      <Route path="/market-rates" component={MarketRates} />
-      <Route path="/labor-rates" component={LaborRates} />
-      <Route path="/trade-contacts" component={TradeContacts} />
-      <Route path="/supplier-prices" component={SupplierPrices} />
-      <Route component={NotFound} />
-    </Switch>
+    <>
+      <OnboardingGuard />
+      <Switch>
+        <Route path="/" component={Dashboard} />
+        <Route path="/welcome" component={Welcome} />
+        <Route path="/invite/:token" component={InviteAccept} />
+        <Route path="/profile" component={Profile} />
+        <Route path="/project/:id/estimate" component={CostEstimator} />
+        <Route path="/project/:id" component={ProjectDetails} />
+        <Route path="/colors" component={ColorPortfolio} />
+        <Route path="/timesheets" component={Timesheets} />
+        <Route path="/payroll" component={Payroll} />
+        <Route path="/market-rates" component={MarketRates} />
+        <Route path="/labor-rates" component={LaborRates} />
+        <Route path="/trade-contacts" component={TradeContacts} />
+        <Route path="/supplier-prices" component={SupplierPrices} />
+        <Route component={NotFound} />
+      </Switch>
+    </>
   );
 }
 
