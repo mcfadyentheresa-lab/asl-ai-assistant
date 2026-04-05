@@ -8,7 +8,7 @@ import {
   useDocuments, useUploadDocument, useDeleteDocument,
   usePhotos, useCreatePhoto, useDeletePhoto, useUploadImage,
   useUsers, useUpdateProject, usePlanningBoards, useUpdateUserPhone, useSendTestSms, useNotifyTeam,
-  useActivityLog, useUpdateMilestone, useDeleteMilestone, useSections,
+  useActivityLog, useUpdateMilestone, useSections,
 } from "@/hooks/use-projects";
 import { useOnlineUsers, isUserOnline } from "@/hooks/use-presence";
 import { useProjectRealtime } from "@/hooks/use-project-realtime";
@@ -821,112 +821,6 @@ function SidebarCards({
   );
 }
 
-function SubMilestoneList({ milestoneId, isAdmin }: { milestoneId: number; isAdmin: boolean }) {
-  const [inputValue, setInputValue] = useState("");
-  const { data: subs = [] } = useQuery<any[]>({
-    queryKey: [`/api/milestones/${milestoneId}/sub-milestones`],
-  });
-
-  const toggleSub = useMutation({
-    mutationFn: (sub: any) => apiRequest("PATCH", `/api/sub-milestones/${sub.id}`, { completed: !sub.completed }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [`/api/milestones/${milestoneId}/sub-milestones`] }),
-  });
-
-  const createSub = useMutation({
-    mutationFn: (title: string) => apiRequest("POST", `/api/milestones/${milestoneId}/sub-milestones`, { title }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/milestones/${milestoneId}/sub-milestones`] });
-      setInputValue("");
-    },
-  });
-
-  const deleteSub = useMutation({
-    mutationFn: (id: number) => apiRequest("DELETE", `/api/sub-milestones/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [`/api/milestones/${milestoneId}/sub-milestones`] }),
-  });
-
-  const completedCount = subs.filter((s: any) => s.completed).length;
-  const totalCount = subs.length;
-
-  return (
-    <div className="space-y-0.5">
-      {subs.map((sub: any) => (
-        <div
-          key={sub.id}
-          className="flex items-center gap-1.5 group/sub py-0.5"
-          data-testid={`sub-milestone-${sub.id}`}
-        >
-          <button
-            onClick={() => isAdmin && toggleSub.mutate(sub)}
-            className={`shrink-0 h-3.5 w-3.5 rounded-sm border transition-colors flex items-center justify-center ${
-              sub.completed
-                ? "bg-primary border-primary"
-                : "border-muted-foreground/30 bg-background"
-            } ${isAdmin ? "cursor-pointer" : "cursor-default"}`}
-            data-testid={`button-toggle-sub-${sub.id}`}
-            disabled={!isAdmin}
-          >
-            {sub.completed && <Check className="h-2 w-2 text-primary-foreground" />}
-          </button>
-          <span
-            className={`flex-1 text-xs ${sub.completed ? "line-through text-muted-foreground" : "text-foreground"}`}
-            data-testid={`text-sub-title-${sub.id}`}
-          >
-            {sub.title}
-          </span>
-          {isAdmin && (
-            <button
-              onClick={() => deleteSub.mutate(sub.id)}
-              className="invisible group-hover/sub:visible text-muted-foreground/60"
-              data-testid={`button-delete-sub-${sub.id}`}
-            >
-              <X className="h-3 w-3" />
-            </button>
-          )}
-        </div>
-      ))}
-      {totalCount > 0 && (
-        <div className="flex items-center gap-1.5 pt-0.5">
-          <div className="flex-1 h-0.5 rounded-full bg-muted overflow-hidden">
-            <div
-              className="h-full rounded-full bg-primary/50 transition-all duration-300"
-              style={{ width: `${(completedCount / totalCount) * 100}%` }}
-            />
-          </div>
-          <span className="text-[10px] text-muted-foreground/60 tabular-nums">{completedCount}/{totalCount}</span>
-        </div>
-      )}
-      {isAdmin && (
-        <form
-          className="flex items-center gap-1 pt-1 min-w-0"
-          onSubmit={(e) => {
-            e.preventDefault();
-            const title = inputValue.trim();
-            if (title) createSub.mutate(title);
-          }}
-          data-testid={`form-add-sub-${milestoneId}`}
-        >
-          <input
-            placeholder="Add sub-item..."
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            className="flex-1 text-xs bg-transparent border-b border-border/50 focus:border-primary/40 outline-none py-1 placeholder:text-muted-foreground/40"
-            data-testid={`input-sub-title-${milestoneId}`}
-          />
-          <button
-            type="submit"
-            disabled={!inputValue.trim()}
-            className="text-muted-foreground/50 hover:text-foreground disabled:opacity-30 p-0.5"
-            data-testid={`button-add-sub-${milestoneId}`}
-          >
-            <Plus className="h-3 w-3" />
-          </button>
-        </form>
-      )}
-    </div>
-  );
-}
-
 export default function ProjectDetails() {
   const { id } = useParams();
   const projectId = Number(id);
@@ -939,7 +833,6 @@ export default function ProjectDetails() {
   const { data: users } = useUsers();
   const { mutate: updateProject } = useUpdateProject();
   const { mutate: updateMilestone } = useUpdateMilestone();
-  const { mutate: deleteMilestone } = useDeleteMilestone();
   const { mutate: updatePhone } = useUpdateUserPhone();
   const { mutate: sendTestSms, isPending: sendingTestSms } = useSendTestSms();
   const { mutate: notifyTeam, isPending: sendingNotification } = useNotifyTeam();
@@ -969,11 +862,6 @@ export default function ProjectDetails() {
   const [showAddPerson, setShowAddPerson] = useState(false);
   const [addPersonForm, setAddPersonForm] = useState({ firstName: "", lastName: "", email: "", phone: "", role: "crew" });
   const [addingPerson, setAddingPerson] = useState(false);
-  const [editingMilestone, setEditingMilestone] = useState<any>(null);
-  const [editMilestoneForm, setEditMilestoneForm] = useState({ title: "", date: "" });
-  const [completingMilestone, setCompletingMilestone] = useState<any>(null);
-  const [completedByUser, setCompletedByUser] = useState<string>("");
-  const [expandedMilestones, setExpandedMilestones] = useState<Set<number>>(new Set());
   const { data: planningBoards } = usePlanningBoards(projectId);
   const assignedClient = users?.find((u) => u.id === project?.clientId);
 
@@ -1000,14 +888,6 @@ export default function ProjectDetails() {
     return () => clearTimeout(timer);
   }, [activeTab, activityLog, user?.id]);
 
-  const toggleMilestoneExpand = (id: number) => {
-    setExpandedMilestones(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
 
 
   const isClientInvitedToBoard = userRole === "client" && Array.isArray(planningBoards) &&
@@ -1197,19 +1077,8 @@ export default function ProjectDetails() {
                               {milestone.completed && <Check className="h-3 w-3 text-primary-foreground" />}
                             </div>
 
-                            <button
-                              onClick={() => toggleMilestoneExpand(milestone.id)}
-                              className="flex-1 min-w-0 text-left group/expand"
-                              data-testid={`button-expand-milestone-${milestone.id}`}
-                            >
+                            <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-1.5">
-                                <span className="shrink-0 text-muted-foreground/50 transition-colors group-hover/expand:text-foreground">
-                                  {expandedMilestones.has(milestone.id) ? (
-                                    <ChevronDown className="h-3.5 w-3.5" />
-                                  ) : (
-                                    <ChevronRight className="h-3.5 w-3.5" />
-                                  )}
-                                </span>
                                 <span
                                   className={`font-medium text-sm leading-snug truncate ${milestone.completed ? "line-through text-muted-foreground" : "text-foreground"}`}
                                   data-testid={`text-milestone-title-${milestone.id}`}
@@ -1222,103 +1091,13 @@ export default function ProjectDetails() {
                                   </Badge>
                                 )}
                               </div>
-                              <div className="flex items-center gap-2 ml-5 mt-0.5">
-                                {milestone.date && (
-                                  <span className="text-[11px] text-muted-foreground">
-                                    {format(new Date(milestone.date), "MMM d, yyyy")}
-                                  </span>
-                                )}
-                                {milestone.completed && milestone.completedBy && (() => {
-                                  const completedUser = users?.find((u: any) => u.id === milestone.completedBy);
-                                  return completedUser ? (
-                                    <span className="text-[11px] text-muted-foreground" data-testid={`text-milestone-completedby-${milestone.id}`}>
-                                      by {completedUser.firstName} {completedUser.lastName}
-                                    </span>
-                                  ) : null;
-                                })()}
-                              </div>
-                            </button>
-
-                            {userRole !== "client" && (
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button size="icon" variant="ghost" className="shrink-0 h-7 w-7" data-testid={`button-milestone-menu-${milestone.id}`}>
-                                    <MoreVertical className="h-3.5 w-3.5" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem
-                                    data-testid={`button-milestone-toggle-${milestone.id}`}
-                                    onClick={() => {
-                                      if (milestone.completed) {
-                                        updateMilestone(
-                                          { id: milestone.id, projectId, completed: false, completedBy: null },
-                                          {
-                                            onSuccess: () => toast({ title: "Milestone marked incomplete" }),
-                                            onError: () => toast({ title: "Failed to update milestone", variant: "destructive" }),
-                                          }
-                                        );
-                                      } else {
-                                        setCompletingMilestone(milestone);
-                                        setCompletedByUser("");
-                                      }
-                                    }}
-                                  >
-                                    <Check className="h-4 w-4 mr-2" />
-                                    {milestone.completed ? "Mark Incomplete" : "Mark Complete"}
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    data-testid={`button-milestone-subtasks-${milestone.id}`}
-                                    onClick={() => {
-                                      setExpandedMilestones(prev => {
-                                        const next = new Set(prev);
-                                        next.add(milestone.id);
-                                        return next;
-                                      });
-                                    }}
-                                  >
-                                    <CheckSquare className="h-4 w-4 mr-2" />
-                                    Sub-tasks
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    data-testid={`button-milestone-edit-${milestone.id}`}
-                                    onClick={() => {
-                                      setEditingMilestone(milestone);
-                                      setEditMilestoneForm({
-                                        title: milestone.title,
-                                        date: milestone.date || "",
-                                      });
-                                    }}
-                                  >
-                                    <Pencil className="h-4 w-4 mr-2" />
-                                    Edit
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    className="text-destructive"
-                                    data-testid={`button-milestone-delete-${milestone.id}`}
-                                    onClick={() => {
-                                      deleteMilestone(
-                                        { id: milestone.id, projectId },
-                                        {
-                                          onSuccess: () => toast({ title: "Milestone deleted" }),
-                                          onError: () => toast({ title: "Failed to delete milestone", variant: "destructive" }),
-                                        }
-                                      );
-                                    }}
-                                  >
-                                    <Trash2 className="h-4 w-4 mr-2" />
-                                    Delete
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            )}
-                          </div>
-
-                          {expandedMilestones.has(milestone.id) && (
-                            <div className="ml-8 mt-2">
-                              <SubMilestoneList milestoneId={milestone.id} isAdmin={userRole !== "client"} />
+                              {milestone.date && (
+                                <span className="text-[11px] text-muted-foreground mt-0.5 block">
+                                  {format(new Date(milestone.date), "MMM d, yyyy")}
+                                </span>
+                              )}
                             </div>
-                          )}
+                          </div>
                         </div>
                     ))
                   ) : (
@@ -1331,133 +1110,9 @@ export default function ProjectDetails() {
                   )}
                 </div>
 
-                <Dialog open={!!editingMilestone} onOpenChange={(open) => { if (!open) setEditingMilestone(null); }}>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Edit Milestone</DialogTitle>
-                      <DialogDescription>Update the milestone title and date.</DialogDescription>
-                    </DialogHeader>
-                    <form
-                      className="space-y-4"
-                      data-testid="form-edit-milestone"
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        if (!editMilestoneForm.title.trim() || !editingMilestone) return;
-                        updateMilestone(
-                          {
-                            id: editingMilestone.id,
-                            projectId,
-                            title: editMilestoneForm.title.trim(),
-                            date: editMilestoneForm.date || null,
-                          },
-                          {
-                            onSuccess: () => {
-                              toast({ title: "Milestone updated" });
-                              setEditingMilestone(null);
-                            },
-                            onError: () => toast({ title: "Failed to update milestone", variant: "destructive" }),
-                          }
-                        );
-                      }}
-                    >
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Title</label>
-                        <Input
-                          value={editMilestoneForm.title}
-                          onChange={(e) => setEditMilestoneForm({ ...editMilestoneForm, title: e.target.value })}
-                          data-testid="input-edit-milestone-title"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Date</label>
-                        <Input
-                          type="date"
-                          value={editMilestoneForm.date}
-                          onChange={(e) => setEditMilestoneForm({ ...editMilestoneForm, date: e.target.value })}
-                          data-testid="input-edit-milestone-date"
-                        />
-                      </div>
-                      <div className="flex justify-end gap-2">
-                        <Button type="button" variant="ghost" onClick={() => setEditingMilestone(null)} data-testid="button-cancel-edit-milestone">
-                          Cancel
-                        </Button>
-                        <Button type="submit" disabled={!editMilestoneForm.title.trim()} data-testid="button-save-milestone">
-                          Save
-                        </Button>
-                      </div>
-                    </form>
-                  </DialogContent>
-                </Dialog>
-
-                <Dialog open={!!completingMilestone} onOpenChange={(open) => { if (!open) setCompletingMilestone(null); }}>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Mark Milestone Complete</DialogTitle>
-                      <DialogDescription>
-                        Mark &quot;{completingMilestone?.title}&quot; as completed.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Completed by (optional)</label>
-                        <Select value={completedByUser} onValueChange={setCompletedByUser}>
-                          <SelectTrigger data-testid="select-completed-by">
-                            <SelectValue placeholder="Select who completed this..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">Not specified</SelectItem>
-                            {users?.map((u: any) => (
-                              <SelectItem key={u.id} value={u.id}>
-                                {u.firstName} {u.lastName}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          onClick={() => {
-                            if (!completingMilestone) return;
-                            updateMilestone(
-                              { id: completingMilestone.id, projectId, completed: true },
-                              {
-                                onSuccess: () => {
-                                  toast({ title: "Milestone marked complete" });
-                                  setCompletingMilestone(null);
-                                },
-                                onError: () => toast({ title: "Failed to update milestone", variant: "destructive" }),
-                              }
-                            );
-                          }}
-                          data-testid="button-skip-completedby"
-                        >
-                          Skip
-                        </Button>
-                        <Button
-                          onClick={() => {
-                            if (!completingMilestone) return;
-                            const cb = completedByUser && completedByUser !== "none" ? completedByUser : null;
-                            updateMilestone(
-                              { id: completingMilestone.id, projectId, completed: true, completedBy: cb },
-                              {
-                                onSuccess: () => {
-                                  toast({ title: "Milestone marked complete" });
-                                  setCompletingMilestone(null);
-                                  setCompletedByUser("");
-                                },
-                                onError: () => toast({ title: "Failed to update milestone", variant: "destructive" }),
-                              }
-                            );
-                          }}
-                          data-testid="button-confirm-complete"
-                        >
-                          Confirm
-                        </Button>
-                      </div>
-                    </div>
-                  </DialogContent>
-                </Dialog>
+                <div className="text-xs text-muted-foreground mt-3 text-center italic" data-testid="text-phases-hint">
+                  Manage phases and timeline in the Progress tab.
+                </div>
               </div>
 
               <div className="md:hidden mb-4">

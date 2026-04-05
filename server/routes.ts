@@ -750,6 +750,10 @@ export async function registerRoutes(
         if (!section || section.projectId !== existingTask.projectId) {
           return res.status(400).json({ message: "Section does not belong to this project" });
         }
+        const effectiveMilestoneId = req.body.milestoneId ?? existingTask.milestoneId;
+        if (effectiveMilestoneId && section.milestoneId !== effectiveMilestoneId) {
+          return res.status(400).json({ message: "Section does not belong to the specified phase" });
+        }
       }
     }
 
