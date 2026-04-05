@@ -159,61 +159,6 @@ function SidebarCards({
 
   return (
     <>
-      {user?.role !== "client" && (
-      <Card>
-        <CardHeader>
-          <CardTitle className="font-serif text-lg" data-testid="text-client-heading">
-            Assigned Client
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-            <Select
-              value={project.clientId || "none"}
-              onValueChange={(val) => {
-                const clientId = val === "none" ? null : val;
-                updateProject({ id: projectId, data: { clientId } }, {
-                  onSuccess: () => toast({ title: "Client updated" }),
-                });
-              }}
-            >
-              <SelectTrigger data-testid="select-project-client">
-                <SelectValue placeholder="Select a client..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">No client assigned</SelectItem>
-                {users?.map((u: any) => (
-                  <SelectItem key={u.id} value={u.id}>
-                    <div className="flex items-center gap-2">
-                      <span>{u.firstName || ""} {u.lastName || ""}</span>
-                      {u.email && <span className="text-muted-foreground text-xs">({u.email})</span>}
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          ) : assignedClient ? (
-            <div className="flex items-center gap-3" data-testid="text-assigned-client">
-              <Avatar>
-                <AvatarFallback>
-                  {(assignedClient.firstName?.[0] || "") + (assignedClient.lastName?.[0] || "")}
-                </AvatarFallback>
-              </Avatar>
-              <div>
-                <p className="font-medium text-foreground text-sm">
-                  {assignedClient.firstName || ""} {assignedClient.lastName || ""}
-                </p>
-                {assignedClient.email && (
-                  <p className="text-muted-foreground text-xs">{assignedClient.email}</p>
-                )}
-              </div>
-            </div>
-          ) : (
-            <p className="text-muted-foreground text-sm" data-testid="text-no-client">No client assigned</p>
-          )}
-        </CardContent>
-      </Card>
-      )}
-
       {userRole !== "client" && (
         <Card>
           <CardHeader>
