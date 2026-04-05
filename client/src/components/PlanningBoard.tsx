@@ -881,6 +881,7 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
         shadow: new fabric.Shadow({ color: "rgba(0,0,0,0.1)", blur: 12, offsetX: 2, offsetY: 4 }),
       });
 
+      const titleBlockHeight = CARD_PAD + titleText.calcTextHeight() + 4 + countText.calcTextHeight() + 20;
       const allObjects = [bg, titleText, countText, ...contentObjects];
 
       const vpt = canvas.viewportTransform!;
@@ -890,7 +891,7 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
 
       const group = new fabric.Group(allObjects, {
         left: left ?? vcx - CARD_WIDTH / 2,
-        top: top ?? Math.max(20, vcy - totalHeight / 2),
+        top: top ?? Math.max(20, vcy - totalHeight / 2 + 24),
         subTargetCheck: true,
         interactive: true,
       });
