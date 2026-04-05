@@ -20,6 +20,7 @@ export const projects = pgTable("projects", {
   thumbnailUrl: text("thumbnail_url"),
   totalBudget: integer("total_budget").default(0),
   budgetUsed: integer("budget_used").default(0),
+  budgetVisibleToClient: boolean("budget_visible_to_client").default(false),
   colorTagId: integer("color_tag_id"),
   createdAt: timestamp("created_at").defaultNow(),
 });

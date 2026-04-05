@@ -383,7 +383,8 @@ export async function registerRoutes(
     const existing = await storage.getProject(Number(req.params.id));
     if (!existing) return res.status(404).json({ message: "Project not found" });
     const input = api.projects.update.input.parse(req.body);
-    const project = await storage.updateProject(Number(req.params.id), input);
+    const { budgetVisibleToClient, ...safeInput } = input as any;
+    const project = await storage.updateProject(Number(req.params.id), safeInput);
     res.json(project);
     broadcastProjectChange(Number(req.params.id), ["project"], "updated", undefined, req.user.claims.sub);
   });
@@ -394,6 +395,97 @@ export async function registerRoutes(
     await storage.deleteProject(Number(req.params.id));
     res.json({ success: true });
     broadcastProjectChange(Number(req.params.id), ["project"], "deleted", undefined, req.user.claims.sub);
+  });
+
+  app.get("/api/projects/:id/budget-summary", isAuthenticated, async (req: any, res) => {
+    try {
+      const projectId = Number(req.params.id);
+      const project = await storage.getProject(projectId);
+      if (!project) return res.status(404).json({ message: "Project not found" });
+
+      const userId = req.user.claims.sub;
+      const dbUser = await authStorage.getUser(userId);
+      if (dbUser?.role === "client" && project.clientId !== userId) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+
+      if (dbUser?.role === "client" && !project.budgetVisibleToClient) {
+        return res.json({ hidden: true });
+      }
+
+      const estimates = await storage.getProjectEstimates(projectId);
+      const activeEstimate = estimates[0];
+      const budget = activeEstimate?.budget ? parseFloat(activeEstimate.budget) : 0;
+
+      let estimatedTotal = 0;
+      if (activeEstimate) {
+        const items = await storage.getEstimateItems(activeEstimate.id);
+        const markupRate = activeEstimate.markupEnabled ? (parseFloat(activeEstimate.markupPercent || "25") / 100) : 0;
+        const contingencyRate = parseFloat(activeEstimate.contingencyPercent || "0") / 100;
+
+        let subtotal = 0;
+        let totalMarkup = 0;
+        for (const item of items) {
+          const qty = parseFloat(item.quantity) || 0;
+          const unitCost = parseFloat(item.unitCost) || 0;
+          const matCost = parseFloat(item.materialCost) || 0;
+          subtotal += qty * unitCost;
+          totalMarkup += matCost * markupRate;
+        }
+        const withMarkup = subtotal + totalMarkup;
+        const contingency = withMarkup * contingencyRate;
+        const hst = (withMarkup + contingency) * 0.13;
+        estimatedTotal = withMarkup + contingency + hst;
+      }
+
+      const projectReceipts = await storage.getReceipts(projectId);
+      const totalSpent = projectReceipts.reduce((sum, r) => sum + (parseFloat(r.amount) || 0), 0);
+
+      let status: "no_budget" | "on_track" | "under_budget" | "over_budget" = "no_budget";
+      let variancePercent = 0;
+      if (budget > 0) {
+        variancePercent = ((totalSpent - budget) / budget) * 100;
+        if (Math.abs(variancePercent) <= 5) status = "on_track";
+        else if (variancePercent < -5) status = "under_budget";
+        else status = "over_budget";
+      }
+
+      res.json({
+        hidden: false,
+        budget,
+        estimatedTotal,
+        totalSpent,
+        status,
+        variancePercent,
+        budgetVisibleToClient: project.budgetVisibleToClient ?? false,
+      });
+    } catch (error) {
+      console.error("Error fetching budget summary:", error);
+      res.status(500).json({ message: "Failed to fetch budget summary" });
+    }
+  });
+
+  app.patch("/api/projects/:id/budget-visibility", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const dbUser = await authStorage.getUser(userId);
+      if (dbUser?.role !== "admin" && dbUser?.role !== "crew") {
+        return res.status(403).json({ message: "Only admin/crew can toggle budget visibility" });
+      }
+      const projectId = Number(req.params.id);
+      const existing = await storage.getProject(projectId);
+      if (!existing) return res.status(404).json({ message: "Project not found" });
+      const { visible } = req.body;
+      if (typeof visible !== "boolean") {
+        return res.status(400).json({ message: "visible must be a boolean" });
+      }
+      const project = await storage.updateProject(projectId, { budgetVisibleToClient: visible } as any);
+      res.json({ budgetVisibleToClient: project.budgetVisibleToClient });
+      broadcastProjectChange(projectId, ["project", "budget"], "updated", undefined, userId);
+    } catch (error) {
+      console.error("Error toggling budget visibility:", error);
+      res.status(500).json({ message: "Failed to toggle budget visibility" });
+    }
   });
 
   // Tasks

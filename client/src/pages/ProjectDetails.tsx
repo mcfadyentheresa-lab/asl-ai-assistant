@@ -15,7 +15,7 @@ import { useProjectRealtime } from "@/hooks/use-project-realtime";
 import { Navbar } from "@/components/layout/Navbar";
 import SpatialCanvas from "@/components/SpatialCanvas";
 import GanttChart from "@/components/GanttChart";
-import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, ExternalLink, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, CalendarDays, ChevronLeft, Upload, Download, User, X, Paperclip, ZoomIn, Palette, Shield, Users, Phone, Check, Bell, Eye, EyeOff, Archive, ArchiveRestore, PanelRightOpen, MoreVertical, Flag, DollarSign, BarChart3 } from "lucide-react";
+import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, ExternalLink, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, CalendarDays, ChevronLeft, Upload, Download, User, X, Paperclip, ZoomIn, Palette, Shield, Users, Phone, Check, Bell, Eye, EyeOff, Archive, ArchiveRestore, PanelRightOpen, MoreVertical, Flag, DollarSign, BarChart3, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -27,6 +27,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -65,6 +66,151 @@ import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths, isSameDay, isSameMonth, parseISO, formatDistanceToNow } from "date-fns";
 import type { ChecklistItem, BoardItem, CalendarEvent } from "@shared/schema";
+
+function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat("en-CA", { style: "currency", currency: "CAD", minimumFractionDigits: 2 }).format(amount);
+}
+
+function BudgetSnapshot({ projectId, userRole }: { projectId: number; userRole: string }) {
+  const { toast } = useToast();
+  const { data, isLoading } = useQuery<any>({
+    queryKey: ["/api/projects", projectId, "budget-summary"],
+    queryFn: async () => {
+      const res = await fetch(`/api/projects/${projectId}/budget-summary`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch budget summary");
+      return res.json();
+    },
+  });
+
+  const toggleVisibility = useMutation({
+    mutationFn: async (visible: boolean) => {
+      const res = await apiRequest("PATCH", `/api/projects/${projectId}/budget-visibility`, { visible });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "budget-summary"] });
+      toast({ title: data?.budgetVisibleToClient ? "Budget hidden from client" : "Budget visible to client" });
+    },
+    onError: () => toast({ title: "Failed to toggle visibility", variant: "destructive" }),
+  });
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="py-6 flex justify-center">
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" data-testid="loader-budget" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!data || data.hidden) return null;
+
+  const { budget, totalSpent, status, variancePercent, budgetVisibleToClient } = data;
+
+  if (budget === 0 && totalSpent === 0) {
+    if (userRole === "client") return null;
+    return (
+      <Card data-testid="card-budget-snapshot-empty">
+        <CardHeader className="pb-2">
+          <CardTitle className="font-serif text-lg flex items-center gap-2" data-testid="text-budget-heading">
+            <DollarSign className="h-4 w-4" /> Budget Snapshot
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">No budget set yet.</p>
+          {userRole === "admin" && (
+            <Link href={`/project/${projectId}/estimate`}>
+              <Button variant="link" size="sm" className="px-0 mt-1" data-testid="link-setup-budget">
+                Set up in Cost Estimator
+              </Button>
+            </Link>
+          )}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const usedPercent = budget > 0 ? Math.min((totalSpent / budget) * 100, 100) : 0;
+
+  const statusConfig: Record<string, { label: string; color: string; icon: any; barColor: string }> = {
+    on_track: { label: "On Track", color: "text-green-600", icon: Check, barColor: "bg-green-500" },
+    under_budget: { label: "Under Budget", color: "text-green-600", icon: TrendingDown, barColor: "bg-green-500" },
+    over_budget: { label: "Over Budget", color: "text-red-600", icon: TrendingUp, barColor: "bg-red-500" },
+    no_budget: { label: "No Budget Set", color: "text-muted-foreground", icon: Minus, barColor: "bg-muted-foreground" },
+  };
+  const sc = statusConfig[status] || statusConfig.no_budget;
+  const StatusIcon = sc.icon;
+
+  return (
+    <Card data-testid="card-budget-snapshot">
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <CardTitle className="font-serif text-lg flex items-center gap-2" data-testid="text-budget-heading">
+            <DollarSign className="h-4 w-4" /> Budget Snapshot
+          </CardTitle>
+          <div className={`flex items-center gap-1 text-xs font-medium ${sc.color}`} data-testid="badge-budget-status">
+            <StatusIcon className="h-3.5 w-3.5" />
+            {sc.label}
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Budget</p>
+            <p className="text-lg font-semibold tabular-nums" data-testid="text-budget-total">{formatCurrency(budget)}</p>
+          </div>
+          <div>
+            <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Spent</p>
+            <p className="text-lg font-semibold tabular-nums" data-testid="text-budget-spent">{formatCurrency(totalSpent)}</p>
+          </div>
+        </div>
+
+        {budget > 0 && (
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>Budget usage</span>
+              <span className="tabular-nums">{usedPercent.toFixed(0)}%</span>
+            </div>
+            <div className="w-full h-2 rounded-full bg-muted overflow-hidden" data-testid="progress-budget">
+              <div
+                className={`h-full rounded-full transition-all duration-500 ${sc.barColor}`}
+                style={{ width: `${Math.min(usedPercent, 100)}%` }}
+              />
+            </div>
+            {status === "over_budget" && (
+              <p className="text-xs text-red-600 font-medium" data-testid="text-over-budget-warning">
+                {Math.abs(variancePercent).toFixed(1)}% over budget ({formatCurrency(totalSpent - budget)} over)
+              </p>
+            )}
+            {status === "under_budget" && (
+              <p className="text-xs text-green-600" data-testid="text-under-budget-info">
+                {formatCurrency(budget - totalSpent)} remaining
+              </p>
+            )}
+          </div>
+        )}
+
+        {(userRole === "admin" || userRole === "crew") && (
+          <div className="flex items-center justify-between pt-2 border-t border-border/60">
+            <label htmlFor="budget-visibility-toggle" className="text-xs text-muted-foreground flex items-center gap-1.5">
+              {budgetVisibleToClient ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+              Visible to client
+            </label>
+            <Switch
+              id="budget-visibility-toggle"
+              checked={budgetVisibleToClient}
+              onCheckedChange={(checked) => toggleVisibility.mutate(checked)}
+              disabled={toggleVisibility.isPending}
+              data-testid="switch-budget-visibility"
+            />
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 function SidebarCards({
   project, user, users, userRole, onlineUsers, planningBoards, assignedClient,
@@ -1249,6 +1395,7 @@ export default function ProjectDetails() {
                       <SheetDescription className="sr-only">Project sidebar with client, access, and activity information</SheetDescription>
                     </SheetHeader>
                     <div className="space-y-6 mt-4">
+                      <BudgetSnapshot projectId={projectId} userRole={userRole} />
                       <SidebarCards
                         project={project}
                         user={user}
@@ -1284,6 +1431,7 @@ export default function ProjectDetails() {
               </div>
 
               <div className="space-y-6 hidden md:block">
+                <BudgetSnapshot projectId={projectId} userRole={userRole} />
                 <SidebarCards
                   project={project}
                   user={user}
