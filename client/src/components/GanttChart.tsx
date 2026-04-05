@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { ChevronLeft, ZoomIn, ZoomOut, Plus, Trash2, Pencil, FolderPlus, Check, X, MoreVertical, CheckSquare, Square, GripVertical, Palette } from "lucide-react";
+import { ChevronLeft, ChevronDown, ChevronUp, ZoomIn, ZoomOut, Plus, Trash2, Pencil, FolderPlus, Check, X, MoreVertical, CheckSquare, Square, GripVertical, Palette, Search } from "lucide-react";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -228,6 +228,117 @@ function PaintColourSwatches({ paintColorIds }: { paintColorIds: number[] | null
   );
 }
 
+function PaintColourPanel({ paintColorIds, onUpdate, isAdmin }: { paintColorIds: number[] | null | undefined; onUpdate: (ids: number[]) => void; isAdmin: boolean }) {
+  const [expanded, setExpanded] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const { data: linkedColors } = useQuery<PaintColor[]>({
+    queryKey: ["/api/paint-colors", "linked", ...(paintColorIds || [])],
+    queryFn: async () => {
+      if (!paintColorIds || paintColorIds.length === 0) return [];
+      const res = await fetch(`/api/paint-colors`, { credentials: "include" });
+      if (!res.ok) return [];
+      const all: PaintColor[] = await res.json();
+      return all.filter(c => paintColorIds.includes(c.id));
+    },
+    enabled: !!paintColorIds && paintColorIds.length > 0,
+  });
+
+  const { data: allColors } = useQuery<PaintColor[]>({
+    queryKey: ["/api/paint-colors"],
+    enabled: expanded && isAdmin,
+  });
+
+  const filteredColors = useMemo(() => {
+    if (!allColors) return [];
+    const ids = paintColorIds || [];
+    const available = allColors.filter(c => !ids.includes(c.id));
+    if (!searchTerm.trim()) return available.slice(0, 20);
+    const term = searchTerm.toLowerCase();
+    return available.filter(c =>
+      c.name.toLowerCase().includes(term) || c.code?.toLowerCase().includes(term) || c.brand?.toLowerCase().includes(term)
+    ).slice(0, 20);
+  }, [allColors, paintColorIds, searchTerm]);
+
+  const handleAdd = (id: number) => {
+    onUpdate([...(paintColorIds || []), id]);
+  };
+
+  const handleRemove = (id: number) => {
+    onUpdate((paintColorIds || []).filter(x => x !== id));
+  };
+
+  return (
+    <div className="border border-border/40 rounded-sm bg-muted/20" data-testid="paint-colour-panel">
+      <button
+        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-muted/40 transition-colors"
+        onClick={() => setExpanded(!expanded)}
+        data-testid="button-toggle-paint-colours"
+      >
+        <Palette className="h-3.5 w-3.5 text-muted-foreground" />
+        <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium flex-1">
+          Paint Colours {paintColorIds && paintColorIds.length > 0 ? `(${paintColorIds.length})` : ""}
+        </span>
+        {expanded ? <ChevronUp className="h-3 w-3 text-muted-foreground" /> : <ChevronDown className="h-3 w-3 text-muted-foreground" />}
+      </button>
+
+      {expanded && (
+        <div className="px-3 pb-3 space-y-2">
+          {linkedColors && linkedColors.length > 0 && (
+            <div className="flex flex-wrap gap-1.5" data-testid="linked-paint-colours">
+              {linkedColors.map((c) => (
+                <div key={c.id} className="flex items-center gap-1 px-1.5 py-0.5 rounded-sm border border-border/60 bg-background">
+                  <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: c.hex }} />
+                  <span className="text-[10px] font-medium">{c.name}</span>
+                  {isAdmin && (
+                    <button onClick={() => handleRemove(c.id)} className="text-muted-foreground hover:text-destructive transition-colors ml-0.5" data-testid={`button-remove-paint-colour-${c.id}`}>
+                      <X className="h-2.5 w-2.5" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {isAdmin && (
+            <div className="space-y-1.5">
+              <div className="relative">
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                <Input
+                  placeholder="Search paint colours..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="h-7 text-xs pl-7"
+                  data-testid="input-search-paint-colours"
+                />
+              </div>
+              {filteredColors.length > 0 && (
+                <div className="max-h-32 overflow-y-auto space-y-0.5" data-testid="paint-colour-search-results">
+                  {filteredColors.map((c) => (
+                    <button
+                      key={c.id}
+                      className="w-full flex items-center gap-2 px-2 py-1 rounded-sm hover:bg-muted/60 transition-colors text-left"
+                      onClick={() => handleAdd(c.id)}
+                      data-testid={`button-add-paint-colour-${c.id}`}
+                    >
+                      <div className="w-3 h-3 rounded-full shrink-0 border border-border/40" style={{ backgroundColor: c.hex }} />
+                      <span className="text-[10px] font-medium truncate">{c.name}</span>
+                      <span className="text-[9px] text-muted-foreground ml-auto">{c.code}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {filteredColors.length === 0 && searchTerm && (
+                <p className="text-[10px] text-muted-foreground text-center py-2">No colours found</p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function GanttChart({ projectId, milestones, sections, tasks, userRole }: GanttChartProps) {
   const [zoomLevel, setZoomLevel] = useState(1);
   const [drillLevel, setDrillLevel] = useState<DrillLevel>("phases");
@@ -238,6 +349,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
   const [newPhaseTitle, setNewPhaseTitle] = useState("");
   const [newPhaseStart, setNewPhaseStart] = useState("");
   const [newPhaseEnd, setNewPhaseEnd] = useState("");
+  const [newPhaseColorHex, setNewPhaseColorHex] = useState<string | null>(null);
   const [addingSectionFor, setAddingSectionFor] = useState<number | null>(null);
   const [newSectionTitle, setNewSectionTitle] = useState("");
   const [newSectionStart, setNewSectionStart] = useState("");
@@ -462,11 +574,12 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
       title: newPhaseTitle.trim(),
       startDate: newPhaseStart || null,
       endDate: newPhaseEnd || null,
+      colorHex: newPhaseColorHex,
     };
     createMilestone(payload, {
       onSuccess: () => {
         toast({ title: "Area added" });
-        setNewPhaseTitle(""); setNewPhaseStart(""); setNewPhaseEnd(""); setAddingPhase(false);
+        setNewPhaseTitle(""); setNewPhaseStart(""); setNewPhaseEnd(""); setNewPhaseColorHex(null); setAddingPhase(false);
       },
       onError: () => toast({ title: "Failed to add area", variant: "destructive" }),
     });
@@ -561,11 +674,26 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
           updateSection({ id: s.id, projectId, order: i });
         }
       });
+    } else if (drillLevel === "tasks" && selectedSectionId !== null) {
+      const sectionTasks = tasks.filter(t =>
+        selectedSectionId === -1 ? (t.milestoneId === selectedPhaseId && !t.sectionId) : t.sectionId === selectedSectionId
+      ).sort((a, b) => (a.order || 0) - (b.order || 0));
+      const dragIdx = sectionTasks.findIndex(t => t.id === dragId);
+      const targetIdx = sectionTasks.findIndex(t => t.id === targetId);
+      if (dragIdx === -1 || targetIdx === -1) return;
+      const reordered = [...sectionTasks];
+      const [moved] = reordered.splice(dragIdx, 1);
+      reordered.splice(targetIdx, 0, moved);
+      reordered.forEach((t, i) => {
+        if ((t.order || 0) !== i) {
+          updateTask({ id: t.id, order: i });
+        }
+      });
     }
 
     setDragId(null);
     setDragOverId(null);
-  }, [dragId, drillLevel, milestones, sections, selectedPhaseId, updateMilestone, updateSection, projectId]);
+  }, [dragId, drillLevel, milestones, sections, tasks, selectedPhaseId, selectedSectionId, updateMilestone, updateSection, updateTask, projectId]);
 
   const drillIntoPhase = (phaseId: number) => {
     setSelectedPhaseId(phaseId);
@@ -772,10 +900,29 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
         </div>
       )}
 
-      {drillLevel === "sections" && selectedPhase && selectedPhase.paintColorIds && selectedPhase.paintColorIds.length > 0 && (
-        <div className="flex items-center gap-2 px-3 py-2 bg-muted/30 rounded-sm border border-border/40" data-testid="area-paint-colours-banner">
-          <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Paint Colours:</span>
-          <PaintColourSwatches paintColorIds={selectedPhase.paintColorIds} />
+      {drillLevel === "sections" && selectedPhase && (
+        <div className="space-y-2">
+          <div
+            className="flex items-center gap-2 px-3 py-2 rounded-sm border border-border/40 sticky top-0 z-10"
+            style={{ backgroundColor: selectedPhase.colorHex ? `${selectedPhase.colorHex}15` : undefined, borderLeftWidth: "3px", borderLeftColor: selectedPhase.colorHex || "transparent" }}
+            data-testid="area-header-band"
+          >
+            {selectedPhase.colorHex && (
+              <div className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: selectedPhase.colorHex }} />
+            )}
+            <span className="text-xs font-semibold uppercase tracking-wide">{selectedPhase.title}</span>
+            <PaintColourSwatches paintColorIds={selectedPhase.paintColorIds} />
+          </div>
+          <PaintColourPanel
+            paintColorIds={selectedPhase.paintColorIds}
+            isAdmin={isAdmin}
+            onUpdate={(ids) => {
+              const phase = milestones.find(m => m.id === selectedPhaseId);
+              if (phase) {
+                updateMilestone({ id: phase.id, projectId, paintColorIds: ids });
+              }
+            }}
+          />
         </div>
       )}
 
@@ -784,11 +931,12 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
           <Input placeholder="Area name (e.g., Kitchen, Master Suite)" value={newPhaseTitle} onChange={e => setNewPhaseTitle(e.target.value)} className="flex-1" autoFocus data-testid="input-phase-title" onKeyDown={e => { if (e.key === "Enter") handleAddPhase(); }} />
           <DateField label="Start date" value={newPhaseStart} onChange={setNewPhaseStart} placeholder="Start date" testId="button-phase-start-date" />
           <DateField label="End date" value={newPhaseEnd} onChange={setNewPhaseEnd} placeholder="End date" testId="button-phase-end-date" />
+          <AreaColourPicker currentHex={newPhaseColorHex} onSelect={setNewPhaseColorHex} />
           <div className="flex gap-1">
             <Button size="sm" onClick={handleAddPhase} disabled={creatingMilestone || !newPhaseTitle.trim()} data-testid="button-confirm-add-phase">
               <Check className="h-3.5 w-3.5" />
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => { setAddingPhase(false); setNewPhaseTitle(""); setNewPhaseStart(""); setNewPhaseEnd(""); }} data-testid="button-cancel-add-phase">
+            <Button size="sm" variant="ghost" onClick={() => { setAddingPhase(false); setNewPhaseTitle(""); setNewPhaseStart(""); setNewPhaseEnd(""); setNewPhaseColorHex(null); }} data-testid="button-cancel-add-phase">
               <X className="h-3.5 w-3.5" />
             </Button>
           </div>
@@ -1008,29 +1156,41 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                 return (
                   <div
                     key={task.id}
-                    className="border-b border-border/30 flex items-center gap-2.5 px-3 group"
+                    className={`border-b border-border/30 flex items-center gap-2 px-0 group ${dragOverId === task.id ? "bg-muted/40" : ""}`}
                     style={{ height: ROW_HEIGHT }}
+                    draggable={isAdmin}
+                    onDragStart={() => handleDragStart(task.id)}
+                    onDragOver={(e) => handleDragOver(e, task.id)}
+                    onDragEnd={handleDragEnd}
+                    onDrop={() => handleDrop(task.id)}
                     data-testid={`gantt-task-row-${task.id}`}
                   >
-                    {isAdmin ? (
-                      <Checkbox
-                        checked={isDone}
-                        onCheckedChange={() => handleToggleTask(task.id, task.status)}
-                        className="shrink-0"
-                        data-testid={`checkbox-task-${task.id}`}
-                      />
-                    ) : (
-                      <div className="shrink-0">
-                        {isDone ? <CheckSquare className="h-4 w-4 text-primary" /> : <Square className="h-4 w-4 text-muted-foreground/40" />}
+                    {isAdmin && (
+                      <div className="shrink-0 pl-1 cursor-grab opacity-0 group-hover:opacity-50 transition-opacity" onClick={(e) => e.stopPropagation()} data-testid={`drag-handle-task-${task.id}`}>
+                        <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
                       </div>
                     )}
+                    <div className="pl-1">
+                      {isAdmin ? (
+                        <Checkbox
+                          checked={isDone}
+                          onCheckedChange={() => handleToggleTask(task.id, task.status)}
+                          className="shrink-0"
+                          data-testid={`checkbox-task-${task.id}`}
+                        />
+                      ) : (
+                        <div className="shrink-0">
+                          {isDone ? <CheckSquare className="h-4 w-4 text-primary" /> : <Square className="h-4 w-4 text-muted-foreground/40" />}
+                        </div>
+                      )}
+                    </div>
                     <div className="flex-1 min-w-0">
                       <span className={`text-xs truncate block ${isDone ? "line-through text-muted-foreground" : ""}`}>{task.title}</span>
                       {task.endDate && (
                         <span className="text-[10px] text-muted-foreground/70">Due {format(task.endDate, "MMM d")}</span>
                       )}
                     </div>
-                    <Badge variant={isDone ? "secondary" : "outline"} className="text-[10px] px-1.5 py-0 h-4 shrink-0 capitalize" data-testid={`badge-task-status-${task.id}`}>
+                    <Badge variant={isDone ? "secondary" : "outline"} className="text-[10px] px-1.5 py-0 h-4 shrink-0 capitalize mr-2" data-testid={`badge-task-status-${task.id}`}>
                       {isDone ? "Done" : (task.status || "To-do")}
                     </Badge>
                   </div>
