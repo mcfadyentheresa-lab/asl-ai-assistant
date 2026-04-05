@@ -104,6 +104,7 @@ function ColorSwatch({
             {color.name}
           </p>
           <p className="text-[10px] text-muted-foreground">{color.code}</p>
+          <span className="sr-only">{`${color.brand} ${color.name} ${color.code}`}</span>
         </div>
       </button>
       <div className="absolute top-1 left-1 z-10" style={{ visibility: "hidden" }} data-swatch-actions>
@@ -599,6 +600,7 @@ export default function ColorPortfolio() {
                   variant={currentSubFamily === fam ? "default" : "outline"}
                   className="cursor-pointer text-xs"
                   onClick={() => setActiveSubFamily(currentSubFamily === fam ? null : fam)}
+                  title={fam}
                   data-testid={`filter-sub-${fam.toLowerCase()}`}
                 >
                   {fam}
