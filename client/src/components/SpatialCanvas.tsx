@@ -195,6 +195,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   const [draggingId, setDraggingId] = useState<number | null>(null);
   const dragStartRef = useRef<{ x: number; y: number; elX: number; elY: number } | null>(null);
   const zoneChildrenRef = useRef<{ id: number; offsetX: number; offsetY: number }[]>([]);
+  const [droppingIds, setDroppingIds] = useState<Set<number>>(new Set());
   const [editingId, setEditingId] = useState<number | null>(null);
   const [maxZ, setMaxZ] = useState(1);
 
@@ -731,16 +732,30 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     let foundColumn: number | null = null;
     Object.values(elements).forEach((col) => {
       if (col.type !== "column" || col.id === elementId) return;
+      const colChildEls = Object.values(elements).filter((e) => e.parentColumnId === col.id && e.id !== elementId);
+      const colChildrenBottom = colChildEls.reduce((acc, child) => {
+        return Math.max(acc, (child.y - col.y) + (child.height || 60) + 12);
+      }, 0);
+      const colHeight = Math.max(col.height || 300, colChildrenBottom, 300);
       if (
         cx >= col.x &&
         cx <= col.x + col.width &&
         cy >= col.y &&
-        cy <= col.y + (col.height || 300)
+        cy <= col.y + colHeight
       ) {
         foundColumn = col.id;
       }
     });
     if (foundColumn !== el.parentColumnId) {
+      setDroppingIds((prev) => new Set(prev).add(elementId));
+      setTimeout(() => {
+        setDroppingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(elementId);
+          return next;
+        });
+      }, 350);
+
       if (foundColumn !== null) {
         const col = elements[foundColumn];
         const padding = 12;
@@ -753,12 +768,20 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           const sibBottom = sib.y + (sib.height || 60);
           return Math.max(acc, sibBottom);
         }, col.y + headerHeight);
-        updateElement(elementId, {
+
+        const updates: Record<string, any> = {
           parentColumnId: foundColumn,
           width: fitWidth,
           x: col.x + padding,
           y: stackY + 8,
-        });
+        };
+
+        if (el.type === "image" && el.width > 0 && el.height && el.height > 0) {
+          const aspectRatio = el.height / el.width;
+          updates.height = Math.round(fitWidth * aspectRatio);
+        }
+
+        updateElement(elementId, updates);
       } else {
         updateElement(elementId, { parentColumnId: foundColumn });
       }
@@ -1474,7 +1497,8 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
 
     const parentCol = el.parentColumnId ? elements[el.parentColumnId] : null;
     const effectiveZ = parentCol ? Math.max(el.zIndex, (parentCol.zIndex || 0) + 1) : el.zIndex;
-    const cardBase = `absolute transition-shadow rounded select-none ${isSelected && !activeEdit ? "ring-2 ring-primary/50 shadow-lg" : "shadow-sm"} ${isDragging ? "opacity-80 cursor-grabbing" : ""}`;
+    const isDropping = droppingIds.has(el.id);
+    const cardBase = `absolute rounded select-none ${isSelected && !activeEdit ? "ring-2 ring-primary/50 shadow-lg" : "shadow-sm"} ${isDragging ? "opacity-80 cursor-grabbing" : ""} ${isDropping && !isDragging ? "transition-[left,top,width,height] duration-300 ease-out" : "transition-shadow"}`;
 
     const handleClick = (e: React.MouseEvent) => {
       e.stopPropagation();
@@ -1761,18 +1785,33 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
 
     if (el.type === "column") {
       const childEls = elementsList.filter((e) => e.parentColumnId === el.id);
-      const isDropTarget = draggingId !== null && draggingId !== el.id && elements[draggingId]?.type !== "column";
+      const draggedType = draggingId !== null ? elements[draggingId]?.type : null;
+      const isDroppableType = draggedType !== null && draggedType !== "column" && draggedType !== "section_header" && draggedType !== "room_zone";
+      const isDropTarget = draggingId !== null && draggingId !== el.id && isDroppableType;
       const childrenBottom = childEls.reduce((acc, child) => {
         return Math.max(acc, (child.y - el.y) + (child.height || 60) + 12);
       }, 0);
-      const computedHeight = Math.max(el.height || 300, childrenBottom);
+      const draggedElForHeight = isDropTarget && draggingId !== null ? elements[draggingId] : null;
+      const pendingDropBottom = draggedElForHeight ? (() => {
+        const headerHeight = 50;
+        const stackY = childEls.reduce((acc, sib) => {
+          const sibBottom = (sib.y - el.y) + (sib.height || 60);
+          return Math.max(acc, sibBottom);
+        }, headerHeight) + 8;
+        let previewH = draggedElForHeight.height || 60;
+        if (draggedElForHeight.type === "image" && draggedElForHeight.width > 0 && draggedElForHeight.height && draggedElForHeight.height > 0) {
+          const fitW = el.width - 24;
+          previewH = Math.round(fitW * (draggedElForHeight.height / draggedElForHeight.width));
+        }
+        return stackY + previewH + 12;
+      })() : 0;
+      const computedHeight = Math.max(el.height || 300, childrenBottom, pendingDropBottom);
       const hasCustomBg = !!c.backgroundColor;
-      const isDraggedSwatch = isDropTarget && draggingId !== null && elements[draggingId]?.type === "color_swatch";
+      const draggedEl = isDropTarget && draggingId !== null ? elements[draggingId] : null;
       const presetColors = ["#ffffff", "#d4d4d4", "#fecdd3", "#e9d5ff", "#bfdbfe", "#bbf7d0", "#fef08a", "#fed7aa"];
 
-      const swatchDropY = (() => {
-        if (!isDraggedSwatch) return 0;
-        const padding = 12;
+      const dropPreviewY = (() => {
+        if (!isDropTarget || !draggedEl) return 0;
         const headerHeight = 50;
         const siblings = childEls;
         return siblings.reduce((acc, sib) => {
@@ -1781,12 +1820,22 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
         }, headerHeight) + 8;
       })();
 
+      const dropPreviewHeight = (() => {
+        if (!isDropTarget || !draggedEl) return 60;
+        const fitWidth = el.width - 24;
+        if (draggedEl.type === "image" && draggedEl.width > 0 && draggedEl.height && draggedEl.height > 0) {
+          return Math.round(fitWidth * (draggedEl.height / draggedEl.width));
+        }
+        return draggedEl.height || 60;
+      })();
+
       return (
         <div
           key={el.id}
           className={`${cardBase} border border-dashed ${isDropTarget ? "border-primary/40" : "border-border/60"} ${!hasCustomBg && !isDropTarget ? "bg-muted/40" : ""} ${isDropTarget && !hasCustomBg ? "bg-primary/10" : ""} transition-colors`}
           style={{
             left: el.x, top: el.y, width: el.width, minHeight: computedHeight, zIndex: effectiveZ,
+            transition: "min-height 250ms ease-out, background-color 200ms, border-color 200ms",
             ...(hasCustomBg ? { backgroundColor: c.backgroundColor } : {}),
           }}
           onClick={handleClick}
@@ -1809,17 +1858,18 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             )}
             <div className="text-[10px] text-muted-foreground text-center">{childEls.length} card{childEls.length !== 1 ? "s" : ""}</div>
           </div>
-          {isDraggedSwatch && (
+          {isDropTarget && draggedEl && (
             <div
-              className="absolute border-2 border-dashed border-foreground rounded"
+              className="absolute border-2 border-dashed border-primary/50 rounded bg-primary/5"
               style={{
                 left: 12,
-                top: swatchDropY,
+                top: dropPreviewY,
                 width: el.width - 24,
-                height: 60,
+                height: dropPreviewHeight,
                 pointerEvents: "none",
+                transition: "top 200ms ease-out, height 200ms ease-out",
               }}
-              data-testid={`swatch-drop-preview-${el.id}`}
+              data-testid={`drop-preview-${el.id}`}
             />
           )}
           {isSelected && (
