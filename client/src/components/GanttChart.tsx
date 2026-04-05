@@ -635,6 +635,16 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                         {renderTooltipDetails(row)}
                       </TooltipContent>
                     </Tooltip>
+                    {isTask && (
+                      <Badge variant="outline" className="ml-1 text-[10px] px-1.5 py-0 h-4 text-muted-foreground border-border/60">
+                        Task
+                      </Badge>
+                    )}
+                    {isSection && (
+                      <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0 h-4">
+                        Section
+                      </Badge>
+                    )}
 
                     <div className="ml-auto flex items-center shrink-0 pr-1">
                       {isAdmin && isPhase && (
