@@ -74,7 +74,6 @@ function formatCurrency(amount: number): string {
 interface BudgetSummaryResponse {
   hidden: boolean;
   budget?: number;
-  estimatedTotal?: number;
   totalSpent?: number;
   status?: "no_budget" | "on_track" | "under_budget" | "over_budget";
   variancePercent?: number;
@@ -122,7 +121,7 @@ function BudgetSnapshot({ projectId, userRole }: { projectId: number; userRole: 
   const variancePercent = data.variancePercent ?? 0;
   const budgetVisibleToClient = data.budgetVisibleToClient ?? false;
 
-  if (budget === 0 && totalSpent === 0) {
+  if (budget === 0 && status === "no_budget") {
     return (
       <Card data-testid="card-budget-snapshot-empty">
         <CardHeader className="pb-2">

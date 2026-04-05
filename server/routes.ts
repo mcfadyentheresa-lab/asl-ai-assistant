@@ -417,27 +417,6 @@ export async function registerRoutes(
       const activeEstimate = estimates[0];
       const budget = activeEstimate?.budget ? parseFloat(activeEstimate.budget) : 0;
 
-      let estimatedTotal = 0;
-      if (activeEstimate) {
-        const items = await storage.getEstimateItems(activeEstimate.id);
-        const markupRate = activeEstimate.markupEnabled ? (parseFloat(activeEstimate.markupPercent || "25") / 100) : 0;
-        const contingencyRate = parseFloat(activeEstimate.contingencyPercent || "0") / 100;
-
-        let subtotal = 0;
-        let totalMarkup = 0;
-        for (const item of items) {
-          const qty = parseFloat(item.quantity) || 0;
-          const unitCost = parseFloat(item.unitCost) || 0;
-          const matCost = parseFloat(item.materialCost) || 0;
-          subtotal += qty * unitCost;
-          totalMarkup += matCost * markupRate;
-        }
-        const withMarkup = subtotal + totalMarkup;
-        const contingency = withMarkup * contingencyRate;
-        const hst = (withMarkup + contingency) * 0.13;
-        estimatedTotal = withMarkup + contingency + hst;
-      }
-
       const projectReceipts = await storage.getReceipts(projectId);
       const totalSpent = projectReceipts.reduce((sum, r) => sum + (parseFloat(r.amount) || 0), 0);
 
@@ -453,7 +432,6 @@ export async function registerRoutes(
       res.json({
         hidden: false,
         budget,
-        estimatedTotal,
         totalSpent,
         status,
         variancePercent,
