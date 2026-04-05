@@ -1074,7 +1074,7 @@ export default function ProjectDetails() {
     <div className={`min-h-screen bg-background ${safeActiveTab === "board" ? "h-[100dvh] flex flex-col overflow-hidden" : "pb-20"}`}>
       <Navbar />
 
-      <div className={`relative w-full overflow-hidden shrink-0 ${safeActiveTab === "board" ? "h-20 mobile-landscape:h-0" : "h-56 md:h-72"}`} data-testid="project-hero">
+      <div className={`relative w-full overflow-hidden shrink-0 ${safeActiveTab === "board" ? "h-16 mobile-landscape:h-0" : "h-44 md:h-52"}`} data-testid="project-hero">
         {project.thumbnailUrl ? (
           <img
             src={project.thumbnailUrl}
@@ -1085,23 +1085,26 @@ export default function ProjectDetails() {
         ) : (
           <div className="h-full w-full bg-muted" />
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/50 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
 
-        <div className="absolute bottom-0 left-0 right-0 container px-5 md:px-8 pb-4">
-          <Link href="/" className="inline-flex items-center text-xs text-muted-foreground mb-2 transition-colors" onClick={() => window.sessionStorage.setItem("aster-spruce:last-planning-board", String(projectId))} data-testid="link-back">
-            <ArrowLeft className="mr-1 h-4 w-4" /> Back to Dashboard
+        <div className="absolute bottom-0 left-0 right-0 container px-5 md:px-8 pb-3">
+          <Link href="/" className="inline-flex items-center text-[11px] text-muted-foreground mb-1.5 transition-colors hover:text-foreground" onClick={() => window.sessionStorage.setItem("aster-spruce:last-planning-board", String(projectId))} data-testid="link-back">
+            <ArrowLeft className="mr-1 h-3.5 w-3.5" /> Dashboard
           </Link>
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-2">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-1.5">
             <div>
               <div className="flex items-center flex-wrap gap-2">
-                <h1 className="font-serif text-2xl md:text-3xl font-bold text-foreground mb-0.5 leading-tight" data-testid="text-project-title">
+                <h1 className="font-serif text-xl md:text-2xl font-bold text-foreground leading-tight" data-testid="text-project-title">
                   {project.name}
                 </h1>
+                <Badge variant="secondary" className="text-[10px]" data-testid="badge-project-status">
+                  {statusLabel[project.status] || project.status}
+                </Badge>
                 {viewers.length > 0 && (
-                  <div className="flex items-center gap-1 ml-3" data-testid="active-viewers">
-                    <div className="flex -space-x-2">
+                  <div className="flex items-center gap-1 ml-1" data-testid="active-viewers">
+                    <div className="flex -space-x-1.5">
                       {viewers.map(v => (
-                        <div key={v.userId} className="w-7 h-7 rounded-full bg-primary/20 border-2 border-background flex items-center justify-center text-xs font-medium" title={`${v.firstName} ${v.lastName}`} data-testid={`viewer-avatar-${v.userId}`}>
+                        <div key={v.userId} className="w-6 h-6 rounded-full bg-primary/20 border-2 border-background flex items-center justify-center text-[10px] font-medium" title={`${v.firstName} ${v.lastName}`} data-testid={`viewer-avatar-${v.userId}`}>
                           {v.profileImageUrl ? (
                             <img src={v.profileImageUrl} className="w-full h-full rounded-full object-cover" alt={`${v.firstName} ${v.lastName}`} />
                           ) : (
@@ -1110,26 +1113,25 @@ export default function ProjectDetails() {
                         </div>
                       ))}
                     </div>
-                    <span className="text-xs text-muted-foreground" data-testid="text-viewer-count">{viewers.length} viewing</span>
+                    <span className="text-[10px] text-muted-foreground" data-testid="text-viewer-count">{viewers.length} viewing</span>
                   </div>
                 )}
               </div>
-              <p className="text-muted-foreground max-w-2xl text-xs md:text-sm" data-testid="text-project-desc">
-                {project.description}
-              </p>
+              {project.description && (
+                <p className="text-muted-foreground max-w-2xl text-xs mt-0.5" data-testid="text-project-desc">
+                  {project.description}
+                </p>
+              )}
             </div>
-            <div className="flex items-center gap-2">
             {user?.role === "admin" && (
-              <Link href={`/project/${projectId}/estimate`}>
-                <Button variant="outline" size="sm" className="h-8 px-3 text-xs" data-testid="link-cost-estimator">
-                  <DollarSign className="h-4 w-4 mr-1" /> Cost Estimator
-                </Button>
-              </Link>
+              <div className="flex items-center gap-2">
+                <Link href={`/project/${projectId}/estimate`}>
+                  <Button variant="outline" size="sm" className="h-7 px-2.5 text-[11px]" data-testid="link-cost-estimator">
+                    <DollarSign className="h-3.5 w-3.5 mr-1" /> Cost Estimator
+                  </Button>
+                </Link>
+              </div>
             )}
-              <Badge variant="secondary" data-testid="badge-project-status">
-                {statusLabel[project.status] || project.status}
-              </Badge>
-            </div>
           </div>
         </div>
       </div>

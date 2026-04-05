@@ -45,13 +45,13 @@ function getContrastColor(hex: string): string {
 
 const CATEGORY_TABS = [
   { label: "Off-Whites", families: ["White", "Neutral"] },
-  { label: "Colors", families: ["Blue", "Green", "Yellow", "Orange", "Red", "Pink", "Purple"] },
+  { label: "Colours", families: ["Blue", "Green", "Yellow", "Orange", "Red", "Pink", "Purple"] },
   { label: "Muted Hues", families: ["Gray", "Brown", "Black"] },
 ];
 
 const SUB_FAMILIES: Record<string, string[]> = {
   "Off-Whites": ["White", "Neutral"],
-  "Colors": ["Blue", "Green", "Yellow", "Orange", "Red", "Pink", "Purple"],
+  "Colours": ["Blue", "Green", "Yellow", "Orange", "Red", "Pink", "Purple"],
   "Muted Hues": ["Gray", "Brown", "Black"],
 };
 
@@ -170,7 +170,7 @@ function LinkToBoardDialog({
       if (!res.ok) throw new Error("Failed to tag board");
       const board = await res.json();
       queryClient.invalidateQueries({ queryKey: ["/api/projects", board.projectId, "planning-boards"] });
-      toast({ title: "Color tagged", description: `"${color.name}" linked to planning board` });
+      toast({ title: "Colour tagged", description: `"${color.name}" linked to planning board` });
       onClose();
     } catch {
       toast({ title: "Error", description: "Failed to tag board", variant: "destructive" });
@@ -189,7 +189,7 @@ function LinkToBoardDialog({
             Tag "{color.name}" to a Board
           </DialogTitle>
           <DialogDescription>
-            Choose a planning board to tag with this color.
+            Choose a planning board to tag with this colour.
           </DialogDescription>
         </DialogHeader>
         <ScrollArea className="max-h-[50vh]">
@@ -321,7 +321,7 @@ function ColorDetail({ color, onClose, onLinkToBoard }: { color: PaintColor; onC
             copied={copied === "RGB"}
           />
           <InfoRow
-            label="Color Family"
+            label="Colour Family"
             value={color.colorFamily}
           />
           {color.lrv != null && (
@@ -335,7 +335,7 @@ function ColorDetail({ color, onClose, onLinkToBoard }: { color: PaintColor; onC
         {color.isPopular && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Star className="w-3.5 h-3.5 text-accent" fill="currentColor" />
-            <span>Popular color</span>
+            <span>Popular colour</span>
           </div>
         )}
 
@@ -343,7 +343,7 @@ function ColorDetail({ color, onClose, onLinkToBoard }: { color: PaintColor; onC
           <Button
             variant="outline"
             className="flex-1 gap-2"
-            onClick={() => copyValue("Color info", `${color.name} (${color.code}) - ${color.hex}`)}
+            onClick={() => copyValue("Colour info", `${color.name} (${color.code}) - ${color.hex}`)}
             data-testid="button-copy-color-info"
           >
             <Copy className="w-4 h-4" />
@@ -364,7 +364,7 @@ function ColorDetail({ color, onClose, onLinkToBoard }: { color: PaintColor; onC
         </div>
 
         <div className="text-[10px] text-muted-foreground pt-2 border-t border-border">
-          {color.brand}<sup>&reg;</sup>. All color names, codes, and formulations are trademarks of {color.brand}. Colors shown are approximate digital representations.
+          {color.brand}<sup>&reg;</sup>. All colour names, codes, and formulations are trademarks of {color.brand}. Colours shown are approximate digital representations.
         </div>
       </div>
     </DialogContent>
@@ -427,7 +427,7 @@ export default function ColorPortfolio() {
       const res = await fetch(`/api/paint-colors?brand=${encodeURIComponent(activeBrand)}`, {
         credentials: "include",
       });
-      if (!res.ok) throw new Error("Failed to fetch colors");
+      if (!res.ok) throw new Error("Failed to fetch colours");
       return res.json();
     },
   });
@@ -626,7 +626,7 @@ export default function ColorPortfolio() {
         ) : filteredColors.length === 0 ? (
           <Card className="p-8 text-center">
             <Search className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-            <p className="text-muted-foreground">No colors found matching your search.</p>
+            <p className="text-muted-foreground">No colours found matching your search.</p>
           </Card>
         ) : groupedByFamily ? (
           <div className="space-y-8">
@@ -657,7 +657,7 @@ export default function ColorPortfolio() {
         <div className="text-center pt-6 sm:pt-8 pb-8 sm:pb-12 space-y-2 border-t border-border/60">
           {filteredColors.length > 0 && (
             <p className="text-xs text-muted-foreground" data-testid="text-color-count">
-              {filteredColors.length} colors
+              {filteredColors.length} colours
             </p>
           )}
           <p className="text-[10px] sm:text-xs text-muted-foreground/70 max-w-md mx-auto leading-relaxed">
@@ -665,7 +665,7 @@ export default function ColorPortfolio() {
             {activeBrand === "Sherwin-Williams" && <>Sherwin-Williams<sup>&reg;</sup> and all colour names are registered trademarks of The Sherwin-Williams Company.</>}
             {activeBrand === "Farrow & Ball" && <>Farrow & Ball<sup>&reg;</sup> and all colour names are registered trademarks of Farrow & Ball Ltd.</>}
             {activeBrand === "Para Paints" && <>Para Paints<sup>&reg;</sup> and all colour names are registered trademarks of Para Paints.</>}
-            {" "}Colors shown are approximate digital representations.
+            {" "}Colours shown are approximate digital representations.
           </p>
         </div>
       </div>

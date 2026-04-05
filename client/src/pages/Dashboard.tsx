@@ -3,7 +3,7 @@ import { useProjects, useDeleteProject, useArchiveProject, useUsers } from "@/ho
 import { Navbar } from "@/components/layout/Navbar";
 import { ProjectCard } from "@/components/project/ProjectCard";
 import { Button } from "@/components/ui/button";
-import { Plus, Loader2, Eye, EyeOff, Upload, X, UserPlus, Mail } from "lucide-react";
+import { Plus, Loader2, Eye, EyeOff, Upload, X, UserPlus, Mail, ArrowRight, FolderOpen, Users, Briefcase } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { apiRequest, queryClient as qc } from "@/lib/queryClient";
 import { motion } from "framer-motion";
@@ -42,6 +42,18 @@ import {
 } from "@/components/ui/select";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
+import { useOnlineUsers } from "@/hooks/use-presence";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { Link } from "wouter";
+
+const statusLabel: Record<string, string> = {
+  planning: "Planning",
+  in_progress: "In Progress",
+  completed: "Completed",
+  archived: "Archived",
+};
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -52,12 +64,22 @@ export default function Dashboard() {
   const { toast } = useToast();
   const [showArchived, setShowArchived] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
+  const { data: onlineUsers } = useOnlineUsers();
 
   const userMap = new Map(allUsers?.map((u) => [u.id, `${u.firstName || ""} ${u.lastName || ""}`.trim()]) || []);
 
   const filteredProjects = projects?.filter((p) =>
     showArchived ? true : p.status !== "archived"
   );
+
+  const activeProjects = projects?.filter((p) => p.status !== "archived" && p.status !== "completed") || [];
+  const completedProjects = projects?.filter((p) => p.status === "completed") || [];
+  const onlineCrew = onlineUsers?.filter((u) => u.role === "crew" || u.role === "admin") || [];
+
+  const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(" ") || "there";
+  const isClient = user?.role === "client";
+  const isAdmin = user?.role === "admin";
+  const isCrew = user?.role === "crew";
 
   const handleArchive = (id: number) => {
     archiveProject(id, {
@@ -88,7 +110,7 @@ export default function Dashboard() {
     );
   }
 
-  if (user?.email?.includes("crew")) {
+  if (isCrew) {
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
@@ -104,35 +126,122 @@ export default function Dashboard() {
     );
   }
 
+  const clientSingleProject = isClient && filteredProjects && filteredProjects.length === 1 ? filteredProjects[0] : null;
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
 
-      <main className="container py-10 md:py-14 px-6 md:px-10">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-10">
+      <main className="container py-8 md:py-12 px-6 md:px-10">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
           <div>
-            <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-1" data-testid="text-greeting">
-              Welcome back, <span className="font-serif">{user?.firstName || "Client"}</span>.
+            <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-0.5" data-testid="text-greeting">
+              Welcome back, <span className="font-serif">{fullName}</span>
             </h1>
-            <p className="text-muted-foreground" data-testid="text-subtitle">
-              Here is an overview of your active projects.
+            <p className="text-sm text-muted-foreground" data-testid="text-subtitle">
+              {isClient && clientSingleProject
+                ? `Your project is ${statusLabel[clientSingleProject.status]?.toLowerCase() || "active"}.`
+                : isClient
+                  ? `You have ${activeProjects.length} active ${activeProjects.length === 1 ? "project" : "projects"}.`
+                  : isAdmin
+                    ? `${activeProjects.length} active ${activeProjects.length === 1 ? "project" : "projects"}${completedProjects.length > 0 ? ` · ${completedProjects.length} completed` : ""}${onlineCrew.length > 0 ? ` · ${onlineCrew.length} team online` : ""}`
+                    : "Here is an overview of your active projects."
+              }
             </p>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
-            <Button
-              variant="outline"
-              onClick={() => setShowArchived(!showArchived)}
-              data-testid="button-toggle-archived"
-            >
-              {showArchived ? <EyeOff className="mr-2 h-4 w-4" /> : <Eye className="mr-2 h-4 w-4" />}
-              {showArchived ? "Hide Archived" : "Show Archived"}
-            </Button>
+            {(isAdmin || isCrew) && filteredProjects && filteredProjects.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowArchived(!showArchived)}
+                data-testid="button-toggle-archived"
+              >
+                {showArchived ? <EyeOff className="mr-2 h-3.5 w-3.5" /> : <Eye className="mr-2 h-3.5 w-3.5" />}
+                {showArchived ? "Hide Archived" : "Show Archived"}
+              </Button>
+            )}
             {user?.role !== "client" && <CreateProjectDialog />}
           </div>
         </div>
 
-        {filteredProjects && filteredProjects.length > 0 ? (
+        {isAdmin && activeProjects.length > 0 && (
+          <div className="flex items-center gap-4 mb-6 flex-wrap" data-testid="admin-stats-strip">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted/50 border border-border/40">
+              <FolderOpen className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-xs font-medium text-foreground">{activeProjects.length} Active</span>
+            </div>
+            {completedProjects.length > 0 && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted/50 border border-border/40">
+                <Briefcase className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="text-xs font-medium text-foreground">{completedProjects.length} Completed</span>
+              </div>
+            )}
+            {onlineCrew.length > 0 && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted/50 border border-border/40">
+                <div className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+                </div>
+                <span className="text-xs font-medium text-foreground">{onlineCrew.length} Team Online</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {clientSingleProject ? (
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <Link href={`/project/${clientSingleProject.id}`} data-testid={`link-project-${clientSingleProject.id}`}>
+              <Card className="overflow-hidden cursor-pointer hover-elevate transition-shadow max-w-3xl" data-testid={`card-project-hero-${clientSingleProject.id}`}>
+                <div className="md:flex">
+                  <div className="relative h-52 md:h-auto md:w-80 flex-shrink-0 overflow-hidden">
+                    {clientSingleProject.thumbnailUrl ? (
+                      <img
+                        src={clientSingleProject.thumbnailUrl}
+                        alt={clientSingleProject.name}
+                        className="h-full w-full object-cover"
+                        data-testid={`img-project-hero-${clientSingleProject.id}`}
+                      />
+                    ) : (
+                      <div className="h-full w-full bg-muted min-h-[13rem]" />
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent to-background/20 hidden md:block" />
+                  </div>
+                  <CardContent className="flex-1 p-6 md:p-8 flex flex-col justify-center">
+                    <Badge variant="secondary" className="w-fit mb-3" data-testid={`badge-status-${clientSingleProject.id}`}>
+                      {statusLabel[clientSingleProject.status] || clientSingleProject.status}
+                    </Badge>
+                    <h2 className="font-serif text-xl md:text-2xl font-bold text-foreground mb-1" data-testid={`text-project-name-${clientSingleProject.id}`}>
+                      {clientSingleProject.name}
+                    </h2>
+                    {clientSingleProject.description && (
+                      <p className="text-sm text-muted-foreground mb-4 line-clamp-2">{clientSingleProject.description}</p>
+                    )}
+                    {clientSingleProject.address && (
+                      <p className="text-xs text-muted-foreground mb-4">{clientSingleProject.address}</p>
+                    )}
+                    {(clientSingleProject.totalBudget || 0) > 0 && (
+                      <div className="space-y-1.5 mb-4">
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span>Budget</span>
+                          <span>${(clientSingleProject.budgetUsed || 0).toLocaleString()} / ${(clientSingleProject.totalBudget || 0).toLocaleString()}</span>
+                        </div>
+                        <Progress value={Math.round(((clientSingleProject.budgetUsed || 0) / (clientSingleProject.totalBudget || 1)) * 100)} className="h-1.5" />
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2 text-sm font-medium text-primary">
+                      View Your Project <ArrowRight className="h-4 w-4" />
+                    </div>
+                  </CardContent>
+                </div>
+              </Card>
+            </Link>
+          </motion.div>
+        ) : filteredProjects && filteredProjects.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredProjects.map((project, idx) => (
               <motion.div
@@ -143,8 +252,8 @@ export default function Dashboard() {
               >
                 <ProjectCard
                   project={project}
-                  onArchive={handleArchive}
-                  onDelete={(id) => setDeleteId(id)}
+                  onArchive={isAdmin ? handleArchive : undefined}
+                  onDelete={isAdmin ? ((id) => setDeleteId(id)) : undefined}
                   clientName={project.clientId ? userMap.get(project.clientId) || null : null}
                 />
               </motion.div>
@@ -285,8 +394,8 @@ function CreateProjectDialog() {
   return (
     <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) removeImage(); }}>
       <DialogTrigger asChild>
-        <Button data-testid="button-new-project">
-          <Plus className="mr-2" />
+        <Button size="sm" data-testid="button-new-project">
+          <Plus className="mr-2 h-4 w-4" />
           New Project
         </Button>
       </DialogTrigger>
