@@ -230,7 +230,7 @@ function SidebarCards({
                   const next = new Set(prev);
                   next.has("admin") ? next.delete("admin") : next.add("admin");
                   return next;
-                })}
+                })}>
                 data-testid="button-toggle-admins"
               >
                 <ChevronRight className={`h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 ${expandedGroups.has("admin") ? "rotate-90" : ""}`} />
@@ -249,7 +249,7 @@ function SidebarCards({
                   const next = new Set(prev);
                   next.has("crew") ? next.delete("crew") : next.add("crew");
                   return next;
-                })}
+                })
                 data-testid="button-toggle-crew"
               >
                 <ChevronRight className={`h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 ${expandedGroups.has("crew") ? "rotate-90" : ""}`} />
