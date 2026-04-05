@@ -36,6 +36,8 @@ export const milestones = pgTable("milestones", {
   completed: boolean("completed").default(false),
   completedBy: text("completed_by").references(() => users.id),
   order: integer("order").default(0),
+  colorHex: text("color_hex"),
+  paintColorIds: integer("paint_color_ids").array(),
 });
 
 // Sub-Milestones

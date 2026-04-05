@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { format, parseISO, differenceInDays, addDays, startOfMonth, endOfMonth, eachMonthOfInterval } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { ChevronLeft, ZoomIn, ZoomOut, Plus, Trash2, Pencil, FolderPlus, Check, X, MoreVertical, CheckSquare, Square } from "lucide-react";
+import { ChevronLeft, ZoomIn, ZoomOut, Plus, Trash2, Pencil, FolderPlus, Check, X, MoreVertical, CheckSquare, Square, GripVertical, Palette } from "lucide-react";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -13,12 +13,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useCreateSection, useUpdateSection, useDeleteSection, useCreateMilestone, useCreateTask, useUpdateTask } from "@/hooks/use-projects";
+import { useCreateSection, useUpdateSection, useDeleteSection, useCreateMilestone, useUpdateMilestone, useCreateTask, useUpdateTask } from "@/hooks/use-projects";
 import { useToast } from "@/hooks/use-toast";
 import type { InsertMilestone } from "@shared/schema";
 import { ListPlus } from "lucide-react";
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useQuery } from "@tanstack/react-query";
+import type { PaintColor } from "@shared/schema";
 
 interface Milestone {
   id: number;
@@ -28,6 +30,8 @@ interface Milestone {
   endDate: string | null;
   completed: boolean;
   order: number;
+  colorHex?: string | null;
+  paintColorIds?: number[] | null;
 }
 
 interface SectionData {
@@ -58,9 +62,15 @@ interface GanttChartProps {
   userRole: string;
 }
 
-const PHASE_COLORS = [
+const AREA_COLORS = [
   "#1E3A2F", "#2D5A47", "#3D7A5F", "#8B7355", "#6B8E73",
   "#4A6741", "#7A6B5D", "#556B2F", "#8B8378", "#5F7161",
+];
+
+const TRADE_PRESETS = [
+  "Painting", "Electrical", "Plumbing", "Framing", "Drywall",
+  "Flooring", "Cabinetry", "Trim", "HVAC", "Roofing",
+  "Demolition", "Insulation", "Tiling", "Countertops",
 ];
 
 type DrillLevel = "phases" | "sections" | "tasks";
@@ -75,6 +85,8 @@ interface PhaseInfo {
   doneTasks: number;
   completed: boolean;
   colorIndex: number;
+  colorHex?: string | null;
+  paintColorIds?: number[] | null;
 }
 
 interface SectionInfo {
@@ -88,6 +100,7 @@ interface SectionInfo {
   doneTasks: number;
   completed: boolean;
   colorIndex: number;
+  parentColorHex?: string | null;
 }
 
 interface TaskInfo {
@@ -130,6 +143,91 @@ function DateField({ label, value, onChange, placeholder, testId }: { label: str
   );
 }
 
+function AreaColourPicker({ currentHex, onSelect }: { currentHex: string | null | undefined; onSelect: (hex: string | null) => void }) {
+  const QUICK_COLOURS = [
+    "#1E3A2F", "#2D5A47", "#3D7A5F", "#8B7355", "#6B8E73",
+    "#4A6741", "#7A6B5D", "#556B2F", "#C4A882", "#3B5249",
+    "#8B4513", "#2F4F4F", "#556B2F", "#6B4423", "#4682B4",
+    "#708090",
+  ];
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={(e) => e.stopPropagation()} data-testid="button-area-colour-picker">
+          {currentHex ? (
+            <div className="w-4 h-4 rounded-sm border border-border/60" style={{ backgroundColor: currentHex }} />
+          ) : (
+            <Palette className="w-3.5 h-3.5 text-muted-foreground" />
+          )}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-48 p-2" align="start" onClick={(e) => e.stopPropagation()}>
+        <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2 font-medium">Area Colour</p>
+        <div className="grid grid-cols-4 gap-1.5">
+          {QUICK_COLOURS.map((hex) => (
+            <button
+              key={hex}
+              className={`w-8 h-8 rounded-sm border transition-all ${currentHex === hex ? "ring-2 ring-offset-1 ring-foreground" : "border-border/40 hover:border-border"}`}
+              style={{ backgroundColor: hex }}
+              onClick={(e) => { e.stopPropagation(); onSelect(hex); }}
+              data-testid={`colour-option-${hex.slice(1)}`}
+            />
+          ))}
+        </div>
+        {currentHex && (
+          <button
+            className="w-full text-[10px] text-muted-foreground mt-2 hover:text-foreground transition-colors text-center py-1"
+            onClick={(e) => { e.stopPropagation(); onSelect(null); }}
+            data-testid="button-clear-area-colour"
+          >
+            Remove colour
+          </button>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function PaintColourSwatches({ paintColorIds }: { paintColorIds: number[] | null | undefined }) {
+  const { data: colors } = useQuery<PaintColor[]>({
+    queryKey: ["/api/paint-colors", "by-ids", ...(paintColorIds || [])],
+    queryFn: async () => {
+      if (!paintColorIds || paintColorIds.length === 0) return [];
+      const res = await fetch(`/api/paint-colors`, { credentials: "include" });
+      if (!res.ok) return [];
+      const all: PaintColor[] = await res.json();
+      return all.filter(c => paintColorIds.includes(c.id));
+    },
+    enabled: !!paintColorIds && paintColorIds.length > 0,
+  });
+
+  if (!colors || colors.length === 0) return null;
+
+  return (
+    <div className="flex items-center gap-0.5" data-testid="paint-colour-swatches">
+      {colors.slice(0, 4).map((c) => (
+        <Tooltip key={c.id}>
+          <TooltipTrigger asChild>
+            <div
+              className="w-3 h-3 rounded-full border border-border/60 shrink-0"
+              style={{ backgroundColor: c.hex }}
+              data-testid={`paint-swatch-${c.id}`}
+            />
+          </TooltipTrigger>
+          <TooltipContent>
+            <p className="text-xs">{c.name} ({c.code})</p>
+            <p className="text-[10px] text-muted-foreground">{c.brand}</p>
+          </TooltipContent>
+        </Tooltip>
+      ))}
+      {colors.length > 4 && (
+        <span className="text-[9px] text-muted-foreground">+{colors.length - 4}</span>
+      )}
+    </div>
+  );
+}
+
 export default function GanttChart({ projectId, milestones, sections, tasks, userRole }: GanttChartProps) {
   const [zoomLevel, setZoomLevel] = useState(1);
   const [drillLevel, setDrillLevel] = useState<DrillLevel>("phases");
@@ -149,9 +247,12 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
   const [addingTask, setAddingTask] = useState<{ milestoneId: number; sectionId: number | null } | null>(null);
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskDueDate, setNewTaskDueDate] = useState("");
+  const [dragId, setDragId] = useState<number | null>(null);
+  const [dragOverId, setDragOverId] = useState<number | null>(null);
 
   const { toast } = useToast();
   const { mutate: createMilestone, isPending: creatingMilestone } = useCreateMilestone();
+  const { mutate: updateMilestone } = useUpdateMilestone();
   const { mutate: createSection, isPending: creatingSection } = useCreateSection();
   const { mutate: updateSection, isPending: updatingSection } = useUpdateSection();
   const { mutate: deleteSection } = useDeleteSection();
@@ -178,7 +279,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
   const phaseInfos = useMemo((): PhaseInfo[] => {
     const sorted = [...milestones].sort((a, b) => (a.order || 0) - (b.order || 0));
     return sorted.map((ms, idx) => {
-      const colorIndex = idx % PHASE_COLORS.length;
+      const colorIndex = idx % AREA_COLORS.length;
       const msTasks = tasks.filter(t => t.milestoneId === ms.id);
       const msSections = sections.filter(s => s.milestoneId === ms.id);
 
@@ -204,7 +305,11 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
         phaseEnd = addDays(phaseStart, 14);
       }
 
-      return { id: ms.id, title: ms.title, startDate: phaseStart, endDate: phaseEnd, progress, totalTasks, doneTasks, completed: !!ms.completed, colorIndex };
+      return {
+        id: ms.id, title: ms.title, startDate: phaseStart, endDate: phaseEnd,
+        progress, totalTasks, doneTasks, completed: !!ms.completed, colorIndex,
+        colorHex: ms.colorHex, paintColorIds: ms.paintColorIds,
+      };
     });
   }, [milestones, sections, tasks]);
 
@@ -237,7 +342,12 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
         secEnd = addDays(secStart, 7);
       }
 
-      result.push({ id: sec.id, milestoneId: sec.milestoneId, title: sec.title, startDate: secStart, endDate: secEnd, progress: secProgress, totalTasks: secTotal, doneTasks: secDone, completed: !!sec.completed, colorIndex: phase.colorIndex });
+      result.push({
+        id: sec.id, milestoneId: sec.milestoneId, title: sec.title,
+        startDate: secStart, endDate: secEnd, progress: secProgress,
+        totalTasks: secTotal, doneTasks: secDone, completed: !!sec.completed,
+        colorIndex: phase.colorIndex, parentColorHex: phase.colorHex,
+      });
     });
 
     const unsectionedTasks = msTasks.filter(t => !t.sectionId);
@@ -249,16 +359,11 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
       if (uStart && (!uEnd || uEnd.getTime() <= uStart.getTime())) uEnd = addDays(uStart, 7);
 
       result.push({
-        id: -1,
-        milestoneId: selectedPhaseId,
-        title: "General Tasks",
-        startDate: uStart,
-        endDate: uEnd,
+        id: -1, milestoneId: selectedPhaseId, title: "General Tasks",
+        startDate: uStart, endDate: uEnd,
         progress: unsectionedTasks.length > 0 ? Math.round((uDone / unsectionedTasks.length) * 100) : 0,
-        totalTasks: unsectionedTasks.length,
-        doneTasks: uDone,
-        completed: false,
-        colorIndex: phase.colorIndex,
+        totalTasks: unsectionedTasks.length, doneTasks: uDone,
+        completed: false, colorIndex: phase.colorIndex, parentColorHex: phase.colorHex,
       });
     }
 
@@ -284,24 +389,21 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
     return filteredTasks.map(t => {
       const taskDate = t.dueDate ? parseISO(t.dueDate) : null;
       return {
-        id: t.id,
-        title: t.title,
+        id: t.id, title: t.title,
         startDate: taskDate ? addDays(taskDate, -3) : null,
-        endDate: taskDate,
-        status: t.status,
-        colorIndex: phase.colorIndex,
+        endDate: taskDate, status: t.status, colorIndex: phase.colorIndex,
       };
     });
   }, [selectedPhaseId, selectedSectionId, phaseInfos, tasks]);
 
-  type BarItem = { startDate: Date | null; endDate: Date | null; colorIndex: number; progress?: number; status?: string | null; type: "phase" | "section" | "task"; id: number; title: string };
+  type BarItem = { startDate: Date | null; endDate: Date | null; colorIndex: number; progress?: number; status?: string | null; type: "phase" | "section" | "task"; id: number; title: string; colorHex?: string | null };
 
   const currentRows: BarItem[] = useMemo(() => {
     if (drillLevel === "phases") {
       return phaseInfos.map(p => ({ ...p, type: "phase" as const }));
     }
     if (drillLevel === "sections") {
-      return sectionInfos.map(s => ({ ...s, type: "section" as const }));
+      return sectionInfos.map(s => ({ ...s, type: "section" as const, colorHex: s.parentColorHex }));
     }
     return taskInfos.map(t => ({ ...t, type: "task" as const }));
   }, [drillLevel, phaseInfos, sectionInfos, taskInfos]);
@@ -350,7 +452,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
   const today = new Date();
   const todayOffset = differenceInDays(today, timelineStart) * dayWidth;
 
-  const ROW_HEIGHT = 44;
+  const ROW_HEIGHT = 48;
   const HEADER_HEIGHT = 40;
 
   const handleAddPhase = () => {
@@ -363,10 +465,10 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
     };
     createMilestone(payload, {
       onSuccess: () => {
-        toast({ title: "Phase added" });
+        toast({ title: "Area added" });
         setNewPhaseTitle(""); setNewPhaseStart(""); setNewPhaseEnd(""); setAddingPhase(false);
       },
-      onError: () => toast({ title: "Failed to add phase", variant: "destructive" }),
+      onError: () => toast({ title: "Failed to add area", variant: "destructive" }),
     });
   };
 
@@ -376,10 +478,10 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
       { projectId, milestoneId, title: newSectionTitle.trim(), startDate: newSectionStart || null, endDate: newSectionEnd || null },
       {
         onSuccess: () => {
-          toast({ title: "Section added" });
+          toast({ title: "Work category added" });
           setNewSectionTitle(""); setNewSectionStart(""); setNewSectionEnd(""); setAddingSectionFor(null);
         },
-        onError: () => toast({ title: "Failed to add section", variant: "destructive" }),
+        onError: () => toast({ title: "Failed to add work category", variant: "destructive" }),
       }
     );
   };
@@ -389,8 +491,8 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
     updateSection(
       { id: editingSection.id, projectId, title: editSectionForm.title.trim(), startDate: editSectionForm.startDate || null, endDate: editSectionForm.endDate || null },
       {
-        onSuccess: () => { toast({ title: "Section updated" }); setEditingSection(null); },
-        onError: () => toast({ title: "Failed to update section", variant: "destructive" }),
+        onSuccess: () => { toast({ title: "Work category updated" }); setEditingSection(null); },
+        onError: () => toast({ title: "Failed to update work category", variant: "destructive" }),
       }
     );
   };
@@ -420,6 +522,51 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
     });
   };
 
+  const handleAreaColourChange = useCallback((phaseId: number, hex: string | null) => {
+    updateMilestone({ id: phaseId, projectId, colorHex: hex }, {
+      onError: () => toast({ title: "Failed to update colour", variant: "destructive" }),
+    });
+  }, [updateMilestone, projectId, toast]);
+
+  const handleDragStart = (id: number) => setDragId(id);
+  const handleDragOver = (e: React.DragEvent, id: number) => { e.preventDefault(); setDragOverId(id); };
+  const handleDragEnd = () => { setDragId(null); setDragOverId(null); };
+
+  const handleDrop = useCallback((targetId: number) => {
+    if (dragId === null || dragId === targetId) { setDragId(null); setDragOverId(null); return; }
+
+    if (drillLevel === "phases") {
+      const sorted = [...milestones].sort((a, b) => (a.order || 0) - (b.order || 0));
+      const dragIdx = sorted.findIndex(m => m.id === dragId);
+      const targetIdx = sorted.findIndex(m => m.id === targetId);
+      if (dragIdx === -1 || targetIdx === -1) return;
+      const reordered = [...sorted];
+      const [moved] = reordered.splice(dragIdx, 1);
+      reordered.splice(targetIdx, 0, moved);
+      reordered.forEach((m, i) => {
+        if ((m.order || 0) !== i) {
+          updateMilestone({ id: m.id, projectId, order: i });
+        }
+      });
+    } else if (drillLevel === "sections" && selectedPhaseId) {
+      const phaseSections = sections.filter(s => s.milestoneId === selectedPhaseId).sort((a, b) => (a.order || 0) - (b.order || 0));
+      const dragIdx = phaseSections.findIndex(s => s.id === dragId);
+      const targetIdx = phaseSections.findIndex(s => s.id === targetId);
+      if (dragIdx === -1 || targetIdx === -1) return;
+      const reordered = [...phaseSections];
+      const [moved] = reordered.splice(dragIdx, 1);
+      reordered.splice(targetIdx, 0, moved);
+      reordered.forEach((s, i) => {
+        if ((s.order || 0) !== i) {
+          updateSection({ id: s.id, projectId, order: i });
+        }
+      });
+    }
+
+    setDragId(null);
+    setDragOverId(null);
+  }, [dragId, drillLevel, milestones, sections, selectedPhaseId, updateMilestone, updateSection, projectId]);
+
   const drillIntoPhase = (phaseId: number) => {
     setSelectedPhaseId(phaseId);
     setSelectedSectionId(null);
@@ -444,6 +591,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
   const renderBar = (row: BarItem) => {
     if (!row.startDate || !row.endDate) return null;
     const { left, width } = getBarPosition(row.startDate, row.endDate);
+    const barColor = row.colorHex || AREA_COLORS[row.colorIndex];
 
     if (row.type === "task") {
       const isDone = row.status === "done";
@@ -454,13 +602,18 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
           <TooltipTrigger asChild>
             <div
               className="absolute rounded-sm cursor-default"
-              style={{ left, width, top: topOffset, height: barHeight, backgroundColor: PHASE_COLORS[row.colorIndex], opacity: isDone ? 0.35 : 0.6 }}
+              style={{ left, width, top: topOffset, height: barHeight, backgroundColor: barColor, opacity: isDone ? 0.35 : 0.6 }}
               data-testid={`gantt-bar-task-${row.id}`}
             >
               {isDone && (
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="w-full h-px bg-foreground/30" />
                 </div>
+              )}
+              {width > 80 && row.endDate && (
+                <span className="absolute inset-0 flex items-center px-1.5 text-[8px] font-medium text-white/80 truncate">
+                  {format(row.endDate, "MMM d")}
+                </span>
               )}
             </div>
           </TooltipTrigger>
@@ -473,9 +626,8 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
       );
     }
 
-    const barHeight = row.type === "phase" ? 22 : 18;
+    const barHeight = row.type === "phase" ? 24 : 20;
     const topOffset = (ROW_HEIGHT - barHeight) / 2;
-    const color = PHASE_COLORS[row.colorIndex];
     const progress = row.progress || 0;
 
     return (
@@ -483,15 +635,23 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
         <TooltipTrigger asChild>
           <div
             className="absolute rounded-sm cursor-default overflow-hidden border border-border/20"
-            style={{ left, width, top: topOffset, height: barHeight, backgroundColor: `${color}22` }}
+            style={{ left, width, top: topOffset, height: barHeight, backgroundColor: `${barColor}22` }}
             data-testid={`gantt-bar-${row.type}-${row.id}`}
           >
-            <div className="h-full transition-all duration-300" style={{ width: `${progress}%`, backgroundColor: color, opacity: row.type === "phase" ? 1 : 0.75 }} />
-            {width > 50 && (
-              <span className="absolute inset-0 flex items-center px-1.5 text-[9px] font-medium text-foreground/70 truncate">
-                {progress}%
-              </span>
-            )}
+            <div className="h-full transition-all duration-300" style={{ width: `${progress}%`, backgroundColor: barColor, opacity: row.type === "phase" ? 1 : 0.75 }} />
+            <span className="absolute inset-0 flex items-center justify-between px-1.5 text-[9px] font-medium text-foreground/70 truncate">
+              <span>{width > 50 ? `${progress}%` : ""}</span>
+              {width > 80 && row.startDate && row.endDate && (
+                <span className="text-[8px] text-foreground/50">
+                  {format(row.startDate, "MMM d")} – {format(row.endDate, "MMM d")}
+                </span>
+              )}
+              {width > 40 && width <= 80 && row.startDate && (
+                <span className="text-[8px] text-foreground/50">
+                  {format(row.startDate, "MMM d")}
+                </span>
+              )}
+            </span>
           </div>
         </TooltipTrigger>
         <TooltipContent>
@@ -515,8 +675,8 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
   }, [drillLevel, selectedPhase, selectedSection]);
 
   const scopeHeading = useMemo(() => {
-    if (drillLevel === "phases") return "Scope";
-    if (drillLevel === "sections") return "Sections";
+    if (drillLevel === "phases") return "Areas";
+    if (drillLevel === "sections") return "Work Categories";
     return "Tasks";
   }, [drillLevel]);
 
@@ -534,7 +694,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
           </h3>
           {drillLevel === "phases" && (
             <Badge variant="outline" className="text-xs" data-testid="badge-phase-count">
-              {milestones.length} {milestones.length === 1 ? "phase" : "phases"}
+              {milestones.length} {milestones.length === 1 ? "area" : "areas"}
             </Badge>
           )}
           {currentProgress !== null && (
@@ -547,13 +707,13 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
           {isAdmin && drillLevel === "phases" && (
             <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => setAddingPhase(true)} data-testid="button-add-phase-timeline">
               <Plus className="h-3 w-3" />
-              Phase
+              Area
             </Button>
           )}
           {isAdmin && drillLevel === "sections" && selectedPhaseId && (
             <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => { setAddingSectionFor(selectedPhaseId); setNewSectionTitle(""); setNewSectionStart(""); setNewSectionEnd(""); }} data-testid="button-add-section-timeline">
               <Plus className="h-3 w-3" />
-              Section
+              Work Category
             </Button>
           )}
           {isAdmin && drillLevel === "tasks" && selectedPhaseId && (
@@ -576,13 +736,31 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
 
       {showBreadcrumb && (
         <div className="flex items-center gap-2 text-sm">
-          <button onClick={goBack} className="text-muted-foreground hover:text-foreground transition-colors underline-offset-2 hover:underline" data-testid="button-breadcrumb-back">
-            {drillLevel === "tasks" && selectedPhase ? selectedPhase.title : "All Phases"}
+          <button onClick={() => { setSelectedPhaseId(null); setSelectedSectionId(null); setDrillLevel("phases"); }} className="text-muted-foreground hover:text-foreground transition-colors underline-offset-2 hover:underline" data-testid="button-breadcrumb-all">
+            All Areas
           </button>
-          <span className="text-muted-foreground">›</span>
-          <span className="font-medium text-foreground" data-testid="text-breadcrumb-current">
-            {drillLevel === "tasks" && selectedSection ? selectedSection.title : selectedPhase?.title}
-          </span>
+          {selectedPhase && (
+            <>
+              <span className="text-muted-foreground">›</span>
+              {drillLevel === "tasks" ? (
+                <button onClick={goBack} className="text-muted-foreground hover:text-foreground transition-colors underline-offset-2 hover:underline" data-testid="button-breadcrumb-phase">
+                  {selectedPhase.title}
+                </button>
+              ) : (
+                <span className="font-medium text-foreground" data-testid="text-breadcrumb-current">
+                  {selectedPhase.title}
+                </span>
+              )}
+            </>
+          )}
+          {drillLevel === "tasks" && selectedSection && (
+            <>
+              <span className="text-muted-foreground">›</span>
+              <span className="font-medium text-foreground" data-testid="text-breadcrumb-section">
+                {selectedSection.title}
+              </span>
+            </>
+          )}
           {currentProgress !== null && (
             <div className="ml-auto flex items-center gap-2">
               <div className="w-20 h-1.5 bg-muted rounded-full overflow-hidden">
@@ -594,9 +772,16 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
         </div>
       )}
 
+      {drillLevel === "sections" && selectedPhase && selectedPhase.paintColorIds && selectedPhase.paintColorIds.length > 0 && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-muted/30 rounded-sm border border-border/40" data-testid="area-paint-colours-banner">
+          <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Paint Colours:</span>
+          <PaintColourSwatches paintColorIds={selectedPhase.paintColorIds} />
+        </div>
+      )}
+
       {addingPhase && isAdmin && (
         <div className="flex flex-col sm:flex-row gap-2 p-3 border border-border/60 rounded-sm bg-muted/20" data-testid="form-add-phase-inline">
-          <Input placeholder="Phase name" value={newPhaseTitle} onChange={e => setNewPhaseTitle(e.target.value)} className="flex-1" autoFocus data-testid="input-phase-title" onKeyDown={e => { if (e.key === "Enter") handleAddPhase(); }} />
+          <Input placeholder="Area name (e.g., Kitchen, Master Suite)" value={newPhaseTitle} onChange={e => setNewPhaseTitle(e.target.value)} className="flex-1" autoFocus data-testid="input-phase-title" onKeyDown={e => { if (e.key === "Enter") handleAddPhase(); }} />
           <DateField label="Start date" value={newPhaseStart} onChange={setNewPhaseStart} placeholder="Start date" testId="button-phase-start-date" />
           <DateField label="End date" value={newPhaseEnd} onChange={setNewPhaseEnd} placeholder="End date" testId="button-phase-end-date" />
           <div className="flex gap-1">
@@ -611,24 +796,38 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
       )}
 
       {addingSectionFor !== null && isAdmin && (
-        <div className="flex flex-col sm:flex-row gap-2 p-3 border border-border/60 rounded-sm bg-muted/20" data-testid="form-add-section-inline">
-          <Input placeholder="Section name" value={newSectionTitle} onChange={e => setNewSectionTitle(e.target.value)} className="flex-1" autoFocus data-testid="input-section-title" onKeyDown={e => { if (e.key === "Enter") handleAddSection(addingSectionFor); }} />
-          <DateField label="Start" value={newSectionStart} onChange={setNewSectionStart} placeholder="Start" testId="button-section-start-date" />
-          <DateField label="End" value={newSectionEnd} onChange={setNewSectionEnd} placeholder="End" testId="button-section-end-date" />
-          <div className="flex gap-1">
-            <Button size="sm" onClick={() => handleAddSection(addingSectionFor)} disabled={creatingSection || !newSectionTitle.trim()} data-testid="button-confirm-add-section">
-              <Check className="h-3.5 w-3.5" />
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => setAddingSectionFor(null)} data-testid="button-cancel-add-section">
-              <X className="h-3.5 w-3.5" />
-            </Button>
+        <div className="space-y-2 p-3 border border-border/60 rounded-sm bg-muted/20" data-testid="form-add-section-inline">
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Input placeholder="Work category name" value={newSectionTitle} onChange={e => setNewSectionTitle(e.target.value)} className="flex-1" autoFocus data-testid="input-section-title" onKeyDown={e => { if (e.key === "Enter") handleAddSection(addingSectionFor); }} />
+            <DateField label="Start" value={newSectionStart} onChange={setNewSectionStart} placeholder="Start" testId="button-section-start-date" />
+            <DateField label="End" value={newSectionEnd} onChange={setNewSectionEnd} placeholder="End" testId="button-section-end-date" />
+            <div className="flex gap-1">
+              <Button size="sm" onClick={() => handleAddSection(addingSectionFor)} disabled={creatingSection || !newSectionTitle.trim()} data-testid="button-confirm-add-section">
+                <Check className="h-3.5 w-3.5" />
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setAddingSectionFor(null)} data-testid="button-cancel-add-section">
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-1" data-testid="trade-preset-chips">
+            {TRADE_PRESETS.map((trade) => (
+              <button
+                key={trade}
+                className={`px-2 py-0.5 text-[10px] font-medium rounded-sm border transition-colors ${newSectionTitle === trade ? "bg-foreground text-background border-foreground" : "border-border/60 text-muted-foreground hover:text-foreground hover:border-border"}`}
+                onClick={() => setNewSectionTitle(trade)}
+                data-testid={`trade-chip-${trade.toLowerCase()}`}
+              >
+                {trade}
+              </button>
+            ))}
           </div>
         </div>
       )}
 
       {editingSection && isAdmin && (
         <div className="flex flex-col sm:flex-row gap-2 p-3 border border-primary/30 rounded-sm bg-muted/20" data-testid="form-edit-section-inline">
-          <Input placeholder="Section name" value={editSectionForm.title} onChange={e => setEditSectionForm({ ...editSectionForm, title: e.target.value })} className="flex-1" autoFocus data-testid="input-edit-section-title" onKeyDown={e => { if (e.key === "Enter") handleEditSection(); }} />
+          <Input placeholder="Work category name" value={editSectionForm.title} onChange={e => setEditSectionForm({ ...editSectionForm, title: e.target.value })} className="flex-1" autoFocus data-testid="input-edit-section-title" onKeyDown={e => { if (e.key === "Enter") handleEditSection(); }} />
           <DateField label="Start date" value={editSectionForm.startDate} onChange={(value) => setEditSectionForm({ ...editSectionForm, startDate: value })} placeholder="Start date" testId="button-edit-section-start" />
           <DateField label="End date" value={editSectionForm.endDate} onChange={(value) => setEditSectionForm({ ...editSectionForm, endDate: value })} placeholder="End date" testId="button-edit-section-end" />
           <div className="flex gap-1">
@@ -660,117 +859,149 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
       {currentRows.length === 0 && !addingPhase && !addingSectionFor && !addingTask ? (
         <div className="py-12 text-center">
           <p className="text-sm text-muted-foreground" data-testid="text-gantt-empty">
-            {drillLevel === "phases" && "No phases yet. Add a phase to start building the project scope."}
-            {drillLevel === "sections" && "No sections in this phase yet. Add a section to organise tasks."}
-            {drillLevel === "tasks" && "No tasks in this section yet. Add a task to get started."}
+            {drillLevel === "phases" && "No areas yet. Add an area to start building the project scope."}
+            {drillLevel === "sections" && "No work categories in this area yet. Add a work category to organise tasks."}
+            {drillLevel === "tasks" && "No tasks in this work category yet. Add a task to get started."}
           </p>
         </div>
       ) : currentRows.length > 0 && (
         <div className="border border-border/50 rounded-sm overflow-hidden">
           <div className="flex">
-            <div className="w-64 min-w-[256px] shrink-0 border-r border-border/50 bg-muted/30">
+            <div className="w-72 min-w-[288px] shrink-0 border-r border-border/50 bg-muted/30">
               <div className="border-b border-border/50 flex items-center px-3" style={{ height: HEADER_HEIGHT }}>
                 <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground" data-testid="text-scope-header">{scopeHeading}</span>
               </div>
 
-              {drillLevel === "phases" && phaseInfos.map((phase) => (
-                <div
-                  key={phase.id}
-                  className="border-b border-border/30 flex items-center gap-2.5 px-3 cursor-pointer hover:bg-muted/20 transition-colors group"
-                  style={{ height: ROW_HEIGHT }}
-                  onClick={() => drillIntoPhase(phase.id)}
-                  data-testid={`gantt-phase-row-${phase.id}`}
-                >
-                  <div className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: PHASE_COLORS[phase.colorIndex] }} />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-medium truncate">{phase.title}</span>
-                      {phase.completed && <Check className="h-3 w-3 text-green-600 shrink-0" />}
-                    </div>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <div className="w-16 h-1 bg-muted rounded-full overflow-hidden">
-                        <div className="h-full rounded-full transition-all duration-300" style={{ width: `${phase.progress}%`, backgroundColor: PHASE_COLORS[phase.colorIndex] }} />
+              {drillLevel === "phases" && phaseInfos.map((phase) => {
+                const accentColor = phase.colorHex || AREA_COLORS[phase.colorIndex];
+                return (
+                  <div
+                    key={phase.id}
+                    className={`border-b border-border/30 flex items-center gap-2 px-0 cursor-pointer hover:bg-muted/20 transition-colors group ${dragOverId === phase.id ? "bg-muted/40" : ""}`}
+                    style={{ height: ROW_HEIGHT, borderLeft: `3px solid ${accentColor}` }}
+                    onClick={() => drillIntoPhase(phase.id)}
+                    draggable={isAdmin}
+                    onDragStart={() => handleDragStart(phase.id)}
+                    onDragOver={(e) => handleDragOver(e, phase.id)}
+                    onDragEnd={handleDragEnd}
+                    onDrop={() => handleDrop(phase.id)}
+                    data-testid={`gantt-phase-row-${phase.id}`}
+                  >
+                    {isAdmin && (
+                      <div className="shrink-0 pl-1 cursor-grab opacity-0 group-hover:opacity-50 transition-opacity" onClick={(e) => e.stopPropagation()} data-testid={`drag-handle-phase-${phase.id}`}>
+                        <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
                       </div>
-                      <span className="text-[10px] text-muted-foreground">{phase.doneTasks}/{phase.totalTasks}</span>
-                      {phase.startDate && (
-                        <span className="text-[10px] text-muted-foreground/70 hidden sm:inline">
-                          {format(phase.startDate, "MMM d")}{phase.endDate ? ` – ${format(phase.endDate, "MMM d")}` : ""}
-                        </span>
-                      )}
+                    )}
+                    <div className="flex-1 min-w-0 pl-2 pr-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold uppercase tracking-wide truncate">{phase.title}</span>
+                        {phase.completed && <Check className="h-3 w-3 text-green-600 shrink-0" />}
+                        <PaintColourSwatches paintColorIds={phase.paintColorIds} />
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
+                          <div className="h-full rounded-full transition-all duration-300" style={{ width: `${phase.progress}%`, backgroundColor: accentColor }} />
+                        </div>
+                        <span className="text-[10px] text-muted-foreground">{phase.doneTasks}/{phase.totalTasks}</span>
+                        {phase.startDate && (
+                          <span className="text-[10px] text-muted-foreground/70 hidden sm:inline">
+                            {format(phase.startDate, "MMM d")}{phase.endDate ? ` – ${format(phase.endDate, "MMM d")}` : ""}
+                          </span>
+                        )}
+                      </div>
                     </div>
+                    {isAdmin && (
+                      <div className="flex items-center gap-0.5 pr-1.5 shrink-0">
+                        <AreaColourPicker
+                          currentHex={phase.colorHex}
+                          onSelect={(hex) => { handleAreaColourChange(phase.id, hex); }}
+                        />
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
+                            <Button size="icon" variant="ghost" className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity" data-testid={`button-phase-menu-${phase.id}`}>
+                              <MoreVertical className="h-3 w-3" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => { setAddingSectionFor(phase.id); setNewSectionTitle(""); setNewSectionStart(""); setNewSectionEnd(""); }} data-testid={`button-add-section-${phase.id}`}>
+                              <FolderPlus className="h-3.5 w-3.5 mr-2" />
+                              Add Work Category
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => { setAddingTask({ milestoneId: phase.id, sectionId: null }); setNewTaskTitle(""); setNewTaskDueDate(""); }} data-testid={`button-add-task-phase-${phase.id}`}>
+                              <ListPlus className="h-3.5 w-3.5 mr-2" />
+                              Add Task
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    )}
                   </div>
-                  {isAdmin && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
-                        <Button size="icon" variant="ghost" className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity" data-testid={`button-phase-menu-${phase.id}`}>
-                          <MoreVertical className="h-3 w-3" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => { setAddingSectionFor(phase.id); setNewSectionTitle(""); setNewSectionStart(""); setNewSectionEnd(""); }} data-testid={`button-add-section-${phase.id}`}>
-                          <FolderPlus className="h-3.5 w-3.5 mr-2" />
-                          Add Section
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => { setAddingTask({ milestoneId: phase.id, sectionId: null }); setNewTaskTitle(""); setNewTaskDueDate(""); }} data-testid={`button-add-task-phase-${phase.id}`}>
-                          <ListPlus className="h-3.5 w-3.5 mr-2" />
-                          Add Task
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
-                </div>
-              ))}
+                );
+              })}
 
-              {drillLevel === "sections" && sectionInfos.map((sec) => (
-                <div
-                  key={sec.id}
-                  className="border-b border-border/30 flex items-center gap-2.5 px-3 cursor-pointer hover:bg-muted/20 transition-colors group"
-                  style={{ height: ROW_HEIGHT }}
-                  onClick={() => drillIntoSection(sec.id)}
-                  data-testid={`gantt-section-row-${sec.id}`}
-                >
-                  <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: PHASE_COLORS[sec.colorIndex], opacity: 0.7 }} />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-medium truncate">{sec.title}</span>
-                    </div>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <div className="w-16 h-1 bg-muted rounded-full overflow-hidden">
-                        <div className="h-full rounded-full transition-all duration-300" style={{ width: `${sec.progress}%`, backgroundColor: PHASE_COLORS[sec.colorIndex] }} />
+              {drillLevel === "sections" && sectionInfos.map((sec) => {
+                const accentColor = sec.parentColorHex || AREA_COLORS[sec.colorIndex];
+                return (
+                  <div
+                    key={sec.id}
+                    className={`border-b border-border/30 flex items-center gap-2 px-0 cursor-pointer hover:bg-muted/20 transition-colors group ${dragOverId === sec.id ? "bg-muted/40" : ""}`}
+                    style={{ height: ROW_HEIGHT, borderLeft: `3px solid ${accentColor}40` }}
+                    onClick={() => drillIntoSection(sec.id)}
+                    draggable={isAdmin && sec.id !== -1}
+                    onDragStart={() => sec.id !== -1 && handleDragStart(sec.id)}
+                    onDragOver={(e) => sec.id !== -1 && handleDragOver(e, sec.id)}
+                    onDragEnd={handleDragEnd}
+                    onDrop={() => sec.id !== -1 && handleDrop(sec.id)}
+                    data-testid={`gantt-section-row-${sec.id}`}
+                  >
+                    {isAdmin && sec.id !== -1 && (
+                      <div className="shrink-0 pl-1 cursor-grab opacity-0 group-hover:opacity-50 transition-opacity" onClick={(e) => e.stopPropagation()} data-testid={`drag-handle-section-${sec.id}`}>
+                        <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
                       </div>
-                      <span className="text-[10px] text-muted-foreground">{sec.doneTasks}/{sec.totalTasks}</span>
-                      {sec.startDate && (
-                        <span className="text-[10px] text-muted-foreground/70 hidden sm:inline">
-                          {format(sec.startDate, "MMM d")}{sec.endDate ? ` – ${format(sec.endDate, "MMM d")}` : ""}
-                        </span>
-                      )}
+                    )}
+                    {(!isAdmin || sec.id === -1) && <div className="w-1" />}
+                    <div className="flex-1 min-w-0 pl-2 pr-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium truncate">{sec.title}</span>
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <div className="w-16 h-1 bg-muted rounded-full overflow-hidden">
+                          <div className="h-full rounded-full transition-all duration-300" style={{ width: `${sec.progress}%`, backgroundColor: accentColor }} />
+                        </div>
+                        <span className="text-[10px] text-muted-foreground">{sec.doneTasks}/{sec.totalTasks}</span>
+                        {sec.startDate && (
+                          <span className="text-[10px] text-muted-foreground/70 hidden sm:inline">
+                            {format(sec.startDate, "MMM d")}{sec.endDate ? ` – ${format(sec.endDate, "MMM d")}` : ""}
+                          </span>
+                        )}
+                      </div>
                     </div>
+                    {isAdmin && sec.id !== -1 && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
+                          <Button size="icon" variant="ghost" className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity mr-1.5" data-testid={`button-section-menu-${sec.id}`}>
+                            <MoreVertical className="h-3 w-3" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => openEditSection(sec.id)} data-testid={`button-edit-section-${sec.id}`}>
+                            <Pencil className="h-3.5 w-3.5 mr-2" />
+                            Edit Work Category
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => { setAddingTask({ milestoneId: sec.milestoneId, sectionId: sec.id }); setNewTaskTitle(""); setNewTaskDueDate(""); }} data-testid={`button-add-task-section-${sec.id}`}>
+                            <ListPlus className="h-3.5 w-3.5 mr-2" />
+                            Add Task
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="text-destructive" onClick={() => deleteSection({ id: sec.id, projectId }, { onSuccess: () => toast({ title: "Work category deleted" }), onError: () => toast({ title: "Failed to delete work category", variant: "destructive" }) })} data-testid={`button-delete-section-${sec.id}`}>
+                            <Trash2 className="h-3.5 w-3.5 mr-2" />
+                            Delete Work Category
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
                   </div>
-                  {isAdmin && sec.id !== -1 && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
-                        <Button size="icon" variant="ghost" className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity" data-testid={`button-section-menu-${sec.id}`}>
-                          <MoreVertical className="h-3 w-3" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => openEditSection(sec.id)} data-testid={`button-edit-section-${sec.id}`}>
-                          <Pencil className="h-3.5 w-3.5 mr-2" />
-                          Edit Section
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => { setAddingTask({ milestoneId: sec.milestoneId, sectionId: sec.id }); setNewTaskTitle(""); setNewTaskDueDate(""); }} data-testid={`button-add-task-section-${sec.id}`}>
-                          <ListPlus className="h-3.5 w-3.5 mr-2" />
-                          Add Task
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive" onClick={() => deleteSection({ id: sec.id, projectId }, { onSuccess: () => toast({ title: "Section deleted" }), onError: () => toast({ title: "Failed to delete section", variant: "destructive" }) })} data-testid={`button-delete-section-${sec.id}`}>
-                          <Trash2 className="h-3.5 w-3.5 mr-2" />
-                          Delete Section
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
-                </div>
-              ))}
+                );
+              })}
 
               {drillLevel === "tasks" && taskInfos.map((task) => {
                 const isDone = task.status === "done";
@@ -837,7 +1068,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                     </div>
                   )}
 
-                  {currentRows.map((row, idx) => (
+                  {currentRows.map((row) => (
                     <div key={`${row.type}-${row.id}`} className="relative border-b border-border/30" style={{ height: ROW_HEIGHT }} data-testid={`gantt-row-${row.type}-${row.id}`}>
                       {months.map(month => {
                         const offset = differenceInDays(month, timelineStart) * dayWidth;
@@ -858,7 +1089,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
         <div className="flex flex-wrap gap-x-6 gap-y-2 text-xs text-muted-foreground pt-1">
           {phaseInfos.map((phase) => (
             <div key={phase.id} className="flex items-center gap-1.5" data-testid={`gantt-legend-${phase.id}`}>
-              <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: PHASE_COLORS[phase.colorIndex] }} />
+              <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: phase.colorHex || AREA_COLORS[phase.colorIndex] }} />
               <span>{phase.title}</span>
               {phase.completed && <span className="text-green-600">✓</span>}
             </div>

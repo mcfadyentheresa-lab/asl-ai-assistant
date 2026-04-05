@@ -819,7 +819,9 @@ export async function registerRoutes(
         endDate: z.string().nullable().optional(),
         completed: z.boolean().optional(),
         completedBy: z.string().nullable().optional(),
-        order: z.number().optional()
+        order: z.number().optional(),
+        colorHex: z.string().nullable().optional(),
+        paintColorIds: z.array(z.number()).nullable().optional(),
       });
       const parsed = schema.safeParse(req.body);
       if (!parsed.success) {

@@ -177,7 +177,7 @@ export function useCreateMilestone() {
 export function useUpdateMilestone() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, projectId, ...data }: { id: number; projectId: number; title?: string; date?: string | null; startDate?: string | null; endDate?: string | null; completed?: boolean; completedBy?: string | null; order?: number }) => {
+    mutationFn: async ({ id, projectId, ...data }: { id: number; projectId: number; title?: string; date?: string | null; startDate?: string | null; endDate?: string | null; completed?: boolean; completedBy?: string | null; order?: number; colorHex?: string | null; paintColorIds?: number[] | null }) => {
       const res = await fetch(`/api/milestones/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
