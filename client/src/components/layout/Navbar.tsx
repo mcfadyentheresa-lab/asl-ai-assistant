@@ -136,7 +136,7 @@ export function Navbar() {
             <Link href="/colors">
               <DropdownMenuItem data-testid="link-colors">
                 <Palette className="mr-2 h-4 w-4" />
-                Color Portfolio
+                Colour Portfolio
               </DropdownMenuItem>
             </Link>
             {(user.role === "crew" || user.role === "admin") && (

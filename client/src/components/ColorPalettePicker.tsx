@@ -67,8 +67,8 @@ export function ColorPalettePicker({
         </div>
         <DialogContent className="sm:max-w-lg max-h-[80vh] flex flex-col p-0">
           <DialogHeader className="px-4 pt-4 pb-0">
-            <DialogTitle className="font-serif text-lg">Color Palette</DialogTitle>
-            <DialogDescription>Select a paint color to tag this item</DialogDescription>
+            <DialogTitle className="font-serif text-lg">Colour Palette</DialogTitle>
+            <DialogDescription>Select a paint colour to tag this item</DialogDescription>
           </DialogHeader>
           <PaletteContent
             selectedColorId={selectedColorId}
@@ -275,7 +275,7 @@ function PaletteContent({
             data-testid="button-clear-color-tag"
           >
             <X className="w-3 h-3" />
-            Remove color tag
+            Remove colour tag
           </button>
         )}
 
@@ -285,7 +285,7 @@ function PaletteContent({
           </div>
         ) : filteredColors.length === 0 ? (
           <div className="text-center py-8 text-xs text-muted-foreground">
-            No colors found
+            No colours found
           </div>
         ) : (
           <div className="grid grid-cols-5 sm:grid-cols-6 gap-1">
@@ -320,7 +320,7 @@ function PaletteContent({
       </div>
 
       <div className="px-3 py-1.5 border-t border-border text-[10px] text-muted-foreground text-center">
-        {filteredColors.length} colors · {activeBrand}
+        {filteredColors.length} colours · {activeBrand}
       </div>
     </div>
   );
