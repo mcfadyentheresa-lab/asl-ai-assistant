@@ -519,7 +519,7 @@ export default function ColorPortfolio() {
           </Button>
           <div className="flex-1 min-w-0">
             <h1 className="font-serif text-xl sm:text-2xl md:text-3xl font-bold text-foreground leading-tight" data-testid="text-page-title">
-              Color Portfolio
+              Colour Portfolio
             </h1>
             <div className="flex items-center gap-2 mt-1.5 sm:mt-2">
               {PAINT_BRANDS.map((brand) => {
