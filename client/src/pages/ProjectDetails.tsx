@@ -107,11 +107,13 @@ function BudgetSnapshot({ projectId, userRole }: { projectId: number; userRole: 
 
   if (isLoading) {
     return (
+      {user?.role !== "client" ? (
       <Card>
         <CardContent className="py-6 flex justify-center">
           <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" data-testid="loader-budget" />
         </CardContent>
       </Card>
+      ) : null}
     );
   }
 
