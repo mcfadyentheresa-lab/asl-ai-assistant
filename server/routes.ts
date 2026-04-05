@@ -719,6 +719,17 @@ export async function registerRoutes(
   app.post(api.tasks.create.path, isAuthenticated, async (req: any, res) => {
     const input = api.tasks.create.input.parse(req.body);
     const projectId = Number(req.params.projectId);
+
+    if (input.sectionId) {
+      const section = await storage.getSection(input.sectionId);
+      if (!section || section.projectId !== projectId) {
+        return res.status(400).json({ message: "Section does not belong to this project" });
+      }
+      if (input.milestoneId && section.milestoneId !== input.milestoneId) {
+        return res.status(400).json({ message: "Section does not belong to the specified phase" });
+      }
+    }
+
     const task = await storage.createTask({ ...input, projectId });
     res.status(201).json(task);
     broadcastProjectChange(task.projectId, ["tasks"], "created", task.id, req.user.claims.sub);
@@ -731,6 +742,17 @@ export async function registerRoutes(
 
   app.put(api.tasks.update.path, isAuthenticated, async (req: any, res) => {
     const taskId = Number(req.params.id);
+
+    if (req.body.sectionId) {
+      const existingTask = await storage.getTask(taskId);
+      if (existingTask) {
+        const section = await storage.getSection(req.body.sectionId);
+        if (!section || section.projectId !== existingTask.projectId) {
+          return res.status(400).json({ message: "Section does not belong to this project" });
+        }
+      }
+    }
+
     const task = await storage.updateTask(taskId, req.body);
     res.json(task);
     broadcastProjectChange(task.projectId, ["tasks"], "updated", task.id, req.user.claims.sub);
@@ -932,8 +954,16 @@ export async function registerRoutes(
   });
 
   // Sections (WBS grouping under phases)
-  app.get("/api/projects/:projectId/sections", isAuthenticated, async (req, res) => {
-    const secs = await storage.getSections(Number(req.params.projectId));
+  app.get("/api/projects/:projectId/sections", isAuthenticated, async (req: any, res) => {
+    const projectId = Number(req.params.projectId);
+    const userId = req.user.claims.sub;
+    const project = await storage.getProject(projectId);
+    if (!project) return res.status(404).json({ message: "Project not found" });
+    const dbUser = await authStorage.getUser(userId);
+    if (dbUser?.role === 'client' && project.clientId !== userId) {
+      return res.status(403).json({ message: "Not authorized to view this project" });
+    }
+    const secs = await storage.getSections(projectId);
     res.json(secs);
   });
 
@@ -941,6 +971,9 @@ export async function registerRoutes(
     try {
       const projectId = Number(req.params.projectId);
       const userId = req.user.claims.sub;
+
+      const project = await storage.getProject(projectId);
+      if (!project) return res.status(404).json({ message: "Project not found" });
 
       const dbUser = await authStorage.getUser(userId);
       if (dbUser?.role === 'client') {
@@ -967,13 +1000,16 @@ export async function registerRoutes(
   app.patch("/api/sections/:id", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+      const section = await storage.getSection(Number(req.params.id));
+      if (!section) return res.status(404).json({ message: "Section not found" });
+
+      const project = await storage.getProject(section.projectId);
+      if (!project) return res.status(404).json({ message: "Project not found" });
+
       const dbUser = await authStorage.getUser(userId);
       if (dbUser?.role === 'client') {
         return res.status(403).json({ message: "Clients cannot update sections" });
       }
-
-      const section = await storage.getSection(Number(req.params.id));
-      if (!section) return res.status(404).json({ message: "Section not found" });
 
       const schema = z.object({
         title: z.string().optional(),
@@ -995,13 +1031,17 @@ export async function registerRoutes(
     try {
       const id = Number(req.params.id);
       const userId = req.user.claims.sub;
+      const section = await storage.getSection(id);
+      if (!section) return res.status(404).json({ message: "Section not found" });
+
+      const project = await storage.getProject(section.projectId);
+      if (!project) return res.status(404).json({ message: "Project not found" });
+
       const dbUser = await authStorage.getUser(userId);
       if (dbUser?.role === 'client') {
         return res.status(403).json({ message: "Clients cannot delete sections" });
       }
 
-      const section = await storage.getSection(id);
-      if (!section) return res.status(404).json({ message: "Section not found" });
       await storage.deleteSection(id);
       res.json({ ok: true });
       broadcastProjectChange(section.projectId, ["sections", "milestones", "tasks"], "deleted", id, userId);
