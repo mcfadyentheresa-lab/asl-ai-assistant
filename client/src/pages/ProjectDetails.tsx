@@ -176,7 +176,7 @@ function BudgetSnapshot({ projectId, userRole }: { projectId: number; userRole: 
           <CardTitle className="font-serif text-lg flex items-center gap-2" data-testid="text-budget-heading">
             <DollarSign className="h-4 w-4" /> Budget Snapshot
           </CardTitle>
-          <div className={`flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full border ${budgetVisibleToClient ? "bg-amber-500/15 text-amber-700 border-amber-500/30" : sc.color}`} data-testid="badge-budget-status">
+          <div className={`flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full border ${budgetVisibleToClient ? "bg-sky-500/15 text-sky-700 border-sky-500/30" : sc.color}`} data-testid="badge-budget-status">
             <StatusIcon className="h-3.5 w-3.5" />
             {sc.label}
           </div>
