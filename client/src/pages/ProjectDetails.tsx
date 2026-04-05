@@ -8,7 +8,7 @@ import {
   useDocuments, useUploadDocument, useDeleteDocument,
   usePhotos, useCreatePhoto, useDeletePhoto, useUploadImage,
   useUsers, useUpdateProject, usePlanningBoards, useUpdateUserPhone, useSendTestSms, useNotifyTeam,
-  useActivityLog, useCreateMilestone, useUpdateMilestone, useDeleteMilestone,
+  useActivityLog, useUpdateMilestone, useDeleteMilestone, useSections,
 } from "@/hooks/use-projects";
 import { useOnlineUsers, isUserOnline } from "@/hooks/use-presence";
 import { useProjectRealtime } from "@/hooks/use-project-realtime";
@@ -932,12 +932,12 @@ export default function ProjectDetails() {
   const projectId = Number(id);
   const { data: project, isLoading: loadingProject } = useProject(projectId);
   const { data: milestones } = useMilestones(projectId);
+  const { data: sections } = useSections(projectId);
   const { data: tasks } = useTasks(projectId);
   const { data: activityLog } = useActivityLog(projectId);
   const { user } = useAuth();
   const { data: users } = useUsers();
   const { mutate: updateProject } = useUpdateProject();
-  const { mutate: createMilestone, isPending: creatingMilestone } = useCreateMilestone();
   const { mutate: updateMilestone } = useUpdateMilestone();
   const { mutate: deleteMilestone } = useDeleteMilestone();
   const { mutate: updatePhone } = useUpdateUserPhone();
@@ -969,10 +969,6 @@ export default function ProjectDetails() {
   const [showAddPerson, setShowAddPerson] = useState(false);
   const [addPersonForm, setAddPersonForm] = useState({ firstName: "", lastName: "", email: "", phone: "", role: "crew" });
   const [addingPerson, setAddingPerson] = useState(false);
-  const [newPhaseArea, setNewPhaseArea] = useState("Main Cottage");
-  const [newPhaseTitle, setNewPhaseTitle] = useState("");
-  const [newPhaseStartDate, setNewPhaseStartDate] = useState("");
-  const [newPhaseEndDate, setNewPhaseEndDate] = useState("");
   const [editingMilestone, setEditingMilestone] = useState<any>(null);
   const [editMilestoneForm, setEditMilestoneForm] = useState({ title: "", date: "" });
   const [completingMilestone, setCompletingMilestone] = useState<any>(null);
@@ -1180,44 +1176,9 @@ export default function ProjectDetails() {
                   </div>
 
                   {userRole !== "client" && (
-                    <form
-                      className="flex flex-col sm:flex-row gap-2"
-                      data-testid="form-add-phase"
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        if (!newPhaseTitle.trim()) return;
-                        createMilestone(
-                          { projectId, title: newPhaseTitle.trim(), date: newPhaseStartDate || null, endDate: newPhaseEndDate || null, projectArea: newPhaseArea } as any,
-                          {
-                            onSuccess: () => {
-                              toast({ title: "Phase added" });
-                              setNewPhaseArea("Main Cottage");
-                              setNewPhaseTitle("");
-                              setNewPhaseStartDate("");
-                              setNewPhaseEndDate("");
-                            },
-                            onError: () => toast({ title: "Failed to add phase", variant: "destructive" }),
-                          }
-                        );
-                      }}
-                    >
-                      <Input
-                        placeholder="Phase name"
-                        value={newPhaseTitle}
-                        onChange={(e) => setNewPhaseTitle(e.target.value)}
-                        data-testid="input-phase-title"
-                      />
-                      <Input
-                        type="date"
-                        value={newPhaseStartDate}
-                        onChange={(e) => setNewPhaseStartDate(e.target.value)}
-                        data-testid="input-phase-start-date"
-                      />
-                      <Button type="submit" size="default" disabled={creatingMilestone || !newPhaseTitle.trim()} data-testid="button-add-phase">
-                        {creatingMilestone ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Plus className="h-4 w-4 mr-1" />}
-                        Add
-                      </Button>
-                    </form>
+                    <p className="text-xs text-muted-foreground italic">
+                      Add and manage phases from the Progress → Timeline view.
+                    </p>
                   )}
                 </div>
 
@@ -1592,7 +1553,7 @@ export default function ProjectDetails() {
           </TabsContent>
 
           <TabsContent value="checklist">
-            <ProgressTab projectId={projectId} milestones={milestones || []} tasks={tasks || []} userRole={userRole} />
+            <ProgressTab projectId={projectId} milestones={milestones || []} sections={sections || []} tasks={tasks || []} userRole={userRole} />
           </TabsContent>
 
           <TabsContent value="board" className="flex-1 min-h-0">
@@ -1890,7 +1851,7 @@ export default function ProjectDetails() {
 
 const EDITED_TEXT_COLOR = "#b45309";
 
-function ProgressTab({ projectId, milestones, tasks, userRole }: { projectId: number; milestones: any[]; tasks: any[]; userRole: string }) {
+function ProgressTab({ projectId, milestones, sections, tasks, userRole }: { projectId: number; milestones: any[]; sections: any[]; tasks: any[]; userRole: string }) {
   const [subTab, setSubTab] = useState<"gantt" | "checklist" | "calendar">("gantt");
 
   return (
@@ -1917,7 +1878,7 @@ function ProgressTab({ projectId, milestones, tasks, userRole }: { projectId: nu
       </div>
 
       {subTab === "gantt" && (
-        <GanttChart milestones={milestones} tasks={tasks} />
+        <GanttChart projectId={projectId} milestones={milestones} sections={sections || []} tasks={tasks} userRole={userRole} />
       )}
       {subTab === "checklist" && (
         <ChecklistTab projectId={projectId} />

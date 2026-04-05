@@ -31,6 +31,8 @@ export const milestones = pgTable("milestones", {
   projectId: integer("project_id").notNull().references(() => projects.id),
   title: text("title").notNull(),
   date: date("date"),
+  startDate: date("start_date"),
+  endDate: date("end_date"),
   completed: boolean("completed").default(false),
   completedBy: text("completed_by").references(() => users.id),
   order: integer("order").default(0),
@@ -45,11 +47,24 @@ export const subMilestones = pgTable("sub_milestones", {
   order: integer("order").default(0),
 });
 
+// Sections (WBS grouping under phases/milestones)
+export const sections = pgTable("sections", {
+  id: serial("id").primaryKey(),
+  milestoneId: integer("milestone_id").notNull().references(() => milestones.id, { onDelete: "cascade" }),
+  projectId: integer("project_id").notNull().references(() => projects.id),
+  title: text("title").notNull(),
+  startDate: date("start_date"),
+  endDate: date("end_date"),
+  completed: boolean("completed").default(false),
+  order: integer("order").default(0),
+});
+
 // Tasks
 export const tasks = pgTable("tasks", {
   id: serial("id").primaryKey(),
   projectId: integer("project_id").notNull().references(() => projects.id),
   milestoneId: integer("milestone_id").references(() => milestones.id),
+  sectionId: integer("section_id").references(() => sections.id),
   title: text("title").notNull(),
   description: text("description"),
   status: text("status").default("todo"), // todo, in_progress, review, done
@@ -269,6 +284,7 @@ export const milestonesRelations = relations(milestones, ({ one, many }) => ({
   }),
   tasks: many(tasks),
   subMilestones: many(subMilestones),
+  sections: many(sections),
 }));
 
 export const subMilestonesRelations = relations(subMilestones, ({ one }) => ({
@@ -276,6 +292,18 @@ export const subMilestonesRelations = relations(subMilestones, ({ one }) => ({
     fields: [subMilestones.milestoneId],
     references: [milestones.id],
   }),
+}));
+
+export const sectionsRelations = relations(sections, ({ one, many }) => ({
+  milestone: one(milestones, {
+    fields: [sections.milestoneId],
+    references: [milestones.id],
+  }),
+  project: one(projects, {
+    fields: [sections.projectId],
+    references: [projects.id],
+  }),
+  tasks: many(tasks),
 }));
 
 export const tasksRelations = relations(tasks, ({ one }) => ({
@@ -286,6 +314,10 @@ export const tasksRelations = relations(tasks, ({ one }) => ({
   milestone: one(milestones, {
     fields: [tasks.milestoneId],
     references: [milestones.id],
+  }),
+  section: one(sections, {
+    fields: [tasks.sectionId],
+    references: [sections.id],
   }),
   assignee: one(users, {
     fields: [tasks.assignedTo],
@@ -538,6 +570,7 @@ export const supplierPrices = pgTable("supplier_prices", {
 export const insertProjectSchema = createInsertSchema(projects).omit({ id: true, createdAt: true });
 export const insertMilestoneSchema = createInsertSchema(milestones).omit({ id: true });
 export const insertSubMilestoneSchema = createInsertSchema(subMilestones).omit({ id: true });
+export const insertSectionSchema = createInsertSchema(sections).omit({ id: true });
 export const insertTaskSchema = createInsertSchema(tasks).omit({ id: true, createdAt: true });
 export const insertPhotoSchema = createInsertSchema(photos).omit({ id: true, createdAt: true });
 export const insertDocumentSchema = createInsertSchema(documents).omit({ id: true, createdAt: true });
@@ -595,6 +628,8 @@ export type PaintColor = typeof paintColors.$inferSelect;
 export type InsertPaintColor = z.infer<typeof insertPaintColorSchema>;
 export type SubMilestone = typeof subMilestones.$inferSelect;
 export type InsertSubMilestone = z.infer<typeof insertSubMilestoneSchema>;
+export type Section = typeof sections.$inferSelect;
+export type InsertSection = z.infer<typeof insertSectionSchema>;
 export type QueuedSms = typeof queuedSms.$inferSelect;
 export type InsertQueuedSms = z.infer<typeof insertQueuedSmsSchema>;
 export type BoardSnapshot = typeof boardSnapshots.$inferSelect;

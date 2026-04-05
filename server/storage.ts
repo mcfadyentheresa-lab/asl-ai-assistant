@@ -1,9 +1,9 @@
 import { db } from "./db";
 import { 
-  users, projects, milestones, subMilestones, tasks, photos, documents, timeEntries, messages, checklistItems, boardItems, calendarEvents, planningBoards, canvasElements, activityLog, activityViews, paintColors, boardSnapshots, costCategories, marketRates, projectEstimates, estimateItems, receipts, estimateWarnings, crewRates, subcontractors, suppliers, supplierPrices, clientInvites,
-  type Project, type Milestone, type SubMilestone, type Task, type Photo, type Document, type TimeEntry, type Message,
+  users, projects, milestones, subMilestones, sections, tasks, photos, documents, timeEntries, messages, checklistItems, boardItems, calendarEvents, planningBoards, canvasElements, activityLog, activityViews, paintColors, boardSnapshots, costCategories, marketRates, projectEstimates, estimateItems, receipts, estimateWarnings, crewRates, subcontractors, suppliers, supplierPrices, clientInvites,
+  type Project, type Milestone, type SubMilestone, type Section, type Task, type Photo, type Document, type TimeEntry, type Message,
   type ChecklistItem, type BoardItem, type CalendarEvent, type PlanningBoard, type CanvasElement, type ActivityLog, type PaintColor, type BoardSnapshot, type CostCategory, type MarketRate, type ProjectEstimate, type EstimateItem, type Receipt, type EstimateWarning, type CrewRate, type Subcontractor,
-  type InsertProject, type InsertMilestone, type InsertSubMilestone, type InsertTask, type InsertPhoto, type InsertDocument, 
+  type InsertProject, type InsertMilestone, type InsertSubMilestone, type InsertSection, type InsertTask, type InsertPhoto, type InsertDocument, 
   type InsertTimeEntry, type InsertMessage, type InsertChecklistItem, type InsertBoardItem, type InsertCalendarEvent, type InsertPlanningBoard, type InsertCanvasElement, type InsertActivityLog, type InsertBoardSnapshot, type InsertCostCategory, type InsertMarketRate, type InsertProjectEstimate, type InsertEstimateItem, type InsertReceipt, type InsertEstimateWarning, type InsertCrewRate, type InsertSubcontractor, type Supplier, type SupplierPrice, type InsertSupplier, type InsertSupplierPrice,
   type ClientInvite, type InsertClientInvite
 } from "@shared/schema";
@@ -30,6 +30,14 @@ export interface IStorage {
   createSubMilestone(sub: InsertSubMilestone): Promise<SubMilestone>;
   updateSubMilestone(id: number, data: Partial<InsertSubMilestone>): Promise<SubMilestone>;
   deleteSubMilestone(id: number): Promise<void>;
+
+  // Sections
+  getSections(projectId: number): Promise<Section[]>;
+  getSectionsByMilestone(milestoneId: number): Promise<Section[]>;
+  getSection(id: number): Promise<Section | undefined>;
+  createSection(section: InsertSection): Promise<Section>;
+  updateSection(id: number, data: Partial<InsertSection>): Promise<Section>;
+  deleteSection(id: number): Promise<void>;
 
   // Tasks
   getTasks(projectId: number): Promise<Task[]>;
@@ -251,6 +259,30 @@ export class DatabaseStorage implements IStorage {
     await db.delete(subMilestones).where(eq(subMilestones.id, id));
   }
 
+  // Sections
+  async getSections(projectId: number): Promise<Section[]> {
+    return await db.select().from(sections).where(eq(sections.projectId, projectId)).orderBy(sections.order);
+  }
+  async getSectionsByMilestone(milestoneId: number): Promise<Section[]> {
+    return await db.select().from(sections).where(eq(sections.milestoneId, milestoneId)).orderBy(sections.order);
+  }
+  async getSection(id: number): Promise<Section | undefined> {
+    const [s] = await db.select().from(sections).where(eq(sections.id, id));
+    return s;
+  }
+  async createSection(section: InsertSection): Promise<Section> {
+    const [newSection] = await db.insert(sections).values(section).returning();
+    return newSection;
+  }
+  async updateSection(id: number, data: Partial<InsertSection>): Promise<Section> {
+    const [updated] = await db.update(sections).set(data).where(eq(sections.id, id)).returning();
+    return updated;
+  }
+  async deleteSection(id: number): Promise<void> {
+    await db.update(tasks).set({ sectionId: null }).where(eq(tasks.sectionId, id));
+    await db.delete(sections).where(eq(sections.id, id));
+  }
+
   // Tasks
   async getTasks(projectId: number): Promise<Task[]> {
     return await db.select().from(tasks).where(eq(tasks.projectId, projectId)).orderBy(tasks.dueDate);
@@ -379,6 +411,7 @@ export class DatabaseStorage implements IStorage {
     await db.delete(documents).where(eq(documents.projectId, id));
     await db.delete(photos).where(eq(photos.projectId, id));
     await db.delete(tasks).where(eq(tasks.projectId, id));
+    await db.delete(sections).where(eq(sections.projectId, id));
     await db.delete(milestones).where(eq(milestones.projectId, id));
     await db.delete(projects).where(eq(projects.id, id));
   }

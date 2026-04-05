@@ -177,7 +177,7 @@ export function useCreateMilestone() {
 export function useUpdateMilestone() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, projectId, ...data }: { id: number; projectId: number; title?: string; date?: string | null; completed?: boolean; completedBy?: string | null; order?: number }) => {
+    mutationFn: async ({ id, projectId, ...data }: { id: number; projectId: number; title?: string; date?: string | null; startDate?: string | null; endDate?: string | null; completed?: boolean; completedBy?: string | null; order?: number }) => {
       const res = await fetch(`/api/milestones/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -208,6 +208,78 @@ export function useDeleteMilestone() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: [api.milestones.list.path, variables.projectId] });
       queryClient.invalidateQueries({ queryKey: [api.calendar.list.path, variables.projectId] });
+    },
+  });
+}
+
+// --- Sections ---
+export function useSections(projectId: number) {
+  return useQuery({
+    queryKey: ['/api/projects', projectId, 'sections'],
+    queryFn: async () => {
+      const res = await fetch(`/api/projects/${projectId}/sections`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch sections");
+      return res.json();
+    },
+    enabled: !!projectId,
+  });
+}
+
+export function useCreateSection() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ projectId, ...data }: { projectId: number; milestoneId: number; title: string; startDate?: string | null; endDate?: string | null }) => {
+      const res = await fetch(`/api/projects/${projectId}/sections`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to create section");
+      return res.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', variables.projectId, 'sections'] });
+      queryClient.invalidateQueries({ queryKey: [api.milestones.list.path, variables.projectId] });
+    },
+  });
+}
+
+export function useUpdateSection() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, projectId, ...data }: { id: number; projectId: number; title?: string; startDate?: string | null; endDate?: string | null; completed?: boolean; order?: number }) => {
+      const res = await fetch(`/api/sections/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to update section");
+      return res.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', variables.projectId, 'sections'] });
+      queryClient.invalidateQueries({ queryKey: [api.milestones.list.path, variables.projectId] });
+    },
+  });
+}
+
+export function useDeleteSection() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id }: { id: number; projectId: number }) => {
+      const res = await fetch(`/api/sections/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to delete section");
+      return res.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', variables.projectId, 'sections'] });
+      queryClient.invalidateQueries({ queryKey: [api.milestones.list.path, variables.projectId] });
+      queryClient.invalidateQueries({ queryKey: [api.tasks.list.path, variables.projectId] });
     },
   });
 }

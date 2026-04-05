@@ -13,6 +13,7 @@ export interface ProjectViewer {
 const RESOURCE_LABELS: Record<string, string> = {
   tasks: "tasks",
   milestones: "milestones",
+  sections: "sections",
   photos: "photos",
   documents: "documents",
   messages: "messages",

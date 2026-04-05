@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
-import { insertSubMilestoneSchema, insertTimeEntrySchema, insertCostCategorySchema, insertMarketRateSchema, insertProjectEstimateSchema, insertEstimateItemSchema, insertReceiptSchema, insertCrewRateSchema, insertSubcontractorSchema, insertSupplierSchema, insertSupplierPriceSchema } from "@shared/schema";
+import { insertSubMilestoneSchema, insertSectionSchema, insertTimeEntrySchema, insertCostCategorySchema, insertMarketRateSchema, insertProjectEstimateSchema, insertEstimateItemSchema, insertReceiptSchema, insertCrewRateSchema, insertSubcontractorSchema, insertSupplierSchema, insertSupplierPriceSchema } from "@shared/schema";
 import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
@@ -783,6 +783,8 @@ export async function registerRoutes(
       const schema = z.object({
         title: z.string().optional(),
         date: z.string().nullable().optional(),
+        startDate: z.string().nullable().optional(),
+        endDate: z.string().nullable().optional(),
         completed: z.boolean().optional(),
         completedBy: z.string().nullable().optional(),
         order: z.number().optional()
@@ -926,6 +928,85 @@ export async function registerRoutes(
       res.json({ ok: true });
     } catch (e) {
       res.status(500).json({ message: "Failed to delete sub-milestone" });
+    }
+  });
+
+  // Sections (WBS grouping under phases)
+  app.get("/api/projects/:projectId/sections", isAuthenticated, async (req, res) => {
+    const secs = await storage.getSections(Number(req.params.projectId));
+    res.json(secs);
+  });
+
+  app.post("/api/projects/:projectId/sections", isAuthenticated, async (req: any, res) => {
+    try {
+      const projectId = Number(req.params.projectId);
+      const userId = req.user.claims.sub;
+
+      const dbUser = await authStorage.getUser(userId);
+      if (dbUser?.role === 'client') {
+        return res.status(403).json({ message: "Clients cannot create sections" });
+      }
+
+      const milestoneId = Number(req.body.milestoneId);
+      if (milestoneId) {
+        const milestone = await storage.getMilestone(milestoneId);
+        if (!milestone || milestone.projectId !== projectId) {
+          return res.status(400).json({ message: "Milestone does not belong to this project" });
+        }
+      }
+
+      const input = insertSectionSchema.parse({ ...req.body, projectId });
+      const section = await storage.createSection(input);
+      res.status(201).json(section);
+      broadcastProjectChange(projectId, ["sections", "milestones"], "created", section.id, userId);
+    } catch (e: any) {
+      res.status(400).json({ message: e.message || "Failed to create section" });
+    }
+  });
+
+  app.patch("/api/sections/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const dbUser = await authStorage.getUser(userId);
+      if (dbUser?.role === 'client') {
+        return res.status(403).json({ message: "Clients cannot update sections" });
+      }
+
+      const section = await storage.getSection(Number(req.params.id));
+      if (!section) return res.status(404).json({ message: "Section not found" });
+
+      const schema = z.object({
+        title: z.string().optional(),
+        startDate: z.string().nullable().optional(),
+        endDate: z.string().nullable().optional(),
+        completed: z.boolean().optional(),
+        order: z.number().optional(),
+      });
+      const parsed = schema.parse(req.body);
+      const updated = await storage.updateSection(Number(req.params.id), parsed);
+      res.json(updated);
+      broadcastProjectChange(updated.projectId, ["sections", "milestones"], "updated", updated.id, userId);
+    } catch (e) {
+      res.status(500).json({ message: "Failed to update section" });
+    }
+  });
+
+  app.delete("/api/sections/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const id = Number(req.params.id);
+      const userId = req.user.claims.sub;
+      const dbUser = await authStorage.getUser(userId);
+      if (dbUser?.role === 'client') {
+        return res.status(403).json({ message: "Clients cannot delete sections" });
+      }
+
+      const section = await storage.getSection(id);
+      if (!section) return res.status(404).json({ message: "Section not found" });
+      await storage.deleteSection(id);
+      res.json({ ok: true });
+      broadcastProjectChange(section.projectId, ["sections", "milestones", "tasks"], "deleted", id, userId);
+    } catch (e) {
+      res.status(500).json({ message: "Failed to delete section" });
     }
   });
 
