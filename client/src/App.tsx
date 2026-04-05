@@ -37,7 +37,7 @@ function OnboardingGuard() {
     if (
       user &&
       user.role === "client" &&
-      !(user as any).onboardingCompleted &&
+      !user.onboardingCompleted &&
       location !== "/welcome" &&
       !location.startsWith("/invite/")
     ) {

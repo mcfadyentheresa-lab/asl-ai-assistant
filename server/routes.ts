@@ -429,9 +429,19 @@ export async function registerRoutes(
       const existingUser = existingUsers.find(u => u.email?.toLowerCase() === parsed.data.email.toLowerCase());
       if (existingUser) {
         userId = existingUser.id;
-        if (!project.clientId) {
-          await storage.updateProject(projectId, { clientId: userId });
-        }
+      } else {
+        const newUser = await authStorage.upsertUser({
+          id: `pre-${randomUUID().slice(0, 12)}`,
+          email: parsed.data.email,
+          firstName: parsed.data.firstName,
+          lastName: parsed.data.lastName,
+          phone: parsed.data.phone,
+          role: "client",
+        });
+        userId = newUser.id;
+      }
+      if (!project.clientId) {
+        await storage.updateProject(projectId, { clientId: userId });
       }
 
       const invite = await storage.createClientInvite({
@@ -498,17 +508,15 @@ export async function registerRoutes(
       const userEmail = currentUser?.email?.toLowerCase().trim();
       const inviteEmail = invite.email?.toLowerCase().trim();
 
-      if (invite.userId && invite.userId !== userId) {
-        if (!userEmail || !inviteEmail || userEmail !== inviteEmail) {
-          return res.status(403).json({ message: "This invite was sent to a different email address. Please log in with the correct account." });
-        }
+      if (!userEmail || !inviteEmail || userEmail !== inviteEmail) {
+        return res.status(403).json({ message: "This invite was sent to a different email address. Please log in with the correct account." });
       }
 
       await storage.updateClientInvite(invite.id, {
         status: "accepted",
         acceptedAt: new Date(),
         userId,
-      } as any);
+      });
 
       const project = await storage.getProject(invite.projectId);
       if (project) {
@@ -518,7 +526,7 @@ export async function registerRoutes(
       }
 
       const currentUserData = await authStorage.getUser(userId);
-      const profileUpdates: any = {};
+      const profileUpdates: { firstName?: string; lastName?: string; phone?: string } = {};
       if (!currentUserData?.firstName) profileUpdates.firstName = invite.firstName;
       if (!currentUserData?.lastName) profileUpdates.lastName = invite.lastName;
       if (!currentUserData?.phone && invite.phone) profileUpdates.phone = invite.phone;
@@ -549,9 +557,11 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Invalid input", errors: parsed.error.flatten().fieldErrors });
       }
 
-      const updates: any = { onboardingCompleted: new Date() };
-      updates.firstName = parsed.data.firstName;
-      updates.lastName = parsed.data.lastName;
+      const updates: { firstName: string; lastName: string; phone?: string | null; onboardingCompleted: Date } = {
+        onboardingCompleted: new Date(),
+        firstName: parsed.data.firstName,
+        lastName: parsed.data.lastName,
+      };
       if (parsed.data.phone !== undefined) updates.phone = parsed.data.phone;
 
       const user = await authStorage.updateUserProfile(userId, updates);
