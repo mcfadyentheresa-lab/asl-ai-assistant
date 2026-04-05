@@ -196,6 +196,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   const dragStartRef = useRef<{ x: number; y: number; elX: number; elY: number } | null>(null);
   const zoneChildrenRef = useRef<{ id: number; offsetX: number; offsetY: number }[]>([]);
   const [droppingIds, setDroppingIds] = useState<Set<number>>(new Set());
+  const droppingTimersRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
   const [editingId, setEditingId] = useState<number | null>(null);
   const [maxZ, setMaxZ] = useState(1);
 
@@ -254,6 +255,14 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   const { mutateAsync: createSnapshot, isPending: isCreatingSnapshot } = useCreateBoardSnapshot();
   const { mutateAsync: restoreSnapshot, isPending: isRestoringSnapshot } = useRestoreBoardSnapshot();
   const { mutateAsync: deleteSnapshot } = useDeleteBoardSnapshot();
+
+  useEffect(() => {
+    const timers = droppingTimersRef.current;
+    return () => {
+      timers.forEach((t) => clearTimeout(t));
+      timers.clear();
+    };
+  }, []);
 
   useEffect(() => {
     if (boards.length > 0 && !selectedBoardId) {
@@ -751,13 +760,17 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     });
     if (foundColumn !== el.parentColumnId) {
       setDroppingIds((prev) => new Set(prev).add(elementId));
-      setTimeout(() => {
+      const existingTimer = droppingTimersRef.current.get(elementId);
+      if (existingTimer) clearTimeout(existingTimer);
+      const timer = setTimeout(() => {
+        droppingTimersRef.current.delete(elementId);
         setDroppingIds((prev) => {
           const next = new Set(prev);
           next.delete(elementId);
           return next;
         });
       }, 350);
+      droppingTimersRef.current.set(elementId, timer);
 
       if (foundColumn !== null) {
         const col = elements[foundColumn];
