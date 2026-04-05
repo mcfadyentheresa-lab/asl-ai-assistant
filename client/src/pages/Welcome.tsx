@@ -187,7 +187,15 @@ export default function Welcome() {
 
             <div className="text-center">
               <button
-                onClick={() => navigate("/")}
+                onClick={() => {
+                  apiRequest("POST", "/api/auth/complete-onboarding", {
+                    firstName: user?.firstName || "Client",
+                    lastName: user?.lastName || "User",
+                  }).then(() => {
+                    queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+                    navigate("/");
+                  }).catch(() => navigate("/"));
+                }}
                 className="text-sm text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1"
                 data-testid="button-skip-onboarding"
               >

@@ -31,7 +31,7 @@ function PresenceTracker() {
 
 function OnboardingGuard() {
   const { user } = useAuth();
-  const [location, navigate] = useLocation();
+  const [, navigate] = useLocation();
   const reconciled = useRef(false);
 
   useEffect(() => {
@@ -54,18 +54,6 @@ function OnboardingGuard() {
         .catch(() => {});
     }
   }, [user]);
-
-  useEffect(() => {
-    if (
-      user &&
-      user.role === "client" &&
-      !user.onboardingCompleted &&
-      location !== "/welcome" &&
-      !location.startsWith("/invite/")
-    ) {
-      navigate("/welcome");
-    }
-  }, [user, location, navigate]);
 
   return null;
 }

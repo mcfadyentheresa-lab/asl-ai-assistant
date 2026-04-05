@@ -521,9 +521,7 @@ export async function registerRoutes(
 
       const project = await storage.getProject(invite.projectId);
       if (project) {
-        if (!project.clientId || project.clientId === invite.userId) {
-          await storage.updateProject(invite.projectId, { clientId: userId });
-        }
+        await storage.updateProject(invite.projectId, { clientId: userId });
       }
 
       const currentUserData = await authStorage.getUser(userId);
@@ -600,7 +598,7 @@ export async function registerRoutes(
         });
 
         const project = await storage.getProject(invite.projectId);
-        if (project && (!project.clientId || project.clientId === invite.userId)) {
+        if (project) {
           await storage.updateProject(invite.projectId, { clientId: userId });
         }
 
