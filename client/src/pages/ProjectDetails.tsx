@@ -754,7 +754,7 @@ export default function ProjectDetails() {
 
   const tabConfig: TabConfig[] = [
     { id: "overview", label: "Overview", icon: Clock, roles: ["admin", "crew", "client"] },
-    { id: "checklist", label: "Checklist", icon: CheckSquare, roles: ["admin", "client"] },
+    { id: "checklist", label: "Progress", icon: CheckSquare, roles: ["admin", "client"] },
     { id: "board", label: "Planning Board", icon: Palette, roles: ["admin", "crew", "client"], clientRequiresInvite: true },
     { id: "calendar", label: "Calendar", icon: CalendarDays, roles: ["admin", "crew", "client"] },
     { id: "photos", label: "Photos", icon: ImageIcon, roles: ["admin", "crew", "client"] },
@@ -2789,8 +2789,8 @@ function ChatTab({ projectId }: { projectId: number }) {
                 <Loader2 className="animate-spin text-muted-foreground" />
               </div>
             ) : messages?.length === 0 ? (
-              <p className="text-center text-muted-foreground py-10 text-sm" data-testid="text-no-messages">
-                No messages yet. Start the conversation!
+            <p className="text-center text-muted-foreground py-10 text-sm" data-testid="text-no-messages">
+                This is your direct line to our team. We typically respond within 24–48 hours.
               </p>
             ) : (
               messages?.map((msg: any) => {
