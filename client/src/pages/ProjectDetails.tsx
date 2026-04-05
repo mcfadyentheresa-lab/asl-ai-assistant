@@ -699,8 +699,10 @@ export default function ProjectDetails() {
   const [showAddPerson, setShowAddPerson] = useState(false);
   const [addPersonForm, setAddPersonForm] = useState({ firstName: "", lastName: "", email: "", phone: "", role: "crew" });
   const [addingPerson, setAddingPerson] = useState(false);
-  const [newMilestoneTitle, setNewMilestoneTitle] = useState("");
-  const [newMilestoneDate, setNewMilestoneDate] = useState("");
+  const [newPhaseArea, setNewPhaseArea] = useState("Main Cottage");
+  const [newPhaseTitle, setNewPhaseTitle] = useState("");
+  const [newPhaseStartDate, setNewPhaseStartDate] = useState("");
+  const [newPhaseEndDate, setNewPhaseEndDate] = useState("");
   const [editingMilestone, setEditingMilestone] = useState<any>(null);
   const [editMilestoneForm, setEditMilestoneForm] = useState({ title: "", date: "" });
   const [completingMilestone, setCompletingMilestone] = useState<any>(null);
