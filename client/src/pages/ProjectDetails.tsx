@@ -1134,14 +1134,14 @@ export default function ProjectDetails() {
         </div>
       </div>
 
-      <main className={`container px-5 md:px-8 ${safeActiveTab === "board" ? "mt-0 flex flex-col flex-1 min-h-0" : "mt-6"}`} id="project-main">
-        <Tabs value={safeActiveTab} onValueChange={setActiveTab} className={safeActiveTab === "board" ? "space-y-1.5 flex flex-col flex-1 min-h-0" : "space-y-6"}>
+      <main className={`container px-5 md:px-8 ${safeActiveTab === "board" ? "mt-0 flex flex-col flex-1 min-h-0" : "mt-4"}`} id="project-main">
+        <Tabs value={safeActiveTab} onValueChange={setActiveTab} className={safeActiveTab === "board" ? "space-y-1 flex flex-col flex-1 min-h-0" : "space-y-4"}>
           <div className={`overflow-x-auto -mx-6 px-6 md:mx-0 md:px-0 ${safeActiveTab === "board" ? "mobile-landscape:hidden" : ""}`}>
-            <TabsList className="w-max md:w-auto h-9 px-1" data-testid="tabs-list">
+            <TabsList className="w-max md:w-auto h-8 p-0.5 gap-0.5" data-testid="tabs-list">
               {visibleTabs.map((tab) => (
-                <TabsTrigger key={tab.id} value={tab.id} className="h-8 px-3 text-xs md:text-sm" data-testid={`tab-${tab.id}`}>
-                  <tab.icon className="h-3.5 w-3.5 md:mr-2" />
-                  <span className="hidden md:inline">{tab.label}</span>
+                <TabsTrigger key={tab.id} value={tab.id} className="h-7 px-2.5 text-[11px] md:text-xs gap-1.5" data-testid={`tab-${tab.id}`}>
+                  <tab.icon className="h-3 w-3" />
+                  <span className="hidden md:inline font-medium">{tab.label}</span>
                 </TabsTrigger>
               ))}
             </TabsList>
