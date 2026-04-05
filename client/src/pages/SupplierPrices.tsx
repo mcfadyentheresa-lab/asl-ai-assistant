@@ -20,7 +20,8 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Package, Plus, Trash2, Pencil, Search, Store, ExternalLink, Loader2, Star, Phone, Mail, MapPin, Globe, Receipt } from "lucide-react";
+import { Package, Plus, Trash2, Pencil, Search, Store, ExternalLink, Loader2, Star, Phone, Mail, MapPin, Globe, Receipt, ArrowLeft } from "lucide-react";
+import { Link } from "wouter";
 import type { Supplier, SupplierPrice, CostCategory } from "@shared/schema";
 
 export default function SupplierPrices() {
@@ -122,11 +123,18 @@ export default function SupplierPrices() {
       <Navbar />
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-serif font-bold text-foreground" data-testid="text-page-title">
-              Supplier Price Book
-            </h1>
-            <p className="text-sm text-muted-foreground mt-1">Track material prices from your suppliers</p>
+          <div className="flex items-center gap-3">
+            <Link href="/">
+              <Button variant="ghost" size="icon" className="h-8 w-8" data-testid="button-back">
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            </Link>
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-serif font-bold text-foreground" data-testid="text-page-title">
+                Supplier Price Book
+              </h1>
+              <p className="text-sm text-muted-foreground mt-1">Track material prices from your suppliers</p>
+            </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <Button variant="outline" onClick={() => setShowAddFromReceipt(true)} data-testid="button-add-from-receipt">

@@ -256,9 +256,16 @@ export default function Timesheets() {
       <Navbar />
 
       <main className="container py-10 md:py-14 px-6 md:px-10 max-w-3xl mx-auto">
-        <h1 className="font-serif text-3xl md:text-4xl font-bold text-foreground mb-6" data-testid="text-timesheets-heading">
-          Timesheets
-        </h1>
+        <div className="flex items-center gap-3 mb-6">
+          <Link href="/">
+            <Button variant="ghost" size="icon" className="h-8 w-8" data-testid="button-back">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          </Link>
+          <h1 className="font-serif text-3xl md:text-4xl font-bold text-foreground" data-testid="text-timesheets-heading">
+            Timesheets
+          </h1>
+        </div>
 
         <Card className="mb-6">
           <CardContent className="py-4 flex items-center gap-3 flex-wrap">

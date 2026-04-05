@@ -14,7 +14,8 @@ import { useOnlineUsers, isUserOnline } from "@/hooks/use-presence";
 import { useProjectRealtime } from "@/hooks/use-project-realtime";
 import { Navbar } from "@/components/layout/Navbar";
 import SpatialCanvas from "@/components/SpatialCanvas";
-import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, ExternalLink, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, CalendarDays, ChevronLeft, Upload, Download, User, X, Paperclip, ZoomIn, Palette, Shield, Users, Phone, Check, Bell, Eye, EyeOff, Archive, ArchiveRestore, PanelRightOpen, MoreVertical, Flag, DollarSign } from "lucide-react";
+import GanttChart from "@/components/GanttChart";
+import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, ExternalLink, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, CalendarDays, ChevronLeft, Upload, Download, User, X, Paperclip, ZoomIn, Palette, Shield, Users, Phone, Check, Bell, Eye, EyeOff, Archive, ArchiveRestore, PanelRightOpen, MoreVertical, Flag, DollarSign, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -754,9 +755,8 @@ export default function ProjectDetails() {
 
   const tabConfig: TabConfig[] = [
     { id: "overview", label: "Overview", icon: Clock, roles: ["admin", "crew", "client"] },
-    { id: "checklist", label: "Progress", icon: CheckSquare, roles: ["admin", "client"] },
+    { id: "checklist", label: "Progress", icon: BarChart3, roles: ["admin", "crew", "client"] },
     { id: "board", label: "Planning Board", icon: Palette, roles: ["admin", "crew", "client"], clientRequiresInvite: true },
-    { id: "calendar", label: "Calendar", icon: CalendarDays, roles: ["admin", "crew", "client"] },
     { id: "photos", label: "Photos", icon: ImageIcon, roles: ["admin", "crew", "client"] },
     { id: "docs", label: "Documents", icon: FileText, roles: ["admin", "client"] },
     { id: "chat", label: "Messages", icon: MessageSquare, roles: ["admin", "crew", "client"] },
@@ -1316,7 +1316,7 @@ export default function ProjectDetails() {
           </TabsContent>
 
           <TabsContent value="checklist">
-            <ChecklistTab projectId={projectId} />
+            <ProgressTab projectId={projectId} milestones={milestones || []} tasks={tasks || []} userRole={userRole} />
           </TabsContent>
 
           <TabsContent value="board" className="flex-1 min-h-0">
@@ -1329,10 +1329,6 @@ export default function ProjectDetails() {
 
           <TabsContent value="photos">
             <PhotosTab projectId={projectId} />
-          </TabsContent>
-
-          <TabsContent value="calendar">
-            <CalendarTab projectId={projectId} />
           </TabsContent>
 
           <TabsContent value="docs">
@@ -1617,6 +1613,70 @@ export default function ProjectDetails() {
 }
 
 const EDITED_TEXT_COLOR = "#b45309";
+
+function ProgressTab({ projectId, milestones, tasks, userRole }: { projectId: number; milestones: any[]; tasks: any[]; userRole: string }) {
+  const [subTab, setSubTab] = useState<"gantt" | "checklist" | "calendar">("gantt");
+  const isAdminOrCrew = userRole === "admin" || userRole === "crew";
+
+  return (
+    <div className="space-y-4" data-testid="progress-tab">
+      <div className="flex items-center gap-1 border-b border-border/50 pb-0">
+        <button
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            subTab === "gantt"
+              ? "border-[hsl(var(--primary))] text-foreground"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+          onClick={() => setSubTab("gantt")}
+          data-testid="button-subtab-gantt"
+        >
+          <span className="flex items-center gap-1.5">
+            <BarChart3 className="h-3.5 w-3.5" />
+            Timeline
+          </span>
+        </button>
+        <button
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            subTab === "checklist"
+              ? "border-[hsl(var(--primary))] text-foreground"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+          onClick={() => setSubTab("checklist")}
+          data-testid="button-subtab-checklist"
+        >
+          <span className="flex items-center gap-1.5">
+            <CheckSquare className="h-3.5 w-3.5" />
+            Checklist
+          </span>
+        </button>
+        <button
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            subTab === "calendar"
+              ? "border-[hsl(var(--primary))] text-foreground"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+          onClick={() => setSubTab("calendar")}
+          data-testid="button-subtab-calendar"
+        >
+          <span className="flex items-center gap-1.5">
+            <CalendarDays className="h-3.5 w-3.5" />
+            Calendar
+          </span>
+        </button>
+      </div>
+
+      {subTab === "gantt" && (
+        <GanttChart milestones={milestones} tasks={tasks} />
+      )}
+      {subTab === "checklist" && (
+        <ChecklistTab projectId={projectId} />
+      )}
+      {subTab === "calendar" && (
+        <CalendarTab projectId={projectId} />
+      )}
+    </div>
+  );
+}
 
 function ChecklistTab({ projectId }: { projectId: number }) {
   const { user } = useAuth();

@@ -177,9 +177,16 @@ export default function LaborRates() {
       <Navbar />
       <div className="container mx-auto px-4 py-6 max-w-6xl">
         <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold" data-testid="text-labor-rates-title">Labor & Contractors</h1>
-            <p className="text-sm text-muted-foreground">Manage crew pay rates, billable rates, and subcontractor information</p>
+          <div className="flex items-center gap-3">
+            <Link href="/">
+              <Button variant="ghost" size="icon" className="h-8 w-8" data-testid="button-back">
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            </Link>
+            <div>
+              <h1 className="text-2xl font-bold" data-testid="text-labor-rates-title">Labor & Contractors</h1>
+              <p className="text-sm text-muted-foreground">Manage crew pay rates, billable rates, and subcontractor information</p>
+            </div>
           </div>
         </div>
 

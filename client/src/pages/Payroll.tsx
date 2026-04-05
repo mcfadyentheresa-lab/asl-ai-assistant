@@ -28,7 +28,9 @@ import {
   ChevronDown,
   ChevronUp,
   FileText,
+  ArrowLeft,
 } from "lucide-react";
+import { Link } from "wouter";
 import type { TimeEntry, Project } from "@shared/schema";
 
 interface UserInfo {
@@ -215,9 +217,16 @@ export default function Payroll() {
       <Navbar />
 
       <main className="container py-10 md:py-14 px-6 md:px-10 max-w-5xl mx-auto">
-        <h1 className="font-serif text-3xl md:text-4xl font-bold text-foreground mb-6">
-          Payroll Summary
-        </h1>
+        <div className="flex items-center gap-3 mb-6">
+          <Link href="/">
+            <Button variant="ghost" size="icon" className="h-8 w-8" data-testid="button-back">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          </Link>
+          <h1 className="font-serif text-3xl md:text-4xl font-bold text-foreground">
+            Payroll Summary
+          </h1>
+        </div>
 
         <Card className="mb-6">
           <CardContent className="py-4 flex items-center justify-between gap-3 flex-wrap">

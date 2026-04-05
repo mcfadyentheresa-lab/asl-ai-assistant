@@ -18,7 +18,8 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useState } from "react";
-import { Phone, Mail, Star, Search, Building2, User, MapPin, Loader2, Plus, Pencil, Trash2 } from "lucide-react";
+import { Phone, Mail, Star, Search, Building2, User, MapPin, Loader2, Plus, Pencil, Trash2, ArrowLeft } from "lucide-react";
+import { Link } from "wouter";
 
 interface Subcontractor {
   id: number;
@@ -106,11 +107,18 @@ export default function TradeContacts() {
       <Navbar />
       <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-serif font-bold text-foreground" data-testid="text-page-title">
-              Trade Contacts
-            </h1>
-            <p className="text-sm text-muted-foreground mt-1">Your go-to list for Muskoka trades and contractors</p>
+          <div className="flex items-center gap-3">
+            <Link href="/">
+              <Button variant="ghost" size="icon" className="h-8 w-8" data-testid="button-back">
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            </Link>
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-serif font-bold text-foreground" data-testid="text-page-title">
+                Trade Contacts
+              </h1>
+              <p className="text-sm text-muted-foreground mt-1">Your go-to list for Muskoka trades and contractors</p>
+            </div>
           </div>
           {isAdmin && (
             <Button onClick={() => setShowAddDialog(true)} data-testid="button-add-contact">
