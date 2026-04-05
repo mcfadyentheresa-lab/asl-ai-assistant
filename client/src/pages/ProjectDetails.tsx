@@ -113,13 +113,15 @@ function BudgetSnapshot({ projectId, userRole }: { projectId: number; userRole: 
     );
   }
 
-  if (!data || data.hidden) return null;
+  if (!data) return null;
+
+  const budgetVisibleToClient = data.budgetVisibleToClient ?? false;
+  if (userRole === "client" && !budgetVisibleToClient) return null;
 
   const budget = data.budget ?? 0;
   const totalSpent = data.totalSpent ?? 0;
   const status = data.status ?? "no_budget";
   const variancePercent = data.variancePercent ?? 0;
-  const budgetVisibleToClient = data.budgetVisibleToClient ?? false;
 
   if (budget === 0 && status === "no_budget") {
     return (
