@@ -694,7 +694,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                       <span className="text-[10px] text-muted-foreground">{phase.doneTasks}/{phase.totalTasks}</span>
                       {phase.startDate && (
                         <span className="text-[10px] text-muted-foreground/70 hidden sm:inline">
-                          {format(phase.startDate, "MMM d")}
+                          {format(phase.startDate, "MMM d")}{phase.endDate ? ` – ${format(phase.endDate, "MMM d")}` : ""}
                         </span>
                       )}
                     </div>
@@ -741,7 +741,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                       <span className="text-[10px] text-muted-foreground">{sec.doneTasks}/{sec.totalTasks}</span>
                       {sec.startDate && (
                         <span className="text-[10px] text-muted-foreground/70 hidden sm:inline">
-                          {format(sec.startDate, "MMM d")}
+                          {format(sec.startDate, "MMM d")}{sec.endDate ? ` – ${format(sec.endDate, "MMM d")}` : ""}
                         </span>
                       )}
                     </div>
