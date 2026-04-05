@@ -1034,8 +1034,6 @@ export default function ProjectDetails() {
     { id: "chat", label: "Messages", icon: MessageSquare, roles: ["admin", "crew", "client"] },
   ];
 
-  const tabTypographyClass = "font-sans tracking-[0.16em] uppercase";
-
   const canViewTab = (tab: TabConfig) => {
     if (!tab.roles.includes(userRole)) return false;
     if (tab.clientRequiresInvite && userRole === "client" && !isClientInvitedToBoard) return false;
