@@ -3,7 +3,7 @@ import { useProjects, useDeleteProject, useArchiveProject, useUsers } from "@/ho
 import { Navbar } from "@/components/layout/Navbar";
 import { ProjectCard } from "@/components/project/ProjectCard";
 import { Button } from "@/components/ui/button";
-import { Plus, Loader2, Eye, EyeOff, Upload, X, UserPlus, Mail, ArrowRight, FolderOpen, Users, Briefcase } from "lucide-react";
+import { Plus, Loader2, Eye, EyeOff, Upload, X, UserPlus, ArrowRight, FolderOpen, Briefcase } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { apiRequest, queryClient as qc } from "@/lib/queryClient";
 import { motion } from "framer-motion";
@@ -164,27 +164,27 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {isAdmin && activeProjects.length > 0 && (
+        {isAdmin && (
           <div className="flex items-center gap-4 mb-6 flex-wrap" data-testid="admin-stats-strip">
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted/50 border border-border/40">
               <FolderOpen className="h-3.5 w-3.5 text-muted-foreground" />
               <span className="text-xs font-medium text-foreground">{activeProjects.length} Active</span>
             </div>
-            {completedProjects.length > 0 && (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted/50 border border-border/40">
-                <Briefcase className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="text-xs font-medium text-foreground">{completedProjects.length} Completed</span>
-              </div>
-            )}
-            {onlineCrew.length > 0 && (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted/50 border border-border/40">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted/50 border border-border/40">
+              <Briefcase className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-xs font-medium text-foreground">{completedProjects.length} Completed</span>
+            </div>
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted/50 border border-border/40">
+              {onlineCrew.length > 0 ? (
                 <div className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75" />
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
                 </div>
-                <span className="text-xs font-medium text-foreground">{onlineCrew.length} Team Online</span>
-              </div>
-            )}
+              ) : (
+                <div className="h-2 w-2 rounded-full bg-muted-foreground/30" />
+              )}
+              <span className="text-xs font-medium text-foreground">{onlineCrew.length} Team Online</span>
+            </div>
           </div>
         )}
 
