@@ -884,7 +884,7 @@ export default function ProjectDetails() {
                   <div className="flex items-center justify-between flex-wrap gap-3">
                     <div>
                       <h3 className="font-serif text-xl font-bold text-foreground" data-testid="text-timeline-heading">
-                        Milestones
+                        Phases
                       </h3>
                       <p className="text-sm text-muted-foreground mt-0.5">
                         {milestones && milestones.length > 0
@@ -910,38 +910,38 @@ export default function ProjectDetails() {
                   {userRole !== "client" && (
                     <form
                       className="flex flex-col sm:flex-row gap-2"
-                      data-testid="form-add-milestone"
+                      data-testid="form-add-phase"
                       onSubmit={(e) => {
                         e.preventDefault();
-                        if (!newMilestoneTitle.trim()) return;
+                        if (!newPhaseTitle.trim()) return;
                         createMilestone(
-                          { projectId, title: newMilestoneTitle.trim(), date: newMilestoneDate || null },
+                          { projectId, title: newPhaseTitle.trim(), date: newPhaseStartDate || null, endDate: newPhaseEndDate || null, projectArea: newPhaseArea } as any,
                           {
                             onSuccess: () => {
-                              toast({ title: "Milestone added" });
-                              setNewMilestoneTitle("");
-                              setNewMilestoneDate("");
+                              toast({ title: "Phase added" });
+                              setNewPhaseArea("Main Cottage");
+                              setNewPhaseTitle("");
+                              setNewPhaseStartDate("");
+                              setNewPhaseEndDate("");
                             },
-                            onError: () => toast({ title: "Failed to add milestone", variant: "destructive" }),
+                            onError: () => toast({ title: "Failed to add phase", variant: "destructive" }),
                           }
                         );
                       }}
                     >
                       <Input
-                        placeholder="Add a milestone..."
-                        value={newMilestoneTitle}
-                        onChange={(e) => setNewMilestoneTitle(e.target.value)}
-                        data-testid="input-milestone-title"
-                        className="flex-1"
+                        placeholder="Phase name"
+                        value={newPhaseTitle}
+                        onChange={(e) => setNewPhaseTitle(e.target.value)}
+                        data-testid="input-phase-title"
                       />
                       <Input
                         type="date"
-                        value={newMilestoneDate}
-                        onChange={(e) => setNewMilestoneDate(e.target.value)}
-                        data-testid="input-milestone-date"
-                        className="sm:w-44"
+                        value={newPhaseStartDate}
+                        onChange={(e) => setNewPhaseStartDate(e.target.value)}
+                        data-testid="input-phase-start-date"
                       />
-                      <Button type="submit" size="default" disabled={creatingMilestone || !newMilestoneTitle.trim()} data-testid="button-add-milestone">
+                      <Button type="submit" size="default" disabled={creatingMilestone || !newPhaseTitle.trim()} data-testid="button-add-phase">
                         {creatingMilestone ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Plus className="h-4 w-4 mr-1" />}
                         Add
                       </Button>
@@ -1089,10 +1089,10 @@ export default function ProjectDetails() {
                         </div>
                     ))
                   ) : (
-                    <div className="text-center py-10 space-y-2" data-testid="text-no-milestones">
+                    <div className="text-center py-10 space-y-2" data-testid="text-no-phases">
                       <Flag className="h-8 w-8 mx-auto text-muted-foreground/30" />
                       <p className="text-muted-foreground text-sm">
-                        No milestones added yet.
+                        No phases added yet.
                       </p>
                     </div>
                   )}
