@@ -9,7 +9,7 @@ export interface IAuthStorage {
   upsertUser(user: UpsertUser): Promise<User>;
   updateUserRole(id: string, role: string): Promise<User | undefined>;
   updateUserPhone(id: string, phone: string | null): Promise<User | undefined>;
-  updateUserProfile(id: string, data: { firstName?: string; lastName?: string; email?: string; role?: string; phone?: string | null; onboardingCompleted?: Date }): Promise<User | undefined>;
+  updateUserProfile(id: string, data: { firstName?: string; lastName?: string; email?: string; role?: string; phone?: string | null; onboardingCompleted?: Date; smsNotifications?: boolean; emailNotifications?: boolean }): Promise<User | undefined>;
   getUsers(): Promise<User[]>;
   deleteUser(id: string): Promise<boolean>;
   archiveUser(id: string): Promise<User | undefined>;
@@ -23,6 +23,41 @@ class AuthStorage implements IAuthStorage {
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {
+    if (userData.email) {
+      const [existingByEmail] = await db.select().from(users).where(eq(users.email, userData.email));
+      if (existingByEmail && existingByEmail.id !== userData.id) {
+        const oldId = existingByEmail.id;
+        const newId = userData.id!;
+        await db.update(users).set({ email: null }).where(eq(users.id, oldId));
+        const [user] = await db
+          .insert(users)
+          .values({
+            ...userData,
+            role: existingByEmail.role,
+            phone: existingByEmail.phone ?? userData.phone,
+          })
+          .onConflictDoUpdate({
+            target: users.id,
+            set: {
+              ...userData,
+              role: existingByEmail.role,
+              phone: existingByEmail.phone ?? userData.phone,
+              updatedAt: new Date(),
+            },
+          })
+          .returning();
+
+        const { projects, clientInvites } = await import("@shared/schema");
+        await db.update(projects).set({ clientId: newId }).where(eq(projects.clientId, oldId));
+        await db.update(clientInvites).set({ userId: newId }).where(eq(clientInvites.userId, oldId));
+
+        try {
+          await db.delete(users).where(eq(users.id, oldId));
+        } catch {}
+
+        return user;
+      }
+    }
     const [user] = await db
       .insert(users)
       .values(userData)
@@ -55,14 +90,16 @@ class AuthStorage implements IAuthStorage {
     return user;
   }
 
-  async updateUserProfile(id: string, data: { firstName?: string; lastName?: string; email?: string; role?: string; phone?: string | null; onboardingCompleted?: Date }): Promise<User | undefined> {
-    const setData: any = { updatedAt: new Date() };
+  async updateUserProfile(id: string, data: { firstName?: string; lastName?: string; email?: string; role?: string; phone?: string | null; onboardingCompleted?: Date; smsNotifications?: boolean; emailNotifications?: boolean }): Promise<User | undefined> {
+    const setData: Record<string, unknown> = { updatedAt: new Date() };
     if (data.firstName !== undefined) setData.firstName = data.firstName;
     if (data.lastName !== undefined) setData.lastName = data.lastName;
     if (data.email !== undefined) setData.email = data.email;
     if (data.role !== undefined) setData.role = data.role;
     if (data.phone !== undefined) setData.phone = data.phone;
     if (data.onboardingCompleted !== undefined) setData.onboardingCompleted = data.onboardingCompleted;
+    if (data.smsNotifications !== undefined) setData.smsNotifications = data.smsNotifications;
+    if (data.emailNotifications !== undefined) setData.emailNotifications = data.emailNotifications;
     const [user] = await db
       .update(users)
       .set(setData)

@@ -429,9 +429,20 @@ export async function registerRoutes(
       const existingUser = existingUsers.find(u => u.email?.toLowerCase() === parsed.data.email.toLowerCase());
       if (existingUser) {
         userId = existingUser.id;
-        if (!project.clientId) {
-          await storage.updateProject(projectId, { clientId: userId });
-        }
+      } else {
+        const preId = `pre-${randomUUID().slice(0, 12)}`;
+        const newUser = await authStorage.upsertUser({
+          id: preId,
+          email: parsed.data.email,
+          firstName: parsed.data.firstName,
+          lastName: parsed.data.lastName,
+          phone: parsed.data.phone,
+          role: "client",
+        });
+        userId = newUser.id;
+      }
+      if (!project.clientId && userId) {
+        await storage.updateProject(projectId, { clientId: userId });
       }
 
       const invite = await storage.createClientInvite({
@@ -537,6 +548,9 @@ export async function registerRoutes(
     firstName: z.string().min(1).max(100),
     lastName: z.string().min(1).max(100),
     phone: z.string().max(30).nullable().optional(),
+    email: z.string().email().optional(),
+    smsNotifications: z.boolean().optional(),
+    emailNotifications: z.boolean().optional(),
   });
 
   app.post("/api/auth/complete-onboarding", isAuthenticated, async (req: any, res) => {
@@ -547,14 +561,17 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Invalid input", errors: parsed.error.flatten().fieldErrors });
       }
 
-      const updates: { firstName: string; lastName: string; phone?: string | null; onboardingCompleted: Date } = {
+      const updates: Record<string, unknown> = {
         onboardingCompleted: new Date(),
         firstName: parsed.data.firstName,
         lastName: parsed.data.lastName,
       };
       if (parsed.data.phone !== undefined) updates.phone = parsed.data.phone;
+      if (parsed.data.email !== undefined) updates.email = parsed.data.email;
+      if (parsed.data.smsNotifications !== undefined) updates.smsNotifications = parsed.data.smsNotifications;
+      if (parsed.data.emailNotifications !== undefined) updates.emailNotifications = parsed.data.emailNotifications;
 
-      const user = await authStorage.updateUserProfile(userId, updates);
+      const user = await authStorage.updateUserProfile(userId, updates as Parameters<typeof authStorage.updateUserProfile>[1]);
       if (!user) return res.status(404).json({ message: "User not found" });
       res.json(user);
     } catch (error) {
@@ -590,6 +607,8 @@ export async function registerRoutes(
         if (!currentUser.firstName && invite.firstName) {
           await authStorage.updateUserProfile(userId, { firstName: invite.firstName, lastName: invite.lastName });
         }
+
+        broadcastProjectChange(invite.projectId, ["invites", "project"], "invite_accepted", undefined, userId);
 
         if (!firstProjectId) firstProjectId = invite.projectId;
         reconciled++;

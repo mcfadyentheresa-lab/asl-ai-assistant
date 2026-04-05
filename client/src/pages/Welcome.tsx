@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Loader2, ArrowRight, Home } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -20,14 +21,20 @@ export default function Welcome() {
 
   const [firstName, setFirstName] = useState(user?.firstName || "");
   const [lastName, setLastName] = useState(user?.lastName || "");
+  const [email, setEmail] = useState(user?.email || "");
   const [phone, setPhone] = useState(user?.phone || "");
+  const [smsNotifications, setSmsNotifications] = useState(true);
+  const [emailNotifications, setEmailNotifications] = useState(true);
 
   const completeMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", "/api/auth/complete-onboarding", {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
+        email: email.trim() || undefined,
         phone: phone.trim() || null,
+        smsNotifications,
+        emailNotifications,
       });
       return res.json();
     },
@@ -90,6 +97,20 @@ export default function Welcome() {
                 </div>
               </div>
               <div className="space-y-2">
+                <Label htmlFor="email">Email Address</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  data-testid="input-welcome-email"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Confirm your email for project communications.
+                </p>
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="phone">Phone Number (optional)</Label>
                 <Input
                   id="phone"
@@ -101,6 +122,40 @@ export default function Welcome() {
                 <p className="text-xs text-muted-foreground">
                   We'll use this to send you project updates via text.
                 </p>
+              </div>
+
+              <div className="border rounded-lg p-4 space-y-4">
+                <h3 className="text-sm font-semibold uppercase tracking-wide">
+                  Notification Preferences
+                </h3>
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="smsNotifications" className="text-sm">SMS Notifications</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Receive text messages for project updates
+                    </p>
+                  </div>
+                  <Switch
+                    id="smsNotifications"
+                    checked={smsNotifications}
+                    onCheckedChange={setSmsNotifications}
+                    data-testid="switch-sms-notifications"
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="emailNotifications" className="text-sm">Email Notifications</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Receive email updates about your project
+                    </p>
+                  </div>
+                  <Switch
+                    id="emailNotifications"
+                    checked={emailNotifications}
+                    onCheckedChange={setEmailNotifications}
+                    data-testid="switch-email-notifications"
+                  />
+                </div>
               </div>
             </div>
 
