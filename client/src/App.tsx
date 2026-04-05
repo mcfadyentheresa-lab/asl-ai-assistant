@@ -5,7 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/use-auth";
 import { usePresenceHeartbeat } from "@/hooks/use-presence";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Loader2 } from "lucide-react";
 
 import LandingPage from "@/pages/LandingPage";
@@ -32,6 +32,28 @@ function PresenceTracker() {
 function OnboardingGuard() {
   const { user } = useAuth();
   const [location, navigate] = useLocation();
+  const reconciled = useRef(false);
+
+  useEffect(() => {
+    if (!user || reconciled.current) return;
+    if (user.role === "client") {
+      reconciled.current = true;
+      fetch("/api/auth/reconcile-invites", {
+        method: "POST",
+        credentials: "include",
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.reconciled > 0) {
+            queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+            if (data.projectId && !user.onboardingCompleted) {
+              navigate(`/welcome?project=${data.projectId}`);
+            }
+          }
+        })
+        .catch(() => {});
+    }
+  }, [user]);
 
   useEffect(() => {
     if (

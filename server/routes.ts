@@ -429,19 +429,9 @@ export async function registerRoutes(
       const existingUser = existingUsers.find(u => u.email?.toLowerCase() === parsed.data.email.toLowerCase());
       if (existingUser) {
         userId = existingUser.id;
-      } else {
-        const newUser = await authStorage.upsertUser({
-          id: `pre-${randomUUID().slice(0, 12)}`,
-          email: parsed.data.email,
-          firstName: parsed.data.firstName,
-          lastName: parsed.data.lastName,
-          phone: parsed.data.phone,
-          role: "client",
-        });
-        userId = newUser.id;
-      }
-      if (!project.clientId) {
-        await storage.updateProject(projectId, { clientId: userId });
+        if (!project.clientId) {
+          await storage.updateProject(projectId, { clientId: userId });
+        }
       }
 
       const invite = await storage.createClientInvite({
@@ -570,6 +560,45 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error completing onboarding:", error);
       res.status(500).json({ message: "Failed to complete onboarding" });
+    }
+  });
+
+  app.post("/api/auth/reconcile-invites", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const currentUser = await authStorage.getUser(userId);
+      if (!currentUser?.email) return res.json({ reconciled: 0 });
+
+      const pendingInvites = await storage.getPendingInvitesByEmail(currentUser.email);
+
+      let reconciled = 0;
+      let firstProjectId: number | null = null;
+      for (const invite of pendingInvites) {
+        if (new Date() > invite.expiresAt) continue;
+
+        await storage.updateClientInvite(invite.id, {
+          status: "accepted",
+          acceptedAt: new Date(),
+          userId,
+        });
+
+        const project = await storage.getProject(invite.projectId);
+        if (project && (!project.clientId || project.clientId === invite.userId)) {
+          await storage.updateProject(invite.projectId, { clientId: userId });
+        }
+
+        if (!currentUser.firstName && invite.firstName) {
+          await authStorage.updateUserProfile(userId, { firstName: invite.firstName, lastName: invite.lastName });
+        }
+
+        if (!firstProjectId) firstProjectId = invite.projectId;
+        reconciled++;
+      }
+
+      res.json({ reconciled, projectId: firstProjectId });
+    } catch (error) {
+      console.error("Error reconciling invites:", error);
+      res.json({ reconciled: 0 });
     }
   });
 
