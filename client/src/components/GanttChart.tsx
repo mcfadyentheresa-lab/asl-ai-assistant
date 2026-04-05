@@ -12,8 +12,17 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useCreateSection, useUpdateSection, useDeleteSection, useCreateMilestone } from "@/hooks/use-projects";
+import { useCreateSection, useUpdateSection, useDeleteSection, useCreateMilestone, useCreateTask } from "@/hooks/use-projects";
 import { useToast } from "@/hooks/use-toast";
+import type { InsertMilestone } from "@shared/schema";
+import { ListPlus } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface Milestone {
   id: number;
@@ -25,7 +34,7 @@ interface Milestone {
   order: number;
 }
 
-interface Section {
+interface SectionData {
   id: number;
   milestoneId: number;
   projectId: number;
@@ -48,7 +57,7 @@ interface Task {
 interface GanttChartProps {
   projectId: number;
   milestones: Milestone[];
-  sections: Section[];
+  sections: SectionData[];
   tasks: Task[];
   userRole: string;
 }
@@ -58,10 +67,51 @@ const PHASE_COLORS = [
   "#4A6741", "#7A6B5D", "#556B2F", "#8B8378", "#5F7161",
 ];
 
-type RowItem =
-  | { type: "phase"; id: number; title: string; startDate: Date | null; endDate: Date | null; progress: number; totalTasks: number; doneTasks: number; completed: boolean; colorIndex: number; depth: 0 }
-  | { type: "section"; id: number; milestoneId: number; title: string; startDate: Date | null; endDate: Date | null; progress: number; totalTasks: number; doneTasks: number; completed: boolean; colorIndex: number; depth: 1 }
-  | { type: "task"; id: number; title: string; startDate: Date | null; endDate: Date | null; status: string | null; colorIndex: number; depth: 2 };
+interface PhaseRow {
+  type: "phase";
+  id: number;
+  title: string;
+  startDate: Date | null;
+  endDate: Date | null;
+  progress: number;
+  totalTasks: number;
+  doneTasks: number;
+  completed: boolean;
+  colorIndex: number;
+  depth: 0;
+}
+
+interface SectionRow {
+  type: "section";
+  id: number;
+  milestoneId: number;
+  title: string;
+  startDate: Date | null;
+  endDate: Date | null;
+  progress: number;
+  totalTasks: number;
+  doneTasks: number;
+  completed: boolean;
+  colorIndex: number;
+  depth: 1;
+}
+
+interface TaskRow {
+  type: "task";
+  id: number;
+  title: string;
+  startDate: Date | null;
+  endDate: Date | null;
+  status: string | null;
+  colorIndex: number;
+  depth: 2;
+}
+
+type RowItem = PhaseRow | SectionRow | TaskRow;
+
+function isGroupRow(row: RowItem): row is PhaseRow | SectionRow {
+  return row.type === "phase" || row.type === "section";
+}
 
 export default function GanttChart({ projectId, milestones, sections, tasks, userRole }: GanttChartProps) {
   const [zoomLevel, setZoomLevel] = useState(1);
@@ -74,11 +124,18 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
   const [newSectionTitle, setNewSectionTitle] = useState("");
   const [newSectionStart, setNewSectionStart] = useState("");
   const [newSectionEnd, setNewSectionEnd] = useState("");
+  const [editingSection, setEditingSection] = useState<SectionData | null>(null);
+  const [editSectionForm, setEditSectionForm] = useState({ title: "", startDate: "", endDate: "" });
+  const [addingTask, setAddingTask] = useState<{ milestoneId: number; sectionId: number | null } | null>(null);
+  const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [newTaskDueDate, setNewTaskDueDate] = useState("");
 
   const { toast } = useToast();
   const { mutate: createMilestone, isPending: creatingMilestone } = useCreateMilestone();
   const { mutate: createSection, isPending: creatingSection } = useCreateSection();
+  const { mutate: updateSection, isPending: updatingSection } = useUpdateSection();
   const { mutate: deleteSection } = useDeleteSection();
+  const { mutate: createTask, isPending: creatingTask } = useCreateTask();
 
   const isAdmin = userRole !== "client";
 
@@ -217,19 +274,22 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
 
   const handleAddPhase = () => {
     if (!newPhaseTitle.trim()) return;
-    createMilestone(
-      { projectId, title: newPhaseTitle.trim(), startDate: newPhaseStart || null, endDate: newPhaseEnd || null } as any,
-      {
-        onSuccess: () => {
-          toast({ title: "Phase added" });
-          setNewPhaseTitle("");
-          setNewPhaseStart("");
-          setNewPhaseEnd("");
-          setAddingPhase(false);
-        },
-        onError: () => toast({ title: "Failed to add phase", variant: "destructive" }),
-      }
-    );
+    const payload: InsertMilestone & { projectId: number } = {
+      projectId,
+      title: newPhaseTitle.trim(),
+      startDate: newPhaseStart || null,
+      endDate: newPhaseEnd || null,
+    };
+    createMilestone(payload, {
+      onSuccess: () => {
+        toast({ title: "Phase added" });
+        setNewPhaseTitle("");
+        setNewPhaseStart("");
+        setNewPhaseEnd("");
+        setAddingPhase(false);
+      },
+      onError: () => toast({ title: "Failed to add phase", variant: "destructive" }),
+    });
   };
 
   const handleAddSection = (milestoneId: number) => {
@@ -249,9 +309,139 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
     );
   };
 
+  const handleEditSection = () => {
+    if (!editingSection || !editSectionForm.title.trim()) return;
+    updateSection(
+      {
+        id: editingSection.id,
+        projectId,
+        title: editSectionForm.title.trim(),
+        startDate: editSectionForm.startDate || null,
+        endDate: editSectionForm.endDate || null,
+      },
+      {
+        onSuccess: () => {
+          toast({ title: "Section updated" });
+          setEditingSection(null);
+        },
+        onError: () => toast({ title: "Failed to update section", variant: "destructive" }),
+      }
+    );
+  };
+
+  const openEditSection = (sectionId: number) => {
+    const sec = sections.find(s => s.id === sectionId);
+    if (!sec) return;
+    setEditingSection(sec);
+    setEditSectionForm({
+      title: sec.title,
+      startDate: sec.startDate || "",
+      endDate: sec.endDate || "",
+    });
+  };
+
+  const handleAddTask = () => {
+    if (!addingTask || !newTaskTitle.trim()) return;
+    createTask(
+      {
+        projectId,
+        milestoneId: addingTask.milestoneId,
+        sectionId: addingTask.sectionId,
+        title: newTaskTitle.trim(),
+        dueDate: newTaskDueDate || null,
+      },
+      {
+        onSuccess: () => {
+          toast({ title: "Task added" });
+          setNewTaskTitle("");
+          setNewTaskDueDate("");
+          setAddingTask(null);
+        },
+        onError: () => toast({ title: "Failed to add task", variant: "destructive" }),
+      }
+    );
+  };
+
   const ROW_HEIGHT = 36;
   const HEADER_HEIGHT = 40;
   const depthPadding = [12, 28, 44];
+
+  const renderTooltipDetails = (row: RowItem) => {
+    if (isGroupRow(row)) {
+      return (
+        <>
+          <p className="font-medium text-sm">{row.title}</p>
+          {row.startDate && (
+            <p className="text-xs text-muted-foreground mt-1">
+              {format(row.startDate, "MMM d")} — {row.endDate ? format(row.endDate, "MMM d, yyyy") : "TBD"}
+            </p>
+          )}
+          {row.totalTasks > 0 && (
+            <p className="text-xs text-muted-foreground">
+              {row.doneTasks}/{row.totalTasks} tasks ({row.progress}%)
+            </p>
+          )}
+        </>
+      );
+    }
+    return (
+      <>
+        <p className="font-medium text-sm">{row.title}</p>
+        <p className="text-xs text-muted-foreground capitalize">{row.status || "to-do"}</p>
+        {row.endDate && <p className="text-xs text-muted-foreground">Due: {format(row.endDate, "MMM d, yyyy")}</p>}
+      </>
+    );
+  };
+
+  const renderBar = (row: RowItem) => {
+    if (!row.startDate || !row.endDate) return null;
+    const { left, width } = getBarPosition(row.startDate, row.endDate);
+
+    if (row.type === "task") {
+      const isDone = row.status === "done";
+      const barHeight = 12;
+      const topOffset = (ROW_HEIGHT - barHeight) / 2;
+      return (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div
+              className="absolute rounded-sm cursor-default"
+              style={{ left, width, top: topOffset, height: barHeight, backgroundColor: PHASE_COLORS[row.colorIndex], opacity: isDone ? 0.4 : 0.55 }}
+            />
+          </TooltipTrigger>
+          <TooltipContent>{renderTooltipDetails(row)}</TooltipContent>
+        </Tooltip>
+      );
+    }
+
+    const barHeight = row.type === "phase" ? 20 : 16;
+    const topOffset = (ROW_HEIGHT - barHeight) / 2;
+    const opacity = row.type === "phase" ? 1 : 0.75;
+    const color = PHASE_COLORS[row.colorIndex];
+
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div
+            className="absolute rounded-sm cursor-default overflow-hidden border border-border/20"
+            style={{ left, width, top: topOffset, height: barHeight, backgroundColor: `${color}22` }}
+            data-testid={`gantt-bar-${row.type}-${row.id}`}
+          >
+            <div
+              className="h-full transition-all duration-300"
+              style={{ width: `${row.progress}%`, backgroundColor: color, opacity }}
+            />
+            {width > 50 && (
+              <span className="absolute inset-0 flex items-center px-1.5 text-[9px] font-medium text-foreground/70 truncate">
+                {row.progress}%
+              </span>
+            )}
+          </div>
+        </TooltipTrigger>
+        <TooltipContent>{renderTooltipDetails(row)}</TooltipContent>
+      </Tooltip>
+    );
+  };
 
   return (
     <div className="space-y-4" data-testid="gantt-chart">
@@ -335,6 +525,42 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
         </div>
       )}
 
+      {editingSection && isAdmin && (
+        <div className="flex flex-col sm:flex-row gap-2 p-3 border border-primary/30 rounded-sm bg-muted/20" data-testid="form-edit-section-inline">
+          <Input
+            placeholder="Section name"
+            value={editSectionForm.title}
+            onChange={e => setEditSectionForm({ ...editSectionForm, title: e.target.value })}
+            className="flex-1"
+            autoFocus
+            data-testid="input-edit-section-title"
+            onKeyDown={e => { if (e.key === "Enter") handleEditSection(); }}
+          />
+          <Input
+            type="date"
+            value={editSectionForm.startDate}
+            onChange={e => setEditSectionForm({ ...editSectionForm, startDate: e.target.value })}
+            className="w-36"
+            data-testid="input-edit-section-start"
+          />
+          <Input
+            type="date"
+            value={editSectionForm.endDate}
+            onChange={e => setEditSectionForm({ ...editSectionForm, endDate: e.target.value })}
+            className="w-36"
+            data-testid="input-edit-section-end"
+          />
+          <div className="flex gap-1">
+            <Button size="sm" onClick={handleEditSection} disabled={updatingSection || !editSectionForm.title.trim()} data-testid="button-save-section">
+              <Check className="h-3.5 w-3.5" />
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setEditingSection(null)} data-testid="button-cancel-edit-section">
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        </div>
+      )}
+
       {milestones.length === 0 && !addingPhase ? (
         <div className="py-12 text-center">
           <p className="text-sm text-muted-foreground" data-testid="text-gantt-empty">
@@ -344,7 +570,6 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
       ) : milestones.length > 0 && (
         <div className="border border-border/50 rounded-sm overflow-hidden">
           <div className="flex">
-            {/* Left labels */}
             <div className="w-56 min-w-[224px] shrink-0 border-r border-border/50 bg-muted/30">
               <div className="border-b border-border/50 flex items-center px-3" style={{ height: HEADER_HEIGHT }}>
                 <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Work Breakdown</span>
@@ -354,9 +579,8 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                 const isPhase = row.type === "phase";
                 const isSection = row.type === "section";
                 const isTask = row.type === "task";
-                const phaseKey = isPhase ? `phase-${row.id}` : null;
-                const sectionKey = isSection ? `section-${row.id}` : null;
-                const isCollapsed = (phaseKey && collapsed.has(phaseKey)) || (sectionKey && collapsed.has(sectionKey));
+                const collapseKey = isPhase ? `phase-${row.id}` : isSection ? `section-${row.id}` : null;
+                const isCollapsed = collapseKey ? collapsed.has(collapseKey) : false;
 
                 return (
                   <div
@@ -365,9 +589,9 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                     style={{ height: ROW_HEIGHT, paddingLeft: depthPadding[row.depth] }}
                     data-testid={`gantt-label-${row.type}-${row.id}`}
                   >
-                    {(isPhase || isSection) && (
+                    {(isPhase || isSection) && collapseKey && (
                       <button
-                        onClick={() => toggleCollapse(isPhase ? `phase-${row.id}` : `section-${row.id}`)}
+                        onClick={() => toggleCollapse(collapseKey)}
                         className="shrink-0 text-muted-foreground/50 hover:text-foreground transition-colors"
                         data-testid={`button-toggle-${row.type}-${row.id}`}
                       >
@@ -387,20 +611,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                         </span>
                       </TooltipTrigger>
                       <TooltipContent side="right" className="max-w-xs">
-                        <p className="font-medium text-sm">{row.title}</p>
-                        {row.startDate && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {format(row.startDate, "MMM d")} — {row.endDate ? format(row.endDate, "MMM d, yyyy") : "TBD"}
-                          </p>
-                        )}
-                        {(isPhase || isSection) && (row as any).totalTasks > 0 && (
-                          <p className="text-xs text-muted-foreground">
-                            {(row as any).doneTasks}/{(row as any).totalTasks} tasks ({(row as any).progress}%)
-                          </p>
-                        )}
-                        {isTask && (
-                          <p className="text-xs text-muted-foreground capitalize">{(row as any).status || "to-do"}</p>
-                        )}
+                        {renderTooltipDetails(row)}
                       </TooltipContent>
                     </Tooltip>
 
@@ -420,20 +631,51 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                               <FolderPlus className="h-3.5 w-3.5 mr-2" />
                               Add Section
                             </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => { setAddingTask({ milestoneId: row.id, sectionId: null }); setNewTaskTitle(""); setNewTaskDueDate(""); }}
+                              data-testid={`button-add-task-phase-${row.id}`}
+                            >
+                              <ListPlus className="h-3.5 w-3.5 mr-2" />
+                              Add Task
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       )}
                       {isAdmin && isSection && (
-                        <Button
-                          size="icon" variant="ghost" className="h-5 w-5"
-                          onClick={() => deleteSection({ id: row.id, projectId }, {
-                            onSuccess: () => toast({ title: "Section deleted" }),
-                            onError: () => toast({ title: "Failed to delete section", variant: "destructive" }),
-                          })}
-                          data-testid={`button-delete-section-${row.id}`}
-                        >
-                          <Trash2 className="h-3 w-3 text-muted-foreground hover:text-destructive" />
-                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button size="icon" variant="ghost" className="h-5 w-5" data-testid={`button-section-menu-${row.id}`}>
+                              <MoreVertical className="h-3 w-3" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => openEditSection(row.id)}
+                              data-testid={`button-edit-section-${row.id}`}
+                            >
+                              <Pencil className="h-3.5 w-3.5 mr-2" />
+                              Edit Section
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => { if (row.type === "section") { setAddingTask({ milestoneId: row.milestoneId, sectionId: row.id }); setNewTaskTitle(""); setNewTaskDueDate(""); } }}
+                              data-testid={`button-add-task-section-${row.id}`}
+                            >
+                              <ListPlus className="h-3.5 w-3.5 mr-2" />
+                              Add Task
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-destructive"
+                              onClick={() => deleteSection({ id: row.id, projectId }, {
+                                onSuccess: () => toast({ title: "Section deleted" }),
+                                onError: () => toast({ title: "Failed to delete section", variant: "destructive" }),
+                              })}
+                              data-testid={`button-delete-section-${row.id}`}
+                            >
+                              <Trash2 className="h-3.5 w-3.5 mr-2" />
+                              Delete Section
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       )}
                     </div>
                   </div>
@@ -473,12 +715,53 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                   </Button>
                 </div>
               )}
+
+              {addingTask !== null && isAdmin && (
+                <div className="border-b border-border/30 flex items-center gap-1.5 px-3 py-1.5 bg-muted/10" data-testid="form-add-task-inline">
+                  <Input
+                    placeholder="Task title"
+                    value={newTaskTitle}
+                    onChange={e => setNewTaskTitle(e.target.value)}
+                    className="h-7 text-xs flex-1"
+                    autoFocus
+                    data-testid="input-task-title"
+                    onKeyDown={e => { if (e.key === "Enter") handleAddTask(); }}
+                  />
+                  <Input
+                    type="date"
+                    value={newTaskDueDate}
+                    onChange={e => setNewTaskDueDate(e.target.value)}
+                    className="h-7 text-xs w-28"
+                    data-testid="input-task-due-date"
+                  />
+                  {addingTask.sectionId === null && sections.filter(s => s.milestoneId === addingTask.milestoneId).length > 0 && (
+                    <Select
+                      value={addingTask.sectionId !== null ? String(addingTask.sectionId) : "__none__"}
+                      onValueChange={v => setAddingTask({ ...addingTask, sectionId: v === "__none__" ? null : Number(v) })}
+                    >
+                      <SelectTrigger className="h-7 text-xs w-28" data-testid="select-task-section">
+                        <SelectValue placeholder="Section" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">No section</SelectItem>
+                        {sections.filter(s => s.milestoneId === addingTask.milestoneId).map(s => (
+                          <SelectItem key={s.id} value={String(s.id)}>{s.title}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  <Button size="icon" className="h-6 w-6" onClick={handleAddTask} disabled={creatingTask || !newTaskTitle.trim()} data-testid="button-confirm-add-task">
+                    <Check className="h-3 w-3" />
+                  </Button>
+                  <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => setAddingTask(null)} data-testid="button-cancel-add-task">
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              )}
             </div>
 
-            {/* Right timeline */}
             <ScrollArea className="flex-1" orientation="horizontal">
               <div style={{ width: totalWidth, minWidth: "100%" }}>
-                {/* Month headers */}
                 <div className="border-b border-border/50 flex relative bg-muted/20" style={{ height: HEADER_HEIGHT }}>
                   {months.map(month => {
                     const offset = differenceInDays(month, timelineStart) * dayWidth;
@@ -498,7 +781,6 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                   })}
                 </div>
 
-                {/* Bars */}
                 <div className="relative">
                   {todayOffset >= 0 && todayOffset <= totalWidth && (
                     <div
@@ -514,11 +796,6 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
 
                   {rows.map(row => {
                     const key = `${row.type}-${row.id}`;
-                    const isPhase = row.type === "phase";
-                    const isSection = row.type === "section";
-                    const isTask = row.type === "task";
-                    const color = PHASE_COLORS[row.colorIndex];
-
                     return (
                       <div
                         key={key}
@@ -532,64 +809,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                             <div key={month.toISOString()} className="absolute top-0 h-full border-l border-border/10" style={{ left: offset }} />
                           );
                         })}
-
-                        {row.startDate && row.endDate && (() => {
-                          const { left, width } = getBarPosition(row.startDate, row.endDate);
-                          const barHeight = isPhase ? 20 : isSection ? 16 : 12;
-                          const topOffset = (ROW_HEIGHT - barHeight) / 2;
-                          const opacity = isPhase ? 1 : isSection ? 0.75 : 0.5;
-
-                          if (isTask) {
-                            const isDone = (row as any).status === "done";
-                            return (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <div
-                                    className="absolute rounded-sm cursor-default"
-                                    style={{ left, width, top: topOffset, height: barHeight, backgroundColor: color, opacity: isDone ? 0.4 : 0.55 }}
-                                  />
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p className="font-medium text-sm">{row.title}</p>
-                                  <p className="text-xs text-muted-foreground capitalize">{(row as any).status || "to-do"}</p>
-                                  {row.endDate && <p className="text-xs text-muted-foreground">Due: {format(row.endDate, "MMM d, yyyy")}</p>}
-                                </TooltipContent>
-                              </Tooltip>
-                            );
-                          }
-
-                          const progress = (row as any).progress || 0;
-                          return (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <div
-                                  className="absolute rounded-sm cursor-default overflow-hidden border border-border/20"
-                                  style={{ left, width, top: topOffset, height: barHeight, backgroundColor: `${color}22` }}
-                                  data-testid={`gantt-bar-${row.type}-${row.id}`}
-                                >
-                                  <div
-                                    className="h-full transition-all duration-300"
-                                    style={{ width: `${progress}%`, backgroundColor: color, opacity }}
-                                  />
-                                  {width > 50 && (
-                                    <span className="absolute inset-0 flex items-center px-1.5 text-[9px] font-medium text-foreground/70 truncate">
-                                      {progress}%
-                                    </span>
-                                  )}
-                                </div>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p className="font-medium text-sm">{row.title}</p>
-                                {row.startDate && (
-                                  <p className="text-xs text-muted-foreground">
-                                    {format(row.startDate, "MMM d")} — {row.endDate ? format(row.endDate, "MMM d, yyyy") : "TBD"}
-                                  </p>
-                                )}
-                                <p className="text-xs">{progress}% complete</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          );
-                        })()}
+                        {renderBar(row)}
                       </div>
                     );
                   })}
@@ -600,7 +820,6 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
         </div>
       )}
 
-      {/* Legend */}
       {milestones.length > 0 && (
         <div className="flex flex-wrap gap-x-6 gap-y-2 text-xs text-muted-foreground pt-1">
           {milestones
