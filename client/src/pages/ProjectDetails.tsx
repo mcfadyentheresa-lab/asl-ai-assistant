@@ -159,7 +159,6 @@ function SidebarCards({
 
   return (
     <>
-      {user?.role !== "client" && (
       <Card>
         <CardHeader>
           <CardTitle className="font-serif text-lg" data-testid="text-client-heading">
@@ -167,6 +166,7 @@ function SidebarCards({
           </CardTitle>
         </CardHeader>
         <CardContent>
+          {user?.role !== "client" ? (
             <Select
               value={project.clientId || "none"}
               onValueChange={(val) => {
@@ -212,7 +212,6 @@ function SidebarCards({
           )}
         </CardContent>
       </Card>
-      )}
 
       {userRole !== "client" && (
         <Card>
