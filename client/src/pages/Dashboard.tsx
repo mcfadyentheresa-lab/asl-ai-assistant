@@ -256,7 +256,7 @@ function CreateProjectDialog() {
     const clientId = selectedClient && selectedClient !== "none" ? selectedClient : null;
     mutate({ ...data, thumbnailUrl: thumbnailUrl || null, clientId }, {
       onSuccess: async (newProject: { id: number }) => {
-        if (showInviteForm && inviteForm.firstName && inviteForm.email && inviteForm.phone) {
+        if (showInviteForm && inviteForm.firstName && inviteForm.lastName && inviteForm.email && inviteForm.phone) {
           try {
             setSendingInvite(true);
             await apiRequest("POST", `/api/projects/${newProject.id}/invite-client`, inviteForm);

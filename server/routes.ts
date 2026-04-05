@@ -625,7 +625,7 @@ export async function registerRoutes(
     try {
       const requesterId = req.user.claims.sub;
       const requester = await authStorage.getUser(requesterId);
-      if (requester?.role === "client") {
+      if (requester?.role !== "admin") {
         return res.status(403).json({ message: "Not authorized" });
       }
       const invites = await storage.getClientInvitesByProject(Number(req.params.id));
