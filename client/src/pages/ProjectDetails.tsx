@@ -939,7 +939,8 @@ export default function ProjectDetails() {
   const [showAddPerson, setShowAddPerson] = useState(false);
   const [addPersonForm, setAddPersonForm] = useState({ firstName: "", lastName: "", email: "", phone: "", role: "crew" });
   const [addingPerson, setAddingPerson] = useState(false);
-  const [progressSubTab, setProgressSubTab] = useState<"gantt" | "checklist" | "calendar">("gantt");
+  const [progressSubTab, setProgressSubTab] = useState<"gantt" | "calendar">("gantt");
+  const [showOpenItemsDrawer, setShowOpenItemsDrawer] = useState(false);
   const { data: planningBoards } = usePlanningBoards(projectId);
   const { data: overviewChecklistItems, isLoading: loadingChecklist } = useChecklistItems(projectId);
   const assignedClient = users?.find((u) => u.id === project?.clientId);
@@ -1166,11 +1167,11 @@ export default function ProjectDetails() {
                     )}
 
                     <button
-                      onClick={() => { setProgressSubTab("gantt"); setActiveTab("checklist"); }}
+                      onClick={() => setShowOpenItemsDrawer(true)}
                       className="text-xs text-primary hover:underline cursor-pointer"
-                      data-testid="link-view-timeline"
+                      data-testid="link-view-open-items"
                     >
-                      View full timeline →
+                      View open items →
                     </button>
                   </div>
                 </Card>
@@ -1687,7 +1688,7 @@ function ProgressTab({ projectId, milestones, sections, tasks, userRole, subTab,
           <h2 className="font-serif text-lg font-semibold uppercase tracking-wide text-foreground" data-testid="text-progress-heading">
             Progress
           </h2>
-          <p className="text-xs text-muted-foreground">Choose open items, timeline, or calendar</p>
+          <p className="text-xs text-muted-foreground">Choose timeline or calendar</p>
         </div>
         <div>
           <Select value={subTab} onValueChange={(value) => onSubTabChange(value as "gantt" | "calendar")}>
@@ -1696,7 +1697,6 @@ function ProgressTab({ projectId, milestones, sections, tasks, userRole, subTab,
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="gantt">Timeline</SelectItem>
-              <SelectItem value="checklist">Open Items</SelectItem>
               <SelectItem value="calendar">Calendar</SelectItem>
             </SelectContent>
           </Select>
@@ -2470,6 +2470,7 @@ function ChecklistTab({ projectId, compact = false }: { projectId: number; compa
     </div>
   );
 }
+
 
 function OpenItemsDrawer({ projectId, open, onOpenChange }: { projectId: number; open: boolean; onOpenChange: (open: boolean) => void }) {
   return (
