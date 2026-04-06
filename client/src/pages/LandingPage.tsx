@@ -18,6 +18,10 @@ export default function LandingPage() {
     window.location.href = "/api/login";
   };
 
+  const handleAdminLogin = () => {
+    window.location.href = "/api/login?returnTo=/";
+  };
+
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
       {/* Hero Section - Full viewport dark section */}
@@ -69,6 +73,15 @@ export default function LandingPage() {
                 >
                   Access Your Portal
                   <ArrowRight className="ml-2" />
+                </Button>
+                <Button
+                  onClick={handleAdminLogin}
+                  size="lg"
+                  variant="outline"
+                  className="border-white/20 bg-white/5 text-white hover:bg-white/10"
+                  data-testid="button-admin-login"
+                >
+                  Admin Login
                 </Button>
               </div>
             </motion.div>
