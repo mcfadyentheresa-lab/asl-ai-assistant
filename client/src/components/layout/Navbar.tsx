@@ -186,10 +186,6 @@ export function Navbar() {
               <ZoomIn className="mr-2 h-4 w-4" />
               Text Size: {zoom}%
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={toggleVisibility} data-testid="button-toggle-visibility">
-              {visible ? <Eye className="mr-2 h-4 w-4" /> : <EyeOff className="mr-2 h-4 w-4" />}
-              {visible ? "Appear Offline" : "Go Online"}
-            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => logout()} data-testid="button-logout">
               <LogOut className="mr-2" />
               Sign Out
