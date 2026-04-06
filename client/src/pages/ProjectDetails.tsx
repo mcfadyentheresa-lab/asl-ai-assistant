@@ -464,8 +464,8 @@ function SidebarCards({
             <div className="mt-4 space-y-3">
               <Dialog open={showInviteDialog} onOpenChange={setShowInviteDialog}>
                 <DialogTrigger asChild>
-                  <Button variant="outline" size="sm" className="w-full justify-start gap-2 rounded-xl border-border/70 bg-background/70" data-testid="button-invite-client">
-                    <UserPlus className="h-3.5 w-3.5 mr-2" />
+                  <Button variant="outline" size="sm" className="w-full justify-start gap-3 rounded-xl border-border/70 bg-background/70 px-4 py-5" data-testid="button-invite-client">
+                    <UserPlus className="h-4 w-4" />
                     Invite New Client
                   </Button>
                 </DialogTrigger>
@@ -514,21 +514,21 @@ function SidebarCards({
                 <div className="space-y-2">
                   <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.18em]">Invites</p>
                   {projectInvites.map((inv: any) => (
-                    <div key={inv.id} className="rounded-xl border border-border/60 bg-background/60 p-3 space-y-2.5" data-testid={`invite-row-${inv.id}`}>
+                    <div key={inv.id} className="rounded-xl border border-border/60 bg-background/60 p-3 space-y-2" data-testid={`invite-row-${inv.id}`}>
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <div className="truncate font-medium text-sm text-foreground">{inv.firstName} {inv.lastName}</div>
-                          <div className="text-xs text-muted-foreground truncate">{inv.email}{inv.phone ? ` • ${inv.phone}` : ""}</div>
+                          <div className="truncate font-semibold text-sm text-foreground">{inv.firstName} {inv.lastName}</div>
+                          <div className="mt-0.5 text-xs text-muted-foreground truncate">{inv.email}{inv.phone ? ` • ${inv.phone}` : ""}</div>
                         </div>
                         <Badge variant={inv.status === "accepted" ? "default" : inv.status === "pending" && new Date() > new Date(inv.expiresAt) ? "destructive" : "secondary"} className="shrink-0 text-[10px] px-2 py-0.5">
                           {inv.status === "accepted" ? "Accepted" : new Date() > new Date(inv.expiresAt) ? "Expired" : "Pending"}
                         </Badge>
                       </div>
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex flex-wrap gap-1.5">
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-8 px-3 text-xs"
+                          className="h-7 px-2.5 text-xs"
                           onClick={() => copyInviteLink(inv.token)}
                           data-testid={`button-copy-invite-link-${inv.id}`}
                         >
@@ -538,7 +538,7 @@ function SidebarCards({
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="h-8 px-3 text-xs"
+                            className="h-7 px-2.5 text-xs"
                             onClick={() => resendInviteMutation.mutate(inv.id)}
                             disabled={resendInviteMutation.isPending}
                             data-testid={`button-resend-invite-${inv.id}`}
@@ -549,7 +549,7 @@ function SidebarCards({
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-8 px-3 text-xs text-destructive hover:text-destructive"
+                          className="h-7 px-2.5 text-xs text-destructive hover:text-destructive"
                           onClick={() => deleteInviteMutation.mutate(inv.id)}
                           disabled={deleteInviteMutation.isPending}
                           data-testid={`button-delete-invite-${inv.id}`}
