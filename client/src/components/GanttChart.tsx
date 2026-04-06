@@ -1081,7 +1081,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                           </div>
                           <span className="text-[10px] text-muted-foreground">{building.doneTasks}/{building.totalTasks}</span>
                           {roomCount > 0 && (
-                            <span className="text-[10px] text-muted-foreground/60">{roomCount} {roomCount === 1 ? "room" : "rooms"}</span>
+                            <span className="text-[10px] text-muted-foreground/60">{roomCount} {roomCount === 1 ? "cottage" : "cottages"}</span>
                           )}
                         </div>
                       </div>
