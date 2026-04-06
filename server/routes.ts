@@ -458,7 +458,24 @@ export async function registerRoutes(
         status: "pending",
       });
 
-      res.status(201).json(invite);
+      let emailSent = false;
+      let smsSent = false;
+      try {
+        const { sendClientInviteEmail } = await import("./email");
+        emailSent = await sendClientInviteEmail(parsed.data.email, parsed.data.firstName, project.name, token);
+      } catch (e) {
+        console.error("Error sending invite email:", e);
+      }
+      if (parsed.data.phone) {
+        try {
+          const { sendClientInviteSms } = await import("./sms");
+          smsSent = await sendClientInviteSms(parsed.data.phone, parsed.data.firstName, project.name, token);
+        } catch (e) {
+          console.error("Error sending invite SMS:", e);
+        }
+      }
+
+      res.status(201).json({ ...invite, emailSent, smsSent });
     } catch (error: any) {
       console.error("Error creating client invite:", error);
       res.status(500).json({ message: "Failed to create invite" });
@@ -483,9 +500,23 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Invite not found" });
       }
 
-      const { sendClientInviteSms } = await import("./sms");
-      const smsSent = invite.phone ? await sendClientInviteSms(invite.phone, invite.firstName, project.name, invite.token) : false;
-      res.json({ success: true, smsSent, emailSent: true });
+      let emailSent = false;
+      let smsSent = false;
+      try {
+        const { sendClientInviteEmail } = await import("./email");
+        emailSent = await sendClientInviteEmail(invite.email, invite.firstName, project.name, invite.token);
+      } catch (e) {
+        console.error("Error resending invite email:", e);
+      }
+      if (invite.phone) {
+        try {
+          const { sendClientInviteSms } = await import("./sms");
+          smsSent = await sendClientInviteSms(invite.phone, invite.firstName, project.name, invite.token);
+        } catch (e) {
+          console.error("Error resending invite SMS:", e);
+        }
+      }
+      res.json({ success: true, smsSent, emailSent });
     } catch (error: any) {
       console.error("Error resending client invite:", error);
       res.status(500).json({ message: "Failed to resend invite" });

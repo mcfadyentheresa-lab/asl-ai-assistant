@@ -278,7 +278,7 @@ function SidebarCards({
       return res.json();
     },
     onSuccess: () => {
-      toast({ title: "Invite sent", description: "Client will receive an SMS with their portal link." });
+      toast({ title: "Invite sent", description: "Client will receive an email with their portal link." });
       setShowInviteDialog(false);
       setInviteForm({ firstName: "", lastName: "", email: "", phone: "" });
       qc.invalidateQueries({ queryKey: ["/api/projects", projectId, "invites"] });
