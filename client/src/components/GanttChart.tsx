@@ -1026,7 +1026,6 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                 <span className="text-xs font-medium">{selectedRoom.title}</span>
               </>
             )}
-            <PaintColourSwatches paintColorIds={selectedBuilding.paintColorIds} />
           </div>
           <PaintColourPanel
             paintColorIds={selectedBuilding.paintColorIds}
