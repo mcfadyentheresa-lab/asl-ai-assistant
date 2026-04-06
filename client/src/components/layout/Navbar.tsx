@@ -16,6 +16,7 @@ import { Link } from "wouter";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useOnlineUsers, useVisibilityToggle } from "@/hooks/use-presence";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { formatDistanceToNow } from "date-fns";
 
 export function Navbar() {
   const { user, logout } = useAuth();
@@ -47,6 +48,7 @@ export function Navbar() {
     `${(user.firstName || "")[0] || ""}${(user.lastName || "")[0] || ""}`.toUpperCase() || "U";
   const roleLabel =
     user.role === "admin" ? "Admin" : user.role === "crew" ? "Crew" : "Client";
+  const showLastLogin = user.role === "admin" && user.lastLoginAt;
 
   return (
     <nav
@@ -60,50 +62,31 @@ export function Navbar() {
       </Link>
 
       <div className="flex items-center gap-3">
-        {onlineUsers && onlineUsers.length > 0 && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div className="flex items-center gap-1.5" data-testid="indicator-online-users">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
-                </span>
-                <span className="text-xs text-muted-foreground">{onlineUsers.length} online</span>
-              </div>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" className="max-w-xs">
-              <p className="text-xs font-medium mb-1">Currently online:</p>
-              {onlineUsers.map((u) => (
-                <p key={u.userId} className="text-xs">
-                  {u.firstName || ""} {u.lastName || ""} <span className="text-muted-foreground">({u.role})</span>
-                </p>
+        {(user.role === "admin" || user.role === "crew") && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" data-testid="button-role-switch">
+                <UserCog className="mr-2 h-4 w-4" />
+                {roleLabel}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-40">
+              <DropdownMenuLabel className="text-xs text-muted-foreground">
+                Switch View
+              </DropdownMenuLabel>
+              {["client", "crew", "admin"].map((role) => (
+                <DropdownMenuItem
+                  key={role}
+                  onClick={() => switchRole.mutate(role)}
+                  data-testid={`button-role-${role}`}
+                  className={user.role === role ? "font-semibold" : ""}
+                >
+                  {role === "admin" ? "Admin" : role === "crew" ? "Crew" : "Client"}
+                </DropdownMenuItem>
               ))}
-            </TooltipContent>
-          </Tooltip>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" data-testid="button-role-switch">
-              <UserCog className="mr-2 h-4 w-4" />
-              {roleLabel}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-40">
-            <DropdownMenuLabel className="text-xs text-muted-foreground">
-              Switch View
-            </DropdownMenuLabel>
-            {["client", "crew", "admin"].map((role) => (
-              <DropdownMenuItem
-                key={role}
-                onClick={() => switchRole.mutate(role)}
-                data-testid={`button-role-${role}`}
-                className={user.role === role ? "font-semibold" : ""}
-              >
-                {role === "admin" ? "Admin" : role === "crew" ? "Crew" : "Client"}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -125,6 +108,11 @@ export function Navbar() {
               <p className="text-muted-foreground text-xs" data-testid="text-user-email">
                 {user.email}
               </p>
+              {showLastLogin && (
+                <p className="text-muted-foreground text-[11px] mt-1" data-testid="text-last-login">
+                  Last logged in {formatDistanceToNow(new Date(user.lastLoginAt), { addSuffix: true })}
+                </p>
+              )}
             </div>
             <DropdownMenuSeparator />
             <Link href="/profile">
@@ -204,10 +192,6 @@ export function Navbar() {
             >
               <ZoomIn className="mr-2 h-4 w-4" />
               Text Size: {zoom}%
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={toggleVisibility} data-testid="button-toggle-visibility">
-              {visible ? <Eye className="mr-2 h-4 w-4" /> : <EyeOff className="mr-2 h-4 w-4" />}
-              {visible ? "Appear Offline" : "Go Online"}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => logout()} data-testid="button-logout">
               <LogOut className="mr-2" />
