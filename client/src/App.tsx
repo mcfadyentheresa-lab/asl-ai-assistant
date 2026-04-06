@@ -22,6 +22,7 @@ import SupplierPrices from "@/pages/SupplierPrices";
 import MasterCalendar from "@/pages/MasterCalendar";
 import InviteAccept from "@/pages/InviteAccept";
 import Welcome from "@/pages/Welcome";
+import SignIn from "@/pages/SignIn";
 import NotFound from "@/pages/not-found";
 
 function PresenceTracker() {
@@ -73,7 +74,7 @@ function Router() {
     return (
       <Switch>
         <Route path="/invite/:token" component={InviteAccept} />
-        <Route component={Dashboard} />
+        <Route component={SignIn} />
       </Switch>
     );
   }
