@@ -751,7 +751,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
     const displayEnd = row.endDate;
 
     const { left, width } = getBarPosition(displayStart, displayEnd);
-    const visibleWidth = Math.max(width, 28);
+    const visibleWidth = Math.max(width, 36);
     const barColor = row.colorHex || BUILDING_COLORS[row.colorIndex];
     const rowH = row.type === "room" ? ROOM_ROW_HEIGHT : ROW_HEIGHT;
     const canResize = isAdmin && row.startDate && row.endDate;
@@ -778,14 +778,12 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
             >
               {canResize && (
                 <>
-                  <button
-                    className="absolute left-0 top-0 h-full w-5 cursor-ew-resize bg-transparent"
+                  <div
+                    className="absolute left-0 top-0 h-full w-2 cursor-ew-resize bg-transparent"
                     onMouseDown={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
                       const startX = e.clientX;
-                      const originalStart = row.startDate!;
-                      const originalEnd = row.endDate!;
                       const onMove = (moveEvent: MouseEvent) => {
                         const deltaDays = Math.round((moveEvent.clientX - startX) / dayWidth);
                         resize("start", deltaDays);
@@ -799,9 +797,11 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                     }}
                     data-testid={`handle-start-${row.type}-${row.id}`}
                     aria-label="Resize start date"
-                  />
-                  <button
-                    className="absolute right-0 top-0 h-full w-5 cursor-ew-resize bg-transparent"
+                  >
+                    <div className="absolute left-0 top-1/2 -translate-y-1/2 h-3 w-[2px] rounded-full bg-white/60" />
+                  </div>
+                  <div
+                    className="absolute right-0 top-0 h-full w-2 cursor-ew-resize bg-transparent"
                     onMouseDown={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
@@ -819,7 +819,9 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                     }}
                     data-testid={`handle-end-${row.type}-${row.id}`}
                     aria-label="Resize finish date"
-                  />
+                  >
+                    <div className="absolute right-0 top-1/2 -translate-y-1/2 h-3 w-[2px] rounded-full bg-white/60" />
+                  </div>
                 </>
               )}
               {isDone && (
@@ -858,8 +860,8 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
           >
             {canResize && (
               <>
-                <button
-                  className="absolute left-0 top-0 h-full w-5 cursor-ew-resize bg-transparent"
+                <div
+                  className="absolute left-0 top-0 h-full w-2 cursor-ew-resize bg-transparent"
                   onMouseDown={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -877,9 +879,11 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                   }}
                   data-testid={`handle-start-${row.type}-${row.id}`}
                   aria-label="Resize start date"
-                />
-                <button
-                  className="absolute right-0 top-0 h-full w-5 cursor-ew-resize bg-transparent"
+                >
+                  <div className="absolute left-0 top-1/2 -translate-y-1/2 h-3 w-[2px] rounded-full bg-white/60" />
+                </div>
+                <div
+                  className="absolute right-0 top-0 h-full w-2 cursor-ew-resize bg-transparent"
                   onMouseDown={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -897,7 +901,9 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                   }}
                   data-testid={`handle-end-${row.type}-${row.id}`}
                   aria-label="Resize finish date"
-                />
+                >
+                  <div className="absolute right-0 top-1/2 -translate-y-1/2 h-3 w-[2px] rounded-full bg-white/60" />
+                </div>
               </>
             )}
             <div className="h-full" style={{ width: `${progress}%`, backgroundColor: barColor, opacity: isRoom ? 0.9 : 1 }} />
