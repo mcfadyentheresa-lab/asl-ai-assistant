@@ -159,11 +159,7 @@ function BuildingColourPicker({ currentHex, onSelect }: { currentHex: string | n
     <Popover>
       <PopoverTrigger asChild>
         <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={(e) => e.stopPropagation()} data-testid="button-building-colour-picker">
-          {currentHex ? (
-            <div className="w-4 h-4 rounded-sm border border-border/60" style={{ backgroundColor: currentHex }} />
-          ) : (
-            <Palette className="w-3.5 h-3.5 text-muted-foreground" />
-          )}
+          <Palette className="w-3.5 h-3.5 text-muted-foreground" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-48 p-2" align="start" onClick={(e) => e.stopPropagation()}>
