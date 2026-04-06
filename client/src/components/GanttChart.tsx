@@ -589,9 +589,9 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
   const today = new Date();
   const todayOffset = differenceInDays(today, timelineStart) * dayWidth;
 
-  const ROW_HEIGHT = 48;
-  const ROOM_ROW_HEIGHT = 40;
-  const HEADER_HEIGHT = 40;
+  const ROW_HEIGHT = 36;
+  const ROOM_ROW_HEIGHT = 30;
+  const HEADER_HEIGHT = 34;
 
   const handleAddBuilding = () => {
     if (!newBuildingTitle.trim()) return;
@@ -756,7 +756,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
     const displayEnd = resizePreview?.rowId === row.id && resizePreview?.rowType === row.type ? resizePreview.endDate : row.endDate;
 
     const { left, width } = getBarPosition(displayStart, displayEnd);
-    const visibleWidth = Math.max(width, 48);
+    const visibleWidth = Math.max(width, 36);
     const barColor = row.colorHex || BUILDING_COLORS[row.colorIndex];
     const rowH = row.type === "room" ? ROOM_ROW_HEIGHT : ROW_HEIGHT;
     const canResize = isAdmin && row.startDate && row.endDate && row.id > 0;
@@ -772,7 +772,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
       const originalStart = row.startDate!;
       const originalEnd = row.endDate!;
       const originalRangeMs = Math.max(originalEnd.getTime() - originalStart.getTime(), 86400000);
-      const originalWidth = Math.max(getBarPosition(originalStart, originalEnd).width, 48);
+      const originalWidth = Math.max(getBarPosition(originalStart, originalEnd).width, 36);
       let lastX = startX;
       const onMove = (moveEvent: MouseEvent) => {
         lastX = moveEvent.clientX;
@@ -805,13 +805,13 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
 
     if (row.type === "task") {
       const isDone = row.status === "done";
-      const barHeight = 14;
+      const barHeight = 10;
       const topOffset = (rowH - barHeight) / 2;
       return (
         <Tooltip>
           <TooltipTrigger asChild>
             <div
-              className="absolute rounded-sm select-none cursor-default min-w-[24px]"
+              className="absolute rounded-sm select-none cursor-default min-w-[20px]"
               style={{ left, width: visibleWidth, top: topOffset, height: barHeight, backgroundColor: barColor, opacity: isDone ? 0.55 : 0.95 }}
               data-testid={`gantt-bar-task-${row.id}`}
             >
@@ -857,7 +857,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
     }
 
     const isRoom = row.type === "room";
-    const barHeight = isRoom ? 18 : 24;
+    const barHeight = isRoom ? 14 : 18;
     const topOffset = (rowH - barHeight) / 2;
     const progress = row.progress || 0;
 
@@ -865,7 +865,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
       <Tooltip>
         <TooltipTrigger asChild>
           <div
-            className="absolute rounded-sm overflow-hidden border border-border/20 select-none cursor-default min-w-[48px]"
+            className="absolute rounded-sm overflow-hidden border border-border/20 select-none cursor-default min-w-[36px]"
             style={{ left, width: visibleWidth, top: topOffset, height: barHeight, backgroundColor: `${barColor}22` }}
             data-testid={`gantt-bar-${row.type}-${row.id}`}
           >
@@ -1129,9 +1129,9 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
       ) : currentRows.length > 0 && (
         <div className="border border-border/50 rounded-sm overflow-hidden">
           <div className="flex">
-            <div className="w-72 min-w-[288px] shrink-0 border-r border-border/50 bg-muted/30">
-              <div className="border-b border-border/50 flex items-center px-3" style={{ height: HEADER_HEIGHT }}>
-                <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground" data-testid="text-scope-header">{scopeHeading}</span>
+            <div className="w-64 min-w-[256px] shrink-0 border-r border-border/50 bg-muted/30">
+              <div className="border-b border-border/50 flex items-center px-2" style={{ height: HEADER_HEIGHT }}>
+                <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground" data-testid="text-scope-header">{scopeHeading}</span>
               </div>
 
               {drillLevel === "buildings" && nestedRows.map((row) => {
@@ -1143,7 +1143,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                   return (
                     <div
                       key={`building-${building.id}`}
-                      className={`border-b border-border/30 flex items-center gap-1.5 px-0 hover:bg-muted/20 transition-colors group ${dragOverId === building.id ? "bg-muted/40" : ""}`}
+                      className={`border-b border-border/30 flex items-center gap-1 px-0 hover:bg-muted/20 transition-colors group ${dragOverId === building.id ? "bg-muted/40" : ""}`}
                       style={{ height: ROW_HEIGHT, borderLeft: `3px solid ${accentColor}` }}
                       draggable={isAdmin}
                       onDragStart={() => handleDragStart(building.id)}
@@ -1154,7 +1154,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                     >
                       {isAdmin && (
                         <div className="shrink-0 pl-1 cursor-grab opacity-0 group-hover:opacity-50 transition-opacity" onClick={(e) => e.stopPropagation()} data-testid={`drag-handle-building-${building.id}`}>
-                          <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
+                          <GripVertical className="h-3 w-3 text-muted-foreground" />
                         </div>
                       )}
                       <button
@@ -1162,21 +1162,21 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                         onClick={(e) => { e.stopPropagation(); toggleBuilding(building.id); }}
                         data-testid={`button-toggle-building-${building.id}`}
                       >
-                        {isExpanded ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
+                        {isExpanded ? <ChevronDown className="h-3 w-3 text-muted-foreground" /> : <ChevronRight className="h-3 w-3 text-muted-foreground" />}
                       </button>
-                      <div className="flex-1 min-w-0 pr-2">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-semibold uppercase tracking-wide truncate">{building.title}</span>
-                          {building.completed && <Check className="h-3 w-3 text-green-600 shrink-0" />}
+                      <div className="flex-1 min-w-0 pr-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[11px] font-semibold uppercase tracking-wide truncate">{building.title}</span>
+                          {building.completed && <Check className="h-2.5 w-2.5 text-green-600 shrink-0" />}
                           <PaintColourSwatches paintColorIds={building.paintColorIds} />
                         </div>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-12 h-1 bg-muted rounded-full overflow-hidden">
                             <div className="h-full rounded-full transition-all duration-300" style={{ width: `${building.progress}%`, backgroundColor: accentColor }} />
                           </div>
-                          <span className="text-[10px] text-muted-foreground">{building.doneTasks}/{building.totalTasks}</span>
+                          <span className="text-[9px] text-muted-foreground">{building.doneTasks}/{building.totalTasks}</span>
                           {roomCount > 0 && (
-                            <span className="text-[10px] text-muted-foreground/60">{roomCount} {roomCount === 1 ? "area" : "areas"}</span>
+                            <span className="text-[9px] text-muted-foreground/60">{roomCount} {roomCount === 1 ? "area" : "areas"}</span>
                           )}
                         </div>
                       </div>
@@ -1223,8 +1223,8 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                   return (
                     <div
                       key={`room-${roomData.id}`}
-                      className={`border-b border-border/30 flex items-center gap-2 cursor-pointer hover:bg-muted/20 transition-colors group ${dragOverId === roomData.id ? "bg-muted/40" : ""}`}
-                      style={{ height: ROOM_ROW_HEIGHT, borderLeft: `3px solid ${accentColor}20`, paddingLeft: isAdmin && !isGeneralTasks ? "12px" : "28px" }}
+                      className={`border-b border-border/30 flex items-center gap-1.5 cursor-pointer hover:bg-muted/20 transition-colors group ${dragOverId === roomData.id ? "bg-muted/40" : ""}`}
+                      style={{ height: ROOM_ROW_HEIGHT, borderLeft: `3px solid ${accentColor}20`, paddingLeft: isAdmin && !isGeneralTasks ? "10px" : "24px" }}
                       onClick={() => drillBuildingId && drillIntoRoom(drillBuildingId, actualRoomId)}
                       draggable={isAdmin && !isGeneralTasks}
                       onDragStart={() => !isGeneralTasks && handleDragStart(roomData.id)}
@@ -1238,12 +1238,12 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                           <GripVertical className="h-3 w-3 text-muted-foreground" />
                         </div>
                       )}
-                      <div className="flex-1 min-w-0 pr-2">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[11px] font-medium truncate text-foreground/80">{roomData.title}</span>
+                      <div className="flex-1 min-w-0 pr-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-medium truncate text-foreground/80">{roomData.title}</span>
                         </div>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <div className="w-12 h-1 bg-muted rounded-full overflow-hidden">
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-10 h-[3px] bg-muted rounded-full overflow-hidden">
                             <div className="h-full rounded-full transition-all duration-300" style={{ width: `${roomInfo?.progress || roomData.progress || 0}%`, backgroundColor: accentColor }} />
                           </div>
                           <span className="text-[9px] text-muted-foreground">
@@ -1288,7 +1288,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                 return (
                   <div
                     key={task.id}
-                    className={`border-b border-border/30 flex items-center gap-2 px-0 group ${dragOverId === task.id ? "bg-muted/40" : ""}`}
+                    className={`border-b border-border/30 flex items-center gap-1.5 px-0 group ${dragOverId === task.id ? "bg-muted/40" : ""}`}
                     style={{ height: ROW_HEIGHT }}
                     draggable={isAdmin}
                     onDragStart={() => handleDragStart(task.id)}
@@ -1299,7 +1299,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                   >
                     {isAdmin && (
                       <div className="shrink-0 pl-1 cursor-grab opacity-0 group-hover:opacity-50 transition-opacity" onClick={(e) => e.stopPropagation()} data-testid={`drag-handle-task-${task.id}`}>
-                        <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
+                        <GripVertical className="h-3 w-3 text-muted-foreground" />
                       </div>
                     )}
                     <div className="pl-1">
@@ -1307,22 +1307,22 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                         <Checkbox
                           checked={isDone}
                           onCheckedChange={() => handleToggleTask(task.id, task.status)}
-                          className="shrink-0"
+                          className="shrink-0 h-3.5 w-3.5"
                           data-testid={`checkbox-task-${task.id}`}
                         />
                       ) : (
                         <div className="shrink-0">
-                          {isDone ? <CheckSquare className="h-4 w-4 text-primary" /> : <Square className="h-4 w-4 text-muted-foreground/40" />}
+                          {isDone ? <CheckSquare className="h-3.5 w-3.5 text-primary" /> : <Square className="h-3.5 w-3.5 text-muted-foreground/40" />}
                         </div>
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <span className={`text-xs truncate block ${isDone ? "line-through text-muted-foreground" : ""}`}>{task.title}</span>
+                      <span className={`text-[11px] truncate block leading-tight ${isDone ? "line-through text-muted-foreground" : ""}`}>{task.title}</span>
                       {task.endDate && (
-                        <span className="text-[10px] text-muted-foreground/70">Due {format(task.endDate, "MMM d")}</span>
+                        <span className="text-[9px] text-muted-foreground/70 leading-none">Due {format(task.endDate, "MMM d")}</span>
                       )}
                     </div>
-                    <Badge variant={isDone ? "secondary" : "outline"} className="text-[10px] px-1.5 py-0 h-4 shrink-0 capitalize" data-testid={`badge-task-status-${task.id}`}>
+                    <Badge variant={isDone ? "secondary" : "outline"} className="text-[9px] px-1 py-0 h-3.5 shrink-0 capitalize" data-testid={`badge-task-status-${task.id}`}>
                       {isDone ? "Done" : (task.status || "To-do")}
                     </Badge>
                     {isAdmin && selectedBuildingId && (
@@ -1371,7 +1371,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                         className="absolute top-0 h-full border-l border-border/30 flex items-center px-2"
                         style={{ left: offset, width: monthWidth }}
                       >
-                        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
+                        <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
                           {format(month, "MMM yyyy")}
                         </span>
                       </div>
@@ -1409,10 +1409,10 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
       )}
 
       {drillLevel === "buildings" && milestones.length > 0 && (
-        <div className="flex flex-wrap gap-x-6 gap-y-2 text-xs text-muted-foreground pt-1">
+        <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-[11px] text-muted-foreground pt-1">
           {buildingInfos.map((building) => (
-            <div key={building.id} className="flex items-center gap-1.5" data-testid={`gantt-legend-${building.id}`}>
-              <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: building.colorHex || BUILDING_COLORS[building.colorIndex] }} />
+            <div key={building.id} className="flex items-center gap-1" data-testid={`gantt-legend-${building.id}`}>
+              <div className="w-2 h-2 rounded-sm" style={{ backgroundColor: building.colorHex || BUILDING_COLORS[building.colorIndex] }} />
               <span>{building.title}</span>
               {building.completed && <span className="text-green-600">✓</span>}
             </div>
