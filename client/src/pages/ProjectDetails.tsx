@@ -294,8 +294,13 @@ function SidebarCards({
       const res = await apiRequest("POST", `/api/projects/${projectId}/invites/${inviteId}/resend`);
       return res.json();
     },
-    onSuccess: () => {
-      toast({ title: "Invite resent", description: "The client will receive another SMS with their portal link." });
+    onSuccess: (data: any) => {
+      toast({
+        title: "Invite resent",
+        description: data?.emailSent
+          ? "The client will receive another email with their portal link."
+          : "The client will receive another message with their portal link.",
+      });
       qc.invalidateQueries({ queryKey: ["/api/projects", projectId, "invites"] });
     },
     onError: (err: any) => {
