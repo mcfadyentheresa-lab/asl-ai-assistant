@@ -929,6 +929,7 @@ export default function ProjectDetails() {
   const [addPersonForm, setAddPersonForm] = useState({ firstName: "", lastName: "", email: "", phone: "", role: "crew" });
   const [addingPerson, setAddingPerson] = useState(false);
   const [showOpenItemsDrawer, setShowOpenItemsDrawer] = useState(false);
+  const [progressSubTab, setProgressSubTab] = useState<"gantt" | "calendar">("gantt");
   const { data: planningBoards } = usePlanningBoards(projectId);
   const { data: overviewChecklistItems, isLoading: loadingChecklist } = useChecklistItems(projectId);
   const assignedClient = users?.find((u) => u.id === project?.clientId);
