@@ -3268,8 +3268,9 @@ function CalendarTab({ projectId }: { projectId: number }) {
   const getEventsForDate = (date: Date) => {
     if (!events) return [];
     return (events as CalendarEvent[]).filter((e) => {
-      const eventDate = parseISO(e.date);
-      return isSameDay(eventDate, date);
+      const start = e.startDate ? parseISO(e.startDate) : parseISO(e.date);
+      const end = e.endDate ? parseISO(e.endDate) : parseISO(e.date);
+      return isWithinInterval(date, { start, end });
     });
   };
 
@@ -3352,14 +3353,6 @@ function CalendarTab({ projectId }: { projectId: number }) {
     });
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex justify-center py-10">
-        <Loader2 className="animate-spin text-muted-foreground" data-testid="loader-calendar" />
-      </div>
-    );
-  }
-
   const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
   return (
@@ -3398,7 +3391,12 @@ function CalendarTab({ projectId }: { projectId: number }) {
         </Button>
       </div>
 
-      <div className="grid grid-cols-7 gap-px bg-border rounded-md overflow-hidden" data-testid="calendar-grid">
+      {isLoading ? (
+        <div className="flex justify-center py-10">
+          <Loader2 className="animate-spin text-muted-foreground" data-testid="loader-calendar" />
+        </div>
+      ) : (
+        <div className="grid grid-cols-7 gap-px bg-border rounded-md overflow-hidden" data-testid="calendar-grid">
         {weekDays.map((day) => (
           <div
             key={day}
@@ -3483,7 +3481,8 @@ function CalendarTab({ projectId }: { projectId: number }) {
             </div>
           );
         })}
-      </div>
+        </div>
+      )}
 
       <Dialog open={selectedDate !== null} onOpenChange={(open) => { if (!open) setSelectedDate(null); }}>
         <DialogContent className="sm:max-w-[500px] max-h-[85vh] flex flex-col" data-testid="selected-date-panel">
