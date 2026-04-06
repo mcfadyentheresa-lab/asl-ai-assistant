@@ -459,7 +459,10 @@ export async function registerRoutes(
       });
 
       const { sendClientInviteSms } = await import("./sms");
-      sendClientInviteSms(parsed.data.phone, parsed.data.firstName, project.name, token).catch(() => {});
+      const smsSent = await sendClientInviteSms(parsed.data.phone, parsed.data.firstName, project.name, token);
+      if (!smsSent) {
+        return res.status(500).json({ message: "Invite created, but SMS could not be sent. Check Twilio and the phone number." });
+      }
 
       res.status(201).json(invite);
     } catch (error: any) {

@@ -284,8 +284,8 @@ function SidebarCards({
       qc.invalidateQueries({ queryKey: ["/api/projects", projectId, "invites"] });
       qc.invalidateQueries({ queryKey: ["/api/users"] });
     },
-    onError: () => {
-      toast({ title: "Failed to send invite", variant: "destructive" });
+    onError: (err: any) => {
+      toast({ title: "Failed to send invite", description: err.message, variant: "destructive" });
     },
   });
 
