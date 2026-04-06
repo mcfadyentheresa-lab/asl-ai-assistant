@@ -426,12 +426,13 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
         if (s.endDate) allDates.push(parseISO(s.endDate));
       });
 
+      const today = new Date();
       const bStart = ms.startDate ? parseISO(ms.startDate)
-        : allDates.length > 0 ? new Date(Math.min(...allDates.map(d => d.getTime()))) : null;
+        : allDates.length > 0 ? new Date(Math.min(...allDates.map(d => d.getTime()))) : today;
       let bEnd = ms.endDate ? parseISO(ms.endDate)
-        : allDates.length > 0 ? new Date(Math.max(...allDates.map(d => d.getTime()))) : null;
-      if (bStart && (!bEnd || bEnd.getTime() <= bStart.getTime())) {
-        bEnd = addDays(bStart, 14);
+        : allDates.length > 0 ? new Date(Math.max(...allDates.map(d => d.getTime()))) : addDays(today, 3);
+      if (bEnd.getTime() <= bStart.getTime()) {
+        bEnd = addDays(bStart, 3);
       }
 
       return {
@@ -459,12 +460,13 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
       if (sec.endDate) secDates.push(parseISO(sec.endDate));
       secTasks.forEach(t => { if (t.dueDate) secDates.push(parseISO(t.dueDate)); });
 
+      const secToday = new Date();
       const secStart = sec.startDate ? parseISO(sec.startDate)
-        : secDates.length > 0 ? new Date(Math.min(...secDates.map(d => d.getTime()))) : building.startDate;
+        : secDates.length > 0 ? new Date(Math.min(...secDates.map(d => d.getTime()))) : (building.startDate || secToday);
       let secEnd = sec.endDate ? parseISO(sec.endDate)
-        : secDates.length > 0 ? new Date(Math.max(...secDates.map(d => d.getTime()))) : null;
-      if (secStart && (!secEnd || secEnd.getTime() <= secStart.getTime())) {
-        secEnd = addDays(secStart, 7);
+        : secDates.length > 0 ? new Date(Math.max(...secDates.map(d => d.getTime()))) : addDays(secStart, 3);
+      if (secEnd.getTime() <= secStart.getTime()) {
+        secEnd = addDays(secStart, 3);
       }
 
       return {
@@ -497,11 +499,13 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
 
     filteredTasks = [...filteredTasks].sort((a, b) => (a.order || 0) - (b.order || 0));
 
+    const taskToday = new Date();
     return filteredTasks.map(t => {
-      const taskDate = t.dueDate ? parseISO(t.dueDate) : null;
+      const taskDate = t.dueDate ? parseISO(t.dueDate) : addDays(taskToday, 1);
+      const taskStart = t.dueDate ? addDays(taskDate, -3) : taskToday;
       return {
         id: t.id, title: t.title,
-        startDate: taskDate ? addDays(taskDate, -3) : null,
+        startDate: taskStart,
         endDate: taskDate, status: t.status, colorIndex: building.colorIndex,
       };
     });
@@ -755,7 +759,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
     const visibleWidth = Math.max(width, 48);
     const barColor = row.colorHex || BUILDING_COLORS[row.colorIndex];
     const rowH = row.type === "room" ? ROOM_ROW_HEIGHT : ROW_HEIGHT;
-    const canResize = isAdmin && row.startDate && row.endDate;
+    const canResize = isAdmin && row.startDate && row.endDate && row.id > 0;
     const commitResize = (start: Date, end: Date) => {
       if (row.type === "building") updateMilestone({ id: row.id, projectId, startDate: format(start, "yyyy-MM-dd"), endDate: format(end, "yyyy-MM-dd") });
       else if (row.type === "room") updateSection({ id: row.id, projectId, startDate: format(start, "yyyy-MM-dd"), endDate: format(end, "yyyy-MM-dd") } as any);
@@ -767,8 +771,10 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
       const startX = e.clientX;
       const originalStart = row.startDate!;
       const originalEnd = row.endDate!;
+      let lastX = startX;
       const onMove = (moveEvent: MouseEvent) => {
-        const deltaDays = Math.round((moveEvent.clientX - startX) / dayWidth);
+        lastX = moveEvent.clientX;
+        const deltaDays = Math.round((lastX - startX) / dayWidth);
         if (edge === "start") {
           const nextStart = addDays(originalStart, deltaDays);
           if (nextStart >= originalEnd) return;
@@ -782,14 +788,14 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
       const onUp = () => {
         window.removeEventListener("mousemove", onMove);
         window.removeEventListener("mouseup", onUp);
-        const finalStart = edge === "start" ? addDays(originalStart, Math.round((lastX - startX) / dayWidth)) : originalStart;
-        const finalEnd = edge === "end" ? addDays(originalEnd, Math.round((lastX - startX) / dayWidth)) : originalEnd;
+        const finalDelta = Math.round((lastX - startX) / dayWidth);
+        const finalStart = edge === "start" ? addDays(originalStart, finalDelta) : originalStart;
+        const finalEnd = edge === "end" ? addDays(originalEnd, finalDelta) : originalEnd;
         if ((edge === "start" && finalStart < originalEnd) || (edge === "end" && finalEnd > originalStart)) {
           commitResize(finalStart, finalEnd);
         }
         setResizePreview(null);
       };
-      let lastX = startX;
       window.addEventListener("mousemove", onMove);
       window.addEventListener("mouseup", onUp);
     };
