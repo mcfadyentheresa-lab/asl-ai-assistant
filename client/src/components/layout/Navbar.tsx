@@ -60,27 +60,6 @@ export function Navbar() {
       </Link>
 
       <div className="flex items-center gap-3">
-        {onlineUsers && onlineUsers.length > 0 && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div className="flex items-center gap-1.5" data-testid="indicator-online-users">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
-                </span>
-                <span className="text-xs text-muted-foreground">{onlineUsers.length} online</span>
-              </div>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" className="max-w-xs">
-              <p className="text-xs font-medium mb-1">Currently online:</p>
-              {onlineUsers.map((u) => (
-                <p key={u.userId} className="text-xs">
-                  {u.firstName || ""} {u.lastName || ""} <span className="text-muted-foreground">({u.role})</span>
-                </p>
-              ))}
-            </TooltipContent>
-          </Tooltip>
-        )}
         {(user.role === "admin" || user.role === "crew") && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
