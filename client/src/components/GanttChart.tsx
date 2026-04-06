@@ -1101,7 +1101,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
       )}
 
       {addingTask !== null && isAdmin && (
-        <div className="flex items-center gap-1.5 px-2 py-1" data-testid="form-add-task-inline">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 px-2 py-1" data-testid="form-add-task-inline">
           <Input placeholder="Task title" value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)} className="flex-1 h-7 text-xs" autoFocus data-testid="input-task-title" onKeyDown={e => { if (e.key === "Enter") handleAddTask(); }} />
           <DateField label="Due date" value={newTaskDueDate} onChange={setNewTaskDueDate} placeholder="Due date" testId="button-task-due-date" />
           <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-primary hover:text-primary" onClick={handleAddTask} disabled={creatingTask || !newTaskTitle.trim()} data-testid="button-confirm-add-task">
