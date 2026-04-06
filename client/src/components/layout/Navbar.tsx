@@ -81,29 +81,31 @@ export function Navbar() {
             </TooltipContent>
           </Tooltip>
         )}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" data-testid="button-role-switch">
-              <UserCog className="mr-2 h-4 w-4" />
-              {roleLabel}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-40">
-            <DropdownMenuLabel className="text-xs text-muted-foreground">
-              Switch View
-            </DropdownMenuLabel>
-            {["client", "crew", "admin"].map((role) => (
-              <DropdownMenuItem
-                key={role}
-                onClick={() => switchRole.mutate(role)}
-                data-testid={`button-role-${role}`}
-                className={user.role === role ? "font-semibold" : ""}
-              >
-                {role === "admin" ? "Admin" : role === "crew" ? "Crew" : "Client"}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {(user.role === "admin" || user.role === "crew") && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" data-testid="button-role-switch">
+                <UserCog className="mr-2 h-4 w-4" />
+                {roleLabel}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-40">
+              <DropdownMenuLabel className="text-xs text-muted-foreground">
+                Switch View
+              </DropdownMenuLabel>
+              {["client", "crew", "admin"].map((role) => (
+                <DropdownMenuItem
+                  key={role}
+                  onClick={() => switchRole.mutate(role)}
+                  data-testid={`button-role-${role}`}
+                  className={user.role === role ? "font-semibold" : ""}
+                >
+                  {role === "admin" ? "Admin" : role === "crew" ? "Crew" : "Client"}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
