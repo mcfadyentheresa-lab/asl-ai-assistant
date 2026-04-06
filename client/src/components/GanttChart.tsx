@@ -517,6 +517,9 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
         });
         const unsectionedTasks = tasks.filter(t => t.milestoneId === b.id && !t.sectionId);
         if (unsectionedTasks.length > 0) {
+          const genDone = unsectionedTasks.filter(t => t.status === "done").length;
+          const genTotal = unsectionedTasks.length;
+          const genProgress = genTotal > 0 ? Math.round((genDone / genTotal) * 100) : 0;
           rows.push({
             id: -b.id,
             title: "General Tasks",
@@ -525,10 +528,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
             colorIndex: b.colorIndex,
             colorHex: b.colorHex,
             type: "room" as const,
-            progress: (() => {
-              const done = unsectionedTasks.filter(t => t.status === "done").length;
-              return unsectionedTasks.length > 0 ? Math.round((done / unsectionedTasks.length) * 100) : 0;
-            })(),
+            progress: genProgress,
           });
         }
       }
@@ -664,6 +664,24 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
   const handleDragStart = (id: number) => setDragId(id);
   const handleDragOver = (e: React.DragEvent, id: number) => { e.preventDefault(); setDragOverId(id); };
   const handleDragEnd = () => { setDragId(null); setDragOverId(null); };
+
+  const handleRoomDrop = useCallback((buildingId: number, targetId: number) => {
+    if (dragId === null || dragId === targetId || targetId < 0) { setDragId(null); setDragOverId(null); return; }
+    const buildingSections = sections.filter(s => s.milestoneId === buildingId).sort((a, b) => (a.order || 0) - (b.order || 0));
+    const dragIdx = buildingSections.findIndex(s => s.id === dragId);
+    const targetIdx = buildingSections.findIndex(s => s.id === targetId);
+    if (dragIdx === -1 || targetIdx === -1) { setDragId(null); setDragOverId(null); return; }
+    const reordered = [...buildingSections];
+    const [moved] = reordered.splice(dragIdx, 1);
+    reordered.splice(targetIdx, 0, moved);
+    reordered.forEach((s, i) => {
+      if ((s.order || 0) !== i) {
+        updateSection({ id: s.id, projectId, order: i });
+      }
+    });
+    setDragId(null);
+    setDragOverId(null);
+  }, [dragId, sections, updateSection, projectId]);
 
   const handleDrop = useCallback((targetId: number) => {
     if (dragId === null || dragId === targetId) { setDragId(null); setDragOverId(null); return; }
@@ -1100,11 +1118,21 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                   return (
                     <div
                       key={`room-${roomData.id}`}
-                      className="border-b border-border/30 flex items-center gap-2 cursor-pointer hover:bg-muted/20 transition-colors group"
-                      style={{ height: ROOM_ROW_HEIGHT, borderLeft: `3px solid ${accentColor}20`, paddingLeft: "28px" }}
+                      className={`border-b border-border/30 flex items-center gap-2 cursor-pointer hover:bg-muted/20 transition-colors group ${dragOverId === roomData.id ? "bg-muted/40" : ""}`}
+                      style={{ height: ROOM_ROW_HEIGHT, borderLeft: `3px solid ${accentColor}20`, paddingLeft: isAdmin && !isGeneralTasks ? "12px" : "28px" }}
                       onClick={() => drillBuildingId && drillIntoRoom(drillBuildingId, actualRoomId)}
+                      draggable={isAdmin && !isGeneralTasks}
+                      onDragStart={() => !isGeneralTasks && handleDragStart(roomData.id)}
+                      onDragOver={(e) => !isGeneralTasks && handleDragOver(e, roomData.id)}
+                      onDragEnd={handleDragEnd}
+                      onDrop={() => !isGeneralTasks && parentBuilding && handleRoomDrop(parentBuilding.id, roomData.id)}
                       data-testid={`gantt-room-row-${roomData.id}`}
                     >
+                      {isAdmin && !isGeneralTasks && (
+                        <div className="shrink-0 cursor-grab opacity-0 group-hover:opacity-50 transition-opacity" onClick={(e) => e.stopPropagation()} data-testid={`drag-handle-room-${roomData.id}`}>
+                          <GripVertical className="h-3 w-3 text-muted-foreground" />
+                        </div>
+                      )}
                       <div className="flex-1 min-w-0 pr-2">
                         <div className="flex items-center gap-2">
                           <span className="text-[11px] font-medium truncate text-foreground/80">{roomData.title}</span>
@@ -1113,7 +1141,12 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                           <div className="w-12 h-1 bg-muted rounded-full overflow-hidden">
                             <div className="h-full rounded-full transition-all duration-300" style={{ width: `${roomInfo?.progress || roomData.progress || 0}%`, backgroundColor: accentColor }} />
                           </div>
-                          <span className="text-[9px] text-muted-foreground">{roomInfo?.doneTasks || 0}/{roomInfo?.totalTasks || 0}</span>
+                          <span className="text-[9px] text-muted-foreground">
+                            {isGeneralTasks
+                              ? (() => { const ut = tasks.filter(t => t.milestoneId === (drillBuildingId || 0) && !t.sectionId); return `${ut.filter(t => t.status === "done").length}/${ut.length}`; })()
+                              : `${roomInfo?.doneTasks || 0}/${roomInfo?.totalTasks || 0}`
+                            }
+                          </span>
                         </div>
                       </div>
                       {isAdmin && !isGeneralTasks && (
