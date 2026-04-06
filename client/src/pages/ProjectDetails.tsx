@@ -464,87 +464,92 @@ function SidebarCards({
             <div className="mt-4 space-y-3">
               <Dialog open={showInviteDialog} onOpenChange={setShowInviteDialog}>
                 <DialogTrigger asChild>
-                  <Button variant="outline" size="sm" className="w-full" data-testid="button-invite-client">
+                  <Button variant="outline" size="sm" className="w-full justify-start gap-2 rounded-xl border-border/70 bg-background/70" data-testid="button-invite-client">
                     <UserPlus className="h-3.5 w-3.5 mr-2" />
                     Invite New Client
                   </Button>
                 </DialogTrigger>
-                <DialogContent>
+                <DialogContent className="sm:max-w-md">
                   <DialogHeader>
-                    <DialogTitle>Invite Client to Project</DialogTitle>
+                    <DialogTitle className="font-serif">Invite Client</DialogTitle>
                     <DialogDescription>
                       The client will receive an email with a link to access their project portal. SMS can be used as a backup.
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4 pt-2">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1">
                         <Label htmlFor="invite-first">First Name</Label>
-                        <Input id="invite-first" value={inviteForm.firstName} onChange={(e) => setInviteForm(f => ({ ...f, firstName: e.target.value }))} placeholder="First name" data-testid="input-invite-first" />
+                        <Input id="invite-first" value={inviteForm.firstName} onChange={(e) => setInviteForm(f => ({ ...f, firstName: e.target.value }))} placeholder="Theresa" data-testid="input-invite-first" />
                       </div>
-                      <div className="space-y-1.5">
+                      <div className="space-y-1">
                         <Label htmlFor="invite-last">Last Name</Label>
-                        <Input id="invite-last" value={inviteForm.lastName} onChange={(e) => setInviteForm(f => ({ ...f, lastName: e.target.value }))} placeholder="Last name" data-testid="input-invite-last" />
+                        <Input id="invite-last" value={inviteForm.lastName} onChange={(e) => setInviteForm(f => ({ ...f, lastName: e.target.value }))} placeholder="McFadyen" data-testid="input-invite-last" />
                       </div>
                     </div>
-                    <div className="space-y-1.5">
+                    <div className="space-y-1">
                       <Label htmlFor="invite-email">Email</Label>
                       <Input id="invite-email" type="email" value={inviteForm.email} onChange={(e) => setInviteForm(f => ({ ...f, email: e.target.value }))} placeholder="client@example.com" data-testid="input-invite-email" />
                     </div>
-                    <div className="space-y-1.5">
+                    <div className="space-y-1">
                       <Label htmlFor="invite-phone">Phone Number (optional)</Label>
                       <Input id="invite-phone" value={inviteForm.phone} onChange={(e) => setInviteForm(f => ({ ...f, phone: e.target.value }))} placeholder="(705) 555-0123" data-testid="input-invite-phone" />
                     </div>
-                    <Button
-                      className="w-full"
-                      onClick={() => inviteClientMutation.mutate(inviteForm)}
-                      disabled={inviteClientMutation.isPending || !inviteForm.firstName.trim() || !inviteForm.lastName.trim() || !inviteForm.email.trim()}
-                      data-testid="button-send-invite"
-                    >
-                      {inviteClientMutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Sending...</> : <><Mail className="mr-2 h-4 w-4" />Send Email Invite</>}
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        className="flex-1"
+                        onClick={() => inviteClientMutation.mutate(inviteForm)}
+                        disabled={inviteClientMutation.isPending || !inviteForm.firstName.trim() || !inviteForm.lastName.trim() || !inviteForm.email.trim()}
+                        data-testid="button-send-invite"
+                      >
+                        {inviteClientMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
+                        Send Invite
+                      </Button>
+                    </div>
                   </div>
                 </DialogContent>
               </Dialog>
 
               {Array.isArray(projectInvites) && projectInvites.length > 0 && (
                 <div className="space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Invites</p>
+                  <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.18em]">Invites</p>
                   {projectInvites.map((inv: any) => (
-                    <div key={inv.id} className="flex items-center justify-between gap-2 text-sm" data-testid={`invite-row-${inv.id}`}>
-                      <div className="min-w-0">
-                        <span className="truncate block">{inv.firstName} {inv.lastName}</span>
-                        <span className="text-xs text-muted-foreground block truncate">{inv.email}{inv.phone ? ` • ${inv.phone}` : ""}</span>
-                      </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <Badge variant={inv.status === "accepted" ? "default" : inv.status === "pending" && new Date() > new Date(inv.expiresAt) ? "destructive" : "secondary"} className="text-[10px]">
+                    <div key={inv.id} className="rounded-xl border border-border/60 bg-background/60 p-3 space-y-2.5" data-testid={`invite-row-${inv.id}`}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="truncate font-medium text-sm text-foreground">{inv.firstName} {inv.lastName}</div>
+                          <div className="text-xs text-muted-foreground truncate">{inv.email}{inv.phone ? ` • ${inv.phone}` : ""}</div>
+                        </div>
+                        <Badge variant={inv.status === "accepted" ? "default" : inv.status === "pending" && new Date() > new Date(inv.expiresAt) ? "destructive" : "secondary"} className="shrink-0 text-[10px] px-2 py-0.5">
                           {inv.status === "accepted" ? "Accepted" : new Date() > new Date(inv.expiresAt) ? "Expired" : "Pending"}
                         </Badge>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-7 px-2 text-xs"
+                          className="h-8 px-3 text-xs"
                           onClick={() => copyInviteLink(inv.token)}
                           data-testid={`button-copy-invite-link-${inv.id}`}
                         >
-                          Copy Link
+                          Copy link
                         </Button>
                         {inv.status !== "accepted" && (
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="h-7 px-2 text-xs"
+                            className="h-8 px-3 text-xs"
                             onClick={() => resendInviteMutation.mutate(inv.id)}
                             disabled={resendInviteMutation.isPending}
                             data-testid={`button-resend-invite-${inv.id}`}
                           >
-                            Resend Email
+                            Resend
                           </Button>
                         )}
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-7 px-2 text-xs text-destructive hover:text-destructive"
+                          className="h-8 px-3 text-xs text-destructive hover:text-destructive"
                           onClick={() => deleteInviteMutation.mutate(inv.id)}
                           disabled={deleteInviteMutation.isPending}
                           data-testid={`button-delete-invite-${inv.id}`}
