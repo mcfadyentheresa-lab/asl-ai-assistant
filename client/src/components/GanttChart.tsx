@@ -960,7 +960,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
             </Button>
           )}
           {isAdmin && drillLevel === "tasks" && selectedBuildingId && (
-            <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => { setAddingTask({ milestoneId: selectedBuildingId, sectionId: selectedRoomId === -1 ? null : selectedRoomId }); setNewTaskTitle(""); setNewTaskDueDate(""); }} data-testid="button-add-task-timeline">
+            <Button variant="default" size="sm" className="h-7 text-xs gap-1 shadow-sm" onClick={() => { setAddingTask({ milestoneId: selectedBuildingId, sectionId: selectedRoomId === -1 ? null : selectedRoomId }); setNewTaskTitle(""); setNewTaskDueDate(""); }} data-testid="button-add-task-timeline">
               <Plus className="h-3 w-3" />
               Task
             </Button>
@@ -1012,7 +1012,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
       {drillLevel === "tasks" && selectedBuilding && (
         <div className="space-y-2">
           <div
-            className="flex items-center gap-2 px-3 py-2 rounded-sm border border-border/40 sticky top-0 z-10"
+            className="flex items-center gap-2 px-3 py-2 rounded-sm border border-primary/25 bg-primary/5 shadow-sm sticky top-0 z-10"
             style={{ backgroundColor: selectedBuilding.colorHex ? `${selectedBuilding.colorHex}15` : undefined, borderLeftWidth: "3px", borderLeftColor: selectedBuilding.colorHex || "transparent" }}
             data-testid="building-header-band"
           >
