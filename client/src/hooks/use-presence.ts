@@ -74,7 +74,12 @@ export function useVisibilityToggle() {
     },
   });
 
-  return { visible, toggleVisibility: () => toggle.mutate(!visible), isPending: toggle.isPending };
+  return {
+    visible,
+    setVisible,
+    toggleVisibility: (newVisible?: boolean) => toggle.mutate(newVisible ?? !visible),
+    isPending: toggle.isPending,
+  };
 }
 
 export function isUserOnline(onlineUsers: OnlineUser[] | undefined, userId: string): boolean {

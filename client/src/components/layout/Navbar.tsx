@@ -67,7 +67,7 @@ export function Navbar() {
           <span className="text-xs font-medium text-muted-foreground">Crew / Admin temp view</span>
           <Switch
             checked={visible}
-            onCheckedChange={(checked) => toggleVisibility()}
+            onCheckedChange={(checked) => toggleVisibility(checked)}
             data-testid="switch-temp-view"
           />
         </div>
