@@ -1687,7 +1687,7 @@ function ProgressTab({ projectId, milestones, sections, tasks, userRole, subTab,
           <h2 className="font-serif text-lg font-semibold uppercase tracking-wide text-foreground" data-testid="text-progress-heading">
             Progress
           </h2>
-          <p className="text-xs text-muted-foreground">Choose a view</p>
+          <p className="text-xs text-muted-foreground">Choose open items, timeline, or calendar</p>
         </div>
         <div>
           <Select value={subTab} onValueChange={(value) => onSubTabChange(value as "gantt" | "checklist" | "calendar")}>
@@ -1696,7 +1696,7 @@ function ProgressTab({ projectId, milestones, sections, tasks, userRole, subTab,
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="gantt">Timeline</SelectItem>
-              <SelectItem value="checklist">Checklist</SelectItem>
+              <SelectItem value="checklist">Open Items</SelectItem>
               <SelectItem value="calendar">Calendar</SelectItem>
             </SelectContent>
           </Select>
