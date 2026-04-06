@@ -71,6 +71,7 @@ export const tasks = pgTable("tasks", {
   description: text("description"),
   status: text("status").default("todo"), // todo, in_progress, review, done
   assignedTo: text("assigned_to").references(() => users.id),
+  startDate: date("start_date"),
   dueDate: date("due_date"),
   order: integer("order").default(0),
   createdAt: timestamp("created_at").defaultNow(),

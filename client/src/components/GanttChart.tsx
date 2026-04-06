@@ -49,6 +49,7 @@ interface Task {
   id: number;
   title: string;
   status: string | null;
+  startDate: string | null;
   dueDate: string | null;
   milestoneId: number | null;
   sectionId: number | null;
@@ -110,6 +111,8 @@ interface TaskInfo {
   title: string;
   startDate: Date | null;
   endDate: Date | null;
+  rawStartDate: string | null;
+  rawEndDate: string | null;
   status: string | null;
   colorIndex: number;
 }
@@ -361,6 +364,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
   const [editSectionForm, setEditSectionForm] = useState({ title: "", startDate: "", endDate: "" });
   const [addingTask, setAddingTask] = useState<{ milestoneId: number; sectionId: number | null } | null>(null);
   const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [newTaskStartDate, setNewTaskStartDate] = useState("");
   const [newTaskDueDate, setNewTaskDueDate] = useState("");
   const [dragId, setDragId] = useState<number | null>(null);
   const [dragOverId, setDragOverId] = useState<number | null>(null);
@@ -501,12 +505,17 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
 
         const taskToday = new Date();
     return filteredTasks.map(t => {
-      const taskDate = t.dueDate ? parseISO(t.dueDate) : addDays(taskToday, 1);
-      const taskStart = t.dueDate ? addDays(taskDate, -3) : taskToday;
+      const hasStart = !!t.startDate;
+      const hasEnd = !!t.dueDate;
+      const taskEnd = hasEnd ? parseISO(t.dueDate!) : (hasStart ? addDays(parseISO(t.startDate!), 7) : addDays(taskToday, 1));
+      const taskStart = hasStart ? parseISO(t.startDate!) : (hasEnd ? addDays(taskEnd, -7) : taskToday);
       return {
         id: t.id, title: t.title,
         startDate: taskStart,
-            endDate: taskDate, status: t.status, colorIndex: 0,
+        endDate: taskEnd,
+        rawStartDate: t.startDate,
+        rawEndDate: t.dueDate,
+        status: t.status, colorIndex: 0,
       };
     });
   }, [drillLevel, selectedBuildingId, selectedRoomId, buildingInfos, tasks]);
@@ -646,10 +655,15 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
 
   const handleAddTask = () => {
     if (!addingTask || !newTaskTitle.trim()) return;
+    let taskStart = newTaskStartDate || null;
+    let taskEnd = newTaskDueDate || null;
+    if (taskStart && taskEnd && taskStart > taskEnd) {
+      [taskStart, taskEnd] = [taskEnd, taskStart];
+    }
     createTask(
-      { projectId, milestoneId: addingTask.milestoneId, sectionId: addingTask.sectionId, title: newTaskTitle.trim(), dueDate: newTaskDueDate || null },
+      { projectId, milestoneId: addingTask.milestoneId, sectionId: addingTask.sectionId, title: newTaskTitle.trim(), startDate: taskStart, dueDate: taskEnd },
       {
-        onSuccess: () => { toast({ title: "Task added" }); setNewTaskTitle(""); setNewTaskDueDate(""); setAddingTask(null); },
+        onSuccess: () => { toast({ title: "Task added" }); setNewTaskTitle(""); setNewTaskStartDate(""); setNewTaskDueDate(""); setAddingTask(null); },
         onError: () => toast({ title: "Failed to add task", variant: "destructive" }),
       }
     );
@@ -763,7 +777,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
     const commitResize = (start: Date, end: Date) => {
       if (row.type === "building") updateMilestone({ id: row.id, projectId, startDate: format(start, "yyyy-MM-dd"), endDate: format(end, "yyyy-MM-dd") });
       else if (row.type === "room") updateSection({ id: row.id, projectId, startDate: format(start, "yyyy-MM-dd"), endDate: format(end, "yyyy-MM-dd") } as any);
-      else updateTask({ id: row.id, dueDate: format(end, "yyyy-MM-dd") } as any);
+      else updateTask({ id: row.id, startDate: format(start, "yyyy-MM-dd"), dueDate: format(end, "yyyy-MM-dd") } as any);
     };
     const bindResize = (edge: "start" | "end", e: React.MouseEvent) => {
       e.preventDefault();
@@ -960,7 +974,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
             </Button>
           )}
           {isAdmin && drillLevel === "tasks" && selectedBuildingId && (
-            <Button variant="default" size="sm" className="h-7 text-xs gap-1 shadow-sm" onClick={() => { setAddingTask({ milestoneId: selectedBuildingId, sectionId: selectedRoomId === -1 ? null : selectedRoomId }); setNewTaskTitle(""); setNewTaskDueDate(""); }} data-testid="button-add-task-timeline">
+            <Button variant="default" size="sm" className="h-7 text-xs gap-1 shadow-sm" onClick={() => { setAddingTask({ milestoneId: selectedBuildingId, sectionId: selectedRoomId === -1 ? null : selectedRoomId }); setNewTaskTitle(""); setNewTaskStartDate(""); setNewTaskDueDate(""); }} data-testid="button-add-task-timeline">
               <Plus className="h-3 w-3" />
               Task
             </Button>
@@ -1104,6 +1118,9 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
         <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 px-2 py-1.5" data-testid="form-add-task-inline" onKeyDown={e => { if (e.key === "Escape") setAddingTask(null); }}>
           <Input placeholder="Task title" value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)} className="flex-1 h-8 text-xs sm:min-w-0" autoFocus data-testid="input-task-title" onKeyDown={e => { if (e.key === "Enter") handleAddTask(); if (e.key === "Escape") setAddingTask(null); }} />
           <div className="sm:shrink-0 sm:mt-0.5">
+            <DateField label="Start date" value={newTaskStartDate} onChange={setNewTaskStartDate} placeholder="Start date" testId="button-task-start-date" />
+          </div>
+          <div className="sm:shrink-0 sm:mt-0.5">
             <DateField label="Due date" value={newTaskDueDate} onChange={setNewTaskDueDate} placeholder="Due date" testId="button-task-due-date" />
           </div>
           <div className="flex items-center gap-1.5">
@@ -1195,7 +1212,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                                 <FolderPlus className="h-3.5 w-3.5 mr-2" />
                                 Add Room
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => { setAddingTask({ milestoneId: building.id, sectionId: null }); setNewTaskTitle(""); setNewTaskDueDate(""); }} data-testid={`button-add-task-building-${building.id}`}>
+                              <DropdownMenuItem onClick={() => { setAddingTask({ milestoneId: building.id, sectionId: null }); setNewTaskTitle(""); setNewTaskStartDate(""); setNewTaskDueDate(""); }} data-testid={`button-add-task-building-${building.id}`}>
                                 <ListPlus className="h-3.5 w-3.5 mr-2" />
                                 Add Task
                               </DropdownMenuItem>
@@ -1264,7 +1281,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                               <Pencil className="h-3.5 w-3.5 mr-2" />
                               Edit Room
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => { if (parentBuilding) { setAddingTask({ milestoneId: parentBuilding.id, sectionId: roomData.id }); setNewTaskTitle(""); setNewTaskDueDate(""); } }} data-testid={`button-add-task-room-${roomData.id}`}>
+                            <DropdownMenuItem onClick={() => { if (parentBuilding) { setAddingTask({ milestoneId: parentBuilding.id, sectionId: roomData.id }); setNewTaskTitle(""); setNewTaskStartDate(""); setNewTaskDueDate(""); } }} data-testid={`button-add-task-room-${roomData.id}`}>
                               <ListPlus className="h-3.5 w-3.5 mr-2" />
                               Add Task
                             </DropdownMenuItem>
@@ -1316,8 +1333,10 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                     </div>
                     <div className="flex-1 min-w-0">
                       <span className={`text-[11px] truncate block leading-tight ${isDone ? "line-through text-muted-foreground" : ""}`}>{task.title}</span>
-                      {task.endDate && (
-                        <span className="text-[9px] text-muted-foreground/70 leading-none">Due {format(task.endDate, "MMM d")}</span>
+                      {(task.rawStartDate || task.rawEndDate) && (
+                        <span className="text-[9px] text-muted-foreground/70 leading-none">
+                          {task.rawStartDate && task.rawEndDate ? `${format(parseISO(task.rawStartDate), "MMM d")} – ${format(parseISO(task.rawEndDate), "MMM d")}` : task.rawEndDate ? `Due ${format(parseISO(task.rawEndDate), "MMM d")}` : `From ${format(parseISO(task.rawStartDate!), "MMM d")}`}
+                        </span>
                       )}
                     </div>
                     <Badge variant={isDone ? "secondary" : "outline"} className="text-[9px] px-1 py-0 h-3.5 shrink-0 capitalize" data-testid={`badge-task-status-${task.id}`}>
