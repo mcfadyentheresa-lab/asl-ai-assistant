@@ -163,7 +163,7 @@ function BuildingColourPicker({ currentHex, onSelect }: { currentHex: string | n
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-48 p-2" align="start" onClick={(e) => e.stopPropagation()}>
-        <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2 font-medium">Building Colour</p>
+        <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2 font-medium">Colour</p>
         <div className="grid grid-cols-4 gap-1.5">
           {QUICK_COLOURS.map((hex) => (
             <button
