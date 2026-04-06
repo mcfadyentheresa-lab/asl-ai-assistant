@@ -771,12 +771,10 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
       const startX = e.clientX;
       const originalStart = row.startDate!;
       const originalEnd = row.endDate!;
-      const originalRangeMs = Math.max(originalEnd.getTime() - originalStart.getTime(), 86400000);
-      const originalWidth = Math.max(getBarPosition(originalStart, originalEnd).width, 36);
       let lastX = startX;
       const onMove = (moveEvent: MouseEvent) => {
         lastX = moveEvent.clientX;
-        const deltaDays = (lastX - startX) / (originalWidth / (originalRangeMs / 86400000));
+        const deltaDays = Math.round((lastX - startX) / dayWidth);
         if (edge === "start") {
           const nextStart = addDays(originalStart, deltaDays);
           if (nextStart >= originalEnd) return;
@@ -790,7 +788,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
       const onUp = () => {
         window.removeEventListener("mousemove", onMove);
         window.removeEventListener("mouseup", onUp);
-        const finalDelta = Math.round((lastX - startX) / (originalWidth / (originalRangeMs / 86400000)));
+        const finalDelta = Math.round((lastX - startX) / dayWidth);
         if (finalDelta === 0) { setResizePreview(null); return; }
         const finalStart = edge === "start" ? addDays(originalStart, finalDelta) : originalStart;
         const finalEnd = edge === "end" ? addDays(originalEnd, finalDelta) : originalEnd;
