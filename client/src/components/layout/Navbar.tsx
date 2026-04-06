@@ -73,7 +73,7 @@ export function Navbar() {
             <DropdownMenuLabel className="text-xs text-muted-foreground">
               Switch View
             </DropdownMenuLabel>
-            {(["client", "crew", "admin"] as const).map((role) => (
+            {(["admin", "crew", "client"] as const).map((role) => (
               <DropdownMenuItem
                 key={role}
                 onClick={() => setViewMode(role)}
