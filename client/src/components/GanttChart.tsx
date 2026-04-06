@@ -757,7 +757,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
 
     const { left, width } = getBarPosition(displayStart, displayEnd);
     const visibleWidth = Math.max(width, 36);
-    const barColor = row.colorHex || BUILDING_COLORS[row.colorIndex];
+    const barColor = row.type === "room" && row.colorHex ? row.colorHex : row.colorHex || BUILDING_COLORS[row.colorIndex];
     const rowH = row.type === "room" ? ROOM_ROW_HEIGHT : ROW_HEIGHT;
     const canResize = isAdmin && row.startDate && row.endDate && row.id > 0;
     const commitResize = (start: Date, end: Date) => {
