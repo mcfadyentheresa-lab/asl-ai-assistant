@@ -462,9 +462,9 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
 
       const secToday = new Date();
       const secStart = sec.startDate ? parseISO(sec.startDate)
-        : secDates.length > 0 ? new Date(Math.min(...secDates.map(d => d.getTime()))) : (building.startDate || secToday);
+        : secDates.length > 0 ? new Date(Math.min(...secDates.map(d => d.getTime()))) : secToday;
       let secEnd = sec.endDate ? parseISO(sec.endDate)
-        : secDates.length > 0 ? new Date(Math.max(...secDates.map(d => d.getTime()))) : addDays(secStart, 3);
+        : secDates.length > 0 ? new Date(Math.max(...secDates.map(d => d.getTime()))) : addDays(secToday, 3);
       if (secEnd.getTime() <= secStart.getTime()) {
         secEnd = addDays(secStart, 3);
       }
