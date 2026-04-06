@@ -67,7 +67,7 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths, isSameDay, isSameMonth, parseISO, formatDistanceToNow, isWithinInterval, differenceInCalendarDays } from "date-fns";
-import type { ChecklistItem, BoardItem, CalendarEvent } from "@shared/schema";
+import type { ChecklistItem, BoardItem, CalendarEvent, Milestone, Section, Task } from "@shared/schema";
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat("en-CA", { style: "currency", currency: "CAD", minimumFractionDigits: 2 }).format(amount);
@@ -3223,6 +3223,8 @@ const eventTypeColors: Record<string, string> = {
   delivery: "#0891b2",
   inspection: "#7c3aed",
   time_off: "#64748b",
+  team: "#0d9488",
+  personal: "#8b5cf6",
 };
 
 const eventTypeLabelsCalendar: Record<string, string> = {
@@ -3233,7 +3235,12 @@ const eventTypeLabelsCalendar: Record<string, string> = {
   delivery: "Delivery",
   inspection: "Inspection",
   time_off: "Time Off",
+  team: "Team",
+  personal: "Personal",
 };
+
+const TEAM_EVENT_TYPES = new Set(["meeting", "delivery", "inspection", "team"]);
+const PERSONAL_EVENT_TYPES = new Set(["time_off", "personal"]);
 
 const CALENDAR_BUILDING_COLORS = [
   "#173B2F", "#2E6B4F", "#3F8A66", "#B87333", "#4D7A68",
@@ -3268,7 +3275,8 @@ function CalendarTab({ projectId }: { projectId: number }) {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [eventForm, setEventForm] = useState({ title: "", description: "", type: "event" });
   const [timeOffCrewId, setTimeOffCrewId] = useState<string>("");
-  const crewMembers = (allUsers as any[] || []).filter((u: any) => u.role === "crew" || u.role === "admin");
+  const typedUsers = (allUsers || []) as { id: string; firstName: string | null; lastName: string | null; role: string | null }[];
+  const crewMembers = typedUsers.filter((u) => u.role === "crew" || u.role === "admin");
   const [eventImageFile, setEventImageFile] = useState<File | null>(null);
   const [eventImagePreview, setEventImagePreview] = useState<string | null>(null);
   const [expandedImage, setExpandedImage] = useState<string | null>(null);
@@ -3280,14 +3288,17 @@ function CalendarTab({ projectId }: { projectId: number }) {
 
   const [showTimeline, setShowTimeline] = useState(true);
   const [showEvents, setShowEvents] = useState(true);
+  const [showTeam, setShowTeam] = useState(true);
+  const [showPersonal, setShowPersonal] = useState(true);
+
+  const milestonesList = (milestonesData || []) as Milestone[];
+  const sectionsList = (sectionsData || []) as Section[];
+  const tasksList = (tasksData || []) as Task[];
 
   const timelineItems: TimelineItem[] = (() => {
     const items: TimelineItem[] = [];
-    const milestones = (milestonesData as any[]) || [];
-    const secs = (sectionsData as any[]) || [];
-    const tks = (tasksData as any[]) || [];
 
-    milestones.forEach((ms: any, idx: number) => {
+    milestonesList.forEach((ms, idx) => {
       if (ms.startDate && ms.endDate) {
         items.push({
           id: `ms-${ms.id}`,
@@ -3301,10 +3312,10 @@ function CalendarTab({ projectId }: { projectId: number }) {
       }
     });
 
-    secs.forEach((s: any) => {
+    sectionsList.forEach((s) => {
       if (s.startDate && s.endDate) {
-        const parent = milestones.find((m: any) => m.id === s.milestoneId);
-        const parentIdx = parent ? milestones.indexOf(parent) : 0;
+        const parent = milestonesList.find((m) => m.id === s.milestoneId);
+        const parentIdx = parent ? milestonesList.indexOf(parent) : 0;
         items.push({
           id: `sec-${s.id}`,
           title: s.title,
@@ -3317,10 +3328,10 @@ function CalendarTab({ projectId }: { projectId: number }) {
       }
     });
 
-    tks.forEach((t: any) => {
+    tasksList.forEach((t) => {
       if (t.startDate && t.dueDate) {
-        const parent = milestones.find((m: any) => m.id === t.milestoneId);
-        const parentIdx = parent ? milestones.indexOf(parent) : 0;
+        const parent = milestonesList.find((m) => m.id === t.milestoneId);
+        const parentIdx = parent ? milestonesList.indexOf(parent) : 0;
         items.push({
           id: `task-${t.id}`,
           title: t.title,
@@ -3341,11 +3352,21 @@ function CalendarTab({ projectId }: { projectId: number }) {
   const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
   const startDayOfWeek = getDay(monthStart);
 
+  const isEventVisible = (ev: CalendarEvent) => {
+    const evType = ev.type || "event";
+    if (!showEvents && !TEAM_EVENT_TYPES.has(evType) && !PERSONAL_EVENT_TYPES.has(evType)) return false;
+    if (TEAM_EVENT_TYPES.has(evType) && !showTeam) return false;
+    if (PERSONAL_EVENT_TYPES.has(evType) && !showPersonal) return false;
+    if (!TEAM_EVENT_TYPES.has(evType) && !PERSONAL_EVENT_TYPES.has(evType) && !showEvents) return false;
+    return true;
+  };
+
   const getEventsForDate = (date: Date) => {
     if (!events) return [];
     return (events as CalendarEvent[]).filter((e) => {
-      const start = (e as any).startDate ? parseISO((e as any).startDate) : parseISO(e.date);
-      const end = e.endDate ? parseISO(e.endDate) : parseISO(e.date);
+      if (!isEventVisible(e)) return false;
+      const start = parseISO(e.date);
+      const end = e.endDate ? parseISO(e.endDate) : start;
       return isWithinInterval(date, { start, end });
     });
   };
@@ -3353,13 +3374,14 @@ function CalendarTab({ projectId }: { projectId: number }) {
   const getTimelineForDate = (date: Date) => {
     if (!showTimeline) return [];
     return timelineItems.filter((item) => {
-      try {
-        return isWithinInterval(date, { start: parseISO(item.startDate), end: parseISO(item.endDate) });
-      } catch { return false; }
+      const start = parseISO(item.startDate);
+      const end = parseISO(item.endDate);
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) return false;
+      return isWithinInterval(date, { start, end });
     });
   };
 
-  const selectedDateEvents = selectedDate && showEvents ? getEventsForDate(selectedDate) : [];
+  const selectedDateEvents = selectedDate ? getEventsForDate(selectedDate) : [];
   const selectedDateTimeline = selectedDate ? getTimelineForDate(selectedDate) : [];
 
   const getEventSpan = (event: CalendarEvent) => {
@@ -3468,7 +3490,7 @@ function CalendarTab({ projectId }: { projectId: number }) {
           </Button>
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer" data-testid="toggle-timeline">
               <Switch checked={showTimeline} onCheckedChange={setShowTimeline} className="scale-75" />
               Timeline
@@ -3476,6 +3498,14 @@ function CalendarTab({ projectId }: { projectId: number }) {
             <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer" data-testid="toggle-events">
               <Switch checked={showEvents} onCheckedChange={setShowEvents} className="scale-75" />
               Events
+            </label>
+            <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer" data-testid="toggle-team">
+              <Switch checked={showTeam} onCheckedChange={setShowTeam} className="scale-75" />
+              Team
+            </label>
+            <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer" data-testid="toggle-personal">
+              <Switch checked={showPersonal} onCheckedChange={setShowPersonal} className="scale-75" />
+              Personal
             </label>
           </div>
           <Button
@@ -3601,7 +3631,7 @@ function CalendarTab({ projectId }: { projectId: number }) {
 
       {showTimeline && timelineItems.length > 0 && (
         <div className="flex flex-wrap gap-2 px-1" data-testid="timeline-legend">
-          {((milestonesData as any[]) || []).map((ms: any, idx: number) => (
+          {milestonesList.map((ms, idx) => (
             <div key={ms.id} className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: ms.colorHex || CALENDAR_BUILDING_COLORS[idx % CALENDAR_BUILDING_COLORS.length] }} />
               {ms.title}
@@ -3799,6 +3829,8 @@ function CalendarTab({ projectId }: { projectId: number }) {
                   <SelectItem value="meeting">Meeting</SelectItem>
                   <SelectItem value="delivery">Delivery</SelectItem>
                   <SelectItem value="inspection">Inspection</SelectItem>
+                  <SelectItem value="team">Team</SelectItem>
+                  <SelectItem value="personal">Personal</SelectItem>
                   {user?.role === "admin" && <SelectItem value="time_off">Time Off</SelectItem>}
                 </SelectContent>
               </Select>

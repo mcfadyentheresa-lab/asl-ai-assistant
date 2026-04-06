@@ -2,7 +2,6 @@ import { useAuth } from "@/hooks/use-auth";
 import { Navbar } from "@/components/layout/Navbar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -23,6 +22,7 @@ import { Loader2, ChevronLeft, ChevronRight, CalendarIcon, ArrowLeft } from "luc
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
+import type { Milestone, Section, Task, CalendarEvent } from "@shared/schema";
 import {
   format,
   startOfMonth,
@@ -49,6 +49,8 @@ const eventTypeColors: Record<string, string> = {
   delivery: "#0891b2",
   inspection: "#7c3aed",
   time_off: "#64748b",
+  team: "#0d9488",
+  personal: "#8b5cf6",
 };
 
 const eventTypeLabels: Record<string, string> = {
@@ -59,7 +61,24 @@ const eventTypeLabels: Record<string, string> = {
   delivery: "Delivery",
   inspection: "Inspection",
   time_off: "Time Off",
+  team: "Team",
+  personal: "Personal",
 };
+
+const TEAM_EVENT_TYPES = new Set(["meeting", "delivery", "inspection", "team"]);
+const PERSONAL_EVENT_TYPES = new Set(["time_off", "personal"]);
+
+type MilestoneWithProject = Milestone & { projectName: string };
+type SectionWithProject = Section & { projectName: string };
+type TaskWithProject = Task & { projectName: string };
+type EventWithProject = CalendarEvent & { projectName: string };
+
+interface MasterCalendarData {
+  events: EventWithProject[];
+  milestones: MilestoneWithProject[];
+  sections: SectionWithProject[];
+  tasks: TaskWithProject[];
+}
 
 type UnifiedItem = {
   id: string;
@@ -71,16 +90,12 @@ type UnifiedItem = {
   color: string;
   layer: "timeline" | "event";
   kind: string;
+  eventType?: string;
   description?: string | null;
 };
 
 function useMasterCalendar(enabled: boolean) {
-  return useQuery<{
-    events: any[];
-    milestones: any[];
-    sections: any[];
-    tasks: any[];
-  }>({
+  return useQuery<MasterCalendarData>({
     queryKey: ["/api/calendar/all"],
     queryFn: async () => {
       const res = await fetch("/api/calendar/all", { credentials: "include" });
@@ -99,6 +114,8 @@ export default function MasterCalendar() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showTimeline, setShowTimeline] = useState(true);
   const [showEvents, setShowEvents] = useState(true);
+  const [showTeam, setShowTeam] = useState(true);
+  const [showPersonal, setShowPersonal] = useState(true);
   const [projectFilter, setProjectFilter] = useState<string>("all");
 
   if (!user || !canAccess) {
@@ -117,7 +134,7 @@ export default function MasterCalendar() {
     const items: UnifiedItem[] = [];
     const milestoneColorMap = new Map<number, string>();
 
-    (data.milestones || []).forEach((ms: any, idx: number) => {
+    data.milestones.forEach((ms, idx) => {
       const color = ms.colorHex || BUILDING_COLORS[idx % BUILDING_COLORS.length];
       milestoneColorMap.set(ms.id, color);
       if (ms.startDate && ms.endDate) {
@@ -135,7 +152,7 @@ export default function MasterCalendar() {
       }
     });
 
-    (data.sections || []).forEach((s: any) => {
+    data.sections.forEach((s) => {
       if (s.startDate && s.endDate) {
         items.push({
           id: `sec-${s.id}`,
@@ -151,7 +168,7 @@ export default function MasterCalendar() {
       }
     });
 
-    (data.tasks || []).forEach((t: any) => {
+    data.tasks.forEach((t) => {
       if (t.startDate && t.dueDate) {
         items.push({
           id: `task-${t.id}`,
@@ -160,14 +177,14 @@ export default function MasterCalendar() {
           projectId: t.projectId,
           startDate: t.startDate,
           endDate: t.dueDate,
-          color: milestoneColorMap.get(t.milestoneId) || BUILDING_COLORS[0],
+          color: milestoneColorMap.get(t.milestoneId ?? 0) || BUILDING_COLORS[0],
           layer: "timeline",
           kind: "Task",
         });
       }
     });
 
-    (data.events || []).forEach((ev: any) => {
+    data.events.forEach((ev) => {
       if (ev.date) {
         items.push({
           id: `ev-${ev.id}`,
@@ -179,6 +196,7 @@ export default function MasterCalendar() {
           color: eventTypeColors[ev.type || "event"] || eventTypeColors.event,
           layer: "event",
           kind: eventTypeLabels[ev.type || "event"] || "Event",
+          eventType: ev.type || "event",
           description: ev.description,
         });
       }
@@ -192,7 +210,12 @@ export default function MasterCalendar() {
   const filtered = allItems.filter((item) => {
     if (projectFilter !== "all" && item.projectName !== projectFilter) return false;
     if (item.layer === "timeline" && !showTimeline) return false;
-    if (item.layer === "event" && !showEvents) return false;
+    if (item.layer === "event") {
+      const evType = item.eventType || "event";
+      if (TEAM_EVENT_TYPES.has(evType) && !showTeam) return false;
+      if (PERSONAL_EVENT_TYPES.has(evType) && !showPersonal) return false;
+      if (!TEAM_EVENT_TYPES.has(evType) && !PERSONAL_EVENT_TYPES.has(evType) && !showEvents) return false;
+    }
     return true;
   });
 
@@ -203,9 +226,10 @@ export default function MasterCalendar() {
 
   const getItemsForDate = (date: Date) => {
     return filtered.filter((item) => {
-      try {
-        return isWithinInterval(date, { start: parseISO(item.startDate), end: parseISO(item.endDate) });
-      } catch { return false; }
+      const start = parseISO(item.startDate);
+      const end = parseISO(item.endDate);
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) return false;
+      return isWithinInterval(date, { start, end });
     });
   };
 
@@ -270,6 +294,14 @@ export default function MasterCalendar() {
               <Switch checked={showEvents} onCheckedChange={setShowEvents} className="scale-75" />
               Events
             </label>
+            <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer" data-testid="toggle-master-team">
+              <Switch checked={showTeam} onCheckedChange={setShowTeam} className="scale-75" />
+              Team
+            </label>
+            <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer" data-testid="toggle-master-personal">
+              <Switch checked={showPersonal} onCheckedChange={setShowPersonal} className="scale-75" />
+              Personal
+            </label>
           </div>
         </div>
 
@@ -317,9 +349,10 @@ export default function MasterCalendar() {
                         key={item.id}
                         className="text-[10px] leading-tight truncate rounded px-1 py-0.5 text-white/90"
                         style={{ backgroundColor: item.color, opacity: item.layer === "timeline" ? 0.85 : 1 }}
+                        title={`${item.projectName}: ${item.title}`}
                         data-testid={`master-item-${item.id}`}
                       >
-                        {item.title}
+                        <span className="font-semibold">{item.projectName}:</span> {item.title}
                       </div>
                     ))}
                     {dayItems.length > 3 && (
