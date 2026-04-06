@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { format, parseISO, differenceInDays, addDays, startOfMonth, endOfMonth, eachMonthOfInterval } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -145,7 +145,7 @@ function DateField({ label, value, onChange, placeholder, testId }: { label: str
   );
 }
 
-function BuildingColourPicker({ currentHex, onSelect }: { currentHex: string | null | undefined; onSelect: (hex: string | null) => void }) {
+function BuildingColourPicker({ currentHex, onSelect, onShift }: { currentHex: string | null | undefined; onSelect: (hex: string | null) => void; onShift?: (direction: "left" | "right") => void }) {
   const QUICK_COLOURS = [
     "#1E3A2F", "#2D5A47", "#3D7A5F", "#8B7355", "#6B8E73",
     "#4A6741", "#7A6B5D", "#556B2F", "#C4A882", "#3B5249",
@@ -164,8 +164,27 @@ function BuildingColourPicker({ currentHex, onSelect }: { currentHex: string | n
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-48 p-2" align="start" onClick={(e) => e.stopPropagation()}>
+      <PopoverContent className="w-52 p-2" align="start" onClick={(e) => e.stopPropagation()}>
         <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2 font-medium">Building Colour</p>
+        {onShift && (
+          <div className="flex items-center justify-between mb-2">
+            <button
+              className="h-7 w-7 flex items-center justify-center rounded-sm border border-border/40 hover:bg-muted/60 transition-colors"
+              onClick={(e) => { e.stopPropagation(); onShift("left"); }}
+              data-testid="button-shift-building-back"
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />
+            </button>
+            <span className="text-[9px] uppercase tracking-wider text-muted-foreground">Adjust length</span>
+            <button
+              className="h-7 w-7 flex items-center justify-center rounded-sm border border-border/40 hover:bg-muted/60 transition-colors"
+              onClick={(e) => { e.stopPropagation(); onShift("right"); }}
+              data-testid="button-shift-building-forward"
+            >
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
         <div className="grid grid-cols-4 gap-1.5">
           {QUICK_COLOURS.map((hex) => (
             <button
@@ -364,17 +383,9 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
   const [newTaskDueDate, setNewTaskDueDate] = useState("");
   const [dragId, setDragId] = useState<number | null>(null);
   const [dragOverId, setDragOverId] = useState<number | null>(null);
+  const [selectedBar, setSelectedBar] = useState<BarItem | null>(null);
 
   const timelineRef = useRef<HTMLDivElement>(null);
-  const [barDrag, setBarDrag] = useState<{
-    rowId: number;
-    rowType: "building" | "room" | "task";
-    startX: number;
-    deltaDays: number;
-    originalStart: Date;
-    originalEnd: Date;
-  } | null>(null);
-
   const { toast } = useToast();
   const { mutate: createMilestone, isPending: creatingMilestone } = useCreateMilestone();
   const { mutate: updateMilestone } = useUpdateMilestone();
@@ -741,57 +752,24 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
     setDragOverId(null);
   }, [dragId, drillLevel, milestones, tasks, selectedBuildingId, selectedRoomId, updateMilestone, updateTask, projectId]);
 
-  const handleBarDragStart = useCallback((e: React.MouseEvent, row: BarItem) => {
-    if (!isAdmin || !row.startDate || !row.endDate) return;
-    e.preventDefault();
-    e.stopPropagation();
-    setBarDrag({
-      rowId: row.id,
-      rowType: row.type,
-      startX: e.clientX,
-      deltaDays: 0,
-      originalStart: row.startDate,
-      originalEnd: row.endDate,
-    });
-  }, [isAdmin]);
+  const shiftSelectedBar = useCallback((direction: "left" | "right") => {
+    if (!selectedBar || !selectedBar.startDate || !selectedBar.endDate) return;
+    const delta = direction === "right" ? 1 : -1;
+    const nextStart = addDays(selectedBar.startDate, delta);
+    const nextEnd = addDays(selectedBar.endDate, delta);
+    const startStr = format(nextStart, "yyyy-MM-dd");
+    const endStr = format(nextEnd, "yyyy-MM-dd");
 
-  const handleBarDragSave = useCallback((drag: NonNullable<typeof barDrag>) => {
-    if (drag.deltaDays === 0) return;
-    const newStart = addDays(drag.originalStart, drag.deltaDays);
-    const newEnd = addDays(drag.originalEnd, drag.deltaDays);
-    const startStr = format(newStart, "yyyy-MM-dd");
-    const endStr = format(newEnd, "yyyy-MM-dd");
-
-    if (drag.rowType === "building") {
-      updateMilestone({ id: drag.rowId, projectId, startDate: startStr, endDate: endStr });
-    } else if (drag.rowType === "room") {
-      updateSection({ id: drag.rowId, projectId, startDate: startStr, endDate: endStr } as any);
+    if (selectedBar.type === "building") {
+      updateMilestone({ id: selectedBar.id, projectId, startDate: startStr, endDate: endStr });
+    } else if (selectedBar.type === "room") {
+      updateSection({ id: selectedBar.id, projectId, startDate: startStr, endDate: endStr } as any);
     } else {
-      updateTask({ id: drag.rowId, dueDate: endStr } as any);
+      updateTask({ id: selectedBar.id, dueDate: endStr } as any);
     }
-    toast({ title: `Dates shifted by ${Math.abs(drag.deltaDays)} day${Math.abs(drag.deltaDays) !== 1 ? "s" : ""} ${drag.deltaDays > 0 ? "forward" : "back"}` });
-  }, [updateMilestone, updateSection, updateTask, projectId, toast]);
 
-  useEffect(() => {
-    if (!barDrag) return;
-    const handleMouseMove = (e: MouseEvent) => {
-      const dx = e.clientX - barDrag.startX;
-      const newDelta = Math.round(dx / dayWidth);
-      if (newDelta !== barDrag.deltaDays) {
-        setBarDrag(prev => prev ? { ...prev, deltaDays: newDelta } : null);
-      }
-    };
-    const handleMouseUp = () => {
-      handleBarDragSave(barDrag);
-      setBarDrag(null);
-    };
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
-    return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-    };
-  }, [barDrag, dayWidth, handleBarDragSave]);
+    toast({ title: `Shifted ${direction === "right" ? "forward" : "back"} 1 day` });
+  }, [selectedBar, projectId, toast, updateMilestone, updateSection, updateTask]);
 
   const drillIntoRoom = (buildingId: number, roomId: number) => {
     setSelectedBuildingId(buildingId);
@@ -808,9 +786,8 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
   const renderBar = (row: BarItem) => {
     if (!row.startDate || !row.endDate) return null;
 
-    const isDraggingThis = barDrag?.rowId === row.id && barDrag?.rowType === row.type;
-    const displayStart = isDraggingThis ? addDays(row.startDate, barDrag.deltaDays) : row.startDate;
-    const displayEnd = isDraggingThis ? addDays(row.endDate, barDrag.deltaDays) : row.endDate;
+    const displayStart = row.startDate;
+    const displayEnd = row.endDate;
 
     const { left, width } = getBarPosition(displayStart, displayEnd);
     const barColor = row.colorHex || BUILDING_COLORS[row.colorIndex];
@@ -825,10 +802,10 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
         <Tooltip>
           <TooltipTrigger asChild>
             <div
-              className={`absolute rounded-sm select-none ${canDrag ? "cursor-grab active:cursor-grabbing" : "cursor-default"} ${isDraggingThis ? "ring-2 ring-primary/50 z-20" : ""}`}
-              style={{ left, width, top: topOffset, height: barHeight, backgroundColor: barColor, opacity: isDone ? 0.55 : 0.95, transition: isDraggingThis ? "none" : "left 0.2s, width 0.2s" }}
+              className="absolute rounded-sm select-none cursor-default"
+              style={{ left, width, top: topOffset, height: barHeight, backgroundColor: barColor, opacity: isDone ? 0.55 : 0.95 }}
               data-testid={`gantt-bar-task-${row.id}`}
-              onMouseDown={(e) => canDrag && handleBarDragStart(e, row)}
+              onClick={() => canDrag && setSelectedBar(row)}
             >
               {isDone && (
                 <div className="absolute inset-0 flex items-center justify-center">
@@ -842,13 +819,11 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
               )}
             </div>
           </TooltipTrigger>
-          {!isDraggingThis && (
-            <TooltipContent>
-              <p className="font-medium text-sm">{row.title}</p>
-              <p className="text-xs text-muted-foreground capitalize">{row.status || "to-do"}</p>
-              {row.endDate && <p className="text-xs text-muted-foreground">Due: {format(row.endDate, "MMM d, yyyy")}</p>}
-            </TooltipContent>
-          )}
+          <TooltipContent>
+            <p className="font-medium text-sm">{row.title}</p>
+            <p className="text-xs text-muted-foreground capitalize">{row.status || "to-do"}</p>
+            {row.endDate && <p className="text-xs text-muted-foreground">Due: {format(row.endDate, "MMM d, yyyy")}</p>}
+          </TooltipContent>
         </Tooltip>
       );
     }
@@ -862,12 +837,12 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
       <Tooltip>
         <TooltipTrigger asChild>
           <div
-            className={`absolute rounded-sm overflow-hidden border border-border/20 select-none ${canDrag ? "cursor-grab active:cursor-grabbing" : "cursor-default"} ${isDraggingThis ? "ring-2 ring-primary/50 z-20" : ""}`}
-            style={{ left, width, top: topOffset, height: barHeight, backgroundColor: `${barColor}22`, transition: isDraggingThis ? "none" : "left 0.2s, width 0.2s" }}
+            className="absolute rounded-sm overflow-hidden border border-border/20 select-none cursor-default"
+            style={{ left, width, top: topOffset, height: barHeight, backgroundColor: `${barColor}22` }}
             data-testid={`gantt-bar-${row.type}-${row.id}`}
-            onMouseDown={(e) => canDrag && handleBarDragStart(e, row)}
+            onClick={() => canDrag && setSelectedBar(row)}
           >
-            <div className="h-full" style={{ width: `${progress}%`, backgroundColor: barColor, opacity: isRoom ? 0.9 : 1, transition: isDraggingThis ? "none" : "all 0.3s" }} />
+            <div className="h-full" style={{ width: `${progress}%`, backgroundColor: barColor, opacity: isRoom ? 0.9 : 1 }} />
             <span className="absolute inset-0 flex items-center justify-between px-1.5 text-[9px] font-medium text-foreground/70 truncate">
               <span>{width > 50 ? `${progress}%` : ""}</span>
               {width > 80 && displayStart && displayEnd && (
@@ -883,16 +858,14 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
             </span>
           </div>
         </TooltipTrigger>
-        {!isDraggingThis && (
-          <TooltipContent>
-            <p className="font-medium text-sm">{row.title}</p>
-            {row.startDate && (
-              <p className="text-xs text-muted-foreground mt-1">
-                {format(row.startDate, "MMM d")} — {row.endDate ? format(row.endDate, "MMM d, yyyy") : "TBD"}
-              </p>
-            )}
-          </TooltipContent>
-        )}
+        <TooltipContent>
+          <p className="font-medium text-sm">{row.title}</p>
+          {row.startDate && (
+            <p className="text-xs text-muted-foreground mt-1">
+              {format(row.startDate, "MMM d")} — {row.endDate ? format(row.endDate, "MMM d, yyyy") : "TBD"}
+            </p>
+          )}
+        </TooltipContent>
       </Tooltip>
     );
   };
@@ -1165,6 +1138,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                           <BuildingColourPicker
                             currentHex={building.colorHex}
                             onSelect={(hex) => handleBuildingColourChange(building.id, hex)}
+                            onShift={shiftSelectedBar}
                           />
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
