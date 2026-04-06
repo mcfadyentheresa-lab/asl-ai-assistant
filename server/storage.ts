@@ -202,6 +202,12 @@ export interface IStorage {
   getClientInvitesByEmail(email: string): Promise<ClientInvite[]>;
   updateClientInvite(id: number, updates: Partial<InsertClientInvite>): Promise<ClientInvite>;
   deleteClientInvite(id: number): Promise<void>;
+
+  // Cross-project calendar (admin/crew)
+  getAllCalendarEvents(): Promise<(CalendarEvent & { projectName: string })[]>;
+  getAllMilestonesWithProject(): Promise<(Milestone & { projectName: string })[]>;
+  getAllSectionsWithProject(): Promise<(Section & { projectName: string })[]>;
+  getAllTasksWithProject(): Promise<(Task & { projectName: string })[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -840,6 +846,39 @@ export class DatabaseStorage implements IStorage {
   }
   async deleteClientInvite(id: number): Promise<void> {
     await db.delete(clientInvites).where(eq(clientInvites.id, id));
+  }
+
+  // Cross-project calendar (admin/crew)
+  async getAllCalendarEvents(): Promise<(CalendarEvent & { projectName: string })[]> {
+    const rows = await db.select({
+      event: calendarEvents,
+      projectName: projects.name,
+    }).from(calendarEvents).innerJoin(projects, eq(calendarEvents.projectId, projects.id)).orderBy(calendarEvents.date);
+    return rows.map(r => ({ ...r.event, projectName: r.projectName }));
+  }
+
+  async getAllMilestonesWithProject(): Promise<(Milestone & { projectName: string })[]> {
+    const rows = await db.select({
+      milestone: milestones,
+      projectName: projects.name,
+    }).from(milestones).innerJoin(projects, eq(milestones.projectId, projects.id)).orderBy(milestones.order);
+    return rows.map(r => ({ ...r.milestone, projectName: r.projectName }));
+  }
+
+  async getAllSectionsWithProject(): Promise<(Section & { projectName: string })[]> {
+    const rows = await db.select({
+      section: sections,
+      projectName: projects.name,
+    }).from(sections).innerJoin(projects, eq(sections.projectId, projects.id)).orderBy(sections.order);
+    return rows.map(r => ({ ...r.section, projectName: r.projectName }));
+  }
+
+  async getAllTasksWithProject(): Promise<(Task & { projectName: string })[]> {
+    const rows = await db.select({
+      task: tasks,
+      projectName: projects.name,
+    }).from(tasks).innerJoin(projects, eq(tasks.projectId, projects.id)).orderBy(tasks.order);
+    return rows.map(r => ({ ...r.task, projectName: r.projectName }));
   }
 }
 

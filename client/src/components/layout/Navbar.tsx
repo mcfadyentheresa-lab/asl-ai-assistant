@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
-import { LogOut, UserCog, Eye, EyeOff, User, Palette, ZoomIn, Clock, DollarSign, Calculator, Users, BookUser, Store } from "lucide-react";
+import { LogOut, UserCog, Eye, EyeOff, User, Palette, ZoomIn, Clock, DollarSign, Calculator, Users, BookUser, Store, CalendarDays } from "lucide-react";
 import { useTextZoom } from "@/hooks/use-text-zoom";
 import { Link } from "wouter";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -139,6 +139,14 @@ export function Navbar() {
                 Colour Portfolio
               </DropdownMenuItem>
             </Link>
+            {(user.role === "crew" || user.role === "admin") && (
+              <Link href="/master-calendar">
+                <DropdownMenuItem data-testid="link-master-calendar">
+                  <CalendarDays className="mr-2 h-4 w-4" />
+                  Master Calendar
+                </DropdownMenuItem>
+              </Link>
+            )}
             {(user.role === "crew" || user.role === "admin") && (
               <Link href="/timesheets">
                 <DropdownMenuItem data-testid="link-timesheets">

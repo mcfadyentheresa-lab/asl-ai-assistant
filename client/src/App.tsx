@@ -20,6 +20,7 @@ import MarketRates from "@/pages/MarketRates";
 import LaborRates from "@/pages/LaborRates";
 import TradeContacts from "@/pages/TradeContacts";
 import SupplierPrices from "@/pages/SupplierPrices";
+import MasterCalendar from "@/pages/MasterCalendar";
 import InviteAccept from "@/pages/InviteAccept";
 import Welcome from "@/pages/Welcome";
 import NotFound from "@/pages/not-found";
@@ -96,6 +97,7 @@ function Router() {
         <Route path="/labor-rates" component={LaborRates} />
         <Route path="/trade-contacts" component={TradeContacts} />
         <Route path="/supplier-prices" component={SupplierPrices} />
+        <Route path="/master-calendar" component={MasterCalendar} />
         <Route component={NotFound} />
       </Switch>
     </>

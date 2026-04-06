@@ -66,7 +66,7 @@ import { UserPlus, Mail } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths, isSameDay, isSameMonth, parseISO, formatDistanceToNow } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths, isSameDay, isSameMonth, parseISO, formatDistanceToNow, isWithinInterval, differenceInCalendarDays } from "date-fns";
 import type { ChecklistItem, BoardItem, CalendarEvent } from "@shared/schema";
 
 function formatCurrency(amount: number): string {
@@ -3235,10 +3235,28 @@ const eventTypeLabelsCalendar: Record<string, string> = {
   time_off: "Time Off",
 };
 
+const CALENDAR_BUILDING_COLORS = [
+  "#173B2F", "#2E6B4F", "#3F8A66", "#B87333", "#4D7A68",
+  "#5A7D4C", "#8C6239", "#6B8E23", "#7A6A58", "#3E6F73",
+];
+
+type TimelineItem = {
+  id: string;
+  title: string;
+  startDate: string;
+  endDate: string;
+  color: string;
+  layer: "timeline";
+  kind: "milestone" | "room" | "task";
+};
+
 function CalendarTab({ projectId }: { projectId: number }) {
   const { toast } = useToast();
   const { user } = useAuth();
   const { data: events, isLoading } = useCalendarEvents(projectId);
+  const { data: milestonesData } = useMilestones(projectId);
+  const { data: sectionsData } = useSections(projectId);
+  const { data: tasksData } = useTasks(projectId);
   const { data: allUsers } = useUsers();
   const { mutate: createEvent, isPending: isCreating } = useCreateCalendarEvent();
   const { mutate: updateEvent } = useUpdateCalendarEvent();
@@ -3260,6 +3278,64 @@ function CalendarTab({ projectId }: { projectId: number }) {
   const canNotify = user?.role === "admin" || user?.role === "crew";
   const eventImageInputRef = useRef<HTMLInputElement>(null);
 
+  const [showTimeline, setShowTimeline] = useState(true);
+  const [showEvents, setShowEvents] = useState(true);
+
+  const timelineItems: TimelineItem[] = (() => {
+    const items: TimelineItem[] = [];
+    const milestones = (milestonesData as any[]) || [];
+    const secs = (sectionsData as any[]) || [];
+    const tks = (tasksData as any[]) || [];
+
+    milestones.forEach((ms: any, idx: number) => {
+      if (ms.startDate && ms.endDate) {
+        items.push({
+          id: `ms-${ms.id}`,
+          title: ms.title,
+          startDate: ms.startDate,
+          endDate: ms.endDate,
+          color: ms.colorHex || CALENDAR_BUILDING_COLORS[idx % CALENDAR_BUILDING_COLORS.length],
+          layer: "timeline",
+          kind: "milestone",
+        });
+      }
+    });
+
+    secs.forEach((s: any) => {
+      if (s.startDate && s.endDate) {
+        const parent = milestones.find((m: any) => m.id === s.milestoneId);
+        const parentIdx = parent ? milestones.indexOf(parent) : 0;
+        items.push({
+          id: `sec-${s.id}`,
+          title: s.title,
+          startDate: s.startDate,
+          endDate: s.endDate,
+          color: parent?.colorHex || CALENDAR_BUILDING_COLORS[parentIdx % CALENDAR_BUILDING_COLORS.length],
+          layer: "timeline",
+          kind: "room",
+        });
+      }
+    });
+
+    tks.forEach((t: any) => {
+      if (t.startDate && t.dueDate) {
+        const parent = milestones.find((m: any) => m.id === t.milestoneId);
+        const parentIdx = parent ? milestones.indexOf(parent) : 0;
+        items.push({
+          id: `task-${t.id}`,
+          title: t.title,
+          startDate: t.startDate,
+          endDate: t.dueDate,
+          color: parent?.colorHex || CALENDAR_BUILDING_COLORS[parentIdx % CALENDAR_BUILDING_COLORS.length],
+          layer: "timeline",
+          kind: "task",
+        });
+      }
+    });
+
+    return items;
+  })();
+
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
   const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
@@ -3268,17 +3344,27 @@ function CalendarTab({ projectId }: { projectId: number }) {
   const getEventsForDate = (date: Date) => {
     if (!events) return [];
     return (events as CalendarEvent[]).filter((e) => {
-      const start = e.startDate ? parseISO(e.startDate) : parseISO(e.date);
+      const start = (e as any).startDate ? parseISO((e as any).startDate) : parseISO(e.date);
       const end = e.endDate ? parseISO(e.endDate) : parseISO(e.date);
       return isWithinInterval(date, { start, end });
     });
   };
 
-  const selectedDateEvents = selectedDate ? getEventsForDate(selectedDate) : [];
+  const getTimelineForDate = (date: Date) => {
+    if (!showTimeline) return [];
+    return timelineItems.filter((item) => {
+      try {
+        return isWithinInterval(date, { start: parseISO(item.startDate), end: parseISO(item.endDate) });
+      } catch { return false; }
+    });
+  };
+
+  const selectedDateEvents = selectedDate && showEvents ? getEventsForDate(selectedDate) : [];
+  const selectedDateTimeline = selectedDate ? getTimelineForDate(selectedDate) : [];
 
   const getEventSpan = (event: CalendarEvent) => {
     if (!event.date) return 1;
-    const start = event.startDate ? parseISO(event.startDate) : parseISO(event.date);
+    const start = (event as any).startDate ? parseISO((event as any).startDate) : parseISO(event.date);
     const end = event.endDate ? parseISO(event.endDate) : parseISO(event.date);
     return Math.max(1, differenceInCalendarDays(end, start) + 1);
   };
@@ -3355,6 +3441,8 @@ function CalendarTab({ projectId }: { projectId: number }) {
 
   const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+  const kindLabel = (k: string) => k === "milestone" ? "Building" : k === "room" ? "Room" : "Task";
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -3379,16 +3467,28 @@ function CalendarTab({ projectId }: { projectId: number }) {
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
-        <Button
-          onClick={() => {
-            setSelectedDate(selectedDate || new Date());
-            setAddDialogOpen(true);
-          }}
-          data-testid="button-add-event"
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Add Event
-        </Button>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer" data-testid="toggle-timeline">
+              <Switch checked={showTimeline} onCheckedChange={setShowTimeline} className="scale-75" />
+              Timeline
+            </label>
+            <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer" data-testid="toggle-events">
+              <Switch checked={showEvents} onCheckedChange={setShowEvents} className="scale-75" />
+              Events
+            </label>
+          </div>
+          <Button
+            onClick={() => {
+              setSelectedDate(selectedDate || new Date());
+              setAddDialogOpen(true);
+            }}
+            data-testid="button-add-event"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add Event
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -3409,7 +3509,9 @@ function CalendarTab({ projectId }: { projectId: number }) {
           <div key={`empty-${i}`} className="bg-card min-h-[80px]" />
         ))}
         {daysInMonth.map((day) => {
-          const dayEvents = getEventsForDate(day);
+          const dayEvents = showEvents ? getEventsForDate(day) : [];
+          const dayTimeline = getTimelineForDate(day);
+          const allItems = [...dayTimeline.map(t => ({ type: "timeline" as const, item: t })), ...dayEvents.map(e => ({ type: "event" as const, item: e }))];
           const isSelected = selectedDate && isSameDay(day, selectedDate);
           const isToday = isSameDay(day, new Date());
           const dateStr = format(day, "yyyy-MM-dd");
@@ -3445,16 +3547,30 @@ function CalendarTab({ projectId }: { projectId: number }) {
                 >
                   {format(day, "d")}
                 </span>
-                {dayEvents[0] && (
-                  <span
-                    className="h-2 w-2 rounded-full shrink-0"
-                    style={{ backgroundColor: eventTypeColors[dayEvents[0].type || "event"] || eventTypeColors.event }}
-                    data-testid={`calendar-day-color-${dateStr}`}
-                  />
+                {allItems.length > 0 && (
+                  <div className="flex gap-0.5">
+                    {allItems.slice(0, 3).map((a, i) => (
+                      <span
+                        key={i}
+                        className="h-2 w-2 rounded-full shrink-0"
+                        style={{ backgroundColor: a.type === "timeline" ? (a.item as TimelineItem).color : eventTypeColors[(a.item as CalendarEvent).type || "event"] || eventTypeColors.event }}
+                      />
+                    ))}
+                  </div>
                 )}
               </div>
-              <div className="mt-0.5 space-y-0.5">
-                {dayEvents.slice(0, 3).map((ev) => (
+              <div className="mt-0.5 space-y-0.5 overflow-hidden">
+                {dayTimeline.slice(0, 2).map((tl) => (
+                  <div
+                    key={tl.id}
+                    className="text-[10px] leading-tight truncate rounded px-1 py-0.5 text-white/90"
+                    style={{ backgroundColor: tl.color, opacity: 0.85 }}
+                    data-testid={`calendar-timeline-${tl.id}`}
+                  >
+                    {tl.title}
+                  </div>
+                ))}
+                {dayEvents.slice(0, Math.max(1, 3 - dayTimeline.length)).map((ev) => (
                   <div
                     key={ev.id}
                     draggable
@@ -3467,20 +3583,30 @@ function CalendarTab({ projectId }: { projectId: number }) {
                     className="text-[10px] leading-tight truncate rounded px-1 py-0.5 text-white cursor-grab active:cursor-grabbing"
                     style={{
                       backgroundColor: eventTypeColors[ev.type || "event"] || eventTypeColors.event,
-                      width: `${Math.min(100, getEventSpan(ev) * 100)}%`,
                     }}
                     data-testid={`calendar-event-dot-${ev.id}`}
                   >
                     {ev.title}
                   </div>
                 ))}
-                {dayEvents.length > 3 && (
-                  <span className="text-[10px] text-muted-foreground">+{dayEvents.length - 3} more</span>
+                {allItems.length > 3 && (
+                  <span className="text-[10px] text-muted-foreground">+{allItems.length - 3} more</span>
                 )}
               </div>
             </div>
           );
         })}
+        </div>
+      )}
+
+      {showTimeline && timelineItems.length > 0 && (
+        <div className="flex flex-wrap gap-2 px-1" data-testid="timeline-legend">
+          {((milestonesData as any[]) || []).map((ms: any, idx: number) => (
+            <div key={ms.id} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: ms.colorHex || CALENDAR_BUILDING_COLORS[idx % CALENDAR_BUILDING_COLORS.length] }} />
+              {ms.title}
+            </div>
+          ))}
         </div>
       )}
 
@@ -3492,15 +3618,31 @@ function CalendarTab({ projectId }: { projectId: number }) {
               {selectedDate && format(selectedDate, "EEEE, MMMM d, yyyy")}
             </DialogTitle>
             <DialogDescription>
-              {selectedDateEvents.length > 0
-                ? <span className="inline-flex items-center gap-1.5"><span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary text-primary-foreground text-xs font-bold">{selectedDateEvents.length}</span>{`event${selectedDateEvents.length > 1 ? "s" : ""} on this date`}</span>
-                : "No events on this date"}
+              {(selectedDateEvents.length + selectedDateTimeline.length) > 0
+                ? <span className="inline-flex items-center gap-1.5"><span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary text-primary-foreground text-xs font-bold">{selectedDateEvents.length + selectedDateTimeline.length}</span>{`item${(selectedDateEvents.length + selectedDateTimeline.length) > 1 ? "s" : ""} on this date`}</span>
+                : "No items on this date"}
             </DialogDescription>
           </DialogHeader>
           <ScrollArea className="flex-1 -mx-6 px-6">
             <div className="space-y-3 pb-4">
-              {selectedDateEvents.length > 0 ? (
-                selectedDateEvents.map((ev) => (
+              {selectedDateTimeline.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Timeline</p>
+                  {selectedDateTimeline.map((tl) => (
+                    <div key={tl.id} className="rounded-md bg-muted p-3 flex items-center gap-3" data-testid={`detail-timeline-${tl.id}`}>
+                      <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: tl.color }} />
+                      <div className="min-w-0">
+                        <p className="font-medium text-sm text-foreground">{tl.title}</p>
+                        <p className="text-xs text-muted-foreground">{kindLabel(tl.kind)} &middot; {format(parseISO(tl.startDate), "MMM d")} — {format(parseISO(tl.endDate), "MMM d")}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {selectedDateEvents.length > 0 && (
+                <div className="space-y-2">
+                  {selectedDateTimeline.length > 0 && <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Events</p>}
+                  {selectedDateEvents.map((ev) => (
                   <div
                     key={ev.id}
                     className="rounded-md bg-muted overflow-hidden"
@@ -3588,10 +3730,12 @@ function CalendarTab({ projectId }: { projectId: number }) {
                       </div>
                     </div>
                   </div>
-                ))
-              ) : (
+                ))}
+                </div>
+              )}
+              {selectedDateEvents.length === 0 && selectedDateTimeline.length === 0 && (
                 <p className="text-sm text-muted-foreground text-center py-4" data-testid="text-no-events">
-                  No events on this date.
+                  No items on this date.
                 </p>
               )}
             </div>

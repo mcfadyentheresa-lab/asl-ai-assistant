@@ -1626,6 +1626,28 @@ export async function registerRoutes(
     }
   });
 
+  // Cross-project calendar (admin/crew only)
+  app.get("/api/calendar/all", isAuthenticated, async (req: any, res) => {
+    const userId = req.user?.claims?.sub;
+    const dbUser = userId ? await authStorage.getUser(userId) : null;
+    const role = dbUser?.role;
+    if (role !== "admin" && role !== "crew") {
+      return res.status(403).json({ message: "Admin or crew access required" });
+    }
+    try {
+      const [events, allMilestones, allSections, allTasks] = await Promise.all([
+        storage.getAllCalendarEvents(),
+        storage.getAllMilestonesWithProject(),
+        storage.getAllSectionsWithProject(),
+        storage.getAllTasksWithProject(),
+      ]);
+      res.json({ events, milestones: allMilestones, sections: allSections, tasks: allTasks });
+    } catch (err) {
+      console.error("Error fetching cross-project calendar:", err);
+      res.status(500).json({ message: "Failed to fetch calendar data" });
+    }
+  });
+
   // Calendar Events
   app.get(api.calendar.list.path, isAuthenticated, async (req, res) => {
     const events = await storage.getCalendarEvents(Number(req.params.projectId));

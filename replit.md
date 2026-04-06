@@ -55,6 +55,7 @@ Replit Auth provides authentication via OpenID Connect, with session management 
 *   **Back Navigation**: Consistent back navigation on admin/utility pages.
 *   **Real-time Collaboration**: WebSocket-based project rooms for live updates across all project data, with active viewer tracking and conflict resolution.
 *   **Client Onboarding System**: Admin-initiated client invite flow via SMS, including invite validation and profile completion.
+*   **Unified Calendar View**: Per-project calendar shows timeline bars (milestones, rooms, tasks) from the Gantt chart alongside calendar events, with layer toggles. A Master Calendar page (`/master-calendar`) aggregates data across all projects for admin/crew, with project filtering.
 
 ## External Dependencies
 
