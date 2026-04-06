@@ -8,14 +8,14 @@ import {
   useDocuments, useUploadDocument, useDeleteDocument,
   usePhotos, useCreatePhoto, useDeletePhoto, useUploadImage,
   useUsers, useUpdateProject, usePlanningBoards, useUpdateUserPhone, useSendTestSms, useNotifyTeam,
-  useActivityLog, useUpdateMilestone, useSections,
+  useActivityLog, useUpdateMilestone, useSections, useCreateMilestone, useCreateTask,
 } from "@/hooks/use-projects";
 import { useOnlineUsers, isUserOnline } from "@/hooks/use-presence";
 import { useProjectRealtime } from "@/hooks/use-project-realtime";
 import { Navbar } from "@/components/layout/Navbar";
 import SpatialCanvas from "@/components/SpatialCanvas";
 import GanttChart from "@/components/GanttChart";
-import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, ExternalLink, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, CalendarDays, ChevronLeft, Upload, Download, User, X, Paperclip, ZoomIn, Palette, Shield, Users, Phone, Check, Bell, Eye, EyeOff, Archive, ArchiveRestore, PanelRightOpen, MoreVertical, Flag, DollarSign, BarChart3, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, ExternalLink, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, CalendarDays, ChevronLeft, Upload, Download, User, X, Paperclip, ZoomIn, Palette, Shield, Users, Phone, Check, Bell, Eye, EyeOff, Archive, ArchiveRestore, PanelRightOpen, MoreVertical, Flag, DollarSign, BarChart3, TrendingUp, TrendingDown, Minus, ArrowUpRight, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -1566,7 +1566,78 @@ function ChecklistTab({ projectId }: { projectId: number }) {
   const [editItem, setEditItem] = useState<ChecklistItem | null>(null);
   const [editForm, setEditForm] = useState({ title: "", group: "", priority: "normal", status: "todo", notes: "", priceEstimate: "" });
 
+  const { mutate: createMilestone, isPending: isCreatingMilestone } = useCreateMilestone();
+  const { mutate: createTask, isPending: isCreatingTask } = useCreateTask();
+  const { data: milestonesForMove } = useMilestones(projectId);
+  const { data: sectionsForMove } = useSections(projectId);
+
+  const [moveItem, setMoveItem] = useState<ChecklistItem | null>(null);
+  const [moveMode, setMoveMode] = useState<"building" | "task" | null>(null);
+  const [selectedBuildingId, setSelectedBuildingId] = useState<string>("");
+  const [selectedRoomId, setSelectedRoomId] = useState<string>("");
+
+  const isAdmin = user?.role === "admin";
   const isCrew = user?.email?.includes("crew") || user?.email?.includes("admin");
+
+  const roomsForBuilding = selectedBuildingId
+    ? (sectionsForMove || []).filter((s: any) => s.milestoneId === parseInt(selectedBuildingId))
+    : [];
+
+  const handleMoveToTimeline = () => {
+    if (!moveItem || !isAdmin) return;
+    const appendNote = (existing: string | null | undefined) => {
+      const tag = "📌 Moved to Timeline";
+      if (existing && existing.includes(tag)) return existing;
+      return existing ? `${existing}\n${tag}` : tag;
+    };
+
+    const closeDialog = () => {
+      setMoveItem(null);
+      setMoveMode(null);
+      setSelectedBuildingId("");
+      setSelectedRoomId("");
+    };
+
+    const markAsMovedAndClose = (description: string) => {
+      updateItem(
+        { id: moveItem.id, notes: appendNote(moveItem.notes) },
+        {
+          onSuccess: () => {
+            toast({ title: "Moved to Timeline", description });
+            closeDialog();
+          },
+          onError: () => {
+            toast({ title: "Moved to Timeline", description: `${description} (Note annotation could not be saved.)` });
+            closeDialog();
+          },
+        }
+      );
+    };
+
+    if (moveMode === "building") {
+      createMilestone(
+        { projectId, title: moveItem.title },
+        {
+          onSuccess: () => markAsMovedAndClose(`"${moveItem.title}" created as a new building.`),
+          onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+        }
+      );
+    } else if (moveMode === "task" && selectedBuildingId) {
+      createTask(
+        {
+          projectId,
+          milestoneId: parseInt(selectedBuildingId),
+          sectionId: selectedRoomId && selectedRoomId !== "__none__" ? parseInt(selectedRoomId) : undefined,
+          title: moveItem.title,
+          description: moveItem.notes || undefined,
+        },
+        {
+          onSuccess: () => markAsMovedAndClose(`"${moveItem.title}" added as a task.`),
+          onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+        }
+      );
+    }
+  };
 
   const defaultGroups = ["Boathouse", "Cottage", "General"];
   const existingGroups = items
@@ -1894,6 +1965,12 @@ function ChecklistTab({ projectId }: { projectId: number }) {
                               {item.priority || "normal"}
                             </Badge>
                             {statusBadge(item.status)}
+                            {item.notes?.includes("📌 Moved to Timeline") && (
+                              <Badge variant="outline" className="text-[10px] no-default-hover-elevate bg-primary/5 text-primary border-primary/20" data-testid={`badge-moved-timeline-${item.id}`}>
+                                <ArrowUpRight className="h-3 w-3 mr-0.5" />
+                                On Timeline
+                              </Badge>
+                            )}
                             {item.priceEstimate != null && (
                               <span className="text-xs text-muted-foreground" data-testid={`text-price-${item.id}`}>
                                 ${item.priceEstimate.toLocaleString()}
@@ -1902,11 +1979,26 @@ function ChecklistTab({ projectId }: { projectId: number }) {
                           </div>
                           {item.notes && (
                             <p className="text-xs text-muted-foreground" data-testid={`text-notes-${item.id}`}>
-                              {item.notes}
+                              {item.notes.replace("📌 Moved to Timeline", "").trim() || null}
                             </p>
                           )}
                         </div>
                         <div className="hidden sm:flex items-center gap-1 relative z-[1]">
+                          {isAdmin && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() => { setMoveItem(item); setMoveMode(null); setSelectedBuildingId(""); setSelectedRoomId(""); }}
+                                  data-testid={`button-move-timeline-${item.id}`}
+                                >
+                                  <ArrowUpRight className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Move to Timeline</TooltipContent>
+                            </Tooltip>
+                          )}
                           <Button
                             size="icon"
                             variant="ghost"
@@ -1954,6 +2046,15 @@ function ChecklistTab({ projectId }: { projectId: number }) {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
+                              {isAdmin && (
+                                <DropdownMenuItem
+                                  onClick={() => { setMoveItem(item); setMoveMode(null); setSelectedBuildingId(""); setSelectedRoomId(""); }}
+                                  data-testid={`menu-move-timeline-${item.id}`}
+                                >
+                                  <ArrowUpRight className="mr-2 h-4 w-4" />
+                                  Move to Timeline
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuItem
                                 onClick={() => {
                                   addToCalendar(
@@ -2089,6 +2190,113 @@ function ChecklistTab({ projectId }: { projectId: number }) {
               <Button variant="outline" onClick={() => setEditItem(null)} data-testid="button-edit-cancel">Cancel</Button>
               <Button onClick={handleEditSave} disabled={!editForm.title.trim()} data-testid="button-edit-save">Save Changes</Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!moveItem} onOpenChange={(open) => { if (!open) { setMoveItem(null); setMoveMode(null); setSelectedBuildingId(""); setSelectedRoomId(""); } }}>
+        <DialogContent className="sm:max-w-[420px]" data-testid="dialog-move-timeline">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-xl" data-testid="text-move-dialog-title">Move to Timeline</DialogTitle>
+            <DialogDescription>
+              Add <span className="font-medium">"{moveItem?.title}"</span> to the project timeline.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            {!moveMode ? (
+              <div className="grid grid-cols-1 gap-3">
+                <Button
+                  variant="outline"
+                  className="h-auto py-4 flex flex-col items-start gap-1 text-left"
+                  onClick={() => setMoveMode("building")}
+                  data-testid="button-move-as-building"
+                >
+                  <div className="flex items-center gap-2 font-medium">
+                    <Building2 className="h-4 w-4" />
+                    Create as New Building
+                  </div>
+                  <span className="text-xs text-muted-foreground">
+                    Add a new building to the timeline with this title
+                  </span>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-auto py-4 flex flex-col items-start gap-1 text-left"
+                  onClick={() => setMoveMode("task")}
+                  data-testid="button-move-as-task"
+                >
+                  <div className="flex items-center gap-2 font-medium">
+                    <CheckSquare className="h-4 w-4" />
+                    Add as Task
+                  </div>
+                  <span className="text-xs text-muted-foreground">
+                    Add as a task inside an existing building or room
+                  </span>
+                </Button>
+              </div>
+            ) : moveMode === "building" ? (
+              <div className="space-y-4">
+                <div className="rounded-lg border p-3 bg-muted/30">
+                  <p className="text-sm">
+                    A new building called <span className="font-medium">"{moveItem?.title}"</span> will be created on the timeline.
+                  </p>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setMoveMode(null)} data-testid="button-move-back">Back</Button>
+                  <Button
+                    onClick={handleMoveToTimeline}
+                    disabled={isCreatingMilestone}
+                    data-testid="button-move-confirm-building"
+                  >
+                    {isCreatingMilestone && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Create Building
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Building</label>
+                  <Select value={selectedBuildingId} onValueChange={(v) => { setSelectedBuildingId(v); setSelectedRoomId(""); }}>
+                    <SelectTrigger data-testid="select-move-building">
+                      <SelectValue placeholder="Select a building..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(milestonesForMove || []).map((m: any) => (
+                        <SelectItem key={m.id} value={String(m.id)}>{m.title}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {selectedBuildingId && roomsForBuilding.length > 0 && (
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">Room (optional)</label>
+                    <Select value={selectedRoomId} onValueChange={setSelectedRoomId}>
+                      <SelectTrigger data-testid="select-move-room">
+                        <SelectValue placeholder="No room (general tasks)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">No room (general tasks)</SelectItem>
+                        {roomsForBuilding.map((s: any) => (
+                          <SelectItem key={s.id} value={String(s.id)}>{s.title}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => { setMoveMode(null); setSelectedBuildingId(""); setSelectedRoomId(""); }} data-testid="button-move-back-task">Back</Button>
+                  <Button
+                    onClick={handleMoveToTimeline}
+                    disabled={!selectedBuildingId || isCreatingTask}
+                    data-testid="button-move-confirm-task"
+                  >
+                    {isCreatingTask && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Add Task
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>
