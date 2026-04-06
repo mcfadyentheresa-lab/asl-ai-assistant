@@ -40,7 +40,7 @@ export const api = {
     create: {
       method: 'POST' as const,
       path: '/api/projects' as const,
-      input: insertProjectSchema,
+      input: insertProjectSchema.omit({ colorTagId: true }),
       responses: {
         201: z.custom<typeof projects.$inferSelect>(),
         400: errorSchemas.validation,
@@ -49,7 +49,7 @@ export const api = {
     update: {
       method: 'PUT' as const,
       path: '/api/projects/:id' as const,
-      input: insertProjectSchema.partial(),
+      input: insertProjectSchema.omit({ colorTagId: true }).partial(),
       responses: {
         200: z.custom<typeof projects.$inferSelect>(),
         400: errorSchemas.validation,
