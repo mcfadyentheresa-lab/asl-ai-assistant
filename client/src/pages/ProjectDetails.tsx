@@ -3434,11 +3434,20 @@ function CalendarTab({ projectId }: { projectId: number }) {
               }}
               data-testid={`calendar-day-${dateStr}`}
             >
-              <span
-                className={`text-xs font-medium inline-flex items-center justify-center w-6 h-6 rounded-full ${isToday ? "bg-primary text-primary-foreground" : "text-foreground"}`}
-              >
-                {format(day, "d")}
-              </span>
+              <div className="flex items-center justify-between gap-1">
+                <span
+                  className={`text-xs font-medium inline-flex items-center justify-center w-6 h-6 rounded-full ${isToday ? "bg-primary text-primary-foreground" : "text-foreground"}`}
+                >
+                  {format(day, "d")}
+                </span>
+                {dayEvents[0] && (
+                  <span
+                    className="h-2 w-2 rounded-full shrink-0"
+                    style={{ backgroundColor: eventTypeColors[dayEvents[0].type || "event"] || eventTypeColors.event }}
+                    data-testid={`calendar-day-color-${dateStr}`}
+                  />
+                )}
+              </div>
               <div className="mt-0.5 space-y-0.5">
                 {dayEvents.slice(0, 3).map((ev) => (
                   <div
