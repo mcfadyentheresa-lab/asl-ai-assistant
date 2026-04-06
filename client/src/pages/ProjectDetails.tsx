@@ -498,9 +498,6 @@ function SidebarCards({
                           <div className="truncate font-semibold text-sm text-foreground">{inv.firstName} {inv.lastName}</div>
                           <div className="mt-0.5 text-xs text-muted-foreground truncate">{inv.email}{inv.phone ? ` • ${inv.phone}` : ""}</div>
                         </div>
-                        <Badge variant={inv.status === "accepted" ? "default" : inv.status === "pending" && new Date() > new Date(inv.expiresAt) ? "destructive" : "secondary"} className="shrink-0 text-[10px] px-2 py-0.5">
-                          {inv.status === "accepted" ? "Accepted" : new Date() > new Date(inv.expiresAt) ? "Expired" : "Pending"}
-                        </Badge>
                       </div>
                       <div className="flex flex-wrap gap-1.5">
                         <Button
