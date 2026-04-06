@@ -499,14 +499,14 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
 
     filteredTasks = [...filteredTasks].sort((a, b) => (a.order || 0) - (b.order || 0));
 
-    const taskToday = new Date();
+        const taskToday = new Date();
     return filteredTasks.map(t => {
       const taskDate = t.dueDate ? parseISO(t.dueDate) : addDays(taskToday, 1);
       const taskStart = t.dueDate ? addDays(taskDate, -3) : taskToday;
       return {
         id: t.id, title: t.title,
         startDate: taskStart,
-        endDate: taskDate, status: t.status, colorIndex: building.colorIndex,
+            endDate: taskDate, status: t.status, colorIndex: 0,
       };
     });
   }, [drillLevel, selectedBuildingId, selectedRoomId, buildingInfos, tasks]);
