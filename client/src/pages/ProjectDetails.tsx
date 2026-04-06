@@ -440,8 +440,7 @@ function SidebarCards({
                 ))}
               </SelectContent>
             </Select>
-          ) : assignedClient ? null
-          ) : (
+          ) : assignedClient ? null : (
             <p className="text-muted-foreground text-sm" data-testid="text-no-client">No client assigned</p>
           )}
 
