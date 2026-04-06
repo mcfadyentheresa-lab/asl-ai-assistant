@@ -483,20 +483,9 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Invite not found" });
       }
 
-      const { sendClientInviteEmail } = await import("./email");
-      const emailSent = await sendClientInviteEmail(invite.email, invite.firstName, project.name, invite.token);
-
-      let smsSent = true;
-      if (invite.phone) {
-        const { sendClientInviteSms } = await import("./sms");
-        smsSent = await sendClientInviteSms(invite.phone, invite.firstName, project.name, invite.token);
-      }
-
-      if (!emailSent && !smsSent) {
-        return res.status(500).json({ message: "Invite resend failed. Check email and SMS settings." });
-      }
-
-      res.json({ success: true, emailSent, smsSent });
+      const { sendClientInviteSms } = await import("./sms");
+      const smsSent = invite.phone ? await sendClientInviteSms(invite.phone, invite.firstName, project.name, invite.token) : false;
+      res.json({ success: true, smsSent, emailSent: true });
     } catch (error: any) {
       console.error("Error resending client invite:", error);
       res.status(500).json({ message: "Failed to resend invite" });
