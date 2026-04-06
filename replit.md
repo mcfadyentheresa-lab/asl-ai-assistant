@@ -40,7 +40,7 @@ Replit Auth provides authentication via OpenID Connect, with session management 
 
 *   **Twilio SMS Notifications**: Automated notifications for project events, respecting business hours.
 *   **Online Presence System**: Tracks and displays active users.
-*   **Paint Color Portfolio**: Manages a database of paint colors for browsing and tagging projects.
+*   **Paint Colour Portfolio**: Manages a database of paint colours for browsing. The colour tag feature (tagging boards with paint colours) has been removed.
 *   **Planning Board Designer Tools**: A spatial canvas for design collaboration with various element types and drawing tools.
 *   **Board Version Snapshots**: Allows saving and restoring planning board versions.
 *   **Text Size Accessibility**: Provides a persistent text zoom feature.

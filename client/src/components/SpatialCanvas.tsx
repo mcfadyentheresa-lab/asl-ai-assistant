@@ -34,7 +34,6 @@ import { recognizeAllShapes, recognizeShape, looksLikeHandwriting } from "@/lib/
 import type { CanvasElement, PlanningBoard as PlanningBoardType, PaintColor } from "@shared/schema";
 import { queryClient } from "@/lib/queryClient";
 import { useQuery } from "@tanstack/react-query";
-import { ColorPalettePicker, ColorTagDot } from "@/components/ColorPalettePicker";
 
 function BmColorPicker({ onSelect }: { onSelect: (color: PaintColor) => void }) {
   const [open, setOpen] = useState(false);
@@ -399,21 +398,6 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     handleLinkUpdate("linkedProjectIds", next);
   };
 
-  const handleBoardColorTag = async (colorId: number | null) => {
-    if (!selectedBoardId) return;
-    try {
-      await fetch(`/api/planning-boards/${selectedBoardId}/color-tag`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ colorTagId: colorId }),
-      });
-      queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'planning-boards'] });
-      toast({ title: colorId ? "Color tag set" : "Color tag removed" });
-    } catch {
-      toast({ title: "Error", description: "Failed to update color tag", variant: "destructive" });
-    }
-  };
 
   const createElement = async (type: string, x?: number, y?: number) => {
     if (!selectedBoardId) return;
@@ -2550,21 +2534,6 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <ColorPalettePicker
-              selectedColorId={selectedBoard?.colorTagId ?? null}
-              onSelect={(colorId) => handleBoardColorTag(colorId)}
-              trigger={
-                selectedBoard?.colorTagId ? (
-                  <Button variant="ghost" size="icon" className="relative" data-testid="button-board-color-tag">
-                    <ColorTagDot colorTagId={selectedBoard.colorTagId} size="md" />
-                  </Button>
-                ) : (
-                  <Button variant="ghost" size="icon" data-testid="button-board-color-tag">
-                    <Palette className="h-4 w-4 text-muted-foreground" />
-                  </Button>
-                )
-              }
-            />
           </>
         )}
         {(selectedBoard?.linkedUserIds?.length ?? 0) > 0 && (

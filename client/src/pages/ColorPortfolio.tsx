@@ -1,18 +1,15 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { queryClient } from "@/lib/queryClient";
 import { Navbar } from "@/components/layout/Navbar";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   Tooltip,
@@ -26,11 +23,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Search, ArrowLeft, Copy, Check, Star, X, Link2, MoreHorizontal, Clipboard, Palette } from "lucide-react";
+import { Search, ArrowLeft, Copy, Check, Star, X, MoreHorizontal, Clipboard, Palette } from "lucide-react";
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
-import { useProjects } from "@/hooks/use-projects";
 import type { PaintColor } from "@shared/schema";
 
 const LAST_BOARD_KEY = "aster-spruce:last-planning-board";
@@ -67,13 +63,11 @@ function ColorSwatch({
   onClick,
   onCopyHex,
   onCopyInfo,
-  onLinkToBoard,
 }: {
   color: PaintColor;
   onClick: () => void;
   onCopyHex: () => void;
   onCopyInfo: () => void;
-  onLinkToBoard: () => void;
 }) {
   const textColor = getContrastColor(color.hex);
 
@@ -132,10 +126,6 @@ function ColorSwatch({
               Copy Name & Code
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onLinkToBoard(); }} data-testid={`menu-link-board-${color.id}`}>
-              <Link2 className="mr-2 h-4 w-4" />
-              Tag a Planning Board
-            </DropdownMenuItem>
             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onClick(); }} data-testid={`menu-view-detail-${color.id}`}>
               <Palette className="mr-2 h-4 w-4" />
               View Details
@@ -147,121 +137,7 @@ function ColorSwatch({
   );
 }
 
-function LinkToBoardDialog({
-  color,
-  open,
-  onClose,
-}: {
-  color: PaintColor;
-  open: boolean;
-  onClose: () => void;
-}) {
-  const { toast } = useToast();
-  const { data: projects } = useProjects();
-
-  const handleLink = async (boardId: number) => {
-    try {
-      const res = await fetch(`/api/planning-boards/${boardId}/color-tag`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ colorTagId: color.id }),
-      });
-      if (!res.ok) throw new Error("Failed to tag board");
-      const board = await res.json();
-      queryClient.invalidateQueries({ queryKey: ["/api/projects", board.projectId, "planning-boards"] });
-      toast({ title: "Colour tagged", description: `"${color.name}" linked to planning board` });
-      onClose();
-    } catch {
-      toast({ title: "Error", description: "Failed to tag board", variant: "destructive" });
-    }
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="font-serif flex items-center gap-2">
-            <div
-              className="w-5 h-5 rounded-sm border border-border/60 shrink-0"
-              style={{ backgroundColor: color.hex }}
-            />
-            Tag "{color.name}" to a Board
-          </DialogTitle>
-          <DialogDescription>
-            Choose a planning board to tag with this colour.
-          </DialogDescription>
-        </DialogHeader>
-        <ScrollArea className="max-h-[50vh]">
-          <div className="space-y-4 pr-3">
-            {projects && projects.length > 0 ? (
-              projects.map((project: any) => (
-                <ProjectBoardList
-                  key={project.id}
-                  projectId={project.id}
-                  projectName={project.name}
-                  onLink={handleLink}
-                  colorHex={color.hex}
-                />
-              ))
-            ) : (
-              <p className="text-sm text-muted-foreground text-center py-4">No projects found</p>
-            )}
-          </div>
-        </ScrollArea>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function ProjectBoardList({
-  projectId,
-  projectName,
-  onLink,
-  colorHex,
-}: {
-  projectId: number;
-  projectName: string;
-  onLink: (boardId: number) => void;
-  colorHex: string;
-}) {
-  const { data: boards } = useQuery<any[]>({
-    queryKey: ["/api/projects", projectId, "planning-boards"],
-    queryFn: async () => {
-      const res = await fetch(`/api/projects/${projectId}/planning-boards`, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed");
-      return res.json();
-    },
-  });
-
-  if (!boards || boards.length === 0) return null;
-
-  return (
-    <div>
-      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">{projectName}</p>
-      <div className="space-y-1">
-        {boards.map((board: any) => (
-          <button
-            key={board.id}
-            onClick={() => onLink(board.id)}
-            className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-md text-sm text-left hover-elevate active-elevate-2"
-            data-testid={`link-board-${board.id}`}
-          >
-            <span className="truncate">{board.name}</span>
-            {board.colorTagId && (
-              <div
-                className="w-3 h-3 rounded-full border border-border/60 shrink-0"
-                style={{ backgroundColor: colorHex }}
-              />
-            )}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function ColorDetail({ color, onClose, onLinkToBoard }: { color: PaintColor; onClose: () => void; onLinkToBoard: () => void }) {
+function ColorDetail({ color, onClose }: { color: PaintColor; onClose: () => void }) {
   const { toast } = useToast();
   const [copied, setCopied] = useState<string | null>(null);
   const textColor = getContrastColor(color.hex);
@@ -349,18 +225,6 @@ function ColorDetail({ color, onClose, onLinkToBoard }: { color: PaintColor; onC
             <Copy className="w-4 h-4" />
             Copy Info
           </Button>
-          <Button
-            variant="outline"
-            className="flex-1 gap-2"
-            onClick={() => {
-              onClose();
-              setTimeout(onLinkToBoard, 200);
-            }}
-            data-testid="button-link-to-board"
-          >
-            <Link2 className="w-4 h-4" />
-            Tag a Board
-          </Button>
         </div>
 
         <div className="text-[10px] text-muted-foreground pt-2 border-t border-border">
@@ -417,7 +281,6 @@ export default function ColorPortfolio() {
   const [activeSubFamily, setActiveSubFamily] = useState<string | null>(null);
   const [showPopularOnly, setShowPopularOnly] = useState(false);
   const [selectedColor, setSelectedColor] = useState<PaintColor | null>(null);
-  const [linkColor, setLinkColor] = useState<PaintColor | null>(null);
   const [activeBrand, setActiveBrand] = useState("Benjamin Moore");
   const { toast } = useToast();
 
@@ -499,7 +362,6 @@ export default function ColorPortfolio() {
       onClick={() => setSelectedColor(color)}
       onCopyHex={() => handleCopyHex(color)}
       onCopyInfo={() => handleCopyInfo(color)}
-      onLinkToBoard={() => setLinkColor(color)}
     />
   );
 
@@ -675,18 +537,10 @@ export default function ColorPortfolio() {
           <ColorDetail
             color={selectedColor}
             onClose={() => setSelectedColor(null)}
-            onLinkToBoard={() => setLinkColor(selectedColor)}
           />
         )}
       </Dialog>
 
-      {linkColor && (
-        <LinkToBoardDialog
-          color={linkColor}
-          open={!!linkColor}
-          onClose={() => setLinkColor(null)}
-        />
-      )}
     </div>
   );
 }
