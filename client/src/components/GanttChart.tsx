@@ -145,7 +145,7 @@ function DateField({ label, value, onChange, placeholder, testId }: { label: str
   );
 }
 
-function BuildingColourPicker({ currentHex, onSelect, onShift }: { currentHex: string | null | undefined; onSelect: (hex: string | null) => void; onShift?: (direction: "left" | "right") => void }) {
+function BuildingColourPicker({ currentHex, onSelect }: { currentHex: string | null | undefined; onSelect: (hex: string | null) => void }) {
   const QUICK_COLOURS = [
     "#1E3A2F", "#2D5A47", "#3D7A5F", "#8B7355", "#6B8E73",
     "#4A6741", "#7A6B5D", "#556B2F", "#C4A882", "#3B5249",
@@ -164,27 +164,8 @@ function BuildingColourPicker({ currentHex, onSelect, onShift }: { currentHex: s
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-52 p-2" align="start" onClick={(e) => e.stopPropagation()}>
+      <PopoverContent className="w-48 p-2" align="start" onClick={(e) => e.stopPropagation()}>
         <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2 font-medium">Building Colour</p>
-        {onShift && (
-          <div className="flex items-center justify-between mb-2">
-            <button
-              className="h-7 w-7 flex items-center justify-center rounded-sm border border-border/40 hover:bg-muted/60 transition-colors"
-              onClick={(e) => { e.stopPropagation(); onShift("left"); }}
-              data-testid="button-shift-building-back"
-            >
-              <ChevronLeft className="h-3.5 w-3.5" />
-            </button>
-            <span className="text-[9px] uppercase tracking-wider text-muted-foreground">Adjust length</span>
-            <button
-              className="h-7 w-7 flex items-center justify-center rounded-sm border border-border/40 hover:bg-muted/60 transition-colors"
-              onClick={(e) => { e.stopPropagation(); onShift("right"); }}
-              data-testid="button-shift-building-forward"
-            >
-              <ChevronRight className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        )}
         <div className="grid grid-cols-4 gap-1.5">
           {QUICK_COLOURS.map((hex) => (
             <button
@@ -383,7 +364,6 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
   const [newTaskDueDate, setNewTaskDueDate] = useState("");
   const [dragId, setDragId] = useState<number | null>(null);
   const [dragOverId, setDragOverId] = useState<number | null>(null);
-  const [selectedBar, setSelectedBar] = useState<BarItem | null>(null);
 
   const timelineRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
@@ -752,25 +732,6 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
     setDragOverId(null);
   }, [dragId, drillLevel, milestones, tasks, selectedBuildingId, selectedRoomId, updateMilestone, updateTask, projectId]);
 
-  const shiftSelectedBar = useCallback((direction: "left" | "right") => {
-    if (!selectedBar || !selectedBar.startDate || !selectedBar.endDate) return;
-    const delta = direction === "right" ? 1 : -1;
-    const nextStart = addDays(selectedBar.startDate, delta);
-    const nextEnd = addDays(selectedBar.endDate, delta);
-    const startStr = format(nextStart, "yyyy-MM-dd");
-    const endStr = format(nextEnd, "yyyy-MM-dd");
-
-    if (selectedBar.type === "building") {
-      updateMilestone({ id: selectedBar.id, projectId, startDate: startStr, endDate: endStr });
-    } else if (selectedBar.type === "room") {
-      updateSection({ id: selectedBar.id, projectId, startDate: startStr, endDate: endStr } as any);
-    } else {
-      updateTask({ id: selectedBar.id, dueDate: endStr } as any);
-    }
-
-    toast({ title: `Shifted ${direction === "right" ? "forward" : "back"} 1 day` });
-  }, [selectedBar, projectId, toast, updateMilestone, updateSection, updateTask]);
-
   const drillIntoRoom = (buildingId: number, roomId: number) => {
     setSelectedBuildingId(buildingId);
     setSelectedRoomId(roomId);
@@ -792,7 +753,17 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
     const { left, width } = getBarPosition(displayStart, displayEnd);
     const barColor = row.colorHex || BUILDING_COLORS[row.colorIndex];
     const rowH = row.type === "room" ? ROOM_ROW_HEIGHT : ROW_HEIGHT;
-    const canDrag = isAdmin && row.startDate && row.endDate;
+    const canResize = isAdmin && row.startDate && row.endDate;
+    const resizeHandleWidth = 8;
+    const minWidth = row.type === "task" ? 18 : 24;
+    const resize = (edge: "start" | "end", deltaDays: number) => {
+      if (!row.startDate || !row.endDate) return;
+      const start = edge === "start" ? addDays(row.startDate, deltaDays) : row.startDate;
+      const end = edge === "end" ? addDays(row.endDate, deltaDays) : row.endDate;
+      if (row.type === "building") updateMilestone({ id: row.id, projectId, startDate: format(start, "yyyy-MM-dd"), endDate: format(end, "yyyy-MM-dd") });
+      else if (row.type === "room") updateSection({ id: row.id, projectId, startDate: format(start, "yyyy-MM-dd"), endDate: format(end, "yyyy-MM-dd") } as any);
+      else updateTask({ id: row.id, dueDate: format(end, "yyyy-MM-dd") } as any);
+    };
 
     if (row.type === "task") {
       const isDone = row.status === "done";
@@ -802,11 +773,56 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
         <Tooltip>
           <TooltipTrigger asChild>
             <div
-              className="absolute rounded-sm select-none cursor-default"
+            className="absolute rounded-sm select-none cursor-default"
               style={{ left, width, top: topOffset, height: barHeight, backgroundColor: barColor, opacity: isDone ? 0.55 : 0.95 }}
               data-testid={`gantt-bar-task-${row.id}`}
-              onClick={() => canDrag && setSelectedBar(row)}
             >
+              {canResize && (
+                <>
+                  <button
+                    className="absolute left-0 top-0 h-full w-2 cursor-ew-resize bg-transparent"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const startX = e.clientX;
+                      const originalStart = row.startDate!;
+                      const originalEnd = row.endDate!;
+                      const onMove = (moveEvent: MouseEvent) => {
+                        const deltaDays = Math.round((moveEvent.clientX - startX) / dayWidth);
+                        resize("start", deltaDays);
+                      };
+                      const onUp = () => {
+                        window.removeEventListener("mousemove", onMove);
+                        window.removeEventListener("mouseup", onUp);
+                      };
+                      window.addEventListener("mousemove", onMove);
+                      window.addEventListener("mouseup", onUp);
+                    }}
+                    data-testid={`handle-start-${row.type}-${row.id}`}
+                    aria-label="Resize start date"
+                  />
+                  <button
+                    className="absolute right-0 top-0 h-full w-2 cursor-ew-resize bg-transparent"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const startX = e.clientX;
+                      const onMove = (moveEvent: MouseEvent) => {
+                        const deltaDays = Math.round((moveEvent.clientX - startX) / dayWidth);
+                        resize("end", deltaDays);
+                      };
+                      const onUp = () => {
+                        window.removeEventListener("mousemove", onMove);
+                        window.removeEventListener("mouseup", onUp);
+                      };
+                      window.addEventListener("mousemove", onMove);
+                      window.addEventListener("mouseup", onUp);
+                    }}
+                    data-testid={`handle-end-${row.type}-${row.id}`}
+                    aria-label="Resize finish date"
+                  />
+                </>
+              )}
               {isDone && (
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="w-full h-px bg-foreground/30" />
@@ -840,8 +856,51 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
             className="absolute rounded-sm overflow-hidden border border-border/20 select-none cursor-default"
             style={{ left, width, top: topOffset, height: barHeight, backgroundColor: `${barColor}22` }}
             data-testid={`gantt-bar-${row.type}-${row.id}`}
-            onClick={() => canDrag && setSelectedBar(row)}
           >
+            {canResize && (
+              <>
+                <button
+                  className="absolute left-0 top-0 h-full w-2 cursor-ew-resize bg-transparent"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const startX = e.clientX;
+                    const onMove = (moveEvent: MouseEvent) => {
+                      const deltaDays = Math.round((moveEvent.clientX - startX) / dayWidth);
+                      resize("start", deltaDays);
+                    };
+                    const onUp = () => {
+                      window.removeEventListener("mousemove", onMove);
+                      window.removeEventListener("mouseup", onUp);
+                    };
+                    window.addEventListener("mousemove", onMove);
+                    window.addEventListener("mouseup", onUp);
+                  }}
+                  data-testid={`handle-start-${row.type}-${row.id}`}
+                  aria-label="Resize start date"
+                />
+                <button
+                  className="absolute right-0 top-0 h-full w-2 cursor-ew-resize bg-transparent"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const startX = e.clientX;
+                    const onMove = (moveEvent: MouseEvent) => {
+                      const deltaDays = Math.round((moveEvent.clientX - startX) / dayWidth);
+                      resize("end", deltaDays);
+                    };
+                    const onUp = () => {
+                      window.removeEventListener("mousemove", onMove);
+                      window.removeEventListener("mouseup", onUp);
+                    };
+                    window.addEventListener("mousemove", onMove);
+                    window.addEventListener("mouseup", onUp);
+                  }}
+                  data-testid={`handle-end-${row.type}-${row.id}`}
+                  aria-label="Resize finish date"
+                />
+              </>
+            )}
             <div className="h-full" style={{ width: `${progress}%`, backgroundColor: barColor, opacity: isRoom ? 0.9 : 1 }} />
             <span className="absolute inset-0 flex items-center justify-between px-1.5 text-[9px] font-medium text-foreground/70 truncate">
               <span>{width > 50 ? `${progress}%` : ""}</span>
@@ -1138,7 +1197,6 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                           <BuildingColourPicker
                             currentHex={building.colorHex}
                             onSelect={(hex) => handleBuildingColourChange(building.id, hex)}
-                            onShift={shiftSelectedBar}
                           />
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
