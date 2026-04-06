@@ -523,6 +523,32 @@ export async function registerRoutes(
     }
   });
 
+  app.delete("/api/projects/:id/invites/:inviteId", isAuthenticated, async (req: any, res) => {
+    try {
+      const requesterId = req.user.claims.sub;
+      const requester = await authStorage.getUser(requesterId);
+      if (requester?.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can delete invites" });
+      }
+
+      const projectId = Number(req.params.id);
+      const inviteId = Number(req.params.inviteId);
+      const project = await storage.getProject(projectId);
+      if (!project) return res.status(404).json({ message: "Project not found" });
+
+      const invite = await storage.getClientInvitesByProject(projectId).then(invites => invites.find(inv => inv.id === inviteId));
+      if (!invite || invite.projectId !== projectId) {
+        return res.status(404).json({ message: "Invite not found" });
+      }
+
+      await storage.deleteClientInvite(inviteId);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error deleting client invite:", error);
+      res.status(500).json({ message: "Failed to delete invite" });
+    }
+  });
+
   app.get("/api/invites/:token/validate", async (req: any, res) => {
     try {
       const invite = await storage.getClientInviteByToken(req.params.token);

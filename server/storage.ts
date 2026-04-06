@@ -201,6 +201,7 @@ export interface IStorage {
   getPendingInvitesByEmail(email: string): Promise<ClientInvite[]>;
   getClientInvitesByEmail(email: string): Promise<ClientInvite[]>;
   updateClientInvite(id: number, updates: Partial<InsertClientInvite>): Promise<ClientInvite>;
+  deleteClientInvite(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -836,6 +837,9 @@ export class DatabaseStorage implements IStorage {
   async updateClientInvite(id: number, updates: Partial<InsertClientInvite>): Promise<ClientInvite> {
     const [updated] = await db.update(clientInvites).set(updates).where(eq(clientInvites.id, id)).returning();
     return updated;
+  }
+  async deleteClientInvite(id: number): Promise<void> {
+    await db.delete(clientInvites).where(eq(clientInvites.id, id));
   }
 }
 

@@ -310,6 +310,20 @@ function SidebarCards({
     },
   });
 
+  const deleteInviteMutation = useMutation({
+    mutationFn: async (inviteId: number) => {
+      const res = await apiRequest("DELETE", `/api/projects/${projectId}/invites/${inviteId}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Invite deleted", description: "The invite has been removed." });
+      qc.invalidateQueries({ queryKey: ["/api/projects", projectId, "invites"] });
+    },
+    onError: (err: any) => {
+      toast({ title: "Failed to delete invite", description: err.message, variant: "destructive" });
+    },
+  });
+
   const renderUserRow = (u: any, badge?: string) => (
     <div key={u.id} className={`space-y-1 ${u.archivedAt ? "opacity-50" : ""}`} data-testid={`access-user-${u.id}`}>
       <div className="flex items-center gap-2">
@@ -527,6 +541,16 @@ function SidebarCards({
                             Resend Email
                           </Button>
                         )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-xs text-destructive hover:text-destructive"
+                          onClick={() => deleteInviteMutation.mutate(inv.id)}
+                          disabled={deleteInviteMutation.isPending}
+                          data-testid={`button-delete-invite-${inv.id}`}
+                        >
+                          Delete
+                        </Button>
                       </div>
                     </div>
                   ))}
