@@ -776,7 +776,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
       let lastX = startX;
       const onMove = (moveEvent: MouseEvent) => {
         lastX = moveEvent.clientX;
-        const deltaDays = Math.round((lastX - startX) / pxPerDay);
+        const deltaDays = (lastX - startX) / pxPerDay;
         if (edge === "start") {
           const nextStart = addDays(originalStart, deltaDays);
           if (nextStart >= originalEnd) return;
