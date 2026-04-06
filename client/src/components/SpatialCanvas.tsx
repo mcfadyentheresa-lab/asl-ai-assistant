@@ -1559,7 +1559,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       return (
         <div
           key={el.id}
-          className="absolute select-none cursor-grab"
+          className="absolute select-none cursor-grab transition-[width,height,transform,border-color,background-color] duration-200 ease-out"
           style={{
             left: el.x, top: el.y, width: el.width, height: el.height,
             zIndex: Math.max(0, effectiveZ - 1000),
@@ -1568,6 +1568,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             borderRadius: "12px",
             border: isSelected ? "2px dashed hsl(var(--primary))" : "1px dashed hsl(var(--border))",
           }}
+          data-testid={`room-zone-${el.id}`}
           onMouseDown={(e) => {
             const tag = (e.target as HTMLElement).tagName.toLowerCase();
             if (tag === "input" || tag === "button" || (e.target as HTMLElement).closest("button")) return;
@@ -1609,6 +1610,27 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
               </span>
             )}
           </div>
+          {(() => {
+            const childEls = elementsList.filter(
+              (child) =>
+                child.id !== el.id &&
+                child.type !== "room_zone" &&
+                child.x >= el.x &&
+                child.y >= el.y &&
+                child.x < el.x + (el.width || 500) &&
+                child.y < el.y + (el.height || 400)
+            );
+            const maxChildRight = childEls.reduce((max, child) => Math.max(max, child.x + (child.width || 200)), el.x + 260);
+            const maxChildBottom = childEls.reduce((max, child) => Math.max(max, child.y + (child.height || 60)), el.y + 120);
+            const computedWidth = Math.max(el.width || 500, maxChildRight - el.x + 24);
+            const computedHeight = Math.max(el.height || 400, maxChildBottom - el.y + 24);
+            return (
+              <div
+                className="absolute inset-0 rounded-[12px] pointer-events-none transition-[width,height] duration-200 ease-out"
+                style={{ width: computedWidth, height: computedHeight }}
+              />
+            );
+          })()}
           {isSelected && (
             <>
               <div className="absolute -top-8 right-0 flex gap-1">
