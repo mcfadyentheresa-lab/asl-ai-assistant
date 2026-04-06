@@ -441,18 +441,18 @@ function SidebarCards({
               </SelectContent>
             </Select>
           ) : assignedClient ? (
-            <div className="flex items-center gap-3" data-testid="text-assigned-client">
-              <Avatar>
-                <AvatarFallback>
+            <div className="flex items-center gap-3 rounded-lg border border-border/60 bg-muted/20 px-3 py-2" data-testid="text-assigned-client">
+              <Avatar className="h-9 w-9 shrink-0">
+                <AvatarFallback className="text-xs">
                   {(assignedClient.firstName?.[0] || "") + (assignedClient.lastName?.[0] || "")}
                 </AvatarFallback>
               </Avatar>
-              <div>
-                <p className="font-medium text-foreground text-sm">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium leading-tight text-foreground">
                   {assignedClient.firstName || ""} {assignedClient.lastName || ""}
                 </p>
                 {assignedClient.email && (
-                  <p className="text-muted-foreground text-xs">{assignedClient.email}</p>
+                  <p className="truncate text-xs leading-tight text-muted-foreground">{assignedClient.email}</p>
                 )}
               </div>
             </div>
