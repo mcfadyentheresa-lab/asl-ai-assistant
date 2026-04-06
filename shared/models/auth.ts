@@ -27,7 +27,6 @@ export const users = pgTable("users", {
   smsNotifications: boolean("sms_notifications").default(true),
   emailNotifications: boolean("email_notifications").default(true),
   archivedAt: timestamp("archived_at"),
-  lastLoginAt: timestamp("last_login_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
