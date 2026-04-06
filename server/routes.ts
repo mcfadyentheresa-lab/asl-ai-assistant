@@ -458,14 +458,7 @@ export async function registerRoutes(
         status: "pending",
       });
 
-      let emailSent = false;
       let smsSent = false;
-      try {
-        const { sendClientInviteEmail } = await import("./email");
-        emailSent = await sendClientInviteEmail(parsed.data.email, parsed.data.firstName, project.name, token);
-      } catch (e) {
-        console.error("Error sending invite email:", e);
-      }
       if (parsed.data.phone) {
         try {
           const { sendClientInviteSms } = await import("./sms");
@@ -475,7 +468,7 @@ export async function registerRoutes(
         }
       }
 
-      res.status(201).json({ ...invite, emailSent, smsSent });
+      res.status(201).json({ ...invite, smsSent });
     } catch (error: any) {
       console.error("Error creating client invite:", error);
       res.status(500).json({ message: "Failed to create invite" });
@@ -500,14 +493,7 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Invite not found" });
       }
 
-      let emailSent = false;
       let smsSent = false;
-      try {
-        const { sendClientInviteEmail } = await import("./email");
-        emailSent = await sendClientInviteEmail(invite.email, invite.firstName, project.name, invite.token);
-      } catch (e) {
-        console.error("Error resending invite email:", e);
-      }
       if (invite.phone) {
         try {
           const { sendClientInviteSms } = await import("./sms");
@@ -516,7 +502,7 @@ export async function registerRoutes(
           console.error("Error resending invite SMS:", e);
         }
       }
-      res.json({ success: true, smsSent, emailSent });
+      res.json({ success: true, smsSent });
     } catch (error: any) {
       console.error("Error resending client invite:", error);
       res.status(500).json({ message: "Failed to resend invite" });

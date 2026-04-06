@@ -278,7 +278,7 @@ function SidebarCards({
       return res.json();
     },
     onSuccess: () => {
-      toast({ title: "Invite sent", description: "Client will receive an email with their portal link." });
+      toast({ title: "Invite sent", description: "Copy the invite link and email it to the client directly." });
       setShowInviteDialog(false);
       setInviteForm({ firstName: "", lastName: "", email: "", phone: "" });
       qc.invalidateQueries({ queryKey: ["/api/projects", projectId, "invites"] });
@@ -297,9 +297,9 @@ function SidebarCards({
     onSuccess: (data: any) => {
       toast({
         title: "Invite resent",
-        description: data?.emailSent
-          ? "The client will receive another email with their portal link."
-          : "The client will receive another message with their portal link.",
+        description: data?.smsSent
+          ? "The client will receive another text message with their portal link."
+          : "Invite link is ready to copy again.",
       });
       qc.invalidateQueries({ queryKey: ["/api/projects", projectId, "invites"] });
     },
@@ -363,6 +363,12 @@ function SidebarCards({
       </div>
     </div>
   );
+
+  const copyInviteLink = async (token: string) => {
+    const link = `${window.location.origin}/invite/${token}`;
+    await navigator.clipboard.writeText(link);
+    toast({ title: "Copied", description: "Invite link copied to clipboard." });
+  };
 
   const [activityExpanded, setActivityExpanded] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
@@ -498,6 +504,15 @@ function SidebarCards({
                         <Badge variant={inv.status === "accepted" ? "default" : inv.status === "pending" && new Date() > new Date(inv.expiresAt) ? "destructive" : "secondary"} className="text-[10px]">
                           {inv.status === "accepted" ? "Accepted" : new Date() > new Date(inv.expiresAt) ? "Expired" : "Pending"}
                         </Badge>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-xs"
+                          onClick={() => copyInviteLink(inv.token)}
+                          data-testid={`button-copy-invite-link-${inv.id}`}
+                        >
+                          Copy Link
+                        </Button>
                         {inv.status !== "accepted" && (
                           <Button
                             variant="ghost"
