@@ -35,6 +35,7 @@ class AuthStorage implements IAuthStorage {
             ...userData,
             role: existingByEmail.role,
             phone: existingByEmail.phone ?? userData.phone,
+            lastLoginAt: new Date(),
           })
           .onConflictDoUpdate({
             target: users.id,
@@ -43,6 +44,7 @@ class AuthStorage implements IAuthStorage {
               role: existingByEmail.role,
               phone: existingByEmail.phone ?? userData.phone,
               updatedAt: new Date(),
+            lastLoginAt: new Date(),
             },
           })
           .returning();
@@ -66,6 +68,7 @@ class AuthStorage implements IAuthStorage {
         set: {
           ...userData,
           updatedAt: new Date(),
+          lastLoginAt: new Date(),
         },
       })
       .returning();

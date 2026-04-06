@@ -16,6 +16,7 @@ import { Link } from "wouter";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useOnlineUsers, useVisibilityToggle } from "@/hooks/use-presence";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { formatDistanceToNow } from "date-fns";
 
 export function Navbar() {
   const { user, logout } = useAuth();
@@ -47,6 +48,7 @@ export function Navbar() {
     `${(user.firstName || "")[0] || ""}${(user.lastName || "")[0] || ""}`.toUpperCase() || "U";
   const roleLabel =
     user.role === "admin" ? "Admin" : user.role === "crew" ? "Crew" : "Client";
+  const showLastLogin = user.role === "admin" && user.lastLoginAt;
 
   return (
     <nav
@@ -106,6 +108,11 @@ export function Navbar() {
               <p className="text-muted-foreground text-xs" data-testid="text-user-email">
                 {user.email}
               </p>
+              {showLastLogin && (
+                <p className="text-muted-foreground text-[11px] mt-1" data-testid="text-last-login">
+                  Last logged in {formatDistanceToNow(new Date(user.lastLoginAt), { addSuffix: true })}
+                </p>
+              )}
             </div>
             <DropdownMenuSeparator />
             <Link href="/profile">
