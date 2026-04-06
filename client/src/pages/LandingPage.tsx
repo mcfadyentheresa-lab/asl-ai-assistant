@@ -1,11 +1,20 @@
 import { Button } from "@/components/ui/button";
 import { ArrowRight, ShieldCheck, Zap, Eye } from "lucide-react";
 import { motion } from "framer-motion";
+import { useAuth } from "@/hooks/use-auth";
+import { useLocation } from "wouter";
 import heroImg from "@/assets/images/hero-cottage.png";
 import craftImg from "@/assets/images/craft-interior.png";
 
 export default function LandingPage() {
+  const { user } = useAuth();
+  const [, navigate] = useLocation();
+
   const handleLogin = () => {
+    if (user?.role === "admin") {
+      navigate("/");
+      return;
+    }
     window.location.href = "/api/login";
   };
 
