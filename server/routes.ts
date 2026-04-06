@@ -478,7 +478,7 @@ export async function registerRoutes(
       const project = await storage.getProject(projectId);
       if (!project) return res.status(404).json({ message: "Project not found" });
 
-      const invite = await storage.getClientInviteByToken(req.params.inviteId);
+      const invite = await storage.getClientInvitesByProject(projectId).then(invites => invites.find(inv => inv.id === inviteId));
       if (!invite || invite.projectId !== projectId) {
         return res.status(404).json({ message: "Invite not found" });
       }
