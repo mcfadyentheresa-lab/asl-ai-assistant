@@ -1045,7 +1045,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
           <BuildingColourPicker currentHex={newBuildingColorHex} onSelect={setNewBuildingColorHex} />
           <div className="flex gap-1">
             <Button size="sm" onClick={handleAddBuilding} disabled={creatingMilestone || !newBuildingTitle.trim()} data-testid="button-confirm-add-building">
-              <Check className="h-3.5 w-3.5" />
+              <Plus className="h-3.5 w-3.5" />
             </Button>
             <Button size="sm" variant="ghost" onClick={() => { setAddingBuilding(false); setNewBuildingTitle(""); setNewBuildingStart(""); setNewBuildingEnd(""); setNewBuildingColorHex(null); }} data-testid="button-cancel-add-building">
               <X className="h-3.5 w-3.5" />
@@ -1163,7 +1163,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                       <div className="flex-1 min-w-0 pr-1">
                         <div className="flex items-center gap-1.5">
                           <span className="text-[11px] font-semibold uppercase tracking-wide truncate">{building.title}</span>
-                          {building.completed && <Check className="h-2.5 w-2.5 text-green-600 shrink-0" />}
+                          {building.totalTasks > 0 && building.doneTasks === building.totalTasks && <Check className="h-2.5 w-2.5 text-green-600 shrink-0" />}
                         </div>
                         <div className="flex items-center gap-1.5">
                           <div className="w-12 h-1 bg-muted rounded-full overflow-hidden">
@@ -1409,7 +1409,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
             <div key={building.id} className="flex items-center gap-1" data-testid={`gantt-legend-${building.id}`}>
               <div className="w-2 h-2 rounded-sm" style={{ backgroundColor: building.colorHex || BUILDING_COLORS[building.colorIndex] }} />
               <span>{building.title}</span>
-              {building.completed && <span className="text-green-600">✓</span>}
+              {building.totalTasks > 0 && building.doneTasks === building.totalTasks && <span className="text-green-600">✓</span>}
             </div>
           ))}
         </div>
