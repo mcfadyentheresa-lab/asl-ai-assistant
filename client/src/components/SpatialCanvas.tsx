@@ -795,6 +795,10 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
         if (el.type === "image" && el.width > 0 && el.height && el.height > 0) {
           const aspectRatio = el.height / el.width;
           updates.height = Math.round(fitWidth * aspectRatio);
+        } else if (el.type === "color_swatch") {
+          updates.height = el.height;
+        } else if (el.type === "link") {
+          updates.height = Math.max(el.height || 100, 120);
         }
 
         updateElement(elementId, updates);
@@ -1824,7 +1828,6 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
         }
         return stackY + previewH + 12;
       })() : 0;
-      const computedHeight = Math.max(el.height || 300, childrenBottom, pendingDropBottom);
       const hasCustomBg = !!c.backgroundColor;
       const draggedEl = isDropTarget && draggingId !== null ? elements[draggingId] : null;
       const presetColors = ["#ffffff", "#d4d4d4", "#fecdd3", "#e9d5ff", "#bfdbfe", "#bbf7d0", "#fef08a", "#fed7aa"];
@@ -1847,14 +1850,16 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
         }
         return draggedEl.height || 60;
       })();
+      const childPreviewHeight = isDropTarget && draggedEl ? dropPreviewHeight + dropPreviewY + 12 : 0;
+      const computedHeight = Math.max(el.height || 300, childrenBottom, pendingDropBottom, childPreviewHeight);
 
       return (
         <div
           key={el.id}
-          className={`${cardBase} border border-dashed ${isDropTarget ? "border-primary/40" : "border-border/60"} ${!hasCustomBg && !isDropTarget ? "bg-muted/40" : ""} ${isDropTarget && !hasCustomBg ? "bg-primary/10" : ""} transition-colors`}
+          className={`${cardBase} border border-dashed ${isDropTarget ? "border-primary/40 scale-[1.01]" : "border-border/60"} ${!hasCustomBg && !isDropTarget ? "bg-muted/40" : ""} ${isDropTarget && !hasCustomBg ? "bg-primary/10" : ""} transition-[transform,min-height,background-color,border-color] duration-200 ease-out`}
           style={{
             left: el.x, top: el.y, width: el.width, minHeight: computedHeight, zIndex: effectiveZ,
-            transition: "min-height 250ms ease-out, background-color 200ms, border-color 200ms",
+            transform: isDropTarget ? "translateY(-1px)" : undefined,
             ...(hasCustomBg ? { backgroundColor: c.backgroundColor } : {}),
           }}
           onClick={handleClick}
@@ -1879,14 +1884,14 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           </div>
           {isDropTarget && draggedEl && (
             <div
-              className="absolute border-2 border-dashed border-primary/50 rounded bg-primary/5"
+              className="absolute border-2 border-dashed border-primary/50 rounded bg-primary/5 animate-in fade-in zoom-in-95 duration-200"
               style={{
                 left: 12,
                 top: dropPreviewY,
                 width: el.width - 24,
                 height: dropPreviewHeight,
                 pointerEvents: "none",
-                transition: "top 200ms ease-out, height 200ms ease-out",
+                transition: "top 180ms ease-out, height 180ms ease-out",
               }}
               data-testid={`drop-preview-${el.id}`}
             />
