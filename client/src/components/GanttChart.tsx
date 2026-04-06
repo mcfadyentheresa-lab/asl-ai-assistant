@@ -193,6 +193,21 @@ function BuildingColourPicker({ currentHex, onSelect }: { currentHex: string | n
   );
 }
 
+function mixHex(hex: string, targetHex: string, amount: number) {
+  const cleanHex = hex.replace("#", "");
+  const cleanTarget = targetHex.replace("#", "");
+  const base = cleanHex.length === 3 ? cleanHex.split("").map((c) => c + c).join("") : cleanHex;
+  const target = cleanTarget.length === 3 ? cleanTarget.split("").map((c) => c + c).join("") : cleanTarget;
+  const r1 = parseInt(base.slice(0, 2), 16);
+  const g1 = parseInt(base.slice(2, 4), 16);
+  const b1 = parseInt(base.slice(4, 6), 16);
+  const r2 = parseInt(target.slice(0, 2), 16);
+  const g2 = parseInt(target.slice(2, 4), 16);
+  const b2 = parseInt(target.slice(4, 6), 16);
+  const blend = (a: number, b: number) => Math.round(a + (b - a) * amount).toString(16).padStart(2, "0");
+  return `#${blend(r1, r2)}${blend(g1, g2)}${blend(b1, b2)}`;
+}
+
 function PaintColourPanel({ paintColorIds, onUpdate, isAdmin }: { paintColorIds: number[] | null | undefined; onUpdate: (ids: number[]) => void; isAdmin: boolean }) {
   const [expanded, setExpanded] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -1114,6 +1129,9 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                 if (row.type === "building") {
                   const building = buildingInfos.find(b => b.id === row.id)!;
                   const accentColor = building.colorHex || BUILDING_COLORS[building.colorIndex];
+                  const progressColor = building.completed || building.progress >= 100
+                    ? accentColor
+                    : mixHex(accentColor, "#ffffff", 0.58);
                   const isExpanded = expandedBuildings.has(building.id);
                   const roomCount = sections.filter(s => s.milestoneId === building.id).length;
                   return (
@@ -1147,7 +1165,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                         </div>
                         <div className="flex items-center gap-1.5">
                           <div className="w-12 h-1 bg-muted rounded-full overflow-hidden">
-                            <div className="h-full rounded-full transition-all duration-300" style={{ width: `${building.progress}%`, backgroundColor: accentColor }} />
+                            <div className="h-full rounded-full transition-all duration-300" style={{ width: `${building.progress}%`, backgroundColor: progressColor }} />
                           </div>
                           <span className="text-[9px] text-muted-foreground">{building.doneTasks}/{building.totalTasks}</span>
                           {roomCount > 0 && (
@@ -1190,6 +1208,9 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                   const actualBuildingId = isGeneralTasks ? -roomData.id : sections.find(s => s.id === roomData.id)?.milestoneId;
                   const parentBuilding = buildingInfos.find(b => b.id === actualBuildingId);
                   const accentColor = roomData.colorHex || BUILDING_COLORS[roomData.colorIndex];
+                  const progressColor = roomInfo?.completed || (roomInfo?.progress ?? roomData.progress ?? 0) >= 100
+                    ? accentColor
+                    : mixHex(accentColor, "#ffffff", 0.58);
                   const roomInfo = (!isGeneralTasks && parentBuilding) ? roomInfosForBuilding(parentBuilding.id).find(r => r.id === roomData.id) : null;
 
                   const actualRoomId = isGeneralTasks ? -1 : roomData.id;
@@ -1219,7 +1240,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                         </div>
                         <div className="flex items-center gap-1.5">
                           <div className="w-10 h-[3px] bg-muted rounded-full overflow-hidden">
-                            <div className="h-full rounded-full transition-all duration-300" style={{ width: `${roomInfo?.progress || roomData.progress || 0}%`, backgroundColor: accentColor }} />
+                            <div className="h-full rounded-full transition-all duration-300" style={{ width: `${roomInfo?.progress || roomData.progress || 0}%`, backgroundColor: progressColor }} />
                           </div>
                           <span className="text-[9px] text-muted-foreground">
                             {isGeneralTasks
