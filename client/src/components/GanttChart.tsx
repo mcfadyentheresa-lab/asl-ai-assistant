@@ -935,11 +935,6 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
           <h3 className="font-serif text-lg font-semibold tracking-tight uppercase" data-testid="text-gantt-heading">
             Project Timeline
           </h3>
-          {drillLevel === "buildings" && (
-            <Badge variant="outline" className="text-xs" data-testid="badge-building-count">
-              {milestones.length} {milestones.length === 1 ? "building" : "buildings"}
-            </Badge>
-          )}
           {currentProgress !== null && (
             <Badge variant="secondary" className="text-xs gap-1" data-testid="badge-drill-progress">
               {currentProgress}% complete
