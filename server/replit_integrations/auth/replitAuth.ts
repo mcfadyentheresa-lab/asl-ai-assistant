@@ -140,9 +140,7 @@ export async function setupAuth(app: Express) {
           const returnTo = (req.session as any).returnTo;
           delete (req.session as any).returnTo;
           const isSafePath = returnTo && typeof returnTo === "string" && /^\/[a-zA-Z0-9/_\-?=&%.]+$/.test(returnTo) && !returnTo.startsWith("//");
-          const userRole = (user as any)?.role;
-          const defaultRedirect = userRole === "admin" || userRole === "crew" ? "/dashboard" : "/";
-          const redirectUrl = isSafePath ? returnTo : defaultRedirect;
+          const redirectUrl = isSafePath ? returnTo : "/";
           return res.redirect(redirectUrl);
         });
       });
