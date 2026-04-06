@@ -278,7 +278,7 @@ function SidebarCards({
       return res.json();
     },
     onSuccess: () => {
-      toast({ title: "Invite sent", description: "Copy the invite link and email it to the client directly." });
+      toast({ title: "Invite sent", description: "The client will receive an email with their portal link." });
       setShowInviteDialog(false);
       setInviteForm({ firstName: "", lastName: "", email: "", phone: "" });
       qc.invalidateQueries({ queryKey: ["/api/projects", projectId, "invites"] });
@@ -297,9 +297,11 @@ function SidebarCards({
     onSuccess: (data: any) => {
       toast({
         title: "Invite resent",
-        description: data?.smsSent
-          ? "The client will receive another text message with their portal link."
-          : "Invite link is ready to copy again.",
+        description: data?.emailSent
+          ? "The client will receive another email with their portal link."
+          : data?.smsSent
+            ? "The client will receive another text message with their portal link."
+            : "Invite resent.",
       });
       qc.invalidateQueries({ queryKey: ["/api/projects", projectId, "invites"] });
     },
