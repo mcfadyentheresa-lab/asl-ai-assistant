@@ -13,7 +13,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useCreateSection, useUpdateSection, useDeleteSection, useCreateMilestone, useUpdateMilestone, useCreateTask, useUpdateTask } from "@/hooks/use-projects";
+import { useCreateSection, useUpdateSection, useDeleteSection, useCreateMilestone, useUpdateMilestone, useDeleteMilestone, useCreateTask, useUpdateTask } from "@/hooks/use-projects";
 import { useToast } from "@/hooks/use-toast";
 import type { InsertMilestone } from "@shared/schema";
 import { ListPlus } from "lucide-react";
