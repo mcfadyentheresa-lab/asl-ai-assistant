@@ -403,21 +403,21 @@ function SidebarCards({
   return (
     <>
       <Card>
-        <CardHeader>
-          <CardTitle className="font-serif text-lg" data-testid="text-client-heading">
+        <CardHeader className="pb-3">
+          <CardTitle className="font-serif text-base" data-testid="text-client-heading">
             Assigned Client
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-0 space-y-3">
           {!assignedClient && (
             <p className="text-muted-foreground text-sm" data-testid="text-no-client">No client assigned</p>
           )}
 
           {userRole === "admin" && (
-            <div className="mt-4 space-y-3">
+            <div className="space-y-2">
               <Dialog open={showInviteDialog} onOpenChange={setShowInviteDialog}>
                 <DialogTrigger asChild>
-                  <Button variant="outline" size="sm" className="w-full justify-start gap-3 rounded-xl border-border/70 bg-background/70 px-4 py-5" data-testid="button-invite-client">
+                  <Button variant="outline" size="sm" className="w-full justify-start gap-2 rounded-xl border-border/70 bg-background/70 px-4 py-3.5" data-testid="button-invite-client">
                     <UserPlus className="h-4 w-4" />
                     Invite New Client
                   </Button>
@@ -429,7 +429,7 @@ function SidebarCards({
                       The client will receive an email with a link to access their project portal. SMS can be used as a backup.
                     </DialogDescription>
                   </DialogHeader>
-                  <div className="space-y-4 pt-2">
+                  <div className="space-y-3 pt-1">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div className="space-y-1">
                         <Label htmlFor="invite-first">First Name</Label>
@@ -465,10 +465,10 @@ function SidebarCards({
 
               {Array.isArray(projectInvites) && projectInvites.length > 0 && (
                 <div className="space-y-2">
-                  <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.18em]">Invites</p>
+                  <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-[0.18em]">Invites</p>
                   {projectInvites.map((inv: any) => (
-                    <div key={inv.id} className="rounded-xl border border-border/60 bg-background/60 p-3 space-y-2" data-testid={`invite-row-${inv.id}`}>
-                      <div className="flex items-start justify-between gap-3">
+                    <div key={inv.id} className="rounded-xl border border-border/60 bg-background/60 p-2.5 space-y-1.5" data-testid={`invite-row-${inv.id}`}>
+                      <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                           <div className="truncate font-semibold text-sm text-foreground">{inv.firstName} {inv.lastName}</div>
                           <div className="mt-0.5 text-xs text-muted-foreground truncate">{inv.email}{inv.phone ? ` • ${inv.phone}` : ""}</div>
