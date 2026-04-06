@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { ChevronLeft, ChevronDown, ChevronUp, ZoomIn, ZoomOut, Plus, Trash2, Pencil, FolderPlus, Check, X, MoreVertical, CheckSquare, Square, GripVertical, Palette, Search } from "lucide-react";
+import { ChevronLeft, ChevronDown, ChevronUp, ChevronRight, ZoomIn, ZoomOut, Plus, Trash2, Pencil, FolderPlus, Check, X, MoreVertical, CheckSquare, Square, GripVertical, Palette, Search } from "lucide-react";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -63,7 +63,7 @@ interface GanttChartProps {
   userRole: string;
 }
 
-const AREA_COLORS = [
+const BUILDING_COLORS = [
   "#1E3A2F", "#2D5A47", "#3D7A5F", "#8B7355", "#6B8E73",
   "#4A6741", "#7A6B5D", "#556B2F", "#8B8378", "#5F7161",
 ];
@@ -74,9 +74,9 @@ const TRADE_PRESETS = [
   "Demolition", "Insulation", "Tiling", "Countertops",
 ];
 
-type DrillLevel = "phases" | "sections" | "tasks";
+type DrillLevel = "buildings" | "tasks";
 
-interface PhaseInfo {
+interface BuildingInfo {
   id: number;
   title: string;
   startDate: Date | null;
@@ -90,7 +90,7 @@ interface PhaseInfo {
   paintColorIds?: number[] | null;
 }
 
-interface SectionInfo {
+interface RoomInfo {
   id: number;
   milestoneId: number;
   title: string;
@@ -144,18 +144,18 @@ function DateField({ label, value, onChange, placeholder, testId }: { label: str
   );
 }
 
-function AreaColourPicker({ currentHex, onSelect }: { currentHex: string | null | undefined; onSelect: (hex: string | null) => void }) {
+function BuildingColourPicker({ currentHex, onSelect }: { currentHex: string | null | undefined; onSelect: (hex: string | null) => void }) {
   const QUICK_COLOURS = [
     "#1E3A2F", "#2D5A47", "#3D7A5F", "#8B7355", "#6B8E73",
     "#4A6741", "#7A6B5D", "#556B2F", "#C4A882", "#3B5249",
-    "#8B4513", "#2F4F4F", "#556B2F", "#6B4423", "#4682B4",
+    "#8B4513", "#2F4F4F", "#5D4037", "#6B4423", "#4682B4",
     "#708090",
   ];
 
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={(e) => e.stopPropagation()} data-testid="button-area-colour-picker">
+        <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={(e) => e.stopPropagation()} data-testid="button-building-colour-picker">
           {currentHex ? (
             <div className="w-4 h-4 rounded-sm border border-border/60" style={{ backgroundColor: currentHex }} />
           ) : (
@@ -164,7 +164,7 @@ function AreaColourPicker({ currentHex, onSelect }: { currentHex: string | null 
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-48 p-2" align="start" onClick={(e) => e.stopPropagation()}>
-        <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2 font-medium">Area Colour</p>
+        <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2 font-medium">Building Colour</p>
         <div className="grid grid-cols-4 gap-1.5">
           {QUICK_COLOURS.map((hex) => (
             <button
@@ -180,7 +180,7 @@ function AreaColourPicker({ currentHex, onSelect }: { currentHex: string | null 
           <button
             className="w-full text-[10px] text-muted-foreground mt-2 hover:text-foreground transition-colors text-center py-1"
             onClick={(e) => { e.stopPropagation(); onSelect(null); }}
-            data-testid="button-clear-area-colour"
+            data-testid="button-clear-building-colour"
           >
             Remove colour
           </button>
@@ -342,19 +342,20 @@ function PaintColourPanel({ paintColorIds, onUpdate, isAdmin }: { paintColorIds:
 
 export default function GanttChart({ projectId, milestones, sections, tasks, userRole }: GanttChartProps) {
   const [zoomLevel, setZoomLevel] = useState(1);
-  const [drillLevel, setDrillLevel] = useState<DrillLevel>("phases");
-  const [selectedPhaseId, setSelectedPhaseId] = useState<number | null>(null);
-  const [selectedSectionId, setSelectedSectionId] = useState<number | null>(null);
+  const [drillLevel, setDrillLevel] = useState<DrillLevel>("buildings");
+  const [selectedBuildingId, setSelectedBuildingId] = useState<number | null>(null);
+  const [selectedRoomId, setSelectedRoomId] = useState<number | null>(null);
+  const [expandedBuildings, setExpandedBuildings] = useState<Set<number>>(new Set());
 
-  const [addingPhase, setAddingPhase] = useState(false);
-  const [newPhaseTitle, setNewPhaseTitle] = useState("");
-  const [newPhaseStart, setNewPhaseStart] = useState("");
-  const [newPhaseEnd, setNewPhaseEnd] = useState("");
-  const [newPhaseColorHex, setNewPhaseColorHex] = useState<string | null>(null);
-  const [addingSectionFor, setAddingSectionFor] = useState<number | null>(null);
-  const [newSectionTitle, setNewSectionTitle] = useState("");
-  const [newSectionStart, setNewSectionStart] = useState("");
-  const [newSectionEnd, setNewSectionEnd] = useState("");
+  const [addingBuilding, setAddingBuilding] = useState(false);
+  const [newBuildingTitle, setNewBuildingTitle] = useState("");
+  const [newBuildingStart, setNewBuildingStart] = useState("");
+  const [newBuildingEnd, setNewBuildingEnd] = useState("");
+  const [newBuildingColorHex, setNewBuildingColorHex] = useState<string | null>(null);
+  const [addingRoomFor, setAddingRoomFor] = useState<number | null>(null);
+  const [newRoomTitle, setNewRoomTitle] = useState("");
+  const [newRoomStart, setNewRoomStart] = useState("");
+  const [newRoomEnd, setNewRoomEnd] = useState("");
   const [editingSection, setEditingSection] = useState<SectionData | null>(null);
   const [editSectionForm, setEditSectionForm] = useState({ title: "", startDate: "", endDate: "" });
   const [addingTask, setAddingTask] = useState<{ milestoneId: number; sectionId: number | null } | null>(null);
@@ -374,25 +375,37 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
 
   const isAdmin = userRole !== "client";
 
-  useEffect(() => {
-    if (selectedPhaseId && !milestones.some(m => m.id === selectedPhaseId)) {
-      setSelectedPhaseId(null);
-      setSelectedSectionId(null);
-      setDrillLevel("phases");
-    }
-  }, [milestones, selectedPhaseId]);
+  const toggleBuilding = useCallback((buildingId: number) => {
+    setExpandedBuildings(prev => {
+      const next = new Set(prev);
+      if (next.has(buildingId)) next.delete(buildingId);
+      else next.add(buildingId);
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
-    if (selectedSectionId !== null && selectedSectionId !== -1 && !sections.some(s => s.id === selectedSectionId)) {
-      setSelectedSectionId(null);
-      setDrillLevel("sections");
+    if (selectedBuildingId && !milestones.some(m => m.id === selectedBuildingId)) {
+      setSelectedBuildingId(null);
+      setSelectedRoomId(null);
+      setDrillLevel("buildings");
     }
-  }, [sections, selectedSectionId]);
+  }, [milestones, selectedBuildingId]);
 
-  const phaseInfos = useMemo((): PhaseInfo[] => {
+  useEffect(() => {
+    if (selectedRoomId !== null && selectedRoomId !== -1 && !sections.some(s => s.id === selectedRoomId)) {
+      setSelectedRoomId(null);
+      if (selectedBuildingId) {
+        setDrillLevel("buildings");
+        setSelectedBuildingId(null);
+      }
+    }
+  }, [sections, selectedRoomId, selectedBuildingId]);
+
+  const buildingInfos = useMemo((): BuildingInfo[] => {
     const sorted = [...milestones].sort((a, b) => (a.order || 0) - (b.order || 0));
     return sorted.map((ms, idx) => {
-      const colorIndex = idx % AREA_COLORS.length;
+      const colorIndex = idx % BUILDING_COLORS.length;
       const msTasks = tasks.filter(t => t.milestoneId === ms.id);
       const msSections = sections.filter(s => s.milestoneId === ms.id);
 
@@ -410,34 +423,30 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
         if (s.endDate) allDates.push(parseISO(s.endDate));
       });
 
-      const phaseStart = ms.startDate ? parseISO(ms.startDate)
+      const bStart = ms.startDate ? parseISO(ms.startDate)
         : allDates.length > 0 ? new Date(Math.min(...allDates.map(d => d.getTime()))) : null;
-      let phaseEnd = ms.endDate ? parseISO(ms.endDate)
+      let bEnd = ms.endDate ? parseISO(ms.endDate)
         : allDates.length > 0 ? new Date(Math.max(...allDates.map(d => d.getTime()))) : null;
-      if (phaseStart && (!phaseEnd || phaseEnd.getTime() <= phaseStart.getTime())) {
-        phaseEnd = addDays(phaseStart, 14);
+      if (bStart && (!bEnd || bEnd.getTime() <= bStart.getTime())) {
+        bEnd = addDays(bStart, 14);
       }
 
       return {
-        id: ms.id, title: ms.title, startDate: phaseStart, endDate: phaseEnd,
+        id: ms.id, title: ms.title, startDate: bStart, endDate: bEnd,
         progress, totalTasks, doneTasks, completed: !!ms.completed, colorIndex,
         colorHex: ms.colorHex, paintColorIds: ms.paintColorIds,
       };
     });
   }, [milestones, sections, tasks]);
 
-  const selectedPhase = phaseInfos.find(p => p.id === selectedPhaseId) || null;
+  const roomInfosForBuilding = useCallback((buildingId: number): RoomInfo[] => {
+    const building = buildingInfos.find(b => b.id === buildingId);
+    if (!building) return [];
+    const bSections = sections.filter(s => s.milestoneId === buildingId).sort((a, b) => (a.order || 0) - (b.order || 0));
+    const bTasks = tasks.filter(t => t.milestoneId === buildingId);
 
-  const sectionInfos = useMemo((): SectionInfo[] => {
-    if (!selectedPhaseId) return [];
-    const phase = phaseInfos.find(p => p.id === selectedPhaseId);
-    if (!phase) return [];
-    const msSections = sections.filter(s => s.milestoneId === selectedPhaseId).sort((a, b) => (a.order || 0) - (b.order || 0));
-    const msTasks = tasks.filter(t => t.milestoneId === selectedPhaseId);
-
-    const result: SectionInfo[] = [];
-    msSections.forEach(sec => {
-      const secTasks = msTasks.filter(t => t.sectionId === sec.id);
+    return bSections.map(sec => {
+      const secTasks = bTasks.filter(t => t.sectionId === sec.id);
       const secTotal = secTasks.length;
       const secDone = secTasks.filter(t => t.status === "done").length;
       const secProgress = secTotal > 0 ? Math.round((secDone / secTotal) * 100) : sec.completed ? 100 : 0;
@@ -448,55 +457,39 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
       secTasks.forEach(t => { if (t.dueDate) secDates.push(parseISO(t.dueDate)); });
 
       const secStart = sec.startDate ? parseISO(sec.startDate)
-        : secDates.length > 0 ? new Date(Math.min(...secDates.map(d => d.getTime()))) : phase.startDate;
+        : secDates.length > 0 ? new Date(Math.min(...secDates.map(d => d.getTime()))) : building.startDate;
       let secEnd = sec.endDate ? parseISO(sec.endDate)
         : secDates.length > 0 ? new Date(Math.max(...secDates.map(d => d.getTime()))) : null;
       if (secStart && (!secEnd || secEnd.getTime() <= secStart.getTime())) {
         secEnd = addDays(secStart, 7);
       }
 
-      result.push({
+      return {
         id: sec.id, milestoneId: sec.milestoneId, title: sec.title,
         startDate: secStart, endDate: secEnd, progress: secProgress,
         totalTasks: secTotal, doneTasks: secDone, completed: !!sec.completed,
-        colorIndex: phase.colorIndex, parentColorHex: phase.colorHex,
-      });
+        colorIndex: building.colorIndex, parentColorHex: building.colorHex,
+      };
     });
+  }, [buildingInfos, sections, tasks]);
 
-    const unsectionedTasks = msTasks.filter(t => !t.sectionId);
-    if (unsectionedTasks.length > 0) {
-      const uDone = unsectionedTasks.filter(t => t.status === "done").length;
-      const uDates = unsectionedTasks.filter(t => t.dueDate).map(t => parseISO(t.dueDate!));
-      const uStart = uDates.length > 0 ? new Date(Math.min(...uDates.map(d => d.getTime()))) : phase.startDate;
-      let uEnd = uDates.length > 0 ? new Date(Math.max(...uDates.map(d => d.getTime()))) : null;
-      if (uStart && (!uEnd || uEnd.getTime() <= uStart.getTime())) uEnd = addDays(uStart, 7);
-
-      result.push({
-        id: -1, milestoneId: selectedPhaseId, title: "General Tasks",
-        startDate: uStart, endDate: uEnd,
-        progress: unsectionedTasks.length > 0 ? Math.round((uDone / unsectionedTasks.length) * 100) : 0,
-        totalTasks: unsectionedTasks.length, doneTasks: uDone,
-        completed: false, colorIndex: phase.colorIndex, parentColorHex: phase.colorHex,
-      });
-    }
-
-    return result;
-  }, [selectedPhaseId, phaseInfos, sections, tasks]);
-
-  const selectedSection = sectionInfos.find(s => s.id === selectedSectionId) || null;
+  const selectedBuilding = buildingInfos.find(b => b.id === selectedBuildingId) || null;
+  const selectedRoom = useMemo(() => {
+    if (!selectedBuildingId || selectedRoomId === null) return null;
+    if (selectedRoomId === -1) return { id: -1, title: "General Tasks", milestoneId: selectedBuildingId, startDate: null, endDate: null, progress: 0, totalTasks: 0, doneTasks: 0, completed: false, colorIndex: 0, parentColorHex: null } as RoomInfo;
+    return roomInfosForBuilding(selectedBuildingId).find(r => r.id === selectedRoomId) || null;
+  }, [selectedBuildingId, selectedRoomId, roomInfosForBuilding]);
 
   const taskInfos = useMemo((): TaskInfo[] => {
-    if (!selectedPhaseId) return [];
-    const phase = phaseInfos.find(p => p.id === selectedPhaseId);
-    if (!phase) return [];
+    if (drillLevel !== "tasks" || !selectedBuildingId || selectedRoomId === null) return [];
+    const building = buildingInfos.find(b => b.id === selectedBuildingId);
+    if (!building) return [];
 
     let filteredTasks: Task[];
-    if (selectedSectionId === -1) {
-      filteredTasks = tasks.filter(t => t.milestoneId === selectedPhaseId && !t.sectionId);
-    } else if (selectedSectionId !== null) {
-      filteredTasks = tasks.filter(t => t.sectionId === selectedSectionId);
+    if (selectedRoomId === -1) {
+      filteredTasks = tasks.filter(t => t.milestoneId === selectedBuildingId && !t.sectionId);
     } else {
-      return [];
+      filteredTasks = tasks.filter(t => t.sectionId === selectedRoomId);
     }
 
     filteredTasks = [...filteredTasks].sort((a, b) => (a.order || 0) - (b.order || 0));
@@ -506,22 +499,47 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
       return {
         id: t.id, title: t.title,
         startDate: taskDate ? addDays(taskDate, -3) : null,
-        endDate: taskDate, status: t.status, colorIndex: phase.colorIndex,
+        endDate: taskDate, status: t.status, colorIndex: building.colorIndex,
       };
     });
-  }, [selectedPhaseId, selectedSectionId, phaseInfos, tasks]);
+  }, [drillLevel, selectedBuildingId, selectedRoomId, buildingInfos, tasks]);
 
-  type BarItem = { startDate: Date | null; endDate: Date | null; colorIndex: number; progress?: number; status?: string | null; type: "phase" | "section" | "task"; id: number; title: string; colorHex?: string | null };
+  type BarItem = { startDate: Date | null; endDate: Date | null; colorIndex: number; progress?: number; status?: string | null; type: "building" | "room" | "task"; id: number; title: string; colorHex?: string | null };
+
+  const nestedRows: BarItem[] = useMemo(() => {
+    const rows: BarItem[] = [];
+    buildingInfos.forEach(b => {
+      rows.push({ ...b, type: "building" as const });
+      if (expandedBuildings.has(b.id)) {
+        const rooms = roomInfosForBuilding(b.id);
+        rooms.forEach(r => {
+          rows.push({ ...r, type: "room" as const, colorHex: r.parentColorHex });
+        });
+        const unsectionedTasks = tasks.filter(t => t.milestoneId === b.id && !t.sectionId);
+        if (unsectionedTasks.length > 0) {
+          rows.push({
+            id: -b.id,
+            title: "General Tasks",
+            startDate: b.startDate,
+            endDate: b.endDate,
+            colorIndex: b.colorIndex,
+            colorHex: b.colorHex,
+            type: "room" as const,
+            progress: (() => {
+              const done = unsectionedTasks.filter(t => t.status === "done").length;
+              return unsectionedTasks.length > 0 ? Math.round((done / unsectionedTasks.length) * 100) : 0;
+            })(),
+          });
+        }
+      }
+    });
+    return rows;
+  }, [buildingInfos, expandedBuildings, roomInfosForBuilding, tasks]);
 
   const currentRows: BarItem[] = useMemo(() => {
-    if (drillLevel === "phases") {
-      return phaseInfos.map(p => ({ ...p, type: "phase" as const }));
-    }
-    if (drillLevel === "sections") {
-      return sectionInfos.map(s => ({ ...s, type: "section" as const, colorHex: s.parentColorHex }));
-    }
+    if (drillLevel === "buildings") return nestedRows;
     return taskInfos.map(t => ({ ...t, type: "task" as const }));
-  }, [drillLevel, phaseInfos, sectionInfos, taskInfos]);
+  }, [drillLevel, nestedRows, taskInfos]);
 
   const rowsWithDates = currentRows.filter(r => r.startDate && r.endDate);
 
@@ -529,15 +547,12 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
     if (rowsWithDates.length === 0) {
       let fallbackStart: Date | null = null;
       let fallbackEnd: Date | null = null;
-      if (drillLevel === "tasks" && selectedSection && selectedSection.startDate) {
-        fallbackStart = selectedSection.startDate;
-        fallbackEnd = selectedSection.endDate || addDays(selectedSection.startDate, 30);
-      } else if (drillLevel === "tasks" && selectedPhase && selectedPhase.startDate) {
-        fallbackStart = selectedPhase.startDate;
-        fallbackEnd = selectedPhase.endDate || addDays(selectedPhase.startDate, 60);
-      } else if (drillLevel === "sections" && selectedPhase && selectedPhase.startDate) {
-        fallbackStart = selectedPhase.startDate;
-        fallbackEnd = selectedPhase.endDate || addDays(selectedPhase.startDate, 60);
+      if (drillLevel === "tasks" && selectedRoom && selectedRoom.startDate) {
+        fallbackStart = selectedRoom.startDate;
+        fallbackEnd = selectedRoom.endDate || addDays(selectedRoom.startDate, 30);
+      } else if (drillLevel === "tasks" && selectedBuilding && selectedBuilding.startDate) {
+        fallbackStart = selectedBuilding.startDate;
+        fallbackEnd = selectedBuilding.endDate || addDays(selectedBuilding.startDate, 60);
       }
       const now = new Date();
       const s = startOfMonth(fallbackStart || now);
@@ -553,7 +568,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
     const e = endOfMonth(addDays(latest, 30));
 
     return { timelineStart: s, timelineEnd: e, months: eachMonthOfInterval({ start: s, end: e }), dayWidth: 4 * zoomLevel };
-  }, [rowsWithDates, zoomLevel, drillLevel, selectedPhase, selectedSection]);
+  }, [rowsWithDates, zoomLevel, drillLevel, selectedBuilding, selectedRoom]);
 
   const totalDays = differenceInDays(timelineEnd, timelineStart);
   const totalWidth = totalDays * dayWidth;
@@ -568,36 +583,38 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
   const todayOffset = differenceInDays(today, timelineStart) * dayWidth;
 
   const ROW_HEIGHT = 48;
+  const ROOM_ROW_HEIGHT = 40;
   const HEADER_HEIGHT = 40;
 
-  const handleAddPhase = () => {
-    if (!newPhaseTitle.trim()) return;
+  const handleAddBuilding = () => {
+    if (!newBuildingTitle.trim()) return;
     const payload: InsertMilestone & { projectId: number } = {
       projectId,
-      title: newPhaseTitle.trim(),
-      startDate: newPhaseStart || null,
-      endDate: newPhaseEnd || null,
-      colorHex: newPhaseColorHex,
+      title: newBuildingTitle.trim(),
+      startDate: newBuildingStart || null,
+      endDate: newBuildingEnd || null,
+      colorHex: newBuildingColorHex,
     };
     createMilestone(payload, {
       onSuccess: () => {
-        toast({ title: "Area added" });
-        setNewPhaseTitle(""); setNewPhaseStart(""); setNewPhaseEnd(""); setNewPhaseColorHex(null); setAddingPhase(false);
+        toast({ title: "Building added" });
+        setNewBuildingTitle(""); setNewBuildingStart(""); setNewBuildingEnd(""); setNewBuildingColorHex(null); setAddingBuilding(false);
       },
-      onError: () => toast({ title: "Failed to add area", variant: "destructive" }),
+      onError: () => toast({ title: "Failed to add building", variant: "destructive" }),
     });
   };
 
-  const handleAddSection = (milestoneId: number) => {
-    if (!newSectionTitle.trim()) return;
+  const handleAddRoom = (milestoneId: number) => {
+    if (!newRoomTitle.trim()) return;
     createSection(
-      { projectId, milestoneId, title: newSectionTitle.trim(), startDate: newSectionStart || null, endDate: newSectionEnd || null },
+      { projectId, milestoneId, title: newRoomTitle.trim(), startDate: newRoomStart || null, endDate: newRoomEnd || null },
       {
         onSuccess: () => {
-          toast({ title: "Work category added" });
-          setNewSectionTitle(""); setNewSectionStart(""); setNewSectionEnd(""); setAddingSectionFor(null);
+          toast({ title: "Room added" });
+          setNewRoomTitle(""); setNewRoomStart(""); setNewRoomEnd(""); setAddingRoomFor(null);
+          setExpandedBuildings(prev => new Set(prev).add(milestoneId));
         },
-        onError: () => toast({ title: "Failed to add work category", variant: "destructive" }),
+        onError: () => toast({ title: "Failed to add room", variant: "destructive" }),
       }
     );
   };
@@ -607,8 +624,8 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
     updateSection(
       { id: editingSection.id, projectId, title: editSectionForm.title.trim(), startDate: editSectionForm.startDate || null, endDate: editSectionForm.endDate || null },
       {
-        onSuccess: () => { toast({ title: "Work category updated" }); setEditingSection(null); },
-        onError: () => toast({ title: "Failed to update work category", variant: "destructive" }),
+        onSuccess: () => { toast({ title: "Updated" }); setEditingSection(null); },
+        onError: () => toast({ title: "Failed to update", variant: "destructive" }),
       }
     );
   };
@@ -638,8 +655,8 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
     });
   };
 
-  const handleAreaColourChange = useCallback((phaseId: number, hex: string | null) => {
-    updateMilestone({ id: phaseId, projectId, colorHex: hex }, {
+  const handleBuildingColourChange = useCallback((buildingId: number, hex: string | null) => {
+    updateMilestone({ id: buildingId, projectId, colorHex: hex }, {
       onError: () => toast({ title: "Failed to update colour", variant: "destructive" }),
     });
   }, [updateMilestone, projectId, toast]);
@@ -651,7 +668,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
   const handleDrop = useCallback((targetId: number) => {
     if (dragId === null || dragId === targetId) { setDragId(null); setDragOverId(null); return; }
 
-    if (drillLevel === "phases") {
+    if (drillLevel === "buildings") {
       const sorted = [...milestones].sort((a, b) => (a.order || 0) - (b.order || 0));
       const dragIdx = sorted.findIndex(m => m.id === dragId);
       const targetIdx = sorted.findIndex(m => m.id === targetId);
@@ -664,27 +681,14 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
           updateMilestone({ id: m.id, projectId, order: i });
         }
       });
-    } else if (drillLevel === "sections" && selectedPhaseId) {
-      const phaseSections = sections.filter(s => s.milestoneId === selectedPhaseId).sort((a, b) => (a.order || 0) - (b.order || 0));
-      const dragIdx = phaseSections.findIndex(s => s.id === dragId);
-      const targetIdx = phaseSections.findIndex(s => s.id === targetId);
-      if (dragIdx === -1 || targetIdx === -1) return;
-      const reordered = [...phaseSections];
-      const [moved] = reordered.splice(dragIdx, 1);
-      reordered.splice(targetIdx, 0, moved);
-      reordered.forEach((s, i) => {
-        if ((s.order || 0) !== i) {
-          updateSection({ id: s.id, projectId, order: i });
-        }
-      });
-    } else if (drillLevel === "tasks" && selectedSectionId !== null) {
-      const sectionTasks = tasks.filter(t =>
-        selectedSectionId === -1 ? (t.milestoneId === selectedPhaseId && !t.sectionId) : t.sectionId === selectedSectionId
+    } else if (drillLevel === "tasks" && selectedRoomId !== null) {
+      const roomTasks = tasks.filter(t =>
+        selectedRoomId === -1 ? (t.milestoneId === selectedBuildingId && !t.sectionId) : t.sectionId === selectedRoomId
       ).sort((a, b) => (a.order || 0) - (b.order || 0));
-      const dragIdx = sectionTasks.findIndex(t => t.id === dragId);
-      const targetIdx = sectionTasks.findIndex(t => t.id === targetId);
+      const dragIdx = roomTasks.findIndex(t => t.id === dragId);
+      const targetIdx = roomTasks.findIndex(t => t.id === targetId);
       if (dragIdx === -1 || targetIdx === -1) return;
-      const reordered = [...sectionTasks];
+      const reordered = [...roomTasks];
       const [moved] = reordered.splice(dragIdx, 1);
       reordered.splice(targetIdx, 0, moved);
       reordered.forEach((t, i) => {
@@ -696,38 +700,30 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
 
     setDragId(null);
     setDragOverId(null);
-  }, [dragId, drillLevel, milestones, sections, tasks, selectedPhaseId, selectedSectionId, updateMilestone, updateSection, updateTask, projectId]);
+  }, [dragId, drillLevel, milestones, tasks, selectedBuildingId, selectedRoomId, updateMilestone, updateTask, projectId]);
 
-  const drillIntoPhase = (phaseId: number) => {
-    setSelectedPhaseId(phaseId);
-    setSelectedSectionId(null);
-    setDrillLevel("sections");
-  };
-
-  const drillIntoSection = (sectionId: number) => {
-    setSelectedSectionId(sectionId);
+  const drillIntoRoom = (buildingId: number, roomId: number) => {
+    setSelectedBuildingId(buildingId);
+    setSelectedRoomId(roomId);
     setDrillLevel("tasks");
   };
 
   const goBack = () => {
-    if (drillLevel === "tasks") {
-      setSelectedSectionId(null);
-      setDrillLevel("sections");
-    } else if (drillLevel === "sections") {
-      setSelectedPhaseId(null);
-      setDrillLevel("phases");
-    }
+    setSelectedBuildingId(null);
+    setSelectedRoomId(null);
+    setDrillLevel("buildings");
   };
 
   const renderBar = (row: BarItem) => {
     if (!row.startDate || !row.endDate) return null;
     const { left, width } = getBarPosition(row.startDate, row.endDate);
-    const barColor = row.colorHex || AREA_COLORS[row.colorIndex];
+    const barColor = row.colorHex || BUILDING_COLORS[row.colorIndex];
+    const rowH = row.type === "room" ? ROOM_ROW_HEIGHT : ROW_HEIGHT;
 
     if (row.type === "task") {
       const isDone = row.status === "done";
       const barHeight = 14;
-      const topOffset = (ROW_HEIGHT - barHeight) / 2;
+      const topOffset = (rowH - barHeight) / 2;
       return (
         <Tooltip>
           <TooltipTrigger asChild>
@@ -757,8 +753,9 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
       );
     }
 
-    const barHeight = row.type === "phase" ? 24 : 20;
-    const topOffset = (ROW_HEIGHT - barHeight) / 2;
+    const isRoom = row.type === "room";
+    const barHeight = isRoom ? 18 : 24;
+    const topOffset = (rowH - barHeight) / 2;
     const progress = row.progress || 0;
 
     return (
@@ -769,7 +766,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
             style={{ left, width, top: topOffset, height: barHeight, backgroundColor: `${barColor}22` }}
             data-testid={`gantt-bar-${row.type}-${row.id}`}
           >
-            <div className="h-full transition-all duration-300" style={{ width: `${progress}%`, backgroundColor: barColor, opacity: row.type === "phase" ? 1 : 0.75 }} />
+            <div className="h-full transition-all duration-300" style={{ width: `${progress}%`, backgroundColor: barColor, opacity: isRoom ? 0.6 : 1 }} />
             <span className="absolute inset-0 flex items-center justify-between px-1.5 text-[9px] font-medium text-foreground/70 truncate">
               <span>{width > 50 ? `${progress}%` : ""}</span>
               {width > 80 && row.startDate && row.endDate && (
@@ -797,17 +794,15 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
     );
   };
 
-  const showBreadcrumb = drillLevel !== "phases";
+  const showBreadcrumb = drillLevel === "tasks";
 
   const currentProgress = useMemo(() => {
-    if (drillLevel === "tasks" && selectedSection) return selectedSection.progress;
-    if (drillLevel === "sections" && selectedPhase) return selectedPhase.progress;
+    if (drillLevel === "tasks" && selectedRoom) return selectedRoom.progress;
     return null;
-  }, [drillLevel, selectedPhase, selectedSection]);
+  }, [drillLevel, selectedRoom]);
 
   const scopeHeading = useMemo(() => {
-    if (drillLevel === "phases") return "Areas";
-    if (drillLevel === "sections") return "Work Categories";
+    if (drillLevel === "buildings") return "Buildings";
     return "Tasks";
   }, [drillLevel]);
 
@@ -815,7 +810,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
     <div className="space-y-4" data-testid="gantt-chart">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-3">
-          {drillLevel !== "phases" && (
+          {drillLevel === "tasks" && (
             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={goBack} data-testid="button-gantt-back">
               <ChevronLeft className="h-4 w-4" />
             </Button>
@@ -823,9 +818,9 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
           <h3 className="font-serif text-lg font-semibold tracking-tight uppercase" data-testid="text-gantt-heading">
             Project Timeline
           </h3>
-          {drillLevel === "phases" && (
-            <Badge variant="outline" className="text-xs" data-testid="badge-phase-count">
-              {milestones.length} {milestones.length === 1 ? "area" : "areas"}
+          {drillLevel === "buildings" && (
+            <Badge variant="outline" className="text-xs" data-testid="badge-building-count">
+              {milestones.length} {milestones.length === 1 ? "building" : "buildings"}
             </Badge>
           )}
           {currentProgress !== null && (
@@ -835,20 +830,14 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
           )}
         </div>
         <div className="flex items-center gap-2">
-          {isAdmin && drillLevel === "phases" && (
-            <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => setAddingPhase(true)} data-testid="button-add-phase-timeline">
+          {isAdmin && drillLevel === "buildings" && (
+            <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => setAddingBuilding(true)} data-testid="button-add-building-timeline">
               <Plus className="h-3 w-3" />
-              Area
+              Building
             </Button>
           )}
-          {isAdmin && drillLevel === "sections" && selectedPhaseId && (
-            <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => { setAddingSectionFor(selectedPhaseId); setNewSectionTitle(""); setNewSectionStart(""); setNewSectionEnd(""); }} data-testid="button-add-section-timeline">
-              <Plus className="h-3 w-3" />
-              Work Category
-            </Button>
-          )}
-          {isAdmin && drillLevel === "tasks" && selectedPhaseId && (
-            <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => { setAddingTask({ milestoneId: selectedPhaseId, sectionId: selectedSectionId === -1 ? null : selectedSectionId }); setNewTaskTitle(""); setNewTaskDueDate(""); }} data-testid="button-add-task-timeline">
+          {isAdmin && drillLevel === "tasks" && selectedBuildingId && (
+            <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => { setAddingTask({ milestoneId: selectedBuildingId, sectionId: selectedRoomId === -1 ? null : selectedRoomId }); setNewTaskTitle(""); setNewTaskDueDate(""); }} data-testid="button-add-task-timeline">
               <Plus className="h-3 w-3" />
               Task
             </Button>
@@ -867,28 +856,22 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
 
       {showBreadcrumb && (
         <div className="flex items-center gap-2 text-sm">
-          <button onClick={() => { setSelectedPhaseId(null); setSelectedSectionId(null); setDrillLevel("phases"); }} className="text-muted-foreground hover:text-foreground transition-colors underline-offset-2 hover:underline" data-testid="button-breadcrumb-all">
-            All Areas
+          <button onClick={goBack} className="text-muted-foreground hover:text-foreground transition-colors underline-offset-2 hover:underline" data-testid="button-breadcrumb-all">
+            All Buildings
           </button>
-          {selectedPhase && (
+          {selectedBuilding && (
             <>
               <span className="text-muted-foreground">›</span>
-              {drillLevel === "tasks" ? (
-                <button onClick={goBack} className="text-muted-foreground hover:text-foreground transition-colors underline-offset-2 hover:underline" data-testid="button-breadcrumb-phase">
-                  {selectedPhase.title}
-                </button>
-              ) : (
-                <span className="font-medium text-foreground" data-testid="text-breadcrumb-current">
-                  {selectedPhase.title}
-                </span>
-              )}
+              <span className="text-muted-foreground" data-testid="text-breadcrumb-building">
+                {selectedBuilding.title}
+              </span>
             </>
           )}
-          {drillLevel === "tasks" && selectedSection && (
+          {selectedRoom && (
             <>
               <span className="text-muted-foreground">›</span>
-              <span className="font-medium text-foreground" data-testid="text-breadcrumb-section">
-                {selectedSection.title}
+              <span className="font-medium text-foreground" data-testid="text-breadcrumb-room">
+                {selectedRoom.title}
               </span>
             </>
           )}
@@ -903,60 +886,66 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
         </div>
       )}
 
-      {drillLevel === "sections" && selectedPhase && (
+      {drillLevel === "tasks" && selectedBuilding && (
         <div className="space-y-2">
           <div
             className="flex items-center gap-2 px-3 py-2 rounded-sm border border-border/40 sticky top-0 z-10"
-            style={{ backgroundColor: selectedPhase.colorHex ? `${selectedPhase.colorHex}15` : undefined, borderLeftWidth: "3px", borderLeftColor: selectedPhase.colorHex || "transparent" }}
-            data-testid="area-header-band"
+            style={{ backgroundColor: selectedBuilding.colorHex ? `${selectedBuilding.colorHex}15` : undefined, borderLeftWidth: "3px", borderLeftColor: selectedBuilding.colorHex || "transparent" }}
+            data-testid="building-header-band"
           >
-            {selectedPhase.colorHex && (
-              <div className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: selectedPhase.colorHex }} />
+            {selectedBuilding.colorHex && (
+              <div className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: selectedBuilding.colorHex }} />
             )}
-            <span className="text-xs font-semibold uppercase tracking-wide">{selectedPhase.title}</span>
-            <PaintColourSwatches paintColorIds={selectedPhase.paintColorIds} />
+            <span className="text-xs font-semibold uppercase tracking-wide">{selectedBuilding.title}</span>
+            {selectedRoom && selectedRoom.id !== -1 && (
+              <>
+                <span className="text-muted-foreground text-xs">›</span>
+                <span className="text-xs font-medium">{selectedRoom.title}</span>
+              </>
+            )}
+            <PaintColourSwatches paintColorIds={selectedBuilding.paintColorIds} />
           </div>
           <PaintColourPanel
-            paintColorIds={selectedPhase.paintColorIds}
+            paintColorIds={selectedBuilding.paintColorIds}
             isAdmin={isAdmin}
             onUpdate={(ids) => {
-              const phase = milestones.find(m => m.id === selectedPhaseId);
-              if (phase) {
-                updateMilestone({ id: phase.id, projectId, paintColorIds: ids });
+              const building = milestones.find(m => m.id === selectedBuildingId);
+              if (building) {
+                updateMilestone({ id: building.id, projectId, paintColorIds: ids });
               }
             }}
           />
         </div>
       )}
 
-      {addingPhase && isAdmin && (
-        <div className="flex flex-col sm:flex-row gap-2 p-3 border border-border/60 rounded-sm bg-muted/20" data-testid="form-add-phase-inline">
-          <Input placeholder="Area name (e.g., Kitchen, Master Suite)" value={newPhaseTitle} onChange={e => setNewPhaseTitle(e.target.value)} className="flex-1" autoFocus data-testid="input-phase-title" onKeyDown={e => { if (e.key === "Enter") handleAddPhase(); }} />
-          <DateField label="Start date" value={newPhaseStart} onChange={setNewPhaseStart} placeholder="Start date" testId="button-phase-start-date" />
-          <DateField label="End date" value={newPhaseEnd} onChange={setNewPhaseEnd} placeholder="End date" testId="button-phase-end-date" />
-          <AreaColourPicker currentHex={newPhaseColorHex} onSelect={setNewPhaseColorHex} />
+      {addingBuilding && isAdmin && (
+        <div className="flex flex-col sm:flex-row gap-2 p-3 border border-border/60 rounded-sm bg-muted/20" data-testid="form-add-building-inline">
+          <Input placeholder="Building name (e.g., Cottage, Boathouse, Bunkie)" value={newBuildingTitle} onChange={e => setNewBuildingTitle(e.target.value)} className="flex-1" autoFocus data-testid="input-building-title" onKeyDown={e => { if (e.key === "Enter") handleAddBuilding(); }} />
+          <DateField label="Start date" value={newBuildingStart} onChange={setNewBuildingStart} placeholder="Start date" testId="button-building-start-date" />
+          <DateField label="End date" value={newBuildingEnd} onChange={setNewBuildingEnd} placeholder="End date" testId="button-building-end-date" />
+          <BuildingColourPicker currentHex={newBuildingColorHex} onSelect={setNewBuildingColorHex} />
           <div className="flex gap-1">
-            <Button size="sm" onClick={handleAddPhase} disabled={creatingMilestone || !newPhaseTitle.trim()} data-testid="button-confirm-add-phase">
+            <Button size="sm" onClick={handleAddBuilding} disabled={creatingMilestone || !newBuildingTitle.trim()} data-testid="button-confirm-add-building">
               <Check className="h-3.5 w-3.5" />
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => { setAddingPhase(false); setNewPhaseTitle(""); setNewPhaseStart(""); setNewPhaseEnd(""); setNewPhaseColorHex(null); }} data-testid="button-cancel-add-phase">
+            <Button size="sm" variant="ghost" onClick={() => { setAddingBuilding(false); setNewBuildingTitle(""); setNewBuildingStart(""); setNewBuildingEnd(""); setNewBuildingColorHex(null); }} data-testid="button-cancel-add-building">
               <X className="h-3.5 w-3.5" />
             </Button>
           </div>
         </div>
       )}
 
-      {addingSectionFor !== null && isAdmin && (
-        <div className="space-y-2 p-3 border border-border/60 rounded-sm bg-muted/20" data-testid="form-add-section-inline">
+      {addingRoomFor !== null && isAdmin && (
+        <div className="space-y-2 p-3 border border-border/60 rounded-sm bg-muted/20" data-testid="form-add-room-inline">
           <div className="flex flex-col sm:flex-row gap-2">
-            <Input placeholder="Work category name" value={newSectionTitle} onChange={e => setNewSectionTitle(e.target.value)} className="flex-1" autoFocus data-testid="input-section-title" onKeyDown={e => { if (e.key === "Enter") handleAddSection(addingSectionFor); }} />
-            <DateField label="Start" value={newSectionStart} onChange={setNewSectionStart} placeholder="Start" testId="button-section-start-date" />
-            <DateField label="End" value={newSectionEnd} onChange={setNewSectionEnd} placeholder="End" testId="button-section-end-date" />
+            <Input placeholder="Room or space name (e.g., Kitchen, Primary Suite, Deck)" value={newRoomTitle} onChange={e => setNewRoomTitle(e.target.value)} className="flex-1" autoFocus data-testid="input-room-title" onKeyDown={e => { if (e.key === "Enter") handleAddRoom(addingRoomFor); }} />
+            <DateField label="Start" value={newRoomStart} onChange={setNewRoomStart} placeholder="Start" testId="button-room-start-date" />
+            <DateField label="End" value={newRoomEnd} onChange={setNewRoomEnd} placeholder="End" testId="button-room-end-date" />
             <div className="flex gap-1">
-              <Button size="sm" onClick={() => handleAddSection(addingSectionFor)} disabled={creatingSection || !newSectionTitle.trim()} data-testid="button-confirm-add-section">
+              <Button size="sm" onClick={() => handleAddRoom(addingRoomFor)} disabled={creatingSection || !newRoomTitle.trim()} data-testid="button-confirm-add-room">
                 <Check className="h-3.5 w-3.5" />
               </Button>
-              <Button size="sm" variant="ghost" onClick={() => setAddingSectionFor(null)} data-testid="button-cancel-add-section">
+              <Button size="sm" variant="ghost" onClick={() => setAddingRoomFor(null)} data-testid="button-cancel-add-room">
                 <X className="h-3.5 w-3.5" />
               </Button>
             </div>
@@ -965,8 +954,8 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
             {TRADE_PRESETS.map((trade) => (
               <button
                 key={trade}
-                className={`px-2 py-0.5 text-[10px] font-medium rounded-sm border transition-colors ${newSectionTitle === trade ? "bg-foreground text-background border-foreground" : "border-border/60 text-muted-foreground hover:text-foreground hover:border-border"}`}
-                onClick={() => setNewSectionTitle(trade)}
+                className={`px-2 py-0.5 text-[10px] font-medium rounded-sm border transition-colors ${newRoomTitle === trade ? "bg-foreground text-background border-foreground" : "border-border/60 text-muted-foreground hover:text-foreground hover:border-border"}`}
+                onClick={() => setNewRoomTitle(trade)}
                 data-testid={`trade-chip-${trade.toLowerCase()}`}
               >
                 {trade}
@@ -978,7 +967,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
 
       {editingSection && isAdmin && (
         <div className="flex flex-col sm:flex-row gap-2 p-3 border border-primary/30 rounded-sm bg-muted/20" data-testid="form-edit-section-inline">
-          <Input placeholder="Work category name" value={editSectionForm.title} onChange={e => setEditSectionForm({ ...editSectionForm, title: e.target.value })} className="flex-1" autoFocus data-testid="input-edit-section-title" onKeyDown={e => { if (e.key === "Enter") handleEditSection(); }} />
+          <Input placeholder="Name" value={editSectionForm.title} onChange={e => setEditSectionForm({ ...editSectionForm, title: e.target.value })} className="flex-1" autoFocus data-testid="input-edit-section-title" onKeyDown={e => { if (e.key === "Enter") handleEditSection(); }} />
           <DateField label="Start date" value={editSectionForm.startDate} onChange={(value) => setEditSectionForm({ ...editSectionForm, startDate: value })} placeholder="Start date" testId="button-edit-section-start" />
           <DateField label="End date" value={editSectionForm.endDate} onChange={(value) => setEditSectionForm({ ...editSectionForm, endDate: value })} placeholder="End date" testId="button-edit-section-end" />
           <div className="flex gap-1">
@@ -1007,12 +996,11 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
         </div>
       )}
 
-      {currentRows.length === 0 && !addingPhase && !addingSectionFor && !addingTask ? (
+      {currentRows.length === 0 && !addingBuilding && !addingRoomFor && !addingTask ? (
         <div className="py-12 text-center">
           <p className="text-sm text-muted-foreground" data-testid="text-gantt-empty">
-            {drillLevel === "phases" && "No areas yet. Add an area to start building the project scope."}
-            {drillLevel === "sections" && "No work categories in this area yet. Add a work category to organise tasks."}
-            {drillLevel === "tasks" && "No tasks in this work category yet. Add a task to get started."}
+            {drillLevel === "buildings" && "No buildings yet. Add a building to start planning your timeline."}
+            {drillLevel === "tasks" && "No tasks in this room yet. Add a task to get started."}
           </p>
         </div>
       ) : currentRows.length > 0 && (
@@ -1023,135 +1011,138 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                 <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground" data-testid="text-scope-header">{scopeHeading}</span>
               </div>
 
-              {drillLevel === "phases" && phaseInfos.map((phase) => {
-                const accentColor = phase.colorHex || AREA_COLORS[phase.colorIndex];
-                return (
-                  <div
-                    key={phase.id}
-                    className={`border-b border-border/30 flex items-center gap-2 px-0 cursor-pointer hover:bg-muted/20 transition-colors group ${dragOverId === phase.id ? "bg-muted/40" : ""}`}
-                    style={{ height: ROW_HEIGHT, borderLeft: `3px solid ${accentColor}` }}
-                    onClick={() => drillIntoPhase(phase.id)}
-                    draggable={isAdmin}
-                    onDragStart={() => handleDragStart(phase.id)}
-                    onDragOver={(e) => handleDragOver(e, phase.id)}
-                    onDragEnd={handleDragEnd}
-                    onDrop={() => handleDrop(phase.id)}
-                    data-testid={`gantt-phase-row-${phase.id}`}
-                  >
-                    {isAdmin && (
-                      <div className="shrink-0 pl-1 cursor-grab opacity-0 group-hover:opacity-50 transition-opacity" onClick={(e) => e.stopPropagation()} data-testid={`drag-handle-phase-${phase.id}`}>
-                        <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
-                      </div>
-                    )}
-                    <div className="flex-1 min-w-0 pl-2 pr-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold uppercase tracking-wide truncate">{phase.title}</span>
-                        {phase.completed && <Check className="h-3 w-3 text-green-600 shrink-0" />}
-                        <PaintColourSwatches paintColorIds={phase.paintColorIds} />
-                      </div>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
-                          <div className="h-full rounded-full transition-all duration-300" style={{ width: `${phase.progress}%`, backgroundColor: accentColor }} />
+              {drillLevel === "buildings" && nestedRows.map((row) => {
+                if (row.type === "building") {
+                  const building = buildingInfos.find(b => b.id === row.id)!;
+                  const accentColor = building.colorHex || BUILDING_COLORS[building.colorIndex];
+                  const isExpanded = expandedBuildings.has(building.id);
+                  const roomCount = sections.filter(s => s.milestoneId === building.id).length;
+                  return (
+                    <div
+                      key={`building-${building.id}`}
+                      className={`border-b border-border/30 flex items-center gap-1.5 px-0 hover:bg-muted/20 transition-colors group ${dragOverId === building.id ? "bg-muted/40" : ""}`}
+                      style={{ height: ROW_HEIGHT, borderLeft: `3px solid ${accentColor}` }}
+                      draggable={isAdmin}
+                      onDragStart={() => handleDragStart(building.id)}
+                      onDragOver={(e) => handleDragOver(e, building.id)}
+                      onDragEnd={handleDragEnd}
+                      onDrop={() => handleDrop(building.id)}
+                      data-testid={`gantt-building-row-${building.id}`}
+                    >
+                      {isAdmin && (
+                        <div className="shrink-0 pl-1 cursor-grab opacity-0 group-hover:opacity-50 transition-opacity" onClick={(e) => e.stopPropagation()} data-testid={`drag-handle-building-${building.id}`}>
+                          <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
                         </div>
-                        <span className="text-[10px] text-muted-foreground">{phase.doneTasks}/{phase.totalTasks}</span>
-                        {phase.startDate && (
-                          <span className="text-[10px] text-muted-foreground/70 hidden sm:inline">
-                            {format(phase.startDate, "MMM d")}{phase.endDate ? ` – ${format(phase.endDate, "MMM d")}` : ""}
-                          </span>
-                        )}
+                      )}
+                      <button
+                        className="shrink-0 p-0.5 hover:bg-muted/40 rounded-sm transition-colors"
+                        onClick={(e) => { e.stopPropagation(); toggleBuilding(building.id); }}
+                        data-testid={`button-toggle-building-${building.id}`}
+                      >
+                        {isExpanded ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
+                      </button>
+                      <div className="flex-1 min-w-0 pr-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold uppercase tracking-wide truncate">{building.title}</span>
+                          {building.completed && <Check className="h-3 w-3 text-green-600 shrink-0" />}
+                          <PaintColourSwatches paintColorIds={building.paintColorIds} />
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
+                            <div className="h-full rounded-full transition-all duration-300" style={{ width: `${building.progress}%`, backgroundColor: accentColor }} />
+                          </div>
+                          <span className="text-[10px] text-muted-foreground">{building.doneTasks}/{building.totalTasks}</span>
+                          {roomCount > 0 && (
+                            <span className="text-[10px] text-muted-foreground/60">{roomCount} {roomCount === 1 ? "room" : "rooms"}</span>
+                          )}
+                        </div>
                       </div>
+                      {isAdmin && (
+                        <div className="flex items-center gap-0.5 pr-1.5 shrink-0">
+                          <BuildingColourPicker
+                            currentHex={building.colorHex}
+                            onSelect={(hex) => handleBuildingColourChange(building.id, hex)}
+                          />
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
+                              <Button size="icon" variant="ghost" className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity" data-testid={`button-building-menu-${building.id}`}>
+                                <MoreVertical className="h-3 w-3" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => { setAddingRoomFor(building.id); setNewRoomTitle(""); setNewRoomStart(""); setNewRoomEnd(""); }} data-testid={`button-add-room-${building.id}`}>
+                                <FolderPlus className="h-3.5 w-3.5 mr-2" />
+                                Add Room
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => { setAddingTask({ milestoneId: building.id, sectionId: null }); setNewTaskTitle(""); setNewTaskDueDate(""); }} data-testid={`button-add-task-building-${building.id}`}>
+                                <ListPlus className="h-3.5 w-3.5 mr-2" />
+                                Add Task
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      )}
                     </div>
-                    {isAdmin && (
-                      <div className="flex items-center gap-0.5 pr-1.5 shrink-0">
-                        <AreaColourPicker
-                          currentHex={phase.colorHex}
-                          onSelect={(hex) => { handleAreaColourChange(phase.id, hex); }}
-                        />
+                  );
+                }
+
+                if (row.type === "room") {
+                  const roomData = row;
+                  const isGeneralTasks = roomData.id < 0;
+                  const actualBuildingId = isGeneralTasks ? -roomData.id : sections.find(s => s.id === roomData.id)?.milestoneId;
+                  const parentBuilding = buildingInfos.find(b => b.id === actualBuildingId);
+                  const accentColor = roomData.colorHex || BUILDING_COLORS[roomData.colorIndex];
+                  const roomInfo = (!isGeneralTasks && parentBuilding) ? roomInfosForBuilding(parentBuilding.id).find(r => r.id === roomData.id) : null;
+
+                  const actualRoomId = isGeneralTasks ? -1 : roomData.id;
+                  const drillBuildingId = isGeneralTasks ? -roomData.id : parentBuilding?.id;
+
+                  return (
+                    <div
+                      key={`room-${roomData.id}`}
+                      className="border-b border-border/30 flex items-center gap-2 cursor-pointer hover:bg-muted/20 transition-colors group"
+                      style={{ height: ROOM_ROW_HEIGHT, borderLeft: `3px solid ${accentColor}20`, paddingLeft: "28px" }}
+                      onClick={() => drillBuildingId && drillIntoRoom(drillBuildingId, actualRoomId)}
+                      data-testid={`gantt-room-row-${roomData.id}`}
+                    >
+                      <div className="flex-1 min-w-0 pr-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] font-medium truncate text-foreground/80">{roomData.title}</span>
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <div className="w-12 h-1 bg-muted rounded-full overflow-hidden">
+                            <div className="h-full rounded-full transition-all duration-300" style={{ width: `${roomInfo?.progress || roomData.progress || 0}%`, backgroundColor: accentColor }} />
+                          </div>
+                          <span className="text-[9px] text-muted-foreground">{roomInfo?.doneTasks || 0}/{roomInfo?.totalTasks || 0}</span>
+                        </div>
+                      </div>
+                      {isAdmin && !isGeneralTasks && (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
-                            <Button size="icon" variant="ghost" className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity" data-testid={`button-phase-menu-${phase.id}`}>
+                            <Button size="icon" variant="ghost" className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity mr-1.5" data-testid={`button-room-menu-${roomData.id}`}>
                               <MoreVertical className="h-3 w-3" />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => { setAddingSectionFor(phase.id); setNewSectionTitle(""); setNewSectionStart(""); setNewSectionEnd(""); }} data-testid={`button-add-section-${phase.id}`}>
-                              <FolderPlus className="h-3.5 w-3.5 mr-2" />
-                              Add Work Category
+                            <DropdownMenuItem onClick={() => openEditSection(roomData.id)} data-testid={`button-edit-room-${roomData.id}`}>
+                              <Pencil className="h-3.5 w-3.5 mr-2" />
+                              Edit Room
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => { setAddingTask({ milestoneId: phase.id, sectionId: null }); setNewTaskTitle(""); setNewTaskDueDate(""); }} data-testid={`button-add-task-phase-${phase.id}`}>
+                            <DropdownMenuItem onClick={() => { if (parentBuilding) { setAddingTask({ milestoneId: parentBuilding.id, sectionId: roomData.id }); setNewTaskTitle(""); setNewTaskDueDate(""); } }} data-testid={`button-add-task-room-${roomData.id}`}>
                               <ListPlus className="h-3.5 w-3.5 mr-2" />
                               Add Task
                             </DropdownMenuItem>
+                            <DropdownMenuItem className="text-destructive" onClick={() => deleteSection({ id: roomData.id, projectId }, { onSuccess: () => toast({ title: "Room deleted" }), onError: () => toast({ title: "Failed to delete room", variant: "destructive" }) })} data-testid={`button-delete-room-${roomData.id}`}>
+                              <Trash2 className="h-3.5 w-3.5 mr-2" />
+                              Delete Room
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-
-              {drillLevel === "sections" && sectionInfos.map((sec) => {
-                const accentColor = sec.parentColorHex || AREA_COLORS[sec.colorIndex];
-                return (
-                  <div
-                    key={sec.id}
-                    className={`border-b border-border/30 flex items-center gap-2 px-0 cursor-pointer hover:bg-muted/20 transition-colors group ${dragOverId === sec.id ? "bg-muted/40" : ""}`}
-                    style={{ height: ROW_HEIGHT, borderLeft: `3px solid ${accentColor}40` }}
-                    onClick={() => drillIntoSection(sec.id)}
-                    draggable={isAdmin && sec.id !== -1}
-                    onDragStart={() => sec.id !== -1 && handleDragStart(sec.id)}
-                    onDragOver={(e) => sec.id !== -1 && handleDragOver(e, sec.id)}
-                    onDragEnd={handleDragEnd}
-                    onDrop={() => sec.id !== -1 && handleDrop(sec.id)}
-                    data-testid={`gantt-section-row-${sec.id}`}
-                  >
-                    {isAdmin && sec.id !== -1 && (
-                      <div className="shrink-0 pl-1 cursor-grab opacity-0 group-hover:opacity-50 transition-opacity" onClick={(e) => e.stopPropagation()} data-testid={`drag-handle-section-${sec.id}`}>
-                        <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
-                      </div>
-                    )}
-                    {(!isAdmin || sec.id === -1) && <div className="w-1" />}
-                    <div className="flex-1 min-w-0 pl-2 pr-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-medium truncate">{sec.title}</span>
-                      </div>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <div className="w-16 h-1 bg-muted rounded-full overflow-hidden">
-                          <div className="h-full rounded-full transition-all duration-300" style={{ width: `${sec.progress}%`, backgroundColor: accentColor }} />
-                        </div>
-                        <span className="text-[10px] text-muted-foreground">{sec.doneTasks}/{sec.totalTasks}</span>
-                        {sec.startDate && (
-                          <span className="text-[10px] text-muted-foreground/70 hidden sm:inline">
-                            {format(sec.startDate, "MMM d")}{sec.endDate ? ` – ${format(sec.endDate, "MMM d")}` : ""}
-                          </span>
-                        )}
-                      </div>
+                      )}
                     </div>
-                    {isAdmin && sec.id !== -1 && (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
-                          <Button size="icon" variant="ghost" className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity mr-1.5" data-testid={`button-section-menu-${sec.id}`}>
-                            <MoreVertical className="h-3 w-3" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => openEditSection(sec.id)} data-testid={`button-edit-section-${sec.id}`}>
-                            <Pencil className="h-3.5 w-3.5 mr-2" />
-                            Edit Work Category
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => { setAddingTask({ milestoneId: sec.milestoneId, sectionId: sec.id }); setNewTaskTitle(""); setNewTaskDueDate(""); }} data-testid={`button-add-task-section-${sec.id}`}>
-                            <ListPlus className="h-3.5 w-3.5 mr-2" />
-                            Add Task
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive" onClick={() => deleteSection({ id: sec.id, projectId }, { onSuccess: () => toast({ title: "Work category deleted" }), onError: () => toast({ title: "Failed to delete work category", variant: "destructive" }) })} data-testid={`button-delete-section-${sec.id}`}>
-                            <Trash2 className="h-3.5 w-3.5 mr-2" />
-                            Delete Work Category
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    )}
-                  </div>
-                );
+                  );
+                }
+                return null;
               })}
 
               {drillLevel === "tasks" && taskInfos.map((task) => {
@@ -1196,7 +1187,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                     <Badge variant={isDone ? "secondary" : "outline"} className="text-[10px] px-1.5 py-0 h-4 shrink-0 capitalize" data-testid={`badge-task-status-${task.id}`}>
                       {isDone ? "Done" : (task.status || "To-do")}
                     </Badge>
-                    {isAdmin && (
+                    {isAdmin && selectedBuildingId && (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button size="icon" variant="ghost" className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity mr-1.5 shrink-0" data-testid={`button-task-menu-${task.id}`}>
@@ -1204,7 +1195,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          {selectedPhaseId && sections.filter(s => s.milestoneId === selectedPhaseId && s.id !== selectedSectionId).map(s => (
+                          {sections.filter(s => s.milestoneId === selectedBuildingId && s.id !== selectedRoomId).map(s => (
                             <DropdownMenuItem
                               key={s.id}
                               onClick={() => {
@@ -1218,8 +1209,8 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                               Move to {s.title}
                             </DropdownMenuItem>
                           ))}
-                          {selectedPhaseId && sections.filter(s => s.milestoneId === selectedPhaseId && s.id !== selectedSectionId).length === 0 && (
-                            <DropdownMenuItem disabled>No other work categories</DropdownMenuItem>
+                          {sections.filter(s => s.milestoneId === selectedBuildingId && s.id !== selectedRoomId).length === 0 && (
+                            <DropdownMenuItem disabled>No other rooms</DropdownMenuItem>
                           )}
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -1259,15 +1250,18 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                     </div>
                   )}
 
-                  {currentRows.map((row) => (
-                    <div key={`${row.type}-${row.id}`} className="relative border-b border-border/30" style={{ height: ROW_HEIGHT }} data-testid={`gantt-row-${row.type}-${row.id}`}>
-                      {months.map(month => {
-                        const offset = differenceInDays(month, timelineStart) * dayWidth;
-                        return <div key={month.toISOString()} className="absolute top-0 h-full border-l border-border/10" style={{ left: offset }} />;
-                      })}
-                      {renderBar(row)}
-                    </div>
-                  ))}
+                  {currentRows.map((row) => {
+                    const rowH = row.type === "room" ? ROOM_ROW_HEIGHT : ROW_HEIGHT;
+                    return (
+                      <div key={`${row.type}-${row.id}`} className="relative border-b border-border/30" style={{ height: rowH }} data-testid={`gantt-row-${row.type}-${row.id}`}>
+                        {months.map(month => {
+                          const offset = differenceInDays(month, timelineStart) * dayWidth;
+                          return <div key={month.toISOString()} className="absolute top-0 h-full border-l border-border/10" style={{ left: offset }} />;
+                        })}
+                        {renderBar(row)}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
               <ScrollBar orientation="horizontal" />
@@ -1276,13 +1270,13 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
         </div>
       )}
 
-      {drillLevel === "phases" && milestones.length > 0 && (
+      {drillLevel === "buildings" && milestones.length > 0 && (
         <div className="flex flex-wrap gap-x-6 gap-y-2 text-xs text-muted-foreground pt-1">
-          {phaseInfos.map((phase) => (
-            <div key={phase.id} className="flex items-center gap-1.5" data-testid={`gantt-legend-${phase.id}`}>
-              <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: phase.colorHex || AREA_COLORS[phase.colorIndex] }} />
-              <span>{phase.title}</span>
-              {phase.completed && <span className="text-green-600">✓</span>}
+          {buildingInfos.map((building) => (
+            <div key={building.id} className="flex items-center gap-1.5" data-testid={`gantt-legend-${building.id}`}>
+              <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: building.colorHex || BUILDING_COLORS[building.colorIndex] }} />
+              <span>{building.title}</span>
+              {building.completed && <span className="text-green-600">✓</span>}
             </div>
           ))}
         </div>
