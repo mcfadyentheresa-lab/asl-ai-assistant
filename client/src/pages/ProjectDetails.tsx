@@ -333,12 +333,6 @@ function SidebarCards({
               {(u.firstName?.[0] || "").toUpperCase()}{(u.lastName?.[0] || "").toUpperCase()}
             </AvatarFallback>
           </Avatar>
-          {!u.archivedAt && isUserOnline(onlineUsers, u.id) && (
-            <span
-              className="absolute -bottom-0.5 -right-0.5 block h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-background"
-              data-testid={`indicator-online-${u.id}`}
-            />
-          )}
         </div>
         <div className="min-w-0 flex-1">
           <span className="text-sm truncate block">
@@ -1019,25 +1013,13 @@ export default function ProjectDetails() {
     <div className={`min-h-screen bg-background ${safeActiveTab === "board" ? "h-[100dvh] flex flex-col overflow-hidden" : "pb-20"}`}>
       <Navbar />
 
-      <div className={`relative w-full overflow-hidden shrink-0 ${safeActiveTab === "board" ? "h-16 mobile-landscape:h-0" : "h-44 md:h-52"}`} data-testid="project-hero">
-        {project.thumbnailUrl ? (
-          <img
-            src={project.thumbnailUrl}
-            alt={project.name}
-            className="h-full w-full object-cover"
-            data-testid="img-project-hero"
-          />
-        ) : (
-          <div className="h-full w-full bg-muted" />
-        )}
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
-
-        <div className="absolute bottom-0 left-0 right-0 container px-5 md:px-8 pb-3">
-          <Link href="/" className="inline-flex items-center text-[11px] text-muted-foreground mb-1.5 transition-colors hover:text-foreground" onClick={() => window.sessionStorage.setItem("aster-spruce:last-planning-board", String(projectId))} data-testid="link-back">
+      <div className="w-full border-b border-border/60 bg-background/90 backdrop-blur-sm" data-testid="project-hero">
+        <div className="container px-5 md:px-8 py-4">
+          <Link href="/" className="inline-flex items-center text-[11px] text-muted-foreground mb-2 transition-colors hover:text-foreground" onClick={() => window.sessionStorage.setItem("aster-spruce:last-planning-board", String(projectId))} data-testid="link-back">
             <ArrowLeft className="mr-1 h-3.5 w-3.5" /> Back to Dashboard
           </Link>
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-1.5">
-            <div>
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-2">
+            <div className="space-y-1">
               <div className="flex items-center flex-wrap gap-2">
                 <h1 className="font-serif text-xl md:text-2xl font-bold text-foreground leading-tight" data-testid="text-project-title">
                   {project.name}
@@ -1063,7 +1045,7 @@ export default function ProjectDetails() {
                 )}
               </div>
               {project.description && (
-                <p className="text-muted-foreground max-w-2xl text-xs mt-0.5" data-testid="text-project-desc">
+                <p className="text-muted-foreground max-w-2xl text-xs" data-testid="text-project-desc">
                   {project.description}
                 </p>
               )}
