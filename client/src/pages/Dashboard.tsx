@@ -80,6 +80,7 @@ export default function Dashboard() {
   const isClient = user?.role === "client";
   const isAdmin = user?.role === "admin";
   const isCrew = user?.role === "crew";
+  const isAdminView = isAdmin || (!isClient && !isCrew);
 
   const handleArchive = (id: number) => {
     archiveProject(id, {
@@ -126,7 +127,7 @@ export default function Dashboard() {
     );
   }
 
-  const canCreateProjects = !isClient;
+  const canCreateProjects = isAdminView;
   const clientSingleProject = isClient && filteredProjects && filteredProjects.length === 1 ? filteredProjects[0] : null;
 
   return (
@@ -165,7 +166,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {isAdmin && (
+        {isAdminView && (
           <div className="flex items-center gap-4 mb-6 flex-wrap" data-testid="admin-stats-strip">
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted/50 border border-border/40">
               <FolderOpen className="h-3.5 w-3.5 text-muted-foreground" />
