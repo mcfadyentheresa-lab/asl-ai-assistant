@@ -751,11 +751,10 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
     const displayEnd = row.endDate;
 
     const { left, width } = getBarPosition(displayStart, displayEnd);
+    const visibleWidth = Math.max(width, 28);
     const barColor = row.colorHex || BUILDING_COLORS[row.colorIndex];
     const rowH = row.type === "room" ? ROOM_ROW_HEIGHT : ROW_HEIGHT;
     const canResize = isAdmin && row.startDate && row.endDate;
-    const resizeHandleWidth = 8;
-    const minWidth = row.type === "task" ? 18 : 24;
     const resize = (edge: "start" | "end", deltaDays: number) => {
       if (!row.startDate || !row.endDate) return;
       const start = edge === "start" ? addDays(row.startDate, deltaDays) : row.startDate;
@@ -773,14 +772,14 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
         <Tooltip>
           <TooltipTrigger asChild>
             <div
-            className="absolute rounded-sm select-none cursor-default"
-              style={{ left, width, top: topOffset, height: barHeight, backgroundColor: barColor, opacity: isDone ? 0.55 : 0.95 }}
+              className="absolute rounded-sm select-none cursor-default min-w-[24px]"
+              style={{ left, width: visibleWidth, top: topOffset, height: barHeight, backgroundColor: barColor, opacity: isDone ? 0.55 : 0.95 }}
               data-testid={`gantt-bar-task-${row.id}`}
             >
               {canResize && (
                 <>
                   <button
-                    className="absolute left-0 top-0 h-full w-2 cursor-ew-resize bg-transparent"
+                    className="absolute left-0 top-0 h-full w-5 cursor-ew-resize bg-transparent"
                     onMouseDown={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
@@ -802,7 +801,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                     aria-label="Resize start date"
                   />
                   <button
-                    className="absolute right-0 top-0 h-full w-2 cursor-ew-resize bg-transparent"
+                    className="absolute right-0 top-0 h-full w-5 cursor-ew-resize bg-transparent"
                     onMouseDown={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
@@ -853,14 +852,14 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
       <Tooltip>
         <TooltipTrigger asChild>
           <div
-            className="absolute rounded-sm overflow-hidden border border-border/20 select-none cursor-default"
-            style={{ left, width, top: topOffset, height: barHeight, backgroundColor: `${barColor}22` }}
+            className="absolute rounded-sm overflow-hidden border border-border/20 select-none cursor-default min-w-[24px]"
+            style={{ left, width: visibleWidth, top: topOffset, height: barHeight, backgroundColor: `${barColor}22` }}
             data-testid={`gantt-bar-${row.type}-${row.id}`}
           >
             {canResize && (
               <>
                 <button
-                  className="absolute left-0 top-0 h-full w-2 cursor-ew-resize bg-transparent"
+                  className="absolute left-0 top-0 h-full w-5 cursor-ew-resize bg-transparent"
                   onMouseDown={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -880,7 +879,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                   aria-label="Resize start date"
                 />
                 <button
-                  className="absolute right-0 top-0 h-full w-2 cursor-ew-resize bg-transparent"
+                  className="absolute right-0 top-0 h-full w-5 cursor-ew-resize bg-transparent"
                   onMouseDown={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
