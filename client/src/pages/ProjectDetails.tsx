@@ -3239,8 +3239,8 @@ const eventTypeLabelsCalendar: Record<string, string> = {
   personal: "Personal",
 };
 
-const TEAM_EVENT_TYPES = new Set(["meeting", "delivery", "inspection", "team"]);
-const PERSONAL_EVENT_TYPES = new Set(["time_off", "personal"]);
+const TEAM_EVENT_TYPES = new Set(["team"]);
+const PERSONAL_EVENT_TYPES = new Set(["personal"]);
 
 const CALENDAR_BUILDING_COLORS = [
   "#173B2F", "#2E6B4F", "#3F8A66", "#B87333", "#4D7A68",
@@ -3354,11 +3354,9 @@ function CalendarTab({ projectId }: { projectId: number }) {
 
   const isEventVisible = (ev: CalendarEvent) => {
     const evType = ev.type || "event";
-    if (!showEvents && !TEAM_EVENT_TYPES.has(evType) && !PERSONAL_EVENT_TYPES.has(evType)) return false;
-    if (TEAM_EVENT_TYPES.has(evType) && !showTeam) return false;
-    if (PERSONAL_EVENT_TYPES.has(evType) && !showPersonal) return false;
-    if (!TEAM_EVENT_TYPES.has(evType) && !PERSONAL_EVENT_TYPES.has(evType) && !showEvents) return false;
-    return true;
+    if (TEAM_EVENT_TYPES.has(evType)) return showTeam;
+    if (PERSONAL_EVENT_TYPES.has(evType)) return showPersonal;
+    return showEvents;
   };
 
   const calendarEvents = (events || []) as CalendarEvent[];

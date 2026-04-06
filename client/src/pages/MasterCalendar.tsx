@@ -65,8 +65,8 @@ const eventTypeLabels: Record<string, string> = {
   personal: "Personal",
 };
 
-const TEAM_EVENT_TYPES = new Set(["meeting", "delivery", "inspection", "team"]);
-const PERSONAL_EVENT_TYPES = new Set(["time_off", "personal"]);
+const TEAM_EVENT_TYPES = new Set(["team"]);
+const PERSONAL_EVENT_TYPES = new Set(["personal"]);
 
 type MilestoneWithProject = Milestone & { projectName: string; projectColor: string | null };
 type SectionWithProject = Section & { projectName: string; projectColor: string | null };
