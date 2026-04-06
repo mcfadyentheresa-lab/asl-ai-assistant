@@ -782,10 +782,14 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
       const onUp = () => {
         window.removeEventListener("mousemove", onMove);
         window.removeEventListener("mouseup", onUp);
-        const currentPreview = resizePreview && resizePreview.rowId === row.id && resizePreview.rowType === row.type ? resizePreview : null;
-        if (currentPreview) commitResize(currentPreview.startDate, currentPreview.endDate);
+        const finalStart = edge === "start" ? addDays(originalStart, Math.round((lastX - startX) / dayWidth)) : originalStart;
+        const finalEnd = edge === "end" ? addDays(originalEnd, Math.round((lastX - startX) / dayWidth)) : originalEnd;
+        if ((edge === "start" && finalStart < originalEnd) || (edge === "end" && finalEnd > originalStart)) {
+          commitResize(finalStart, finalEnd);
+        }
         setResizePreview(null);
       };
+      let lastX = startX;
       window.addEventListener("mousemove", onMove);
       window.addEventListener("mouseup", onUp);
     };
