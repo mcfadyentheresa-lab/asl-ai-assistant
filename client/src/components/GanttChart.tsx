@@ -624,8 +624,8 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
     updateSection(
       { id: editingSection.id, projectId, title: editSectionForm.title.trim(), startDate: editSectionForm.startDate || null, endDate: editSectionForm.endDate || null },
       {
-        onSuccess: () => { toast({ title: "Updated" }); setEditingSection(null); },
-        onError: () => toast({ title: "Failed to update", variant: "destructive" }),
+        onSuccess: () => { toast({ title: "Room updated" }); setEditingSection(null); },
+        onError: () => toast({ title: "Failed to update room", variant: "destructive" }),
       }
     );
   };
@@ -1017,7 +1017,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
       {currentRows.length === 0 && !addingBuilding && !addingRoomFor && !addingTask ? (
         <div className="py-12 text-center">
           <p className="text-sm text-muted-foreground" data-testid="text-gantt-empty">
-            {drillLevel === "buildings" && "No buildings yet. Add a building to start planning your timeline."}
+            {drillLevel === "buildings" && "No buildings yet. Add a building to start organising your project timeline."}
             {drillLevel === "tasks" && "No tasks in this room yet. Add a task to get started."}
           </p>
         </div>
