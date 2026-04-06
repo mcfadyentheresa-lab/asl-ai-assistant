@@ -1081,7 +1081,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                           </div>
                           <span className="text-[10px] text-muted-foreground">{building.doneTasks}/{building.totalTasks}</span>
                           {roomCount > 0 && (
-                            <span className="text-[10px] text-muted-foreground/60">{roomCount} {roomCount === 1 ? "cottage" : "cottages"}</span>
+                            <span className="text-[10px] text-muted-foreground/60">{roomCount} {roomCount === 1 ? "area" : "areas"}</span>
                           )}
                         </div>
                       </div>
@@ -1253,7 +1253,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                             </DropdownMenuItem>
                           ))}
                           {sections.filter(s => s.milestoneId === selectedBuildingId && s.id !== selectedRoomId).length === 0 && (
-                            <DropdownMenuItem disabled>No other rooms</DropdownMenuItem>
+                            <DropdownMenuItem disabled>No other areas</DropdownMenuItem>
                           )}
                         </DropdownMenuContent>
                       </DropdownMenu>
