@@ -1206,7 +1206,7 @@ export default function ProjectDetails() {
                           <div className="flex items-center gap-2">
                             <CheckSquare className="h-4 w-4 text-primary" />
                             <h3 className="font-serif text-base font-semibold text-foreground" data-testid="text-checklist-heading">
-                              Checklist
+                              Open Items
                             </h3>
                           </div>
                           {total > 0 && (
@@ -1270,7 +1270,7 @@ export default function ProjectDetails() {
                           </>
                         ) : (
                           <p className="text-sm text-muted-foreground py-2" data-testid="text-no-checklist">
-                            No checklist items yet.
+                            No open items yet.
                           </p>
                         )}
 
@@ -1279,7 +1279,7 @@ export default function ProjectDetails() {
                           className="text-xs text-primary hover:underline cursor-pointer"
                           data-testid="link-view-checklist"
                         >
-                          View full checklist →
+                          View open items →
                         </button>
                       </div>
                     </Card>
