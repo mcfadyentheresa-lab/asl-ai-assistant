@@ -1168,7 +1168,6 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                         <div className="flex items-center gap-1.5">
                           <span className="text-[11px] font-semibold uppercase tracking-wide truncate">{building.title}</span>
                           {building.completed && <Check className="h-2.5 w-2.5 text-green-600 shrink-0" />}
-                          <PaintColourSwatches paintColorIds={building.paintColorIds} />
                         </div>
                         <div className="flex items-center gap-1.5">
                           <div className="w-12 h-1 bg-muted rounded-full overflow-hidden">
