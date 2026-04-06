@@ -771,10 +771,12 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
       const startX = e.clientX;
       const originalStart = row.startDate!;
       const originalEnd = row.endDate!;
+      const rangeDays = Math.max(differenceInDays(originalEnd, originalStart), 1);
+      const pxPerDay = Math.max(getBarPosition(originalStart, originalEnd).width, 36) / rangeDays;
       let lastX = startX;
       const onMove = (moveEvent: MouseEvent) => {
         lastX = moveEvent.clientX;
-        const deltaDays = Math.round((lastX - startX) / dayWidth);
+        const deltaDays = Math.round((lastX - startX) / pxPerDay);
         if (edge === "start") {
           const nextStart = addDays(originalStart, deltaDays);
           if (nextStart >= originalEnd) return;
@@ -788,7 +790,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
       const onUp = () => {
         window.removeEventListener("mousemove", onMove);
         window.removeEventListener("mouseup", onUp);
-        const finalDelta = Math.round((lastX - startX) / dayWidth);
+        const finalDelta = Math.round((lastX - startX) / pxPerDay);
         if (finalDelta === 0) { setResizePreview(null); return; }
         const finalStart = edge === "start" ? addDays(originalStart, finalDelta) : originalStart;
         const finalEnd = edge === "end" ? addDays(originalEnd, finalDelta) : originalEnd;
@@ -1014,9 +1016,6 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
             style={{ backgroundColor: selectedBuilding.colorHex ? `${selectedBuilding.colorHex}15` : undefined, borderLeftWidth: "3px", borderLeftColor: selectedBuilding.colorHex || "transparent" }}
             data-testid="building-header-band"
           >
-            {selectedBuilding.colorHex && (
-              <div className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: selectedBuilding.colorHex }} />
-            )}
             <span className="text-xs font-semibold uppercase tracking-wide">{selectedBuilding.title}</span>
             {selectedRoom && selectedRoom.id !== -1 && (
               <>
