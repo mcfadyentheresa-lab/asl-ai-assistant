@@ -126,6 +126,7 @@ export default function Dashboard() {
     );
   }
 
+  const canCreateProjects = !isClient;
   const clientSingleProject = isClient && filteredProjects && filteredProjects.length === 1 ? filteredProjects[0] : null;
 
   return (
@@ -160,7 +161,7 @@ export default function Dashboard() {
               {showArchived ? <EyeOff className="mr-2 h-3.5 w-3.5" /> : <Eye className="mr-2 h-3.5 w-3.5" />}
               {showArchived ? "Hide Archived" : "Show Archived"}
             </Button>
-            {user?.role !== "client" && <CreateProjectDialog />}
+            {canCreateProjects && <CreateProjectDialog />}
           </div>
         </div>
 
@@ -262,7 +263,7 @@ export default function Dashboard() {
             <div className="bg-background p-4 rounded-full shadow-sm mb-4">
               <Plus className="h-6 w-6 text-muted-foreground" />
             </div>
-            {user?.role !== "client" ? (
+            {canCreateProjects ? (
               <>
                 <h3 className="font-serif text-xl font-semibold text-foreground mb-2">No projects yet</h3>
                 <p className="text-muted-foreground mb-6">Create your first project to get started.</p>
