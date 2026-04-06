@@ -5,6 +5,10 @@ import heroImg from "@/assets/images/hero-cottage.png";
 import craftImg from "@/assets/images/craft-interior.png";
 
 export default function LandingPage() {
+  const handleLogin = () => {
+    window.location.href = "/api/login";
+  };
+
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
       {/* Hero Section - Full viewport dark section */}
@@ -21,6 +25,14 @@ export default function LandingPage() {
           <span className="font-serif text-2xl font-bold text-white tracking-tight" data-testid="text-logo">
             Aster & Spruce
           </span>
+          <Button
+            onClick={handleLogin}
+            variant="outline"
+            className="bg-white/10 backdrop-blur-md text-white border-white/20"
+            data-testid="button-login"
+          >
+            Log In
+          </Button>
         </nav>
 
         <div className="relative z-10 flex-1 flex items-center">
@@ -41,6 +53,14 @@ export default function LandingPage() {
                 Bespoke cottage renovations in the heart of Muskoka. Transparent project management from blueprint to final walkthrough.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 pt-2">
+                <Button
+                  onClick={handleLogin}
+                  size="lg"
+                  data-testid="button-portal"
+                >
+                  Access Your Portal
+                  <ArrowRight className="ml-2" />
+                </Button>
               </div>
             </motion.div>
           </div>
