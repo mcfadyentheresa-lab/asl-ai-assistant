@@ -47,6 +47,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Link } from "wouter";
+import { useViewMode } from "@/hooks/use-view-mode";
 
 const statusLabel: Record<string, string> = {
   planning: "Planning",
@@ -64,10 +65,7 @@ export default function Dashboard() {
   const { toast } = useToast();
   const [showArchived, setShowArchived] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
-  const [viewMode, setViewMode] = useState<"admin" | "crew" | "client">(() => {
-    const saved = window.localStorage.getItem("dashboard-view-mode");
-    return saved === "admin" || saved === "crew" || saved === "client" ? saved : "admin";
-  });
+  const { viewMode, setViewMode } = useViewMode();
   const { data: onlineUsers } = useOnlineUsers();
 
   const userMap = new Map(allUsers?.map((u) => [u.id, `${u.firstName || ""} ${u.lastName || ""}`.trim()]) || []);
@@ -86,11 +84,6 @@ export default function Dashboard() {
   const isCrew = user?.role === "crew";
   const isAdminView = viewMode === "admin";
   const isClientView = viewMode === "client";
-
-  const handleViewModeChange = (mode: "admin" | "crew" | "client") => {
-    setViewMode(mode);
-    window.localStorage.setItem("dashboard-view-mode", mode);
-  };
 
   const handleArchive = (id: number) => {
     archiveProject(id, {
@@ -164,9 +157,9 @@ export default function Dashboard() {
 
           <div className="flex items-center gap-2 flex-wrap">
             <div className="flex items-center rounded-md border border-border overflow-hidden" data-testid="view-mode-toggle">
-              <Button type="button" size="sm" variant={viewMode === "admin" ? "default" : "ghost"} onClick={() => handleViewModeChange("admin")} data-testid="button-view-admin">Admin</Button>
-              <Button type="button" size="sm" variant={viewMode === "crew" ? "default" : "ghost"} onClick={() => handleViewModeChange("crew")} data-testid="button-view-crew">Crew</Button>
-              <Button type="button" size="sm" variant={viewMode === "client" ? "default" : "ghost"} onClick={() => handleViewModeChange("client")} data-testid="button-view-client">Client</Button>
+              <Button type="button" size="sm" variant={viewMode === "admin" ? "default" : "ghost"} onClick={() => setViewMode("admin")} data-testid="button-view-admin">Admin</Button>
+              <Button type="button" size="sm" variant={viewMode === "crew" ? "default" : "ghost"} onClick={() => setViewMode("crew")} data-testid="button-view-crew">Crew</Button>
+              <Button type="button" size="sm" variant={viewMode === "client" ? "default" : "ghost"} onClick={() => setViewMode("client")} data-testid="button-view-client">Client</Button>
             </div>
             <Button
               variant="outline"

@@ -16,6 +16,7 @@ import { Link } from "wouter";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useOnlineUsers, useVisibilityToggle } from "@/hooks/use-presence";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useViewMode } from "@/hooks/use-view-mode";
 
 export function Navbar() {
   const { user, logout } = useAuth();
@@ -23,6 +24,7 @@ export function Navbar() {
   const { data: onlineUsers } = useOnlineUsers();
   const { visible, toggleVisibility } = useVisibilityToggle();
   const { zoom, cycleZoom } = useTextZoom();
+  const { viewMode, setViewMode } = useViewMode();
 
   const switchRole = useMutation({
     mutationFn: async (role: string) => {
@@ -85,19 +87,19 @@ export function Navbar() {
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm" data-testid="button-role-switch">
               <UserCog className="mr-2 h-4 w-4" />
-              {roleLabel}
+              {viewMode === "admin" ? "Admin" : viewMode === "crew" ? "Crew" : "Client"}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-40">
             <DropdownMenuLabel className="text-xs text-muted-foreground">
               Switch View
             </DropdownMenuLabel>
-            {["client", "crew", "admin"].map((role) => (
+            {(["client", "crew", "admin"] as const).map((role) => (
               <DropdownMenuItem
                 key={role}
-                onClick={() => switchRole.mutate(role)}
+                onClick={() => setViewMode(role)}
                 data-testid={`button-role-${role}`}
-                className={user.role === role ? "font-semibold" : ""}
+                className={viewMode === role ? "font-semibold" : ""}
               >
                 {role === "admin" ? "Admin" : role === "crew" ? "Crew" : "Client"}
               </DropdownMenuItem>
