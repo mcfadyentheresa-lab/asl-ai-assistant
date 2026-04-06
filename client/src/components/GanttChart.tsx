@@ -364,6 +364,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
   const [newTaskDueDate, setNewTaskDueDate] = useState("");
   const [dragId, setDragId] = useState<number | null>(null);
   const [dragOverId, setDragOverId] = useState<number | null>(null);
+  const [resizePreview, setResizePreview] = useState<{ rowId: number; rowType: BarItem["type"]; startDate: Date; endDate: Date } | null>(null);
 
   const timelineRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
@@ -747,18 +748,15 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
   const renderBar = (row: BarItem) => {
     if (!row.startDate || !row.endDate) return null;
 
-    const displayStart = row.startDate;
-    const displayEnd = row.endDate;
+    const displayStart = resizePreview?.rowId === row.id && resizePreview?.rowType === row.type ? resizePreview.startDate : row.startDate;
+    const displayEnd = resizePreview?.rowId === row.id && resizePreview?.rowType === row.type ? resizePreview.endDate : row.endDate;
 
     const { left, width } = getBarPosition(displayStart, displayEnd);
     const visibleWidth = Math.max(width, 48);
     const barColor = row.colorHex || BUILDING_COLORS[row.colorIndex];
     const rowH = row.type === "room" ? ROOM_ROW_HEIGHT : ROW_HEIGHT;
     const canResize = isAdmin && row.startDate && row.endDate;
-    const resize = (edge: "start" | "end", deltaDays: number) => {
-      if (!row.startDate || !row.endDate) return;
-      const start = edge === "start" ? addDays(row.startDate, deltaDays) : row.startDate;
-      const end = edge === "end" ? addDays(row.endDate, deltaDays) : row.endDate;
+    const commitResize = (start: Date, end: Date) => {
       if (row.type === "building") updateMilestone({ id: row.id, projectId, startDate: format(start, "yyyy-MM-dd"), endDate: format(end, "yyyy-MM-dd") });
       else if (row.type === "room") updateSection({ id: row.id, projectId, startDate: format(start, "yyyy-MM-dd"), endDate: format(end, "yyyy-MM-dd") } as any);
       else updateTask({ id: row.id, dueDate: format(end, "yyyy-MM-dd") } as any);
@@ -774,16 +772,19 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
         if (edge === "start") {
           const nextStart = addDays(originalStart, deltaDays);
           if (nextStart >= originalEnd) return;
-          resize("start", deltaDays);
+          setResizePreview({ rowId: row.id, rowType: row.type, startDate: nextStart, endDate: originalEnd });
         } else {
           const nextEnd = addDays(originalEnd, deltaDays);
           if (nextEnd <= originalStart) return;
-          resize("end", deltaDays);
+          setResizePreview({ rowId: row.id, rowType: row.type, startDate: originalStart, endDate: nextEnd });
         }
       };
       const onUp = () => {
         window.removeEventListener("mousemove", onMove);
         window.removeEventListener("mouseup", onUp);
+        const currentPreview = resizePreview && resizePreview.rowId === row.id && resizePreview.rowType === row.type ? resizePreview : null;
+        if (currentPreview) commitResize(currentPreview.startDate, currentPreview.endDate);
+        setResizePreview(null);
       };
       window.addEventListener("mousemove", onMove);
       window.addEventListener("mouseup", onUp);
