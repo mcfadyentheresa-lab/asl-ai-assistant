@@ -757,7 +757,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
           <TooltipTrigger asChild>
             <div
               className="absolute rounded-sm cursor-default"
-              style={{ left, width, top: topOffset, height: barHeight, backgroundColor: barColor, opacity: isDone ? 0.35 : 0.6 }}
+              style={{ left, width, top: topOffset, height: barHeight, backgroundColor: barColor, opacity: isDone ? 0.55 : 0.95 }}
               data-testid={`gantt-bar-task-${row.id}`}
             >
               {isDone && (
@@ -794,7 +794,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
             style={{ left, width, top: topOffset, height: barHeight, backgroundColor: `${barColor}22` }}
             data-testid={`gantt-bar-${row.type}-${row.id}`}
           >
-            <div className="h-full transition-all duration-300" style={{ width: `${progress}%`, backgroundColor: barColor, opacity: isRoom ? 0.6 : 1 }} />
+            <div className="h-full transition-all duration-300" style={{ width: `${progress}%`, backgroundColor: barColor, opacity: isRoom ? 0.9 : 1 }} />
             <span className="absolute inset-0 flex items-center justify-between px-1.5 text-[9px] font-medium text-foreground/70 truncate">
               <span>{width > 50 ? `${progress}%` : ""}</span>
               {width > 80 && row.startDate && row.endDate && (
