@@ -1678,7 +1678,7 @@ export default function ProjectDetails() {
 
 const EDITED_TEXT_COLOR = "#b45309";
 
-function ProgressTab({ projectId, milestones, sections, tasks, userRole, subTab, onSubTabChange }: { projectId: number; milestones: any[]; sections: any[]; tasks: any[]; userRole: string; subTab: "gantt" | "checklist" | "calendar"; onSubTabChange: (v: "gantt" | "checklist" | "calendar") => void }) {
+function ProgressTab({ projectId, milestones, sections, tasks, userRole, subTab, onSubTabChange }: { projectId: number; milestones: any[]; sections: any[]; tasks: any[]; userRole: string; subTab: "gantt" | "calendar"; onSubTabChange: (v: "gantt" | "calendar") => void }) {
 
   return (
     <div className="space-y-4" data-testid="progress-tab">
@@ -1690,7 +1690,7 @@ function ProgressTab({ projectId, milestones, sections, tasks, userRole, subTab,
           <p className="text-xs text-muted-foreground">Choose open items, timeline, or calendar</p>
         </div>
         <div>
-          <Select value={subTab} onValueChange={(value) => onSubTabChange(value as "gantt" | "checklist" | "calendar")}>
+          <Select value={subTab} onValueChange={(value) => onSubTabChange(value as "gantt" | "calendar")}>
             <SelectTrigger className="h-9 w-full sm:w-36" data-testid="select-progress-view">
               <SelectValue placeholder="Select view" />
             </SelectTrigger>
@@ -1706,9 +1706,6 @@ function ProgressTab({ projectId, milestones, sections, tasks, userRole, subTab,
       {subTab === "gantt" && (
         <GanttChart projectId={projectId} milestones={milestones} sections={sections || []} tasks={tasks} userRole={userRole} />
       )}
-      {subTab === "checklist" && (
-        <ChecklistTab projectId={projectId} />
-      )}
       {subTab === "calendar" && (
         <CalendarTab projectId={projectId} />
       )}
@@ -1716,7 +1713,7 @@ function ProgressTab({ projectId, milestones, sections, tasks, userRole, subTab,
   );
 }
 
-function ChecklistTab({ projectId }: { projectId: number }) {
+function ChecklistTab({ projectId, compact = false }: { projectId: number; compact?: boolean }) {
   const { user } = useAuth();
   const { toast } = useToast();
   const { data: items, isLoading } = useChecklistItems(projectId);
@@ -1943,7 +1940,7 @@ function ChecklistTab({ projectId }: { projectId: number }) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className={compact ? "space-y-4" : "space-y-6"}>
       <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground" data-testid="checklist-summary">
         <span data-testid="text-total-items">{totalItems} items total</span>
         <span className="text-border">·</span>
@@ -1965,8 +1962,8 @@ function ChecklistTab({ projectId }: { projectId: number }) {
           <div className="p-4">
             <div className="flex items-center gap-2 mb-3">
               <Flag className="h-4 w-4 text-muted-foreground" />
-              <span className="font-serif font-semibold text-foreground" data-testid="text-milestones-heading">
-                Milestones
+                      <span className="font-serif font-semibold text-foreground" data-testid="text-milestones-heading">
+                Discussion Notes
               </span>
               <span className="text-xs text-muted-foreground">
                 ({checklistMilestones.length})
@@ -2471,6 +2468,22 @@ function ChecklistTab({ projectId }: { projectId: number }) {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+function OpenItemsDrawer({ projectId, open, onOpenChange }: { projectId: number; open: boolean; onOpenChange: (open: boolean) => void }) {
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="w-[96vw] sm:max-w-2xl overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle className="font-serif">Open Items</SheetTitle>
+          <SheetDescription className="sr-only">Open items drawer for new discussion items and wish-list changes</SheetDescription>
+        </SheetHeader>
+        <div className="mt-4">
+          <ChecklistTab projectId={projectId} compact />
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }
 
