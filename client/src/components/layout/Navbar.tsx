@@ -64,7 +64,7 @@ export function Navbar() {
 
       <div className="flex items-center gap-3">
         <div className="hidden md:flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-3 py-1.5">
-          <span className="text-xs font-medium text-muted-foreground">Temp view</span>
+          <span className="text-xs font-medium text-muted-foreground">Crew / Admin temp view</span>
           <Switch
             checked={visible}
             onCheckedChange={toggleVisibility}
