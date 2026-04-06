@@ -3361,9 +3361,10 @@ function CalendarTab({ projectId }: { projectId: number }) {
     return true;
   };
 
+  const calendarEvents = (events || []) as CalendarEvent[];
+
   const getEventsForDate = (date: Date) => {
-    if (!events) return [];
-    return (events as CalendarEvent[]).filter((e) => {
+    return calendarEvents.filter((e) => {
       if (!isEventVisible(e)) return false;
       const start = parseISO(e.date);
       const end = e.endDate ? parseISO(e.endDate) : start;
@@ -3386,8 +3387,8 @@ function CalendarTab({ projectId }: { projectId: number }) {
 
   const getEventSpan = (event: CalendarEvent) => {
     if (!event.date) return 1;
-    const start = (event as any).startDate ? parseISO((event as any).startDate) : parseISO(event.date);
-    const end = event.endDate ? parseISO(event.endDate) : parseISO(event.date);
+    const start = parseISO(event.date);
+    const end = event.endDate ? parseISO(event.endDate) : start;
     return Math.max(1, differenceInCalendarDays(end, start) + 1);
   };
 
@@ -3461,7 +3462,7 @@ function CalendarTab({ projectId }: { projectId: number }) {
     });
   };
 
-  const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const weekDayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
   const kindLabel = (k: string) => k === "milestone" ? "Building" : k === "room" ? "Room" : "Task";
 
@@ -3525,109 +3526,156 @@ function CalendarTab({ projectId }: { projectId: number }) {
         <div className="flex justify-center py-10">
           <Loader2 className="animate-spin text-muted-foreground" data-testid="loader-calendar" />
         </div>
-      ) : (
-        <div className="grid grid-cols-7 gap-px bg-border rounded-md overflow-hidden" data-testid="calendar-grid">
-        {weekDays.map((day) => (
-          <div
-            key={day}
-            className="bg-muted text-center py-2 text-xs font-medium text-muted-foreground"
-          >
-            {day}
-          </div>
-        ))}
-        {Array.from({ length: startDayOfWeek }).map((_, i) => (
-          <div key={`empty-${i}`} className="bg-card min-h-[80px]" />
-        ))}
-        {daysInMonth.map((day) => {
-          const dayEvents = showEvents ? getEventsForDate(day) : [];
-          const dayTimeline = getTimelineForDate(day);
-          const allItems = [...dayTimeline.map(t => ({ type: "timeline" as const, item: t })), ...dayEvents.map(e => ({ type: "event" as const, item: e }))];
-          const isSelected = selectedDate && isSameDay(day, selectedDate);
-          const isToday = isSameDay(day, new Date());
-          const dateStr = format(day, "yyyy-MM-dd");
-          return (
-            <div
-              key={day.toISOString()}
-              className={`bg-card min-h-[80px] p-1.5 cursor-pointer transition-colors hover-elevate ${isSelected ? "ring-2 ring-primary ring-inset" : ""} ${draggedEventId ? "ring-1 ring-inset ring-transparent hover:ring-primary/40" : ""}`}
-              onClick={() => setSelectedDate(day)}
-              onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add("ring-primary/40"); }}
-              onDragLeave={(e) => { e.currentTarget.classList.remove("ring-primary/40"); }}
-              onDrop={(e) => {
-                e.preventDefault();
-                e.currentTarget.classList.remove("ring-primary/40");
-                const evId = parseInt(e.dataTransfer.getData("text/plain"), 10);
-                if (!evId) return;
-                updateEvent(
-                  { id: evId, date: dateStr },
-                  {
-                    onSuccess: () => {
-                      toast({ title: "Moved", description: `Event moved to ${format(day, "MMM d")}.` });
-                      setSelectedDate(day);
-                    },
-                    onError: (err) => toast({ title: "Error", description: err.message, variant: "destructive" }),
-                  }
-                );
-                setDraggedEventId(null);
-              }}
-              data-testid={`calendar-day-${dateStr}`}
-            >
-              <div className="flex items-center justify-between gap-1">
-                <span
-                  className={`text-xs font-medium inline-flex items-center justify-center w-6 h-6 rounded-full ${isToday ? "bg-primary text-primary-foreground" : "text-foreground"}`}
-                >
-                  {format(day, "d")}
-                </span>
-                {allItems.length > 0 && (
-                  <div className="flex gap-0.5">
-                    {allItems.slice(0, 3).map((a, i) => (
-                      <span
-                        key={i}
-                        className="h-2 w-2 rounded-full shrink-0"
-                        style={{ backgroundColor: a.type === "timeline" ? (a.item as TimelineItem).color : eventTypeColors[(a.item as CalendarEvent).type || "event"] || eventTypeColors.event }}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div className="mt-0.5 space-y-0.5 overflow-hidden">
-                {dayTimeline.slice(0, 2).map((tl) => (
-                  <div
-                    key={tl.id}
-                    className="text-[10px] leading-tight truncate rounded px-1 py-0.5 text-white/90"
-                    style={{ backgroundColor: tl.color, opacity: 0.85 }}
-                    data-testid={`calendar-timeline-${tl.id}`}
-                  >
-                    {tl.title}
-                  </div>
-                ))}
-                {dayEvents.slice(0, Math.max(1, 3 - dayTimeline.length)).map((ev) => (
-                  <div
-                    key={ev.id}
-                    draggable
-                    onDragStart={(e) => {
-                      e.dataTransfer.setData("text/plain", String(ev.id));
-                      e.dataTransfer.effectAllowed = "move";
-                      setDraggedEventId(ev.id);
-                    }}
-                    onDragEnd={() => setDraggedEventId(null)}
-                    className="text-[10px] leading-tight truncate rounded px-1 py-0.5 text-white cursor-grab active:cursor-grabbing"
-                    style={{
-                      backgroundColor: eventTypeColors[ev.type || "event"] || eventTypeColors.event,
-                    }}
-                    data-testid={`calendar-event-dot-${ev.id}`}
-                  >
-                    {ev.title}
-                  </div>
-                ))}
-                {allItems.length > 3 && (
-                  <span className="text-[10px] text-muted-foreground">+{allItems.length - 3} more</span>
-                )}
-              </div>
+      ) : (() => {
+        const allDays: (Date | null)[] = [];
+        for (let i = 0; i < startDayOfWeek; i++) allDays.push(null);
+        daysInMonth.forEach((d) => allDays.push(d));
+        while (allDays.length % 7 !== 0) allDays.push(null);
+        const weeks: (Date | null)[][] = [];
+        for (let i = 0; i < allDays.length; i += 7) weeks.push(allDays.slice(i, i + 7));
+
+        const getSpanBars = (weekDays: (Date | null)[]) => {
+          const bars: { id: string; title: string; color: string; startCol: number; span: number; layer: "timeline" | "event" }[] = [];
+          const seen = new Set<string>();
+
+          const firstDay = weekDays.find((d) => d !== null);
+          const lastDay = [...weekDays].reverse().find((d) => d !== null);
+          if (!firstDay || !lastDay) return bars;
+
+          const allSpanItems = [
+            ...timelineItems.map((t) => ({ id: t.id, title: t.title, color: t.color, start: parseISO(t.startDate), end: parseISO(t.endDate), layer: "timeline" as const })),
+            ...calendarEvents.filter(isEventVisible).filter((e) => e.endDate && e.endDate !== e.date).map((e) => ({
+              id: `ev-${e.id}`,
+              title: e.title,
+              color: eventTypeColors[e.type || "event"] || eventTypeColors.event,
+              start: parseISO(e.date),
+              end: parseISO(e.endDate!),
+              layer: "event" as const,
+            })),
+          ];
+
+          for (const item of allSpanItems) {
+            if (isNaN(item.start.getTime()) || isNaN(item.end.getTime())) continue;
+            if (item.layer === "timeline" && !showTimeline) continue;
+
+            let startCol = -1;
+            let endCol = -1;
+            for (let c = 0; c < 7; c++) {
+              const d = weekDays[c];
+              if (!d) continue;
+              if (isWithinInterval(d, { start: item.start, end: item.end })) {
+                if (startCol === -1) startCol = c;
+                endCol = c;
+              }
+            }
+            if (startCol === -1) continue;
+            const barKey = `${item.id}-w${format(firstDay, "MMdd")}`;
+            if (seen.has(barKey)) continue;
+            seen.add(barKey);
+            bars.push({ id: item.id, title: item.title, color: item.color, startCol, span: endCol - startCol + 1, layer: item.layer });
+          }
+          return bars;
+        };
+
+        return (
+          <div className="rounded-md overflow-hidden border border-border" data-testid="calendar-grid">
+            <div className="grid grid-cols-7 gap-px bg-border">
+              {weekDayLabels.map((day) => (
+                <div key={day} className="bg-muted text-center py-2 text-xs font-medium text-muted-foreground">
+                  {day}
+                </div>
+              ))}
             </div>
-          );
-        })}
-        </div>
-      )}
+            {weeks.map((week, wi) => {
+              const spanBars = getSpanBars(week);
+              return (
+                <div key={wi}>
+                  <div className="grid grid-cols-7 gap-px bg-border">
+                    {week.map((day, di) => {
+                      if (!day) return <div key={`empty-${wi}-${di}`} className="bg-card min-h-[48px]" />;
+                      const dayEvents = getEventsForDate(day);
+                      const singleDayEvents = dayEvents.filter((e) => !e.endDate || e.endDate === e.date);
+                      const isSelected = selectedDate && isSameDay(day, selectedDate);
+                      const isToday = isSameDay(day, new Date());
+                      const dateStr = format(day, "yyyy-MM-dd");
+                      const dayHasItems = getTimelineForDate(day).length > 0 || dayEvents.length > 0;
+                      return (
+                        <div
+                          key={day.toISOString()}
+                          className={`bg-card min-h-[48px] p-1 cursor-pointer transition-colors hover:bg-muted/30 ${isSelected ? "ring-2 ring-primary ring-inset" : ""} ${draggedEventId ? "ring-1 ring-inset ring-transparent hover:ring-primary/40" : ""}`}
+                          onClick={() => setSelectedDate(day)}
+                          onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add("ring-primary/40"); }}
+                          onDragLeave={(e) => { e.currentTarget.classList.remove("ring-primary/40"); }}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            e.currentTarget.classList.remove("ring-primary/40");
+                            const evId = parseInt(e.dataTransfer.getData("text/plain"), 10);
+                            if (!evId) return;
+                            updateEvent(
+                              { id: evId, date: dateStr },
+                              {
+                                onSuccess: () => {
+                                  toast({ title: "Moved", description: `Event moved to ${format(day, "MMM d")}.` });
+                                  setSelectedDate(day);
+                                },
+                                onError: (err) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+                              }
+                            );
+                            setDraggedEventId(null);
+                          }}
+                          data-testid={`calendar-day-${dateStr}`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className={`text-xs font-medium inline-flex items-center justify-center w-6 h-6 rounded-full ${isToday ? "bg-primary text-primary-foreground" : "text-foreground"}`}>
+                              {format(day, "d")}
+                            </span>
+                            {dayHasItems && <span className="h-1.5 w-1.5 rounded-full bg-primary/50" />}
+                          </div>
+                          {singleDayEvents.slice(0, 2).map((ev) => (
+                            <div
+                              key={ev.id}
+                              draggable
+                              onDragStart={(e) => {
+                                e.dataTransfer.setData("text/plain", String(ev.id));
+                                e.dataTransfer.effectAllowed = "move";
+                                setDraggedEventId(ev.id);
+                              }}
+                              onDragEnd={() => setDraggedEventId(null)}
+                              className="text-[10px] leading-tight truncate rounded px-1 py-0.5 mt-0.5 text-white cursor-grab active:cursor-grabbing"
+                              style={{ backgroundColor: eventTypeColors[ev.type || "event"] || eventTypeColors.event }}
+                              data-testid={`calendar-event-dot-${ev.id}`}
+                            >
+                              {ev.title}
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {spanBars.length > 0 && (
+                    <div className="bg-card border-t border-border/30">
+                      {spanBars.slice(0, 4).map((bar) => (
+                        <div key={bar.id} className="grid grid-cols-7 gap-px" data-testid={`calendar-bar-${bar.id}`}>
+                          {bar.startCol > 0 && <div style={{ gridColumn: `span ${bar.startCol}` }} />}
+                          <div
+                            className="text-[10px] leading-tight truncate rounded-sm px-1.5 py-0.5 text-white/90 my-px mx-0.5"
+                            style={{ gridColumn: `span ${bar.span}`, backgroundColor: bar.color, opacity: bar.layer === "timeline" ? 0.85 : 1 }}
+                          >
+                            {bar.title}
+                          </div>
+                        </div>
+                      ))}
+                      {spanBars.length > 4 && (
+                        <p className="text-[10px] text-muted-foreground px-2 pb-0.5">+{spanBars.length - 4} more</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
 
       {showTimeline && timelineItems.length > 0 && (
         <div className="flex flex-wrap gap-2 px-1" data-testid="timeline-legend">

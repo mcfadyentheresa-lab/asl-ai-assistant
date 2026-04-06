@@ -235,7 +235,7 @@ export default function MasterCalendar() {
 
   const selectedItems = selectedDate ? getItemsForDate(selectedDate) : [];
 
-  const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const weekDayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -309,61 +309,120 @@ export default function MasterCalendar() {
           <div className="flex justify-center py-10">
             <Loader2 className="animate-spin text-muted-foreground" data-testid="loader-master-calendar" />
           </div>
-        ) : (
-          <div className="grid grid-cols-7 gap-px bg-border rounded-md overflow-hidden" data-testid="master-calendar-grid">
-            {weekDays.map((day) => (
-              <div key={day} className="bg-muted text-center py-2 text-xs font-medium text-muted-foreground">
-                {day}
+        ) : (() => {
+          const allDays: (Date | null)[] = [];
+          for (let i = 0; i < startDayOfWeek; i++) allDays.push(null);
+          daysInMonth.forEach((d) => allDays.push(d));
+          while (allDays.length % 7 !== 0) allDays.push(null);
+          const weeks: (Date | null)[][] = [];
+          for (let i = 0; i < allDays.length; i += 7) weeks.push(allDays.slice(i, i + 7));
+
+          const getSpanBars = (weekCells: (Date | null)[]) => {
+            const bars: { id: string; title: string; projectName: string; color: string; startCol: number; span: number; layer: "timeline" | "event" }[] = [];
+            const seen = new Set<string>();
+            const firstDay = weekCells.find((d) => d !== null);
+            if (!firstDay) return bars;
+
+            for (const item of filtered) {
+              const start = parseISO(item.startDate);
+              const end = parseISO(item.endDate);
+              if (isNaN(start.getTime()) || isNaN(end.getTime())) continue;
+              if (item.startDate === item.endDate) continue;
+
+              let startCol = -1;
+              let endCol = -1;
+              for (let c = 0; c < 7; c++) {
+                const d = weekCells[c];
+                if (!d) continue;
+                if (isWithinInterval(d, { start, end })) {
+                  if (startCol === -1) startCol = c;
+                  endCol = c;
+                }
+              }
+              if (startCol === -1) continue;
+              const barKey = `${item.id}-w${format(firstDay, "MMdd")}`;
+              if (seen.has(barKey)) continue;
+              seen.add(barKey);
+              bars.push({ id: item.id, title: item.title, projectName: item.projectName, color: item.color, startCol, span: endCol - startCol + 1, layer: item.layer });
+            }
+            return bars;
+          };
+
+          return (
+            <div className="rounded-md overflow-hidden border border-border" data-testid="master-calendar-grid">
+              <div className="grid grid-cols-7 gap-px bg-border">
+                {weekDayLabels.map((day) => (
+                  <div key={day} className="bg-muted text-center py-2 text-xs font-medium text-muted-foreground">
+                    {day}
+                  </div>
+                ))}
               </div>
-            ))}
-            {Array.from({ length: startDayOfWeek }).map((_, i) => (
-              <div key={`empty-${i}`} className="bg-card min-h-[80px]" />
-            ))}
-            {daysInMonth.map((day) => {
-              const dayItems = getItemsForDate(day);
-              const isSelected = selectedDate && isSameDay(day, selectedDate);
-              const isToday = isSameDay(day, new Date());
-              const dateStr = format(day, "yyyy-MM-dd");
-              return (
-                <div
-                  key={day.toISOString()}
-                  className={`bg-card min-h-[80px] p-1.5 cursor-pointer transition-colors hover:bg-muted/30 ${isSelected ? "ring-2 ring-primary ring-inset" : ""}`}
-                  onClick={() => setSelectedDate(day)}
-                  data-testid={`master-day-${dateStr}`}
-                >
-                  <div className="flex items-center justify-between gap-1">
-                    <span className={`text-xs font-medium inline-flex items-center justify-center w-6 h-6 rounded-full ${isToday ? "bg-primary text-primary-foreground" : "text-foreground"}`}>
-                      {format(day, "d")}
-                    </span>
-                    {dayItems.length > 0 && (
-                      <div className="flex gap-0.5">
-                        {dayItems.slice(0, 3).map((a, i) => (
-                          <span key={i} className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: a.color }} />
+              {weeks.map((week, wi) => {
+                const spanBars = getSpanBars(week);
+                return (
+                  <div key={wi}>
+                    <div className="grid grid-cols-7 gap-px bg-border">
+                      {week.map((day, di) => {
+                        if (!day) return <div key={`empty-${wi}-${di}`} className="bg-card min-h-[48px]" />;
+                        const dayItems = getItemsForDate(day);
+                        const singleDayItems = dayItems.filter((it) => it.startDate === it.endDate);
+                        const isSelected = selectedDate && isSameDay(day, selectedDate);
+                        const isToday = isSameDay(day, new Date());
+                        const dateStr = format(day, "yyyy-MM-dd");
+                        const dayHasItems = dayItems.length > 0;
+                        return (
+                          <div
+                            key={day.toISOString()}
+                            className={`bg-card min-h-[48px] p-1 cursor-pointer transition-colors hover:bg-muted/30 ${isSelected ? "ring-2 ring-primary ring-inset" : ""}`}
+                            onClick={() => setSelectedDate(day)}
+                            data-testid={`master-day-${dateStr}`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className={`text-xs font-medium inline-flex items-center justify-center w-6 h-6 rounded-full ${isToday ? "bg-primary text-primary-foreground" : "text-foreground"}`}>
+                                {format(day, "d")}
+                              </span>
+                              {dayHasItems && <span className="h-1.5 w-1.5 rounded-full bg-primary/50" />}
+                            </div>
+                            {singleDayItems.slice(0, 2).map((item) => (
+                              <div
+                                key={item.id}
+                                className="text-[10px] leading-tight truncate rounded px-1 py-0.5 mt-0.5 text-white/90"
+                                style={{ backgroundColor: item.color }}
+                                title={`${item.projectName}: ${item.title}`}
+                                data-testid={`master-item-${item.id}`}
+                              >
+                                {item.title}
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {spanBars.length > 0 && (
+                      <div className="bg-card border-t border-border/30">
+                        {spanBars.slice(0, 4).map((bar) => (
+                          <div key={bar.id} className="grid grid-cols-7 gap-px" data-testid={`master-bar-${bar.id}`}>
+                            {bar.startCol > 0 && <div style={{ gridColumn: `span ${bar.startCol}` }} />}
+                            <div
+                              className="text-[10px] leading-tight truncate rounded-sm px-1.5 py-0.5 text-white/90 my-px mx-0.5"
+                              style={{ gridColumn: `span ${bar.span}`, backgroundColor: bar.color, opacity: bar.layer === "timeline" ? 0.85 : 1 }}
+                              title={`${bar.projectName}: ${bar.title}`}
+                            >
+                              <span className="font-semibold">{bar.projectName}:</span> {bar.title}
+                            </div>
+                          </div>
                         ))}
+                        {spanBars.length > 4 && (
+                          <p className="text-[10px] text-muted-foreground px-2 pb-0.5">+{spanBars.length - 4} more</p>
+                        )}
                       </div>
                     )}
                   </div>
-                  <div className="mt-0.5 space-y-0.5 overflow-hidden">
-                    {dayItems.slice(0, 3).map((item) => (
-                      <div
-                        key={item.id}
-                        className="text-[10px] leading-tight truncate rounded px-1 py-0.5 text-white/90"
-                        style={{ backgroundColor: item.color, opacity: item.layer === "timeline" ? 0.85 : 1 }}
-                        title={`${item.projectName}: ${item.title}`}
-                        data-testid={`master-item-${item.id}`}
-                      >
-                        <span className="font-semibold">{item.projectName}:</span> {item.title}
-                      </div>
-                    ))}
-                    {dayItems.length > 3 && (
-                      <span className="text-[10px] text-muted-foreground">+{dayItems.length - 3} more</span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+                );
+              })}
+            </div>
+          );
+        })()}
 
         {data && (
           <div className="flex flex-wrap gap-3 px-1" data-testid="master-legend">
