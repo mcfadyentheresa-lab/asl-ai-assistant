@@ -81,7 +81,6 @@ export default function Dashboard() {
   const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(" ") || "there";
   const isClient = user?.role === "client";
   const isAdmin = user?.role === "admin";
-  const isCrew = user?.role === "crew";
   const isAdminView = viewMode === "admin";
   const isClientView = viewMode === "client";
 
@@ -110,22 +109,6 @@ export default function Dashboard() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" data-testid="loader-dashboard" />
-      </div>
-    );
-  }
-
-  if (viewMode === "crew") {
-    return (
-      <div className="min-h-screen bg-background">
-        <Navbar />
-        <div className="container py-12 px-6 md:px-10">
-          <h1 className="font-serif text-3xl font-bold text-foreground mb-6" data-testid="text-crew-heading">
-            Today's Schedule
-          </h1>
-          <div className="bg-card border border-card-border rounded-xl p-10 text-center text-muted-foreground" data-testid="text-crew-placeholder">
-            Crew dashboard coming soon. Please check with your foreman.
-          </div>
-        </div>
       </div>
     );
   }

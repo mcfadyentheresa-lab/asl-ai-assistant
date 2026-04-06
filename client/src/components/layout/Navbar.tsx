@@ -13,42 +13,21 @@ import {
 import { LogOut, UserCog, Eye, EyeOff, User, Palette, ZoomIn, Clock, DollarSign, Calculator, Users, BookUser, Store, CalendarDays } from "lucide-react";
 import { useTextZoom } from "@/hooks/use-text-zoom";
 import { Link } from "wouter";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useOnlineUsers, useVisibilityToggle } from "@/hooks/use-presence";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useViewMode } from "@/hooks/use-view-mode";
 
 export function Navbar() {
   const { user, logout } = useAuth();
-  const queryClient = useQueryClient();
   const { data: onlineUsers } = useOnlineUsers();
   const { visible, toggleVisibility } = useVisibilityToggle();
   const { zoom, cycleZoom } = useTextZoom();
   const { viewMode, setViewMode } = useViewMode();
 
-  const switchRole = useMutation({
-    mutationFn: async (role: string) => {
-      const res = await fetch("/api/auth/role", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role }),
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error("Failed to switch role");
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
-    },
-  });
-
   if (!user) return null;
 
   const initials =
     `${(user.firstName || "")[0] || ""}${(user.lastName || "")[0] || ""}`.toUpperCase() || "U";
-  const roleLabel =
-    user.role === "admin" ? "Admin" : user.role === "crew" ? "Crew" : "Client";
 
   return (
     <nav
