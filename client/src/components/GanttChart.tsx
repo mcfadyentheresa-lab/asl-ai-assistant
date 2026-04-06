@@ -64,8 +64,8 @@ interface GanttChartProps {
 }
 
 const BUILDING_COLORS = [
-  "#1E3A2F", "#2D5A47", "#3D7A5F", "#8B7355", "#6B8E73",
-  "#4A6741", "#7A6B5D", "#556B2F", "#8B8378", "#5F7161",
+  "#163629", "#24513D", "#2F6B52", "#7A5A36", "#577A63",
+  "#355C3A", "#6A5138", "#6B7E2E", "#6B6258", "#4F6A5D",
 ];
 
 const TRADE_PRESETS = [
