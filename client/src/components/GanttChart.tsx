@@ -1203,11 +1203,11 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                   const isGeneralTasks = roomData.id < 0;
                   const actualBuildingId = isGeneralTasks ? -roomData.id : sections.find(s => s.id === roomData.id)?.milestoneId;
                   const parentBuilding = buildingInfos.find(b => b.id === actualBuildingId);
+                  const roomInfo = (!isGeneralTasks && parentBuilding) ? roomInfosForBuilding(parentBuilding.id).find(r => r.id === roomData.id) : null;
                   const accentColor = roomData.colorHex || BUILDING_COLORS[roomData.colorIndex];
                   const progressColor = roomInfo?.completed || (roomInfo?.progress ?? roomData.progress ?? 0) >= 100
                     ? accentColor
                     : mixHex(accentColor, "#ffffff", 0.58);
-                  const roomInfo = (!isGeneralTasks && parentBuilding) ? roomInfosForBuilding(parentBuilding.id).find(r => r.id === roomData.id) : null;
 
                   const actualRoomId = isGeneralTasks ? -1 : roomData.id;
                   const drillBuildingId = isGeneralTasks ? -roomData.id : parentBuilding?.id;
