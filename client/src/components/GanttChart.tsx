@@ -251,7 +251,7 @@ function PaintColourPanel({ paintColorIds, onUpdate, isAdmin }: { paintColorIds:
         onClick={() => setExpanded(!expanded)}
         data-testid="button-toggle-paint-colours"
       >
-        <Palette className="h-3.5 w-3.5 text-muted-foreground" />
+        {isAdmin ? <Palette className="h-3.5 w-3.5 text-muted-foreground" /> : null}
         <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium flex-1">
           Paint Colours {paintColorIds && paintColorIds.length > 0 ? `(${paintColorIds.length})` : ""}
         </span>
