@@ -430,7 +430,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
       const bStart = ms.startDate ? parseISO(ms.startDate)
         : allDates.length > 0 ? new Date(Math.min(...allDates.map(d => d.getTime()))) : today;
       let bEnd = ms.endDate ? parseISO(ms.endDate)
-        : allDates.length > 0 ? new Date(Math.max(...allDates.map(d => d.getTime()))) : addDays(today, 3);
+        : allDates.length > 0 ? new Date(Math.max(...allDates.map(d => d.getTime()))) : addDays(bStart, 3);
       if (bEnd.getTime() <= bStart.getTime()) {
         bEnd = addDays(bStart, 3);
       }
@@ -464,7 +464,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
       const secStart = sec.startDate ? parseISO(sec.startDate)
         : secDates.length > 0 ? new Date(Math.min(...secDates.map(d => d.getTime()))) : secToday;
       let secEnd = sec.endDate ? parseISO(sec.endDate)
-        : secDates.length > 0 ? new Date(Math.max(...secDates.map(d => d.getTime()))) : addDays(secToday, 3);
+        : secDates.length > 0 ? new Date(Math.max(...secDates.map(d => d.getTime()))) : addDays(secStart, 3);
       if (secEnd.getTime() <= secStart.getTime()) {
         secEnd = addDays(secStart, 3);
       }
@@ -789,6 +789,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
         window.removeEventListener("mousemove", onMove);
         window.removeEventListener("mouseup", onUp);
         const finalDelta = Math.round((lastX - startX) / dayWidth);
+        if (finalDelta === 0) { setResizePreview(null); return; }
         const finalStart = edge === "start" ? addDays(originalStart, finalDelta) : originalStart;
         const finalEnd = edge === "end" ? addDays(originalEnd, finalDelta) : originalEnd;
         if ((edge === "start" && finalStart < originalEnd) || (edge === "end" && finalEnd > originalStart)) {
