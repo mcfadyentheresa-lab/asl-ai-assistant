@@ -1661,16 +1661,15 @@ function ProgressTab({ projectId, milestones, sections, tasks, userRole, subTab,
 
   return (
     <div className="space-y-4" data-testid="progress-tab">
-      <div className="flex items-end gap-3 flex-wrap">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="space-y-0.5">
           <h2 className="font-serif text-lg font-semibold uppercase tracking-wide text-foreground" data-testid="text-progress-heading">
             Progress
           </h2>
-          <p className="text-xs text-muted-foreground">Choose timeline or calendar</p>
         </div>
         <div>
           <Select value={subTab} onValueChange={(value) => onSubTabChange(value as "gantt" | "calendar")}>
-            <SelectTrigger className="h-9 w-full sm:w-36" data-testid="select-progress-view">
+            <SelectTrigger className="h-8 w-full sm:w-32" data-testid="select-progress-view">
               <SelectValue placeholder="Select view" />
             </SelectTrigger>
             <SelectContent>
