@@ -1180,10 +1180,6 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                       </div>
                       {isAdmin && (
                         <div className="flex items-center gap-0.5 pr-1.5 shrink-0">
-                          <BuildingColourPicker
-                            currentHex={building.colorHex}
-                            onSelect={(hex) => handleBuildingColourChange(building.id, hex)}
-                          />
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
                               <Button size="icon" variant="ghost" className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity" data-testid={`button-building-menu-${building.id}`}>
@@ -1191,6 +1187,12 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
+                              <div className="px-2 py-1.5">
+                                <BuildingColourPicker
+                                  currentHex={building.colorHex}
+                                  onSelect={(hex) => handleBuildingColourChange(building.id, hex)}
+                                />
+                              </div>
                               <DropdownMenuItem onClick={() => { setAddingRoomFor(building.id); setNewRoomTitle(""); setNewRoomStart(""); setNewRoomEnd(""); }} data-testid={`button-add-room-${building.id}`}>
                                 <FolderPlus className="h-3.5 w-3.5 mr-2" />
                                 Add Room
