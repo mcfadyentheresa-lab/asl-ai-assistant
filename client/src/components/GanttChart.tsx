@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { ChevronLeft, ChevronDown, ChevronUp, ChevronRight, ZoomIn, ZoomOut, Plus, Trash2, Pencil, FolderPlus, Check, X, MoreVertical, CheckSquare, Square, GripVertical, Palette, Search } from "lucide-react";
+import { ChevronLeft, ChevronDown, ChevronUp, ChevronRight, ZoomIn, ZoomOut, Plus, Trash2, Pencil, FolderPlus, Check, X, MoreVertical, CheckSquare, Square, GripVertical, Palette } from "lucide-react";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -20,7 +20,6 @@ import { ListPlus } from "lucide-react";
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useQuery } from "@tanstack/react-query";
-import type { PaintColor } from "@shared/schema";
 
 interface Milestone {
   id: number;
@@ -191,45 +190,6 @@ function BuildingColourPicker({ currentHex, onSelect }: { currentHex: string | n
         )}
       </PopoverContent>
     </Popover>
-  );
-}
-
-function PaintColourSwatches({ paintColorIds }: { paintColorIds: number[] | null | undefined }) {
-  const { data: colors } = useQuery<PaintColor[]>({
-    queryKey: ["/api/paint-colors", "by-ids", ...(paintColorIds || [])],
-    queryFn: async () => {
-      if (!paintColorIds || paintColorIds.length === 0) return [];
-      const res = await fetch(`/api/paint-colors`, { credentials: "include" });
-      if (!res.ok) return [];
-      const all: PaintColor[] = await res.json();
-      return all.filter(c => paintColorIds.includes(c.id));
-    },
-    enabled: !!paintColorIds && paintColorIds.length > 0,
-  });
-
-  if (!colors || colors.length === 0) return null;
-
-  return (
-    <div className="flex items-center gap-0.5" data-testid="paint-colour-swatches">
-      {colors.slice(0, 4).map((c) => (
-        <Tooltip key={c.id}>
-          <TooltipTrigger asChild>
-            <div
-              className="w-3 h-3 rounded-full border border-border/60 shrink-0"
-              style={{ backgroundColor: c.hex }}
-              data-testid={`paint-swatch-${c.id}`}
-            />
-          </TooltipTrigger>
-          <TooltipContent>
-            <p className="text-xs">{c.name} ({c.code})</p>
-            <p className="text-[10px] text-muted-foreground">{c.brand}</p>
-          </TooltipContent>
-        </Tooltip>
-      ))}
-      {colors.length > 4 && (
-        <span className="text-[9px] text-muted-foreground">+{colors.length - 4}</span>
-      )}
-    </div>
   );
 }
 
