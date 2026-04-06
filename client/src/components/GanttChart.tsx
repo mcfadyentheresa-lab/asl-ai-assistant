@@ -751,7 +751,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
     const displayEnd = row.endDate;
 
     const { left, width } = getBarPosition(displayStart, displayEnd);
-    const visibleWidth = Math.max(width, 36);
+    const visibleWidth = Math.max(width, 48);
     const barColor = row.colorHex || BUILDING_COLORS[row.colorIndex];
     const rowH = row.type === "room" ? ROOM_ROW_HEIGHT : ROW_HEIGHT;
     const canResize = isAdmin && row.startDate && row.endDate;
@@ -762,6 +762,31 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
       if (row.type === "building") updateMilestone({ id: row.id, projectId, startDate: format(start, "yyyy-MM-dd"), endDate: format(end, "yyyy-MM-dd") });
       else if (row.type === "room") updateSection({ id: row.id, projectId, startDate: format(start, "yyyy-MM-dd"), endDate: format(end, "yyyy-MM-dd") } as any);
       else updateTask({ id: row.id, dueDate: format(end, "yyyy-MM-dd") } as any);
+    };
+    const bindResize = (edge: "start" | "end", e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const startX = e.clientX;
+      const originalStart = row.startDate!;
+      const originalEnd = row.endDate!;
+      const onMove = (moveEvent: MouseEvent) => {
+        const deltaDays = Math.round((moveEvent.clientX - startX) / dayWidth);
+        if (edge === "start") {
+          const nextStart = addDays(originalStart, deltaDays);
+          if (nextStart >= originalEnd) return;
+          resize("start", deltaDays);
+        } else {
+          const nextEnd = addDays(originalEnd, deltaDays);
+          if (nextEnd <= originalStart) return;
+          resize("end", deltaDays);
+        }
+      };
+      const onUp = () => {
+        window.removeEventListener("mousemove", onMove);
+        window.removeEventListener("mouseup", onUp);
+      };
+      window.addEventListener("mousemove", onMove);
+      window.addEventListener("mouseup", onUp);
     };
 
     if (row.type === "task") {
@@ -779,48 +804,20 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
               {canResize && (
                 <>
                   <div
-                    className="absolute left-0 top-0 h-full w-2 cursor-ew-resize bg-transparent"
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      const startX = e.clientX;
-                      const onMove = (moveEvent: MouseEvent) => {
-                        const deltaDays = Math.round((moveEvent.clientX - startX) / dayWidth);
-                        resize("start", deltaDays);
-                      };
-                      const onUp = () => {
-                        window.removeEventListener("mousemove", onMove);
-                        window.removeEventListener("mouseup", onUp);
-                      };
-                      window.addEventListener("mousemove", onMove);
-                      window.addEventListener("mouseup", onUp);
-                    }}
+                  className="absolute left-0 top-0 h-full w-5 cursor-ew-resize bg-transparent z-20"
+                  onMouseDown={(e) => bindResize("start", e)}
                     data-testid={`handle-start-${row.type}-${row.id}`}
                     aria-label="Resize start date"
                   >
-                    <div className="absolute left-0 top-1/2 -translate-y-1/2 h-3 w-[2px] rounded-full bg-white/60" />
+                    <div className="absolute left-0 top-1/2 -translate-y-1/2 h-4 w-[3px] rounded-full bg-white/80 shadow-sm" />
                   </div>
                   <div
-                    className="absolute right-0 top-0 h-full w-2 cursor-ew-resize bg-transparent"
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      const startX = e.clientX;
-                      const onMove = (moveEvent: MouseEvent) => {
-                        const deltaDays = Math.round((moveEvent.clientX - startX) / dayWidth);
-                        resize("end", deltaDays);
-                      };
-                      const onUp = () => {
-                        window.removeEventListener("mousemove", onMove);
-                        window.removeEventListener("mouseup", onUp);
-                      };
-                      window.addEventListener("mousemove", onMove);
-                      window.addEventListener("mouseup", onUp);
-                    }}
+                    className="absolute right-0 top-0 h-full w-5 cursor-ew-resize bg-transparent z-20"
+                    onMouseDown={(e) => bindResize("end", e)}
                     data-testid={`handle-end-${row.type}-${row.id}`}
                     aria-label="Resize finish date"
                   >
-                    <div className="absolute right-0 top-1/2 -translate-y-1/2 h-3 w-[2px] rounded-full bg-white/60" />
+                    <div className="absolute right-0 top-1/2 -translate-y-1/2 h-4 w-[3px] rounded-full bg-white/80 shadow-sm" />
                   </div>
                 </>
               )}
@@ -854,55 +851,27 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
       <Tooltip>
         <TooltipTrigger asChild>
           <div
-            className="absolute rounded-sm overflow-hidden border border-border/20 select-none cursor-default min-w-[24px]"
+            className="absolute rounded-sm overflow-hidden border border-border/20 select-none cursor-default min-w-[48px]"
             style={{ left, width: visibleWidth, top: topOffset, height: barHeight, backgroundColor: `${barColor}22` }}
             data-testid={`gantt-bar-${row.type}-${row.id}`}
           >
             {canResize && (
               <>
                 <div
-                  className="absolute left-0 top-0 h-full w-2 cursor-ew-resize bg-transparent"
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    const startX = e.clientX;
-                    const onMove = (moveEvent: MouseEvent) => {
-                      const deltaDays = Math.round((moveEvent.clientX - startX) / dayWidth);
-                      resize("start", deltaDays);
-                    };
-                    const onUp = () => {
-                      window.removeEventListener("mousemove", onMove);
-                      window.removeEventListener("mouseup", onUp);
-                    };
-                    window.addEventListener("mousemove", onMove);
-                    window.addEventListener("mouseup", onUp);
-                  }}
+                  className="absolute left-0 top-0 h-full w-5 cursor-ew-resize bg-transparent z-20"
+                  onMouseDown={(e) => bindResize("start", e)}
                   data-testid={`handle-start-${row.type}-${row.id}`}
                   aria-label="Resize start date"
                 >
-                  <div className="absolute left-0 top-1/2 -translate-y-1/2 h-3 w-[2px] rounded-full bg-white/60" />
+                  <div className="absolute left-0 top-1/2 -translate-y-1/2 h-4 w-[3px] rounded-full bg-white/80 shadow-sm" />
                 </div>
                 <div
-                  className="absolute right-0 top-0 h-full w-2 cursor-ew-resize bg-transparent"
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    const startX = e.clientX;
-                    const onMove = (moveEvent: MouseEvent) => {
-                      const deltaDays = Math.round((moveEvent.clientX - startX) / dayWidth);
-                      resize("end", deltaDays);
-                    };
-                    const onUp = () => {
-                      window.removeEventListener("mousemove", onMove);
-                      window.removeEventListener("mouseup", onUp);
-                    };
-                    window.addEventListener("mousemove", onMove);
-                    window.addEventListener("mouseup", onUp);
-                  }}
+                  className="absolute right-0 top-0 h-full w-5 cursor-ew-resize bg-transparent z-20"
+                  onMouseDown={(e) => bindResize("end", e)}
                   data-testid={`handle-end-${row.type}-${row.id}`}
                   aria-label="Resize finish date"
                 >
-                  <div className="absolute right-0 top-1/2 -translate-y-1/2 h-3 w-[2px] rounded-full bg-white/60" />
+                  <div className="absolute right-0 top-1/2 -translate-y-1/2 h-4 w-[3px] rounded-full bg-white/80 shadow-sm" />
                 </div>
               </>
             )}
