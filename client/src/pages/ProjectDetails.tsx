@@ -862,7 +862,9 @@ export default function ProjectDetails() {
   const [showAddPerson, setShowAddPerson] = useState(false);
   const [addPersonForm, setAddPersonForm] = useState({ firstName: "", lastName: "", email: "", phone: "", role: "crew" });
   const [addingPerson, setAddingPerson] = useState(false);
+  const [progressSubTab, setProgressSubTab] = useState<"gantt" | "checklist" | "calendar">("gantt");
   const { data: planningBoards } = usePlanningBoards(projectId);
+  const { data: overviewChecklistItems, isLoading: loadingChecklist } = useChecklistItems(projectId);
   const assignedClient = users?.find((u) => u.id === project?.clientId);
 
   const userRole = user?.role || "client";
@@ -1027,92 +1029,183 @@ export default function ProjectDetails() {
 
           <TabsContent value="overview" className="space-y-8">
             <div className="grid md:grid-cols-3 gap-8">
-              <div className="md:col-span-2 space-y-6">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between flex-wrap gap-3">
-                    <div>
-                      <h3 className="font-serif text-xl font-bold text-foreground" data-testid="text-timeline-heading">
-                        Phases
-                      </h3>
-                      <p className="text-sm text-muted-foreground mt-0.5">
-                        {milestones && milestones.length > 0
-                          ? `${milestones.filter((m) => m.completed).length} of ${milestones.length} complete`
-                          : "Track project progress"}
-                      </p>
-                    </div>
-                    {milestones && milestones.length > 0 && (
-                      <div className="flex items-center gap-3" data-testid="progress-indicator">
-                        <div className="w-32 h-2 rounded-full bg-muted overflow-hidden">
-                          <div
-                            className="h-full rounded-full bg-primary transition-all duration-500"
-                            style={{ width: `${Math.round((milestones.filter((m) => m.completed).length / milestones.length) * 100)}%` }}
-                          />
-                        </div>
-                        <span className="text-sm font-medium text-foreground tabular-nums">
-                          {Math.round((milestones.filter((m) => m.completed).length / milestones.length) * 100)}%
-                        </span>
+              <div className="md:col-span-2 space-y-5">
+                <Card data-testid="card-phases-snapshot">
+                  <div className="p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Flag className="h-4 w-4 text-primary" />
+                        <h3 className="font-serif text-base font-semibold text-foreground" data-testid="text-timeline-heading">
+                          Buildings
+                        </h3>
                       </div>
-                    )}
-                  </div>
-
-                  {userRole !== "client" && (
-                    <p className="text-xs text-muted-foreground italic">
-                      Add and manage phases from the Progress → Timeline view.
-                    </p>
-                  )}
-                </div>
-
-                <div className="space-y-0 divide-y divide-border/60">
-                  {milestones && milestones.length > 0 ? (
-                    milestones.map((milestone) => (
-                        <div key={milestone.id} className="py-3 first:pt-0" data-testid={`milestone-${milestone.id}`}>
-                          <div className="flex items-center gap-3">
+                      {milestones && milestones.length > 0 && (
+                        <div className="flex items-center gap-2" data-testid="progress-indicator">
+                          <div className="w-20 h-1.5 rounded-full bg-muted overflow-hidden">
                             <div
-                              className={`shrink-0 h-5 w-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                              className="h-full rounded-full bg-primary transition-all duration-500"
+                              style={{ width: `${Math.round((milestones.filter((m) => m.completed).length / milestones.length) * 100)}%` }}
+                            />
+                          </div>
+                          <span className="text-xs font-medium text-muted-foreground tabular-nums">
+                            {milestones.filter((m) => m.completed).length}/{milestones.length}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {milestones && milestones.length > 0 ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                        {milestones.map((milestone) => (
+                          <div
+                            key={milestone.id}
+                            className="flex items-center gap-2 py-1.5 px-2 rounded-md hover:bg-muted/40 transition-colors"
+                            data-testid={`milestone-${milestone.id}`}
+                          >
+                            <div
+                              className={`shrink-0 h-4 w-4 rounded-full border-[1.5px] flex items-center justify-center transition-colors ${
                                 milestone.completed
                                   ? "border-primary bg-primary"
-                                  : "border-muted-foreground/30 bg-background"
+                                  : "border-muted-foreground/25 bg-background"
                               }`}
                             >
-                              {milestone.completed && <Check className="h-3 w-3 text-primary-foreground" />}
+                              {milestone.completed && <Check className="h-2.5 w-2.5 text-primary-foreground" />}
                             </div>
+                            <span
+                              className={`text-sm truncate ${milestone.completed ? "line-through text-muted-foreground" : "text-foreground"}`}
+                              data-testid={`text-milestone-title-${milestone.id}`}
+                            >
+                              {milestone.title}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground py-2" data-testid="text-no-phases">
+                        No buildings added yet.
+                      </p>
+                    )}
 
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-1.5">
-                                <span
-                                  className={`font-medium text-sm leading-snug truncate ${milestone.completed ? "line-through text-muted-foreground" : "text-foreground"}`}
-                                  data-testid={`text-milestone-title-${milestone.id}`}
-                                >
-                                  {milestone.title}
-                                </span>
-                                {milestone.completed && (
-                                  <Badge variant="outline" className="text-[9px] h-4 px-1.5 border-primary/30 text-primary shrink-0" data-testid={`badge-milestone-complete-${milestone.id}`}>
-                                    Done
-                                  </Badge>
-                                )}
+                    <button
+                      onClick={() => { setProgressSubTab("gantt"); setActiveTab("checklist"); }}
+                      className="text-xs text-primary hover:underline cursor-pointer"
+                      data-testid="link-view-timeline"
+                    >
+                      View full timeline →
+                    </button>
+                  </div>
+                </Card>
+
+                {(() => {
+                  if (loadingChecklist) {
+                    return (
+                      <Card data-testid="card-checklist-snapshot">
+                        <div className="p-4 flex items-center gap-2 text-muted-foreground">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span className="text-sm">Loading checklist…</span>
+                        </div>
+                      </Card>
+                    );
+                  }
+
+                  const clItems = (overviewChecklistItems || []) as ChecklistItem[];
+                  const total = clItems.length;
+                  const done = clItems.filter((i) => i.status === "done" || i.completed).length;
+                  const inProgress = clItems.filter((i) => i.status === "in_progress").length;
+                  const nextYear = clItems.filter((i) => i.status === "next_year").length;
+                  const todo = total - done - inProgress - nextYear;
+                  const highPriority = clItems.filter((i) => i.priority === "high" && i.status !== "done" && !i.completed);
+                  const recentIncomplete = clItems
+                    .filter((i) => i.status !== "done" && !i.completed && i.status !== "next_year" && i.priority !== "high")
+                    .slice(0, Math.max(0, 4 - highPriority.length));
+                  const previewItems = [...highPriority.slice(0, 4), ...recentIncomplete].slice(0, 4);
+
+                  return (
+                    <Card data-testid="card-checklist-snapshot">
+                      <div className="p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <CheckSquare className="h-4 w-4 text-primary" />
+                            <h3 className="font-serif text-base font-semibold text-foreground" data-testid="text-checklist-heading">
+                              Checklist
+                            </h3>
+                          </div>
+                          {total > 0 && (
+                            <div className="flex items-center gap-2">
+                              <div className="w-20 h-1.5 rounded-full bg-muted overflow-hidden">
+                                <div
+                                  className="h-full rounded-full bg-primary transition-all duration-500"
+                                  style={{ width: `${Math.round((done / total) * 100)}%` }}
+                                />
                               </div>
-                              {milestone.date && (
-                                <span className="text-[11px] text-muted-foreground mt-0.5 block">
-                                  {format(new Date(milestone.date), "MMM d, yyyy")}
-                                </span>
+                              <span className="text-xs font-medium text-muted-foreground tabular-nums">
+                                {done}/{total}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        {total > 0 ? (
+                          <>
+                            <div className="flex flex-wrap gap-2" data-testid="checklist-status-counts">
+                              {done > 0 && (
+                                <Badge variant="outline" className="text-[10px] no-default-hover-elevate border-primary/20 text-primary bg-primary/5" data-testid="badge-done-count">
+                                  <Check className="h-3 w-3 mr-0.5" /> {done} done
+                                </Badge>
+                              )}
+                              {todo > 0 && (
+                                <Badge variant="outline" className="text-[10px] no-default-hover-elevate" data-testid="badge-todo-count">
+                                  {todo} to do
+                                </Badge>
+                              )}
+                              {inProgress > 0 && (
+                                <Badge variant="outline" className="text-[10px] no-default-hover-elevate border-blue-200 text-blue-600 bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:bg-blue-950" data-testid="badge-inprogress-count">
+                                  {inProgress} in progress
+                                </Badge>
+                              )}
+                              {nextYear > 0 && (
+                                <Badge variant="outline" className="text-[10px] no-default-hover-elevate border-amber-200 text-amber-600 bg-amber-50 dark:border-amber-800 dark:text-amber-400 dark:bg-amber-950" data-testid="badge-nextyear-count">
+                                  {nextYear} next year
+                                </Badge>
                               )}
                             </div>
-                          </div>
-                        </div>
-                    ))
-                  ) : (
-                    <div className="text-center py-10 space-y-2" data-testid="text-no-phases">
-                      <Flag className="h-8 w-8 mx-auto text-muted-foreground/30" />
-                      <p className="text-muted-foreground text-sm">
-                        No phases added yet.
-                      </p>
-                    </div>
-                  )}
-                </div>
 
-                <div className="text-xs text-muted-foreground mt-3 text-center italic" data-testid="text-phases-hint">
-                  Manage phases and timeline in the Progress tab.
-                </div>
+                            {previewItems.length > 0 && (
+                              <div className="space-y-1" data-testid="checklist-preview-items">
+                                {previewItems.map((item) => (
+                                  <div key={item.id} className="flex items-center gap-2 py-1 px-2 rounded-md hover:bg-muted/40 transition-colors" data-testid={`checklist-preview-${item.id}`}>
+                                    <div className="shrink-0 h-3.5 w-3.5 rounded border border-muted-foreground/25 bg-background" />
+                                    <span className="text-sm truncate text-foreground flex-1">{item.title}</span>
+                                    {item.priority === "high" && (
+                                      <Badge variant="destructive" className="text-[9px] h-4 px-1.5 no-default-hover-elevate">high</Badge>
+                                    )}
+                                    {item.notes?.includes("📌 Moved to Timeline") && (
+                                      <Badge variant="outline" className="text-[9px] h-4 px-1.5 no-default-hover-elevate bg-primary/5 text-primary border-primary/20">
+                                        <ArrowUpRight className="h-2.5 w-2.5" />
+                                      </Badge>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <p className="text-sm text-muted-foreground py-2" data-testid="text-no-checklist">
+                            No checklist items yet.
+                          </p>
+                        )}
+
+                        <button
+                          onClick={() => { setProgressSubTab("checklist"); setActiveTab("checklist"); }}
+                          className="text-xs text-primary hover:underline cursor-pointer"
+                          data-testid="link-view-checklist"
+                        >
+                          View full checklist →
+                        </button>
+                      </div>
+                    </Card>
+                  );
+                })()}
               </div>
 
               <div className="md:hidden mb-4">
@@ -1208,7 +1301,7 @@ export default function ProjectDetails() {
           </TabsContent>
 
           <TabsContent value="checklist">
-            <ProgressTab projectId={projectId} milestones={milestones || []} sections={sections || []} tasks={tasks || []} userRole={userRole} />
+            <ProgressTab projectId={projectId} milestones={milestones || []} sections={sections || []} tasks={tasks || []} userRole={userRole} subTab={progressSubTab} onSubTabChange={setProgressSubTab} />
           </TabsContent>
 
           <TabsContent value="board" className="flex-1 min-h-0">
@@ -1506,8 +1599,7 @@ export default function ProjectDetails() {
 
 const EDITED_TEXT_COLOR = "#b45309";
 
-function ProgressTab({ projectId, milestones, sections, tasks, userRole }: { projectId: number; milestones: any[]; sections: any[]; tasks: any[]; userRole: string }) {
-  const [subTab, setSubTab] = useState<"gantt" | "checklist" | "calendar">("gantt");
+function ProgressTab({ projectId, milestones, sections, tasks, userRole, subTab, onSubTabChange }: { projectId: number; milestones: any[]; sections: any[]; tasks: any[]; userRole: string; subTab: "gantt" | "checklist" | "calendar"; onSubTabChange: (v: "gantt" | "checklist" | "calendar") => void }) {
 
   return (
     <div className="space-y-4" data-testid="progress-tab">
@@ -1519,7 +1611,7 @@ function ProgressTab({ projectId, milestones, sections, tasks, userRole }: { pro
           <p className="text-xs text-muted-foreground">Choose a view</p>
         </div>
         <div>
-          <Select value={subTab} onValueChange={(value) => setSubTab(value as "gantt" | "checklist" | "calendar")}>
+          <Select value={subTab} onValueChange={(value) => onSubTabChange(value as "gantt" | "checklist" | "calendar")}>
             <SelectTrigger className="h-9 w-full sm:w-36" data-testid="select-progress-view">
               <SelectValue placeholder="Select view" />
             </SelectTrigger>
