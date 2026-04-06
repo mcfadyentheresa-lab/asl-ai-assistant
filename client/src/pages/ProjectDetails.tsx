@@ -446,7 +446,7 @@ function SidebarCards({
                   <DialogHeader>
                     <DialogTitle>Invite Client to Project</DialogTitle>
                     <DialogDescription>
-                      The client will receive an SMS with a link to access their project portal.
+                      The client will receive an email with a link to access their project portal. SMS can be used as a backup.
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4 pt-2">
@@ -465,16 +465,16 @@ function SidebarCards({
                       <Input id="invite-email" type="email" value={inviteForm.email} onChange={(e) => setInviteForm(f => ({ ...f, email: e.target.value }))} placeholder="client@example.com" data-testid="input-invite-email" />
                     </div>
                     <div className="space-y-1.5">
-                      <Label htmlFor="invite-phone">Phone Number</Label>
+                      <Label htmlFor="invite-phone">Phone Number (optional)</Label>
                       <Input id="invite-phone" value={inviteForm.phone} onChange={(e) => setInviteForm(f => ({ ...f, phone: e.target.value }))} placeholder="(705) 555-0123" data-testid="input-invite-phone" />
                     </div>
                     <Button
                       className="w-full"
                       onClick={() => inviteClientMutation.mutate(inviteForm)}
-                      disabled={inviteClientMutation.isPending || !inviteForm.firstName.trim() || !inviteForm.lastName.trim() || !inviteForm.email.trim() || !inviteForm.phone.trim()}
+                      disabled={inviteClientMutation.isPending || !inviteForm.firstName.trim() || !inviteForm.lastName.trim() || !inviteForm.email.trim()}
                       data-testid="button-send-invite"
                     >
-                      {inviteClientMutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Sending...</> : <><Mail className="mr-2 h-4 w-4" />Send Invite</>}
+                      {inviteClientMutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Sending...</> : <><Mail className="mr-2 h-4 w-4" />Send Email Invite</>}
                     </Button>
                   </div>
                 </DialogContent>
@@ -487,7 +487,7 @@ function SidebarCards({
                     <div key={inv.id} className="flex items-center justify-between gap-2 text-sm" data-testid={`invite-row-${inv.id}`}>
                       <div className="min-w-0">
                         <span className="truncate block">{inv.firstName} {inv.lastName}</span>
-                        <span className="text-xs text-muted-foreground block truncate">{inv.phone || inv.email}</span>
+                        <span className="text-xs text-muted-foreground block truncate">{inv.email}{inv.phone ? ` • ${inv.phone}` : ""}</span>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
                         <Badge variant={inv.status === "accepted" ? "default" : inv.status === "pending" && new Date() > new Date(inv.expiresAt) ? "destructive" : "secondary"} className="text-[10px]">
@@ -502,7 +502,7 @@ function SidebarCards({
                             disabled={resendInviteMutation.isPending}
                             data-testid={`button-resend-invite-${inv.id}`}
                           >
-                            Resend
+                            Resend Email
                           </Button>
                         )}
                       </div>

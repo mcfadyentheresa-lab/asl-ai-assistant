@@ -458,12 +458,6 @@ export async function registerRoutes(
         status: "pending",
       });
 
-      const { sendClientInviteSms } = await import("./sms");
-      const smsSent = await sendClientInviteSms(parsed.data.phone, parsed.data.firstName, project.name, token);
-      if (!smsSent) {
-        return res.status(500).json({ message: "Invite created, but SMS could not be sent. Check Twilio and the phone number." });
-      }
-
       res.status(201).json(invite);
     } catch (error: any) {
       console.error("Error creating client invite:", error);
@@ -488,16 +482,6 @@ export async function registerRoutes(
       if (!invite || invite.projectId !== projectId) {
         return res.status(404).json({ message: "Invite not found" });
       }
-      if (!invite.phone) {
-        return res.status(400).json({ message: "This invite does not have a phone number to resend to." });
-      }
-
-      const { sendClientInviteSms } = await import("./sms");
-      const sent = await sendClientInviteSms(invite.phone, invite.firstName, project.name, invite.token);
-      if (!sent) {
-        return res.status(500).json({ message: "SMS resend failed. Check Twilio and the phone number." });
-      }
-
       res.json({ success: true });
     } catch (error: any) {
       console.error("Error resending client invite:", error);
