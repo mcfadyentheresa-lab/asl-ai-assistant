@@ -1368,6 +1368,18 @@ export default function ProjectDetails() {
             </div>
           </TabsContent>
 
+          <TabsContent value="checklist" className="space-y-8">
+            <ProgressTab
+              projectId={projectId}
+              milestones={milestones}
+              sections={sections}
+              tasks={tasks}
+              userRole={userRole}
+              subTab={progressSubTab}
+              onSubTabChange={setProgressSubTab}
+            />
+          </TabsContent>
+
           <TabsContent value="board" className="flex-1 min-h-0">
             <SpatialCanvas projectId={projectId} />
           </TabsContent>
