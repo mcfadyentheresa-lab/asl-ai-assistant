@@ -345,6 +345,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
   const { toast } = useToast();
   const { mutate: createMilestone, isPending: creatingMilestone } = useCreateMilestone();
   const { mutate: updateMilestone } = useUpdateMilestone();
+  const { mutate: deleteMilestone } = useDeleteMilestone();
   const { mutate: createSection, isPending: creatingSection } = useCreateSection();
   const { mutate: updateSection, isPending: updatingSection } = useUpdateSection();
   const { mutate: deleteSection } = useDeleteSection();
@@ -652,6 +653,14 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
       onError: () => toast({ title: "Failed to update colour", variant: "destructive" }),
     });
   }, [updateMilestone, projectId, toast]);
+
+  const handleDeleteBuilding = useCallback((buildingId: number) => {
+    if (!window.confirm("Delete this building? This will remove its rooms and tasks.")) return;
+    deleteMilestone({ id: buildingId, projectId }, {
+      onSuccess: () => toast({ title: "Building deleted" }),
+      onError: () => toast({ title: "Failed to delete building", variant: "destructive" }),
+    });
+  }, [deleteMilestone, projectId, toast]);
 
   const handleDragStart = (id: number) => setDragId(id);
   const handleDragOver = (e: React.DragEvent, id: number) => { e.preventDefault(); setDragOverId(id); };
@@ -1189,6 +1198,10 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                               <DropdownMenuItem onClick={() => { setAddingTask({ milestoneId: building.id, sectionId: null }); setNewTaskTitle(""); setNewTaskStartDate(""); setNewTaskDueDate(""); }} data-testid={`button-add-task-building-${building.id}`}>
                                 <ListPlus className="h-3.5 w-3.5 mr-2" />
                                 Add Task
+                              </DropdownMenuItem>
+                              <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => handleDeleteBuilding(building.id)} data-testid={`button-delete-building-${building.id}`}>
+                                <Trash2 className="h-3.5 w-3.5 mr-2" />
+                                Delete Building
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
