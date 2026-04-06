@@ -1101,17 +1101,15 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
       )}
 
       {addingTask !== null && isAdmin && (
-        <div className="flex flex-col sm:flex-row gap-2 p-3 border border-border/60 rounded-sm bg-muted/20" data-testid="form-add-task-inline">
-          <Input placeholder="Task title" value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)} className="flex-1" autoFocus data-testid="input-task-title" onKeyDown={e => { if (e.key === "Enter") handleAddTask(); }} />
+        <div className="flex items-center gap-1.5 px-2 py-1" data-testid="form-add-task-inline">
+          <Input placeholder="Task title" value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)} className="flex-1 h-7 text-xs" autoFocus data-testid="input-task-title" onKeyDown={e => { if (e.key === "Enter") handleAddTask(); }} />
           <DateField label="Due date" value={newTaskDueDate} onChange={setNewTaskDueDate} placeholder="Due date" testId="button-task-due-date" />
-          <div className="flex gap-1">
-            <Button size="sm" onClick={handleAddTask} disabled={creatingTask || !newTaskTitle.trim()} data-testid="button-confirm-add-task">
-              <Check className="h-3.5 w-3.5" />
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => setAddingTask(null)} data-testid="button-cancel-add-task">
-              <X className="h-3.5 w-3.5" />
-            </Button>
-          </div>
+          <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-primary hover:text-primary" onClick={handleAddTask} disabled={creatingTask || !newTaskTitle.trim()} data-testid="button-confirm-add-task">
+            <Check className="h-3.5 w-3.5" />
+          </Button>
+          <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setAddingTask(null)} data-testid="button-cancel-add-task">
+            <X className="h-3.5 w-3.5" />
+          </Button>
         </div>
       )}
 
