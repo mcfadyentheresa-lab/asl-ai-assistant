@@ -1137,7 +1137,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                   return (
                     <div
                       key={`building-${building.id}`}
-                      className={`border-b border-border/30 flex items-center gap-1 px-0 hover:bg-muted/20 transition-colors group ${dragOverId === building.id ? "bg-muted/40" : ""}`}
+                      className={`border-b border-border/30 flex items-center gap-1 px-0 hover:bg-muted/15 transition-colors group ${dragOverId === building.id ? "bg-muted/30" : ""}`}
                       style={{ height: ROW_HEIGHT, borderLeft: `3px solid ${accentColor}` }}
                       draggable={isAdmin}
                       onDragStart={() => handleDragStart(building.id)}
@@ -1219,8 +1219,8 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                   return (
                     <div
                       key={`room-${roomData.id}`}
-                      className={`border-b border-border/30 flex items-center gap-1.5 cursor-pointer hover:bg-muted/20 transition-colors group ${dragOverId === roomData.id ? "bg-muted/40" : ""}`}
-                      style={{ height: ROOM_ROW_HEIGHT, borderLeft: `3px solid ${accentColor}20`, paddingLeft: isAdmin && !isGeneralTasks ? "10px" : "24px" }}
+                      className={`border-b border-border/30 flex items-center gap-1.5 cursor-pointer hover:bg-muted/15 transition-colors group ${dragOverId === roomData.id ? "bg-muted/30" : ""}`}
+                      style={{ height: ROOM_ROW_HEIGHT, borderLeft: `3px solid ${accentColor}26`, paddingLeft: isAdmin && !isGeneralTasks ? "10px" : "24px" }}
                       onClick={() => drillBuildingId && drillIntoRoom(drillBuildingId, actualRoomId)}
                       draggable={isAdmin && !isGeneralTasks}
                       onDragStart={() => !isGeneralTasks && handleDragStart(roomData.id)}
