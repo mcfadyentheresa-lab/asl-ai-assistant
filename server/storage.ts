@@ -204,10 +204,10 @@ export interface IStorage {
   deleteClientInvite(id: number): Promise<void>;
 
   // Cross-project calendar (admin/crew)
-  getAllCalendarEvents(): Promise<(CalendarEvent & { projectName: string })[]>;
-  getAllMilestonesWithProject(): Promise<(Milestone & { projectName: string })[]>;
-  getAllSectionsWithProject(): Promise<(Section & { projectName: string })[]>;
-  getAllTasksWithProject(): Promise<(Task & { projectName: string })[]>;
+  getAllCalendarEvents(): Promise<(CalendarEvent & { projectName: string; projectColor: string | null })[]>;
+  getAllMilestonesWithProject(): Promise<(Milestone & { projectName: string; projectColor: string | null })[]>;
+  getAllSectionsWithProject(): Promise<(Section & { projectName: string; projectColor: string | null })[]>;
+  getAllTasksWithProject(): Promise<(Task & { projectName: string; projectColor: string | null })[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -849,36 +849,48 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Cross-project calendar (admin/crew)
-  async getAllCalendarEvents(): Promise<(CalendarEvent & { projectName: string })[]> {
+  private projectColorFromId(id: number): string {
+    const PROJECT_COLORS = [
+      "#173B2F", "#2E6B4F", "#3F8A66", "#B87333", "#4D7A68",
+      "#5A7D4C", "#8C6239", "#6B8E23", "#7A6A58", "#3E6F73",
+    ];
+    return PROJECT_COLORS[id % PROJECT_COLORS.length];
+  }
+
+  async getAllCalendarEvents(): Promise<(CalendarEvent & { projectName: string; projectColor: string | null })[]> {
     const rows = await db.select({
       event: calendarEvents,
       projectName: projects.name,
+      projectId: projects.id,
     }).from(calendarEvents).innerJoin(projects, eq(calendarEvents.projectId, projects.id)).orderBy(calendarEvents.date);
-    return rows.map(r => ({ ...r.event, projectName: r.projectName }));
+    return rows.map(r => ({ ...r.event, projectName: r.projectName, projectColor: this.projectColorFromId(r.projectId) }));
   }
 
-  async getAllMilestonesWithProject(): Promise<(Milestone & { projectName: string })[]> {
+  async getAllMilestonesWithProject(): Promise<(Milestone & { projectName: string; projectColor: string | null })[]> {
     const rows = await db.select({
       milestone: milestones,
       projectName: projects.name,
+      projectId: projects.id,
     }).from(milestones).innerJoin(projects, eq(milestones.projectId, projects.id)).orderBy(milestones.order);
-    return rows.map(r => ({ ...r.milestone, projectName: r.projectName }));
+    return rows.map(r => ({ ...r.milestone, projectName: r.projectName, projectColor: this.projectColorFromId(r.projectId) }));
   }
 
-  async getAllSectionsWithProject(): Promise<(Section & { projectName: string })[]> {
+  async getAllSectionsWithProject(): Promise<(Section & { projectName: string; projectColor: string | null })[]> {
     const rows = await db.select({
       section: sections,
       projectName: projects.name,
+      projectId: projects.id,
     }).from(sections).innerJoin(projects, eq(sections.projectId, projects.id)).orderBy(sections.order);
-    return rows.map(r => ({ ...r.section, projectName: r.projectName }));
+    return rows.map(r => ({ ...r.section, projectName: r.projectName, projectColor: this.projectColorFromId(r.projectId) }));
   }
 
-  async getAllTasksWithProject(): Promise<(Task & { projectName: string })[]> {
+  async getAllTasksWithProject(): Promise<(Task & { projectName: string; projectColor: string | null })[]> {
     const rows = await db.select({
       task: tasks,
       projectName: projects.name,
+      projectId: projects.id,
     }).from(tasks).innerJoin(projects, eq(tasks.projectId, projects.id)).orderBy(tasks.order);
-    return rows.map(r => ({ ...r.task, projectName: r.projectName }));
+    return rows.map(r => ({ ...r.task, projectName: r.projectName, projectColor: this.projectColorFromId(r.projectId) }));
   }
 }
 

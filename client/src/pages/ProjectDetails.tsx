@@ -3595,10 +3595,12 @@ function CalendarTab({ projectId }: { projectId: number }) {
                       if (!day) return <div key={`empty-${wi}-${di}`} className="bg-card min-h-[48px]" />;
                       const dayEvents = getEventsForDate(day);
                       const singleDayEvents = dayEvents.filter((e) => !e.endDate || e.endDate === e.date);
+                      const dayTimeline = getTimelineForDate(day);
+                      const singleDayTimeline = dayTimeline.filter((t) => t.startDate === t.endDate);
                       const isSelected = selectedDate && isSameDay(day, selectedDate);
                       const isToday = isSameDay(day, new Date());
                       const dateStr = format(day, "yyyy-MM-dd");
-                      const dayHasItems = getTimelineForDate(day).length > 0 || dayEvents.length > 0;
+                      const dayHasItems = dayTimeline.length > 0 || dayEvents.length > 0;
                       return (
                         <div
                           key={day.toISOString()}
@@ -3631,7 +3633,17 @@ function CalendarTab({ projectId }: { projectId: number }) {
                             </span>
                             {dayHasItems && <span className="h-1.5 w-1.5 rounded-full bg-primary/50" />}
                           </div>
-                          {singleDayEvents.slice(0, 2).map((ev) => (
+                          {singleDayTimeline.slice(0, 2).map((tl) => (
+                            <div
+                              key={tl.id}
+                              className="text-[10px] leading-tight truncate rounded px-1 py-0.5 mt-0.5 text-white/90"
+                              style={{ backgroundColor: tl.color, opacity: 0.85 }}
+                              data-testid={`calendar-timeline-${tl.id}`}
+                            >
+                              {tl.title}
+                            </div>
+                          ))}
+                          {singleDayEvents.slice(0, Math.max(1, 2 - singleDayTimeline.length)).map((ev) => (
                             <div
                               key={ev.id}
                               draggable

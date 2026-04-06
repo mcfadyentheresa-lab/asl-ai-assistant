@@ -68,10 +68,10 @@ const eventTypeLabels: Record<string, string> = {
 const TEAM_EVENT_TYPES = new Set(["meeting", "delivery", "inspection", "team"]);
 const PERSONAL_EVENT_TYPES = new Set(["time_off", "personal"]);
 
-type MilestoneWithProject = Milestone & { projectName: string };
-type SectionWithProject = Section & { projectName: string };
-type TaskWithProject = Task & { projectName: string };
-type EventWithProject = CalendarEvent & { projectName: string };
+type MilestoneWithProject = Milestone & { projectName: string; projectColor: string | null };
+type SectionWithProject = Section & { projectName: string; projectColor: string | null };
+type TaskWithProject = Task & { projectName: string; projectColor: string | null };
+type EventWithProject = CalendarEvent & { projectName: string; projectColor: string | null };
 
 interface MasterCalendarData {
   events: EventWithProject[];
@@ -85,6 +85,7 @@ type UnifiedItem = {
   title: string;
   projectName: string;
   projectId: number;
+  projectColor: string | null;
   startDate: string;
   endDate: string;
   color: string;
@@ -143,6 +144,7 @@ export default function MasterCalendar() {
           title: ms.title,
           projectName: ms.projectName,
           projectId: ms.projectId,
+          projectColor: ms.projectColor,
           startDate: ms.startDate,
           endDate: ms.endDate,
           color,
@@ -159,6 +161,7 @@ export default function MasterCalendar() {
           title: s.title,
           projectName: s.projectName,
           projectId: s.projectId,
+          projectColor: s.projectColor,
           startDate: s.startDate,
           endDate: s.endDate,
           color: milestoneColorMap.get(s.milestoneId) || BUILDING_COLORS[0],
@@ -175,6 +178,7 @@ export default function MasterCalendar() {
           title: t.title,
           projectName: t.projectName,
           projectId: t.projectId,
+          projectColor: t.projectColor,
           startDate: t.startDate,
           endDate: t.dueDate,
           color: milestoneColorMap.get(t.milestoneId ?? 0) || BUILDING_COLORS[0],
@@ -191,6 +195,7 @@ export default function MasterCalendar() {
           title: ev.title,
           projectName: ev.projectName,
           projectId: ev.projectId,
+          projectColor: ev.projectColor,
           startDate: ev.date,
           endDate: ev.endDate || ev.date,
           color: eventTypeColors[ev.type || "event"] || eventTypeColors.event,
@@ -365,7 +370,8 @@ export default function MasterCalendar() {
                       {week.map((day, di) => {
                         if (!day) return <div key={`empty-${wi}-${di}`} className="bg-card min-h-[48px]" />;
                         const dayItems = getItemsForDate(day);
-                        const singleDayItems = dayItems.filter((it) => it.startDate === it.endDate);
+                        const singleDayTimeline = dayItems.filter((it) => it.layer === "timeline" && it.startDate === it.endDate);
+                        const singleDayEvents = dayItems.filter((it) => it.layer === "event" && it.startDate === it.endDate);
                         const isSelected = selectedDate && isSameDay(day, selectedDate);
                         const isToday = isSameDay(day, new Date());
                         const dateStr = format(day, "yyyy-MM-dd");
@@ -383,7 +389,18 @@ export default function MasterCalendar() {
                               </span>
                               {dayHasItems && <span className="h-1.5 w-1.5 rounded-full bg-primary/50" />}
                             </div>
-                            {singleDayItems.slice(0, 2).map((item) => (
+                            {singleDayTimeline.slice(0, 2).map((item) => (
+                              <div
+                                key={item.id}
+                                className="text-[10px] leading-tight truncate rounded px-1 py-0.5 mt-0.5 text-white/90"
+                                style={{ backgroundColor: item.color, opacity: 0.85 }}
+                                title={`${item.projectName}: ${item.title}`}
+                                data-testid={`master-item-${item.id}`}
+                              >
+                                {item.title}
+                              </div>
+                            ))}
+                            {singleDayEvents.slice(0, Math.max(1, 2 - singleDayTimeline.length)).map((item) => (
                               <div
                                 key={item.id}
                                 className="text-[10px] leading-tight truncate rounded px-1 py-0.5 mt-0.5 text-white/90"
@@ -426,12 +443,16 @@ export default function MasterCalendar() {
 
         {data && (
           <div className="flex flex-wrap gap-3 px-1" data-testid="master-legend">
-            {projectNames.map((name, idx) => (
-              <div key={name} className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: BUILDING_COLORS[idx % BUILDING_COLORS.length] }} />
-                {name}
-              </div>
-            ))}
+            {projectNames.map((name) => {
+              const projectItem = allItems.find(i => i.projectName === name);
+              const legendColor = projectItem?.projectColor || BUILDING_COLORS[0];
+              return (
+                <div key={name} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: legendColor }} />
+                  {name}
+                </div>
+              );
+            })}
           </div>
         )}
 
