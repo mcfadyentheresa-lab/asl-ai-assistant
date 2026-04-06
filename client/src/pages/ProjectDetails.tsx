@@ -1107,13 +1107,13 @@ export default function ProjectDetails() {
           <TabsContent value="overview" className="space-y-8">
             <div className="grid md:grid-cols-3 gap-8">
               <div className="md:col-span-2 space-y-5">
-                <Card data-testid="card-phases-snapshot">
+                <Card data-testid="card-project-overview">
                   <div className="p-4 space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Flag className="h-4 w-4 text-primary" />
-                        <h3 className="font-serif text-base font-semibold text-foreground" data-testid="text-timeline-heading">
-                          Buildings
+                        <h3 className="font-serif text-base font-semibold text-foreground" data-testid="text-project-overview-heading">
+                          Project Overview
                         </h3>
                       </div>
                       {milestones && milestones.length > 0 && (
@@ -1132,15 +1132,15 @@ export default function ProjectDetails() {
                     </div>
 
                     {milestones && milestones.length > 0 ? (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                        {milestones.map((milestone) => (
+                      <div className="grid gap-2 sm:grid-cols-2" data-testid="project-overview-list">
+                        {milestones.slice(0, 4).map((milestone) => (
                           <div
                             key={milestone.id}
-                            className="flex items-center gap-2 py-1.5 px-2 rounded-md hover:bg-muted/40 transition-colors"
-                            data-testid={`milestone-${milestone.id}`}
+                            className="flex items-start gap-2 rounded-lg border border-border/50 bg-background/70 px-2.5 py-2"
+                            data-testid={`project-overview-item-${milestone.id}`}
                           >
                             <div
-                              className={`shrink-0 h-4 w-4 rounded-full border-[1.5px] flex items-center justify-center transition-colors ${
+                              className={`mt-0.5 shrink-0 h-4 w-4 rounded-full border-[1.5px] flex items-center justify-center ${
                                 milestone.completed
                                   ? "border-primary bg-primary"
                                   : "border-muted-foreground/25 bg-background"
@@ -1148,18 +1148,20 @@ export default function ProjectDetails() {
                             >
                               {milestone.completed && <Check className="h-2.5 w-2.5 text-primary-foreground" />}
                             </div>
-                            <span
-                              className={`text-sm truncate ${milestone.completed ? "line-through text-muted-foreground" : "text-foreground"}`}
-                              data-testid={`text-milestone-title-${milestone.id}`}
-                            >
-                              {milestone.title}
-                            </span>
+                            <div className="min-w-0">
+                              <p className={`text-sm font-medium truncate ${milestone.completed ? "text-muted-foreground line-through" : "text-foreground"}`} data-testid={`text-project-overview-title-${milestone.id}`}>
+                                {milestone.title}
+                              </p>
+                              <p className="text-[11px] text-muted-foreground">
+                                {milestone.completed ? "Completed" : "In progress"}
+                              </p>
+                            </div>
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <p className="text-sm text-muted-foreground py-2" data-testid="text-no-phases">
-                        No buildings added yet.
+                      <p className="text-sm text-muted-foreground py-2" data-testid="text-no-overview">
+                        No project overview items yet.
                       </p>
                     )}
 
