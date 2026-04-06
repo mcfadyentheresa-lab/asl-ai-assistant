@@ -3275,6 +3275,13 @@ function CalendarTab({ projectId }: { projectId: number }) {
 
   const selectedDateEvents = selectedDate ? getEventsForDate(selectedDate) : [];
 
+  const getEventSpan = (event: CalendarEvent) => {
+    if (!event.date) return 1;
+    const start = event.startDate ? parseISO(event.startDate) : parseISO(event.date);
+    const end = event.endDate ? parseISO(event.endDate) : parseISO(event.date);
+    return Math.max(1, differenceInCalendarDays(end, start) + 1);
+  };
+
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -3460,7 +3467,10 @@ function CalendarTab({ projectId }: { projectId: number }) {
                     }}
                     onDragEnd={() => setDraggedEventId(null)}
                     className="text-[10px] leading-tight truncate rounded px-1 py-0.5 text-white cursor-grab active:cursor-grabbing"
-                    style={{ backgroundColor: eventTypeColors[ev.type || "event"] || eventTypeColors.event }}
+                    style={{
+                      backgroundColor: eventTypeColors[ev.type || "event"] || eventTypeColors.event,
+                      width: `${Math.min(100, getEventSpan(ev) * 100)}%`,
+                    }}
                     data-testid={`calendar-event-dot-${ev.id}`}
                   >
                     {ev.title}
