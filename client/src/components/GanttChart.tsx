@@ -1402,17 +1402,6 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
         </div>
       )}
 
-      {drillLevel === "buildings" && milestones.length > 0 && (
-        <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-[11px] text-muted-foreground pt-1">
-          {buildingInfos.map((building) => (
-            <div key={building.id} className="flex items-center gap-1" data-testid={`gantt-legend-${building.id}`}>
-              <div className="w-2 h-2 rounded-sm" style={{ backgroundColor: building.colorHex || BUILDING_COLORS[building.colorIndex] }} />
-              <span>{building.title}</span>
-              {building.totalTasks > 0 && building.doneTasks === building.totalTasks && <span className="text-green-600">✓</span>}
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
