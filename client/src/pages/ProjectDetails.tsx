@@ -1520,7 +1520,7 @@ function ProgressTab({ projectId, milestones, sections, tasks, userRole }: { pro
         </div>
         <div>
           <Select value={subTab} onValueChange={(value) => setSubTab(value as "gantt" | "checklist" | "calendar")}>
-            <SelectTrigger className="h-9 w-36" data-testid="select-progress-view">
+            <SelectTrigger className="h-9 w-full sm:w-36" data-testid="select-progress-view">
               <SelectValue placeholder="Select view" />
             </SelectTrigger>
             <SelectContent>
