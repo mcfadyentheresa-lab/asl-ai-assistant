@@ -1,5 +1,6 @@
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -62,6 +63,14 @@ export function Navbar() {
       </Link>
 
       <div className="flex items-center gap-3">
+        <div className="hidden md:flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-3 py-1.5">
+          <span className="text-xs font-medium text-muted-foreground">Temp view</span>
+          <Switch
+            checked={visible}
+            onCheckedChange={toggleVisibility}
+            data-testid="switch-temp-view"
+          />
+        </div>
         {(user.role === "admin" || user.role === "crew") && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
