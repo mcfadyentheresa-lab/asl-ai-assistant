@@ -1113,13 +1113,14 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
               {drillLevel === "buildings" && nestedRows.map((row) => {
                 if (row.type === "building") {
                   const building = buildingInfos.find(b => b.id === row.id)!;
+                  const accentColor = building.colorHex || BUILDING_COLORS[building.colorIndex];
                   const isExpanded = expandedBuildings.has(building.id);
                   const roomCount = sections.filter(s => s.milestoneId === building.id).length;
                   return (
                     <div
                       key={`building-${building.id}`}
                       className={`border-b border-border/30 flex items-center gap-1 px-0 hover:bg-muted/20 transition-colors group ${dragOverId === building.id ? "bg-muted/40" : ""}`}
-                      style={{ height: ROW_HEIGHT }}
+                      style={{ height: ROW_HEIGHT, borderLeft: `3px solid ${accentColor}` }}
                       draggable={isAdmin}
                       onDragStart={() => handleDragStart(building.id)}
                       onDragOver={(e) => handleDragOver(e, building.id)}
@@ -1146,7 +1147,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                         </div>
                         <div className="flex items-center gap-1.5">
                           <div className="w-12 h-1 bg-muted rounded-full overflow-hidden">
-                            <div className="h-full rounded-full transition-all duration-300" style={{ width: `${building.progress}%`, backgroundColor: "currentColor" }} />
+                            <div className="h-full rounded-full transition-all duration-300" style={{ width: `${building.progress}%`, backgroundColor: accentColor }} />
                           </div>
                           <span className="text-[9px] text-muted-foreground">{building.doneTasks}/{building.totalTasks}</span>
                           {roomCount > 0 && (
@@ -1188,6 +1189,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                   const isGeneralTasks = roomData.id < 0;
                   const actualBuildingId = isGeneralTasks ? -roomData.id : sections.find(s => s.id === roomData.id)?.milestoneId;
                   const parentBuilding = buildingInfos.find(b => b.id === actualBuildingId);
+                  const accentColor = roomData.colorHex || BUILDING_COLORS[roomData.colorIndex];
                   const roomInfo = (!isGeneralTasks && parentBuilding) ? roomInfosForBuilding(parentBuilding.id).find(r => r.id === roomData.id) : null;
 
                   const actualRoomId = isGeneralTasks ? -1 : roomData.id;
@@ -1197,7 +1199,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                     <div
                       key={`room-${roomData.id}`}
                       className={`border-b border-border/30 flex items-center gap-1.5 cursor-pointer hover:bg-muted/20 transition-colors group ${dragOverId === roomData.id ? "bg-muted/40" : ""}`}
-                      style={{ height: ROOM_ROW_HEIGHT, paddingLeft: isAdmin && !isGeneralTasks ? "10px" : "24px" }}
+                      style={{ height: ROOM_ROW_HEIGHT, borderLeft: `3px solid ${accentColor}20`, paddingLeft: isAdmin && !isGeneralTasks ? "10px" : "24px" }}
                       onClick={() => drillBuildingId && drillIntoRoom(drillBuildingId, actualRoomId)}
                       draggable={isAdmin && !isGeneralTasks}
                       onDragStart={() => !isGeneralTasks && handleDragStart(roomData.id)}
@@ -1217,7 +1219,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                         </div>
                         <div className="flex items-center gap-1.5">
                           <div className="w-10 h-[3px] bg-muted rounded-full overflow-hidden">
-                            <div className="h-full rounded-full transition-all duration-300" style={{ width: `${roomInfo?.progress || roomData.progress || 0}%`, backgroundColor: "currentColor" }} />
+                            <div className="h-full rounded-full transition-all duration-300" style={{ width: `${roomInfo?.progress || roomData.progress || 0}%`, backgroundColor: accentColor }} />
                           </div>
                           <span className="text-[9px] text-muted-foreground">
                             {isGeneralTasks
@@ -1387,6 +1389,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
         <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-[11px] text-muted-foreground pt-1">
           {buildingInfos.map((building) => (
             <div key={building.id} className="flex items-center gap-1" data-testid={`gantt-legend-${building.id}`}>
+              <div className="w-2 h-2 rounded-sm" style={{ backgroundColor: building.colorHex || BUILDING_COLORS[building.colorIndex] }} />
               <span>{building.title}</span>
               {building.totalTasks > 0 && building.doneTasks === building.totalTasks && <span className="text-green-600">✓</span>}
             </div>
