@@ -1165,7 +1165,7 @@ export default function ProjectDetails() {
                     )}
 
                     <button
-                      onClick={() => { setActiveTab("checklist"); }}
+                      onClick={() => setShowOpenItemsDrawer(true)}
                       className="text-xs text-primary hover:underline cursor-pointer"
                       data-testid="link-view-open-items"
                     >
@@ -1378,10 +1378,6 @@ export default function ProjectDetails() {
             </div>
           </TabsContent>
 
-          <TabsContent value="checklist">
-            <ProgressTab projectId={projectId} milestones={milestones || []} sections={sections || []} tasks={tasks || []} userRole={userRole} subTab="gantt" onSubTabChange={() => {}} />
-          </TabsContent>
-
           <TabsContent value="board" className="flex-1 min-h-0">
             <SpatialCanvas projectId={projectId} />
           </TabsContent>
@@ -1399,6 +1395,8 @@ export default function ProjectDetails() {
           </TabsContent>
         </Tabs>
       </main>
+
+      <OpenItemsDrawer projectId={projectId} open={showOpenItemsDrawer} onOpenChange={setShowOpenItemsDrawer} />
 
       <Dialog open={showAddPerson} onOpenChange={(open) => { if (!open) setShowAddPerson(false); }}>
         <DialogContent className="sm:max-w-md">
