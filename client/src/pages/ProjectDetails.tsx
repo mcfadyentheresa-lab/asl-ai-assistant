@@ -409,32 +409,7 @@ function SidebarCards({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {user?.role !== "client" ? (
-            <Select
-              value={project.clientId || "none"}
-              onValueChange={(val) => {
-                const clientId = val === "none" ? null : val;
-                updateProject({ id: projectId, data: { clientId } }, {
-                  onSuccess: () => toast({ title: "Client updated" }),
-                });
-              }}
-            >
-              <SelectTrigger data-testid="select-project-client">
-                <SelectValue placeholder="Select a client..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">No client assigned</SelectItem>
-                {users?.map((u: any) => (
-                  <SelectItem key={u.id} value={u.id}>
-                    <div className="flex items-center gap-2">
-                      <span>{u.firstName || ""} {u.lastName || ""}</span>
-                      {u.email && <span className="text-muted-foreground text-xs">({u.email})</span>}
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          ) : assignedClient ? null : (
+          {!assignedClient && (
             <p className="text-muted-foreground text-sm" data-testid="text-no-client">No client assigned</p>
           )}
 
