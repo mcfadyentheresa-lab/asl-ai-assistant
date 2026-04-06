@@ -1556,17 +1556,44 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     };
 
     if (el.type === "room_zone") {
+      const childEls = elementsList.filter(
+        (child) =>
+          child.id !== el.id &&
+          child.type !== "room_zone" &&
+          child.x >= el.x &&
+          child.y >= el.y &&
+          child.x < el.x + (el.width || 500) &&
+          child.y < el.y + (el.height || 400)
+      );
+      const draggedType = draggingId !== null ? elements[draggingId]?.type : null;
+      const isDroppableType = draggedType !== null && draggedType !== "room_zone" && draggedType !== "section_header";
+      const isRoomDropTarget = draggingId !== null && draggingId !== el.id && isDroppableType;
+      const dragPreviewEl = isRoomDropTarget && draggingId !== null ? elements[draggingId] : null;
+      const maxChildRight = childEls.reduce((max, child) => Math.max(max, child.x + (child.width || 200)), el.x + 260);
+      const maxChildBottom = childEls.reduce((max, child) => Math.max(max, child.y + (child.height || 60)), el.y + 120);
+      const computedWidth = Math.max(el.width || 500, maxChildRight - el.x + 24);
+      const computedHeight = Math.max(el.height || 400, maxChildBottom - el.y + 24);
+      const roomDropPreviewTop = childEls.reduce((acc, sib) => {
+        const sibBottom = (sib.y - el.y) + (sib.height || 60);
+        return Math.max(acc, sibBottom);
+      }, 12);
+      const roomDropPreviewWidth = computedWidth - 24;
+      const roomDropPreviewHeight = dragPreviewEl
+        ? dragPreviewEl.type === "image" && dragPreviewEl.width > 0 && dragPreviewEl.height && dragPreviewEl.height > 0
+          ? Math.round(roomDropPreviewWidth * (dragPreviewEl.height / dragPreviewEl.width))
+          : Math.max(dragPreviewEl.height || 60, 60)
+        : 60;
       return (
         <div
           key={el.id}
-          className="absolute select-none cursor-grab transition-[width,height,transform,border-color,background-color] duration-200 ease-out"
+          className={`${isRoomDropTarget ? "scale-[1.01]" : ""} absolute select-none cursor-grab transition-[width,height,transform,border-color,background-color] duration-200 ease-out`}
           style={{
-            left: el.x, top: el.y, width: el.width, height: el.height,
+            left: el.x, top: el.y, width: computedWidth, height: computedHeight,
             zIndex: Math.max(0, effectiveZ - 1000),
             backgroundColor: c.color || "#f0ede8",
             opacity: c.opacity ?? 0.5,
             borderRadius: "12px",
-            border: isSelected ? "2px dashed hsl(var(--primary))" : "1px dashed hsl(var(--border))",
+            border: isSelected || isRoomDropTarget ? "2px dashed hsl(var(--primary))" : "1px dashed hsl(var(--border))",
           }}
           data-testid={`room-zone-${el.id}`}
           onMouseDown={(e) => {
@@ -1610,27 +1637,19 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
               </span>
             )}
           </div>
-          {(() => {
-            const childEls = elementsList.filter(
-              (child) =>
-                child.id !== el.id &&
-                child.type !== "room_zone" &&
-                child.x >= el.x &&
-                child.y >= el.y &&
-                child.x < el.x + (el.width || 500) &&
-                child.y < el.y + (el.height || 400)
-            );
-            const maxChildRight = childEls.reduce((max, child) => Math.max(max, child.x + (child.width || 200)), el.x + 260);
-            const maxChildBottom = childEls.reduce((max, child) => Math.max(max, child.y + (child.height || 60)), el.y + 120);
-            const computedWidth = Math.max(el.width || 500, maxChildRight - el.x + 24);
-            const computedHeight = Math.max(el.height || 400, maxChildBottom - el.y + 24);
-            return (
-              <div
-                className="absolute inset-0 rounded-[12px] pointer-events-none transition-[width,height] duration-200 ease-out"
-                style={{ width: computedWidth, height: computedHeight }}
-              />
-            );
-          })()}
+          {isRoomDropTarget && dragPreviewEl && (
+            <div
+              className="absolute border-2 border-dashed border-primary/50 rounded bg-primary/5 animate-in fade-in zoom-in-95 duration-200 pointer-events-none"
+              style={{
+                left: 12,
+                top: roomDropPreviewTop,
+                width: roomDropPreviewWidth,
+                height: roomDropPreviewHeight,
+                transition: "top 180ms ease-out, height 180ms ease-out",
+              }}
+              data-testid={`room-drop-preview-${el.id}`}
+            />
+          )}
           {isSelected && (
             <>
               <div className="absolute -top-8 right-0 flex gap-1">
