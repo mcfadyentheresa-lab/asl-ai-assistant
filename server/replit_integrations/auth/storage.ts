@@ -44,7 +44,7 @@ class AuthStorage implements IAuthStorage {
               role: existingByEmail.role,
               phone: existingByEmail.phone ?? userData.phone,
               updatedAt: new Date(),
-            lastLoginAt: new Date(),
+              lastLoginAt: new Date(),
             },
           })
           .returning();
