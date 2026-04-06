@@ -939,8 +939,6 @@ export default function ProjectDetails() {
   const [showAddPerson, setShowAddPerson] = useState(false);
   const [addPersonForm, setAddPersonForm] = useState({ firstName: "", lastName: "", email: "", phone: "", role: "crew" });
   const [addingPerson, setAddingPerson] = useState(false);
-  const [progressSubTab, setProgressSubTab] = useState<"gantt" | "calendar">("gantt");
-  const [showOpenItemsDrawer, setShowOpenItemsDrawer] = useState(false);
   const { data: planningBoards } = usePlanningBoards(projectId);
   const { data: overviewChecklistItems, isLoading: loadingChecklist } = useChecklistItems(projectId);
   const assignedClient = users?.find((u) => u.id === project?.clientId);
@@ -1167,7 +1165,7 @@ export default function ProjectDetails() {
                     )}
 
                     <button
-                      onClick={() => setShowOpenItemsDrawer(true)}
+                      onClick={() => { setActiveTab("checklist"); }}
                       className="text-xs text-primary hover:underline cursor-pointer"
                       data-testid="link-view-open-items"
                     >
@@ -1381,7 +1379,7 @@ export default function ProjectDetails() {
           </TabsContent>
 
           <TabsContent value="checklist">
-            <ProgressTab projectId={projectId} milestones={milestones || []} sections={sections || []} tasks={tasks || []} userRole={userRole} subTab={progressSubTab} onSubTabChange={setProgressSubTab} />
+            <ProgressTab projectId={projectId} milestones={milestones || []} sections={sections || []} tasks={tasks || []} userRole={userRole} subTab="gantt" onSubTabChange={() => {}} />
           </TabsContent>
 
           <TabsContent value="board" className="flex-1 min-h-0">
