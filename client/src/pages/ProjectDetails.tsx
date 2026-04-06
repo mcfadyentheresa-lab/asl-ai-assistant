@@ -2456,12 +2456,12 @@ function ChecklistTab({ projectId, compact = false }: { projectId: number; compa
 function OpenItemsDrawer({ projectId, open, onOpenChange }: { projectId: number; open: boolean; onOpenChange: (open: boolean) => void }) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-[96vw] sm:max-w-2xl overflow-y-auto">
+      <SheetContent side="right" className="w-[94vw] sm:max-w-xl overflow-y-auto">
         <SheetHeader>
-          <SheetTitle className="font-serif">Open Items</SheetTitle>
+          <SheetTitle className="font-serif text-lg">Open Items</SheetTitle>
           <SheetDescription className="sr-only">Open items drawer for new discussion items and wish-list changes</SheetDescription>
         </SheetHeader>
-        <div className="mt-4">
+        <div className="mt-2">
           <ChecklistTab projectId={projectId} compact />
         </div>
       </SheetContent>
