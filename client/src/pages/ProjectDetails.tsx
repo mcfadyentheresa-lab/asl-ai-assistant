@@ -1568,7 +1568,6 @@ function ChecklistTab({ projectId }: { projectId: number }) {
 
   const { mutate: createMilestone, isPending: isCreatingMilestone } = useCreateMilestone();
   const { mutate: createTask, isPending: isCreatingTask } = useCreateTask();
-  const { data: milestonesForMove } = useMilestones(projectId);
   const { data: sectionsForMove } = useSections(projectId);
 
   const [moveItem, setMoveItem] = useState<ChecklistItem | null>(null);
@@ -1977,9 +1976,9 @@ function ChecklistTab({ projectId }: { projectId: number }) {
                               </span>
                             )}
                           </div>
-                          {item.notes && (
+                          {item.notes && item.notes.replace("📌 Moved to Timeline", "").trim() && (
                             <p className="text-xs text-muted-foreground" data-testid={`text-notes-${item.id}`}>
-                              {item.notes.replace("📌 Moved to Timeline", "").trim() || null}
+                              {item.notes.replace("📌 Moved to Timeline", "").trim()}
                             </p>
                           )}
                         </div>
@@ -2262,7 +2261,7 @@ function ChecklistTab({ projectId }: { projectId: number }) {
                       <SelectValue placeholder="Select a building..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {(milestonesForMove || []).map((m: any) => (
+                      {(checklistMilestones || []).map((m: any) => (
                         <SelectItem key={m.id} value={String(m.id)}>{m.title}</SelectItem>
                       ))}
                     </SelectContent>
