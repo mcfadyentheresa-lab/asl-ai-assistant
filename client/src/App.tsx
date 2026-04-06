@@ -73,9 +73,8 @@ function Router() {
   if (!user) {
     return (
       <Switch>
-        <Route path="/" component={LandingPage} />
         <Route path="/invite/:token" component={InviteAccept} />
-        <Route component={LandingPage} />
+        <Route component={Dashboard} />
       </Switch>
     );
   }
