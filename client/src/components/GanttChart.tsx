@@ -363,6 +363,8 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskDueDate, setNewTaskDueDate] = useState("");
   const [dragId, setDragId] = useState<number | null>(null);
+  const [dragMode, setDragMode] = useState<"row" | "bar" | null>(null);
+  const [dragDateOffset, setDragDateOffset] = useState<number | null>(null);
   const [dragOverId, setDragOverId] = useState<number | null>(null);
 
   const { toast } = useToast();
@@ -662,9 +664,12 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
     });
   }, [updateMilestone, projectId, toast]);
 
-  const handleDragStart = (id: number) => setDragId(id);
+  const handleDragStart = (id: number, mode: "row" | "bar" = "row") => {
+    setDragId(id);
+    setDragMode(mode);
+  };
   const handleDragOver = (e: React.DragEvent, id: number) => { e.preventDefault(); setDragOverId(id); };
-  const handleDragEnd = () => { setDragId(null); setDragOverId(null); };
+  const handleDragEnd = () => { setDragId(null); setDragMode(null); setDragDateOffset(null); setDragOverId(null); };
 
   const handleRoomDrop = useCallback((buildingId: number, targetId: number) => {
     if (dragId === null || dragId === targetId || targetId < 0) { setDragId(null); setDragOverId(null); return; }
@@ -696,6 +701,23 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
 
   const handleDrop = useCallback((targetId: number) => {
     if (dragId === null || dragId === targetId) { setDragId(null); setDragOverId(null); return; }
+
+    if (dragMode === "bar") {
+      const row = rowsWithDates.find(r => r.id === dragId);
+      if (!row) { handleDragEnd(); return; }
+      const deltaDays = dragDateOffset ?? 0;
+      if (deltaDays === 0) { handleDragEnd(); return; }
+      const shiftDate = (value: Date | null) => value ? addDays(value, deltaDays).toISOString() : null;
+      if (row.type === "building") {
+        updateMilestone({ id: row.id, projectId, startDate: shiftDate(row.startDate)?.slice(0, 10) ?? null, endDate: shiftDate(row.endDate)?.slice(0, 10) ?? null });
+      } else if (row.type === "room") {
+        updateSection({ id: row.id, projectId, startDate: shiftDate(row.startDate)?.slice(0, 10) ?? null, endDate: shiftDate(row.endDate)?.slice(0, 10) ?? null } as any);
+      } else {
+        updateTask({ id: row.id, startDate: shiftDate(row.startDate)?.slice(0, 10) ?? null, dueDate: shiftDate(row.endDate)?.slice(0, 10) ?? null } as any);
+      }
+      handleDragEnd();
+      return;
+    }
 
     if (drillLevel === "buildings") {
       const sorted = [...milestones].sort((a, b) => (a.order || 0) - (b.order || 0));
@@ -729,7 +751,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
 
     setDragId(null);
     setDragOverId(null);
-  }, [dragId, drillLevel, milestones, tasks, selectedBuildingId, selectedRoomId, updateMilestone, updateTask, projectId]);
+  }, [dragId, dragMode, dragDateOffset, rowsWithDates, drillLevel, milestones, tasks, selectedBuildingId, selectedRoomId, updateMilestone, updateTask, updateSection, projectId, handleDragEnd]);
 
   const drillIntoRoom = (buildingId: number, roomId: number) => {
     setSelectedBuildingId(buildingId);
