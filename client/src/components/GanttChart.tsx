@@ -919,7 +919,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
   }, [drillLevel, selectedRoom]);
 
   const scopeHeading = useMemo(() => {
-    if (drillLevel === "buildings") return "Buildings";
+    if (drillLevel === "buildings") return "Plan";
     return "Tasks";
   }, [drillLevel]);
 
@@ -974,7 +974,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
       {showBreadcrumb && (
         <div className="flex items-center gap-2 text-sm">
           <button onClick={goBack} className="text-muted-foreground hover:text-foreground transition-colors underline-offset-2 hover:underline" data-testid="button-breadcrumb-all">
-            All Buildings
+            All Plan
           </button>
           {selectedBuilding && (
             <>
