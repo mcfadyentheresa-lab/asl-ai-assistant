@@ -50,6 +50,7 @@ export function Navbar() {
   const roleLabel =
     user.role === "admin" ? "Admin" : user.role === "crew" ? "Crew" : "Client";
   const showLastLogin = user.role === "admin" && user.lastLoginAt;
+  const tempViewLabel = user.role === "admin" ? "Admin temp view" : user.role === "crew" ? "Crew temp view" : "Client temp view";
 
   return (
     <nav
@@ -64,7 +65,7 @@ export function Navbar() {
 
       <div className="flex items-center gap-3">
         <div className="hidden md:flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-3 py-1.5">
-          <span className="text-xs font-medium text-muted-foreground">Crew / Admin temp view</span>
+          <span className="text-xs font-medium text-muted-foreground">{tempViewLabel}</span>
           <Switch
             checked={visible}
             onCheckedChange={(checked) => toggleVisibility(checked)}
