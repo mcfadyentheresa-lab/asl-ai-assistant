@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { format, parseISO, differenceInDays, addDays, startOfMonth, endOfMonth, eachMonthOfInterval } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -363,9 +363,17 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskDueDate, setNewTaskDueDate] = useState("");
   const [dragId, setDragId] = useState<number | null>(null);
-  const [dragMode, setDragMode] = useState<"row" | "bar" | null>(null);
-  const [dragDateOffset, setDragDateOffset] = useState<number | null>(null);
   const [dragOverId, setDragOverId] = useState<number | null>(null);
+
+  const timelineRef = useRef<HTMLDivElement>(null);
+  const [barDrag, setBarDrag] = useState<{
+    rowId: number;
+    rowType: "building" | "room" | "task";
+    startX: number;
+    deltaDays: number;
+    originalStart: Date;
+    originalEnd: Date;
+  } | null>(null);
 
   const { toast } = useToast();
   const { mutate: createMilestone, isPending: creatingMilestone } = useCreateMilestone();
@@ -664,12 +672,9 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
     });
   }, [updateMilestone, projectId, toast]);
 
-  const handleDragStart = (id: number, mode: "row" | "bar" = "row") => {
-    setDragId(id);
-    setDragMode(mode);
-  };
+  const handleDragStart = (id: number) => setDragId(id);
   const handleDragOver = (e: React.DragEvent, id: number) => { e.preventDefault(); setDragOverId(id); };
-  const handleDragEnd = () => { setDragId(null); setDragMode(null); setDragDateOffset(null); setDragOverId(null); };
+  const handleDragEnd = () => { setDragId(null); setDragOverId(null); };
 
   const handleRoomDrop = useCallback((buildingId: number, targetId: number) => {
     if (dragId === null || dragId === targetId || targetId < 0) { setDragId(null); setDragOverId(null); return; }
@@ -701,23 +706,6 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
 
   const handleDrop = useCallback((targetId: number) => {
     if (dragId === null || dragId === targetId) { setDragId(null); setDragOverId(null); return; }
-
-    if (dragMode === "bar") {
-      const row = rowsWithDates.find(r => r.id === dragId);
-      if (!row) { handleDragEnd(); return; }
-      const deltaDays = dragDateOffset ?? 0;
-      if (deltaDays === 0) { handleDragEnd(); return; }
-      const shiftDate = (value: Date | null) => value ? addDays(value, deltaDays).toISOString() : null;
-      if (row.type === "building") {
-        updateMilestone({ id: row.id, projectId, startDate: shiftDate(row.startDate)?.slice(0, 10) ?? null, endDate: shiftDate(row.endDate)?.slice(0, 10) ?? null });
-      } else if (row.type === "room") {
-        updateSection({ id: row.id, projectId, startDate: shiftDate(row.startDate)?.slice(0, 10) ?? null, endDate: shiftDate(row.endDate)?.slice(0, 10) ?? null } as any);
-      } else {
-        updateTask({ id: row.id, startDate: shiftDate(row.startDate)?.slice(0, 10) ?? null, dueDate: shiftDate(row.endDate)?.slice(0, 10) ?? null } as any);
-      }
-      handleDragEnd();
-      return;
-    }
 
     if (drillLevel === "buildings") {
       const sorted = [...milestones].sort((a, b) => (a.order || 0) - (b.order || 0));
@@ -751,7 +739,59 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
 
     setDragId(null);
     setDragOverId(null);
-  }, [dragId, dragMode, dragDateOffset, rowsWithDates, drillLevel, milestones, tasks, selectedBuildingId, selectedRoomId, updateMilestone, updateTask, updateSection, projectId, handleDragEnd]);
+  }, [dragId, drillLevel, milestones, tasks, selectedBuildingId, selectedRoomId, updateMilestone, updateTask, projectId]);
+
+  const handleBarDragStart = useCallback((e: React.MouseEvent, row: BarItem) => {
+    if (!isAdmin || !row.startDate || !row.endDate) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setBarDrag({
+      rowId: row.id,
+      rowType: row.type,
+      startX: e.clientX,
+      deltaDays: 0,
+      originalStart: row.startDate,
+      originalEnd: row.endDate,
+    });
+  }, [isAdmin]);
+
+  const handleBarDragSave = useCallback((drag: NonNullable<typeof barDrag>) => {
+    if (drag.deltaDays === 0) return;
+    const newStart = addDays(drag.originalStart, drag.deltaDays);
+    const newEnd = addDays(drag.originalEnd, drag.deltaDays);
+    const startStr = format(newStart, "yyyy-MM-dd");
+    const endStr = format(newEnd, "yyyy-MM-dd");
+
+    if (drag.rowType === "building") {
+      updateMilestone({ id: drag.rowId, projectId, startDate: startStr, endDate: endStr });
+    } else if (drag.rowType === "room") {
+      updateSection({ id: drag.rowId, projectId, startDate: startStr, endDate: endStr } as any);
+    } else {
+      updateTask({ id: drag.rowId, dueDate: endStr } as any);
+    }
+    toast({ title: `Dates shifted by ${Math.abs(drag.deltaDays)} day${Math.abs(drag.deltaDays) !== 1 ? "s" : ""} ${drag.deltaDays > 0 ? "forward" : "back"}` });
+  }, [updateMilestone, updateSection, updateTask, projectId, toast]);
+
+  useEffect(() => {
+    if (!barDrag) return;
+    const handleMouseMove = (e: MouseEvent) => {
+      const dx = e.clientX - barDrag.startX;
+      const newDelta = Math.round(dx / dayWidth);
+      if (newDelta !== barDrag.deltaDays) {
+        setBarDrag(prev => prev ? { ...prev, deltaDays: newDelta } : null);
+      }
+    };
+    const handleMouseUp = () => {
+      handleBarDragSave(barDrag);
+      setBarDrag(null);
+    };
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [barDrag, dayWidth, handleBarDragSave]);
 
   const drillIntoRoom = (buildingId: number, roomId: number) => {
     setSelectedBuildingId(buildingId);
@@ -767,9 +807,15 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
 
   const renderBar = (row: BarItem) => {
     if (!row.startDate || !row.endDate) return null;
-    const { left, width } = getBarPosition(row.startDate, row.endDate);
+
+    const isDraggingThis = barDrag?.rowId === row.id && barDrag?.rowType === row.type;
+    const displayStart = isDraggingThis ? addDays(row.startDate, barDrag.deltaDays) : row.startDate;
+    const displayEnd = isDraggingThis ? addDays(row.endDate, barDrag.deltaDays) : row.endDate;
+
+    const { left, width } = getBarPosition(displayStart, displayEnd);
     const barColor = row.colorHex || BUILDING_COLORS[row.colorIndex];
     const rowH = row.type === "room" ? ROOM_ROW_HEIGHT : ROW_HEIGHT;
+    const canDrag = isAdmin && row.startDate && row.endDate;
 
     if (row.type === "task") {
       const isDone = row.status === "done";
@@ -779,27 +825,30 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
         <Tooltip>
           <TooltipTrigger asChild>
             <div
-              className="absolute rounded-sm cursor-default"
-              style={{ left, width, top: topOffset, height: barHeight, backgroundColor: barColor, opacity: isDone ? 0.55 : 0.95 }}
+              className={`absolute rounded-sm select-none ${canDrag ? "cursor-grab active:cursor-grabbing" : "cursor-default"} ${isDraggingThis ? "ring-2 ring-primary/50 z-20" : ""}`}
+              style={{ left, width, top: topOffset, height: barHeight, backgroundColor: barColor, opacity: isDone ? 0.55 : 0.95, transition: isDraggingThis ? "none" : "left 0.2s, width 0.2s" }}
               data-testid={`gantt-bar-task-${row.id}`}
+              onMouseDown={(e) => canDrag && handleBarDragStart(e, row)}
             >
               {isDone && (
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="w-full h-px bg-foreground/30" />
                 </div>
               )}
-              {width > 80 && row.endDate && (
+              {width > 80 && displayEnd && (
                 <span className="absolute inset-0 flex items-center px-1.5 text-[8px] font-medium text-white/80 truncate">
-                  {format(row.endDate, "MMM d")}
+                  {format(displayEnd, "MMM d")}
                 </span>
               )}
             </div>
           </TooltipTrigger>
-          <TooltipContent>
-            <p className="font-medium text-sm">{row.title}</p>
-            <p className="text-xs text-muted-foreground capitalize">{row.status || "to-do"}</p>
-            {row.endDate && <p className="text-xs text-muted-foreground">Due: {format(row.endDate, "MMM d, yyyy")}</p>}
-          </TooltipContent>
+          {!isDraggingThis && (
+            <TooltipContent>
+              <p className="font-medium text-sm">{row.title}</p>
+              <p className="text-xs text-muted-foreground capitalize">{row.status || "to-do"}</p>
+              {row.endDate && <p className="text-xs text-muted-foreground">Due: {format(row.endDate, "MMM d, yyyy")}</p>}
+            </TooltipContent>
+          )}
         </Tooltip>
       );
     }
@@ -813,34 +862,37 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
       <Tooltip>
         <TooltipTrigger asChild>
           <div
-            className="absolute rounded-sm cursor-default overflow-hidden border border-border/20"
-            style={{ left, width, top: topOffset, height: barHeight, backgroundColor: `${barColor}22` }}
+            className={`absolute rounded-sm overflow-hidden border border-border/20 select-none ${canDrag ? "cursor-grab active:cursor-grabbing" : "cursor-default"} ${isDraggingThis ? "ring-2 ring-primary/50 z-20" : ""}`}
+            style={{ left, width, top: topOffset, height: barHeight, backgroundColor: `${barColor}22`, transition: isDraggingThis ? "none" : "left 0.2s, width 0.2s" }}
             data-testid={`gantt-bar-${row.type}-${row.id}`}
+            onMouseDown={(e) => canDrag && handleBarDragStart(e, row)}
           >
-            <div className="h-full transition-all duration-300" style={{ width: `${progress}%`, backgroundColor: barColor, opacity: isRoom ? 0.9 : 1 }} />
+            <div className="h-full" style={{ width: `${progress}%`, backgroundColor: barColor, opacity: isRoom ? 0.9 : 1, transition: isDraggingThis ? "none" : "all 0.3s" }} />
             <span className="absolute inset-0 flex items-center justify-between px-1.5 text-[9px] font-medium text-foreground/70 truncate">
               <span>{width > 50 ? `${progress}%` : ""}</span>
-              {width > 80 && row.startDate && row.endDate && (
+              {width > 80 && displayStart && displayEnd && (
                 <span className="text-[8px] text-foreground/50">
-                  {format(row.startDate, "MMM d")} – {format(row.endDate, "MMM d")}
+                  {format(displayStart, "MMM d")} – {format(displayEnd, "MMM d")}
                 </span>
               )}
-              {width > 40 && width <= 80 && row.startDate && (
+              {width > 40 && width <= 80 && displayStart && (
                 <span className="text-[8px] text-foreground/50">
-                  {format(row.startDate, "MMM d")}
+                  {format(displayStart, "MMM d")}
                 </span>
               )}
             </span>
           </div>
         </TooltipTrigger>
-        <TooltipContent>
-          <p className="font-medium text-sm">{row.title}</p>
-          {row.startDate && (
-            <p className="text-xs text-muted-foreground mt-1">
-              {format(row.startDate, "MMM d")} — {row.endDate ? format(row.endDate, "MMM d, yyyy") : "TBD"}
-            </p>
-          )}
-        </TooltipContent>
+        {!isDraggingThis && (
+          <TooltipContent>
+            <p className="font-medium text-sm">{row.title}</p>
+            {row.startDate && (
+              <p className="text-xs text-muted-foreground mt-1">
+                {format(row.startDate, "MMM d")} — {row.endDate ? format(row.endDate, "MMM d, yyyy") : "TBD"}
+              </p>
+            )}
+          </TooltipContent>
+        )}
       </Tooltip>
     );
   };
