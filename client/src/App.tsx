@@ -8,6 +8,7 @@ import { usePresenceHeartbeat } from "@/hooks/use-presence";
 import { useEffect, useRef } from "react";
 import { Loader2 } from "lucide-react";
 
+import LandingPage from "@/pages/LandingPage";
 import Dashboard from "@/pages/Dashboard";
 import ProjectDetails from "@/pages/ProjectDetails";
 import Profile from "@/pages/Profile";
@@ -72,9 +73,9 @@ function Router() {
   if (!user) {
     return (
       <Switch>
-        <Route path="/" component={InviteAccept} />
+        <Route path="/" component={LandingPage} />
         <Route path="/invite/:token" component={InviteAccept} />
-        <Route component={InviteAccept} />
+        <Route component={LandingPage} />
       </Switch>
     );
   }
