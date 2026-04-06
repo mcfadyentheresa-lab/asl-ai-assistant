@@ -289,6 +289,20 @@ function SidebarCards({
     },
   });
 
+  const resendInviteMutation = useMutation({
+    mutationFn: async (inviteId: number) => {
+      const res = await apiRequest("POST", `/api/projects/${projectId}/invites/${inviteId}/resend`);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Invite resent", description: "The client will receive another SMS with their portal link." });
+      qc.invalidateQueries({ queryKey: ["/api/projects", projectId, "invites"] });
+    },
+    onError: (err: any) => {
+      toast({ title: "Failed to resend invite", description: err.message, variant: "destructive" });
+    },
+  });
+
   const renderUserRow = (u: any, badge?: string) => (
     <div key={u.id} className={`space-y-1 ${u.archivedAt ? "opacity-50" : ""}`} data-testid={`access-user-${u.id}`}>
       <div className="flex items-center gap-2">
@@ -470,11 +484,28 @@ function SidebarCards({
                 <div className="space-y-2">
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Invites</p>
                   {projectInvites.map((inv: any) => (
-                    <div key={inv.id} className="flex items-center justify-between text-sm" data-testid={`invite-row-${inv.id}`}>
-                      <span className="truncate">{inv.firstName} {inv.lastName}</span>
-                      <Badge variant={inv.status === "accepted" ? "default" : inv.status === "pending" && new Date() > new Date(inv.expiresAt) ? "destructive" : "secondary"} className="text-[10px] ml-2">
-                        {inv.status === "accepted" ? "Accepted" : new Date() > new Date(inv.expiresAt) ? "Expired" : "Pending"}
-                      </Badge>
+                    <div key={inv.id} className="flex items-center justify-between gap-2 text-sm" data-testid={`invite-row-${inv.id}`}>
+                      <div className="min-w-0">
+                        <span className="truncate block">{inv.firstName} {inv.lastName}</span>
+                        <span className="text-xs text-muted-foreground block truncate">{inv.phone || inv.email}</span>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <Badge variant={inv.status === "accepted" ? "default" : inv.status === "pending" && new Date() > new Date(inv.expiresAt) ? "destructive" : "secondary"} className="text-[10px]">
+                          {inv.status === "accepted" ? "Accepted" : new Date() > new Date(inv.expiresAt) ? "Expired" : "Pending"}
+                        </Badge>
+                        {inv.status !== "accepted" && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-xs"
+                            onClick={() => resendInviteMutation.mutate(inv.id)}
+                            disabled={resendInviteMutation.isPending}
+                            data-testid={`button-resend-invite-${inv.id}`}
+                          >
+                            Resend
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>

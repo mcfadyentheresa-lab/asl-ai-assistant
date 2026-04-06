@@ -471,6 +471,40 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/projects/:id/invites/:inviteId/resend", isAuthenticated, async (req: any, res) => {
+    try {
+      const requesterId = req.user.claims.sub;
+      const requester = await authStorage.getUser(requesterId);
+      if (requester?.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can resend invites" });
+      }
+
+      const projectId = Number(req.params.id);
+      const inviteId = Number(req.params.inviteId);
+      const project = await storage.getProject(projectId);
+      if (!project) return res.status(404).json({ message: "Project not found" });
+
+      const invite = await storage.getClientInvite(inviteId);
+      if (!invite || invite.projectId !== projectId) {
+        return res.status(404).json({ message: "Invite not found" });
+      }
+      if (!invite.phone) {
+        return res.status(400).json({ message: "This invite does not have a phone number to resend to." });
+      }
+
+      const { sendClientInviteSms } = await import("./sms");
+      const sent = await sendClientInviteSms(invite.phone, invite.firstName, project.name, invite.token);
+      if (!sent) {
+        return res.status(500).json({ message: "SMS resend failed. Check Twilio and the phone number." });
+      }
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error resending client invite:", error);
+      res.status(500).json({ message: "Failed to resend invite" });
+    }
+  });
+
   app.get("/api/invites/:token/validate", async (req: any, res) => {
     try {
       const invite = await storage.getClientInviteByToken(req.params.token);
