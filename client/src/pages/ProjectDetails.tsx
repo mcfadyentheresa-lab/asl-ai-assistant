@@ -1274,7 +1274,7 @@ export default function ProjectDetails() {
                         )}
 
                         <button
-                          onClick={() => { setProgressSubTab("checklist"); setActiveTab("checklist"); }}
+                          onClick={() => setShowOpenItemsDrawer(true)}
                           className="text-xs text-primary hover:underline cursor-pointer"
                           data-testid="link-view-checklist"
                         >
