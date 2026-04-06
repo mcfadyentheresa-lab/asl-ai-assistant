@@ -402,18 +402,18 @@ function SidebarCards({
 
   return (
     <>
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="font-serif text-base" data-testid="text-client-heading">
-            Assigned Client
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-0 space-y-3">
-          {!assignedClient && (
-            <p className="text-muted-foreground text-sm" data-testid="text-no-client">No client assigned</p>
-          )}
+      {userRole === "admin" && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="font-serif text-base" data-testid="text-client-heading">
+              Assigned Client
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0 space-y-3">
+            {!assignedClient && (
+              <p className="text-muted-foreground text-sm" data-testid="text-no-client">No client assigned</p>
+            )}
 
-          {userRole === "admin" && (
             <div className="space-y-2">
               <Dialog open={showInviteDialog} onOpenChange={setShowInviteDialog}>
                 <DialogTrigger asChild>
@@ -512,9 +512,9 @@ function SidebarCards({
                 </div>
               )}
             </div>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       {userRole !== "client" && (
         <Card>
