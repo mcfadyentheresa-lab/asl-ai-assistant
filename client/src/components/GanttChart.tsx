@@ -667,6 +667,16 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
 
   const handleRoomDrop = useCallback((buildingId: number, targetId: number) => {
     if (dragId === null || dragId === targetId || targetId < 0) { setDragId(null); setDragOverId(null); return; }
+    const draggedRoom = sections.find(s => s.id === dragId);
+    if (!draggedRoom) { setDragId(null); setDragOverId(null); return; }
+
+    if (draggedRoom.milestoneId !== buildingId) {
+      updateSection({ id: draggedRoom.id, projectId } as any);
+      setDragId(null);
+      setDragOverId(null);
+      return;
+    }
+
     const buildingSections = sections.filter(s => s.milestoneId === buildingId).sort((a, b) => (a.order || 0) - (b.order || 0));
     const dragIdx = buildingSections.findIndex(s => s.id === dragId);
     const targetIdx = buildingSections.findIndex(s => s.id === targetId);
@@ -1044,7 +1054,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                       onDragStart={() => handleDragStart(building.id)}
                       onDragOver={(e) => handleDragOver(e, building.id)}
                       onDragEnd={handleDragEnd}
-                      onDrop={() => handleDrop(building.id)}
+                      onDrop={(e) => { e.preventDefault(); handleDrop(building.id); }}
                       data-testid={`gantt-building-row-${building.id}`}
                     >
                       {isAdmin && (
@@ -1123,9 +1133,9 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                       onClick={() => drillBuildingId && drillIntoRoom(drillBuildingId, actualRoomId)}
                       draggable={isAdmin && !isGeneralTasks}
                       onDragStart={() => !isGeneralTasks && handleDragStart(roomData.id)}
-                      onDragOver={(e) => !isGeneralTasks && handleDragOver(e, roomData.id)}
                       onDragEnd={handleDragEnd}
-                      onDrop={() => !isGeneralTasks && parentBuilding && handleRoomDrop(parentBuilding.id, roomData.id)}
+                      onDrop={(e) => { e.preventDefault(); !isGeneralTasks && parentBuilding && handleRoomDrop(parentBuilding.id, roomData.id); }}
+                      onDragOver={(e) => !isGeneralTasks && handleDragOver(e, roomData.id)}
                       data-testid={`gantt-room-row-${roomData.id}`}
                     >
                       {isAdmin && !isGeneralTasks && (

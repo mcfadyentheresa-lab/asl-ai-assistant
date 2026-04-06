@@ -1029,6 +1029,7 @@ export async function registerRoutes(
         endDate: z.string().nullable().optional(),
         completed: z.boolean().optional(),
         order: z.number().optional(),
+        milestoneId: z.number().optional(),
       });
       const parsed = schema.parse(req.body);
       const updated = await storage.updateSection(Number(req.params.id), parsed);
