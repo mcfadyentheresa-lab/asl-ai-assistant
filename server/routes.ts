@@ -2941,8 +2941,9 @@ Respond with valid JSON only, no markdown:
       });
       const parsed = updateSchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: "Invalid input" });
+      const postId = Number(req.params.id);
       if (parsed.data.photoId != null && parsed.data.photoUrl != null) {
-        const post = await storage.getSocialPost(id);
+        const post = await storage.getSocialPost(postId);
         if (post) {
           const photos = await storage.getPhotos(post.projectId);
           const matchedPhoto = photos.find((p: any) => p.id === parsed.data.photoId);
@@ -2953,7 +2954,7 @@ Respond with valid JSON only, no markdown:
       }
       const updates: any = { ...parsed.data };
       if (parsed.data.status === "posted") updates.postedAt = new Date();
-      const updated = await storage.updateSocialPost(Number(req.params.id), updates);
+      const updated = await storage.updateSocialPost(postId, updates);
       res.json(updated);
     } catch { res.status(500).json({ message: "Failed to update social post" }); }
   });
