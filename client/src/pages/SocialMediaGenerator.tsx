@@ -130,10 +130,12 @@ export default function SocialMediaGenerator() {
     return params.toString();
   }, [filterProject, filterPlatform, filterStatus]);
 
+  const markSeenParam = activeTab === "library" ? "&markSeen=true" : "";
+
   const { data: libraryData, isLoading: libraryLoading } = useQuery<{ posts: SocialPost[]; unseenMilestoneCount: number }>({
-    queryKey: ["/api/social-posts", libraryQueryParams],
+    queryKey: ["/api/social-posts", libraryQueryParams, activeTab],
     queryFn: async () => {
-      const res = await fetch(`/api/social-posts?${libraryQueryParams}`, { credentials: "include" });
+      const res = await fetch(`/api/social-posts?${libraryQueryParams}${markSeenParam}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch");
       return res.json();
     },
@@ -141,16 +143,6 @@ export default function SocialMediaGenerator() {
 
   const libraryPosts = libraryData?.posts ?? [];
   const unseenMilestoneCount = libraryData?.unseenMilestoneCount ?? 0;
-
-  useEffect(() => {
-    if (activeTab === "library" && unseenMilestoneCount > 0) {
-      apiRequest("POST", "/api/social-posts/mark-seen", {})
-        .then(() => {
-          queryClient.invalidateQueries({ queryKey: ["/api/social-posts"] });
-        })
-        .catch(() => {});
-    }
-  }, [activeTab, unseenMilestoneCount]);
 
   const { data: seasonalPrompts = [] } = useQuery<SeasonalPrompt[]>({
     queryKey: ["/api/social-media/seasonal-prompts"],
