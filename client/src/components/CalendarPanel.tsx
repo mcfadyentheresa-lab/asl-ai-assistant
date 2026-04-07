@@ -84,11 +84,13 @@ interface CalendarPanelProps {
   projectId: number;
   compact?: boolean;
   readOnly?: boolean;
+  effectiveRole?: string;
 }
 
-export default function CalendarPanel({ projectId, compact = false, readOnly = false }: CalendarPanelProps) {
+export default function CalendarPanel({ projectId, compact = false, readOnly = false, effectiveRole }: CalendarPanelProps) {
   const { toast } = useToast();
   const { user } = useAuth();
+  const role = effectiveRole || user?.role || "client";
   const { data: events, isLoading } = useCalendarEvents(projectId);
   const { data: milestonesData } = useMilestones(projectId);
   const { data: sectionsData } = useSections(projectId);
@@ -112,8 +114,8 @@ export default function CalendarPanel({ projectId, compact = false, readOnly = f
   const [draggedEventId, setDraggedEventId] = useState<number | null>(null);
   const [moveEvent, setMoveEvent] = useState<{ id: number; title: string } | null>(null);
   const [moveDate, setMoveDate] = useState("");
-  const canEdit = !readOnly && (user?.role === "admin" || user?.role === "crew");
-  const canNotify = user?.role === "admin" || user?.role === "crew";
+  const canEdit = !readOnly && (role === "admin" || role === "crew");
+  const canNotify = role === "admin" || role === "crew";
   const eventImageInputRef = useRef<HTMLInputElement>(null);
 
   const [showTimeline, setShowTimeline] = useState(true);
@@ -741,7 +743,7 @@ export default function CalendarPanel({ projectId, compact = false, readOnly = f
                       <SelectItem value="inspection">Inspection</SelectItem>
                       <SelectItem value="team">Team</SelectItem>
                       <SelectItem value="personal">Personal</SelectItem>
-                      {user?.role === "admin" && <SelectItem value="time_off">Time Off</SelectItem>}
+                      {role === "admin" && <SelectItem value="time_off">Time Off</SelectItem>}
                     </SelectContent>
                   </Select>
                 </div>

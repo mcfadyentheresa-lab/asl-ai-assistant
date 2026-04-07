@@ -30,6 +30,7 @@ import CalendarPanel from "@/components/CalendarPanel";
 import { useCanvasStore, debouncedSavePositions } from "@/stores/canvas-store";
 import { useBoardRealtime } from "@/hooks/use-board-realtime";
 import { useAuth } from "@/hooks/use-auth";
+import { useViewMode } from "@/hooks/use-view-mode";
 import { api, buildUrl } from "@shared/routes";
 import { recognizeAllShapes, recognizeShape, looksLikeHandwriting } from "@/lib/shape-recognition";
 import type { CanvasElement, PlanningBoard as PlanningBoardType, PaintColor } from "@shared/schema";
@@ -161,6 +162,9 @@ function getContrastColor(hex: string): string {
 export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   const { toast } = useToast();
   const { user } = useAuth();
+  const { viewMode } = useViewMode();
+  const actualRole = user?.role || "client";
+  const effectiveRole = actualRole === "admin" ? viewMode : actualRole;
   const containerRef = useRef<HTMLDivElement>(null);
 
   const [selectedBoardId, setSelectedBoardId] = useState<number | null>(null);
@@ -3706,7 +3710,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
               Project Calendar
             </SheetTitle>
             <SheetDescription>
-              {user?.role === "client"
+              {effectiveRole === "client"
                 ? "View your project schedule and upcoming events."
                 : "Manage events and view the project schedule."}
             </SheetDescription>
@@ -3715,7 +3719,8 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             <CalendarPanel
               projectId={projectId}
               compact
-              readOnly={user?.role === "client"}
+              readOnly={effectiveRole === "client"}
+              effectiveRole={effectiveRole}
             />
           </div>
         </SheetContent>

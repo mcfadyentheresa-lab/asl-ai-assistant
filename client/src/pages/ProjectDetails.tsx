@@ -11,6 +11,7 @@ import {
   useActivityLog, useUpdateMilestone, useSections, useCreateMilestone, useCreateTask,
 } from "@/hooks/use-projects";
 import { useOnlineUsers, isUserOnline } from "@/hooks/use-presence";
+import { useViewMode } from "@/hooks/use-view-mode";
 import { useProjectRealtime } from "@/hooks/use-project-realtime";
 import { Navbar } from "@/components/layout/Navbar";
 import SpatialCanvas from "@/components/SpatialCanvas";
@@ -901,7 +902,9 @@ export default function ProjectDetails() {
   const { data: overviewChecklistItems, isLoading: loadingChecklist } = useChecklistItems(projectId);
   const assignedClient = users?.find((u) => u.id === project?.clientId);
 
-  const userRole = user?.role || "client";
+  const { viewMode } = useViewMode();
+  const actualRole = user?.role || "client";
+  const userRole = actualRole === "admin" ? viewMode : actualRole;
 
   const [seenLocally, setSeenLocally] = useState<Set<number>>(new Set());
 
@@ -1023,7 +1026,7 @@ export default function ProjectDetails() {
                 </p>
               )}
             </div>
-            {user?.role === "admin" && (
+            {userRole === "admin" && (
               <div className="flex items-center gap-2">
                 <Link href={`/project/${projectId}/estimate`}>
                   <Button variant="outline" size="sm" className="h-7 px-2.5 text-[11px]" data-testid="link-cost-estimator">
@@ -1668,6 +1671,9 @@ function ProgressTab({ projectId, milestones, sections, tasks, userRole, subTab,
 
 function ChecklistTab({ projectId, compact = false }: { projectId: number; compact?: boolean }) {
   const { user } = useAuth();
+  const { viewMode } = useViewMode();
+  const actualRole = user?.role || "client";
+  const effectiveRole = actualRole === "admin" ? viewMode : actualRole;
   const { toast } = useToast();
   const { data: items, isLoading } = useChecklistItems(projectId);
   const { mutate: createItem, isPending: isCreating } = useCreateChecklistItem();
@@ -1696,8 +1702,8 @@ function ChecklistTab({ projectId, compact = false }: { projectId: number; compa
   const [selectedBuildingId, setSelectedBuildingId] = useState<string>("");
   const [selectedRoomId, setSelectedRoomId] = useState<string>("");
 
-  const isAdmin = user?.role === "admin";
-  const isCrew = user?.email?.includes("crew") || user?.email?.includes("admin");
+  const isAdmin = effectiveRole === "admin";
+  const isCrew = effectiveRole === "crew" || effectiveRole === "admin";
 
   const roomsForBuilding = selectedBuildingId
     ? (sectionsForMove || []).filter((s: any) => s.milestoneId === parseInt(selectedBuildingId))
@@ -3192,7 +3198,11 @@ function ChatTab({ projectId }: { projectId: number }) {
 }
 
 function CalendarTab({ projectId }: { projectId: number }) {
-  return <CalendarPanel projectId={projectId} />;
+  const { user } = useAuth();
+  const { viewMode } = useViewMode();
+  const actualRole = user?.role || "client";
+  const effectiveRole = actualRole === "admin" ? viewMode : actualRole;
+  return <CalendarPanel projectId={projectId} effectiveRole={effectiveRole} />;
 }
 
 const docTypeLabels: Record<string, string> = {
