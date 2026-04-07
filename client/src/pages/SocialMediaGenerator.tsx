@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useLocation } from "wouter";
 import { Navbar } from "@/components/layout/Navbar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,10 +11,19 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { useProjects } from "@/hooks/use-projects";
 import { apiRequest } from "@/lib/queryClient";
-import { Loader2, Sparkles, Shuffle, Copy, RefreshCw, ArrowLeft } from "lucide-react";
+import { Loader2, Sparkles, Shuffle, Copy, RefreshCw, ArrowLeft, X, ImageIcon, ChevronLeft, ChevronRight } from "lucide-react";
 import { Link } from "wouter";
 
 const tones = ["Professional", "Warm", "Behind the scenes", "Polished", "Excited"] as const;
+
+interface SocialPhoto {
+  id: number;
+  url: string;
+  caption: string | null;
+  tags: string[];
+  isShowcase: boolean;
+  isBeforeAfter: boolean;
+}
 
 export default function SocialMediaGenerator() {
   const { user } = useAuth();
@@ -28,6 +37,8 @@ export default function SocialMediaGenerator() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedPost, setGeneratedPost] = useState("");
   const [generatedTitle, setGeneratedTitle] = useState("");
+  const [photos, setPhotos] = useState<SocialPhoto[]>([]);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   const selectedProject = useMemo(() => projects.find((p) => String(p.id) === projectId), [projects, projectId]);
 
@@ -36,6 +47,18 @@ export default function SocialMediaGenerator() {
       navigate("/");
     }
   }, [user, navigate]);
+
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (lightboxIndex === null) return;
+    if (e.key === "Escape") setLightboxIndex(null);
+    if (e.key === "ArrowLeft" && lightboxIndex > 0) setLightboxIndex(lightboxIndex - 1);
+    if (e.key === "ArrowRight" && lightboxIndex < photos.length - 1) setLightboxIndex(lightboxIndex + 1);
+  }, [lightboxIndex, photos.length]);
+
+  useEffect(() => {
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleKeyDown]);
 
   if (user && (user as any).role !== "admin") {
     return null;
@@ -59,6 +82,7 @@ export default function SocialMediaGenerator() {
       const data = await res.json();
       setGeneratedTitle(data.title || `${chosenProject.name} post`);
       setGeneratedPost(data.copy || "");
+      setPhotos(data.photos || []);
     } catch {
       toast({ title: "Generation failed", description: "Could not create a social post.", variant: "destructive" });
     } finally {
@@ -148,39 +172,159 @@ export default function SocialMediaGenerator() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="uppercase tracking-wide">Generated Post</CardTitle>
-              <CardDescription>Copy and paste this into Instagram or Facebook.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {generatedPost ? (
-                <>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary">{generatedTitle}</Badge>
-                    <Badge variant="outline">{platform}</Badge>
-                  </div>
-                  <div className="whitespace-pre-wrap rounded-lg border border-border bg-muted/30 p-4 text-sm leading-6" data-testid="text-generated-social-post">
-                    {generatedPost}
-                  </div>
-                  <div className="flex gap-3">
-                    <Button onClick={copyPost} variant="outline" data-testid="button-copy-social-post">
-                      <Copy className="mr-2 h-4 w-4" />
-                      Copy
-                    </Button>
-                    <Button onClick={() => generatePost(false)} variant="secondary" disabled={isGenerating || !projectId} data-testid="button-regenerate-social-post">
-                      <RefreshCw className="mr-2 h-4 w-4" />
-                      Regenerate
-                    </Button>
-                  </div>
-                </>
-              ) : (
-                <p className="text-sm text-muted-foreground">Your generated post will appear here.</p>
-              )}
-            </CardContent>
-          </Card>
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="uppercase tracking-wide">Generated Post</CardTitle>
+                <CardDescription>Copy and paste this into Instagram or Facebook.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {generatedPost ? (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary" data-testid="badge-social-title">{generatedTitle}</Badge>
+                      <Badge variant="outline" data-testid="badge-social-platform">{platform}</Badge>
+                    </div>
+                    <div className="whitespace-pre-wrap rounded-lg border border-border bg-muted/30 p-4 text-sm leading-6" data-testid="text-generated-social-post">
+                      {generatedPost}
+                    </div>
+                    <div className="flex gap-3">
+                      <Button onClick={copyPost} variant="outline" data-testid="button-copy-social-post">
+                        <Copy className="mr-2 h-4 w-4" />
+                        Copy
+                      </Button>
+                      <Button onClick={() => generatePost(false)} variant="secondary" disabled={isGenerating || !projectId} data-testid="button-regenerate-social-post">
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                        Regenerate
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground" data-testid="text-social-placeholder">Your generated post will appear here.</p>
+                )}
+              </CardContent>
+            </Card>
+
+            {generatedPost && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="uppercase tracking-wide flex items-center gap-2">
+                    <ImageIcon className="h-5 w-5" />
+                    Project Photos
+                  </CardTitle>
+                  <CardDescription>Choose a photo to pair with your post.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {photos.length > 0 ? (
+                    <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1" data-testid="gallery-social-photos">
+                      {photos.map((photo, index) => (
+                        <button
+                          key={photo.id}
+                          onClick={() => setLightboxIndex(index)}
+                          className="group relative flex-shrink-0 rounded-lg overflow-hidden border border-border hover:border-primary/50 transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50"
+                          data-testid={`photo-thumbnail-${photo.id}`}
+                        >
+                          <img
+                            src={photo.url}
+                            alt={photo.caption || "Project photo"}
+                            className="h-24 w-24 object-cover"
+                            loading="lazy"
+                          />
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
+                          {photo.isShowcase && (
+                            <span className="absolute top-1 right-1 bg-primary/90 text-primary-foreground text-[10px] px-1 rounded" data-testid={`badge-showcase-${photo.id}`}>
+                              Showcase
+                            </span>
+                          )}
+                          {photo.isBeforeAfter && (
+                            <span className="absolute bottom-1 left-1 bg-orange-500/90 text-white text-[10px] px-1 rounded" data-testid={`badge-before-after-${photo.id}`}>
+                              B/A
+                            </span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground" data-testid="text-no-photos">
+                      No photos uploaded for this project.
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </div>
       </main>
+
+      {lightboxIndex !== null && photos[lightboxIndex] && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+          onClick={() => setLightboxIndex(null)}
+          data-testid="lightbox-overlay"
+        >
+          <div className="relative max-w-4xl max-h-[90vh] w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute -top-12 right-0 text-white hover:bg-white/20"
+              onClick={() => setLightboxIndex(null)}
+              data-testid="button-lightbox-close"
+            >
+              <X className="h-6 w-6" />
+            </Button>
+
+            {lightboxIndex > 0 && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute left-2 top-1/2 -translate-y-1/2 text-white hover:bg-white/20 z-10"
+                onClick={() => setLightboxIndex(lightboxIndex - 1)}
+                data-testid="button-lightbox-prev"
+              >
+                <ChevronLeft className="h-8 w-8" />
+              </Button>
+            )}
+
+            {lightboxIndex < photos.length - 1 && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-white hover:bg-white/20 z-10"
+                onClick={() => setLightboxIndex(lightboxIndex + 1)}
+                data-testid="button-lightbox-next"
+              >
+                <ChevronRight className="h-8 w-8" />
+              </Button>
+            )}
+
+            <img
+              src={photos[lightboxIndex].url}
+              alt={photos[lightboxIndex].caption || "Project photo"}
+              className="w-full h-auto max-h-[80vh] object-contain rounded-lg"
+              data-testid="img-lightbox-photo"
+            />
+
+            {(photos[lightboxIndex].caption || photos[lightboxIndex].tags.length > 0) && (
+              <div className="mt-3 text-center">
+                {photos[lightboxIndex].caption && (
+                  <p className="text-white text-sm" data-testid="text-lightbox-caption">{photos[lightboxIndex].caption}</p>
+                )}
+                {photos[lightboxIndex].tags.length > 0 && (
+                  <div className="flex justify-center gap-1.5 mt-1.5 flex-wrap" data-testid="lightbox-tags">
+                    {photos[lightboxIndex].tags.map((tag) => (
+                      <Badge key={tag} variant="secondary" className="text-xs" data-testid={`badge-lightbox-tag-${tag}`}>{tag}</Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <p className="text-white/60 text-xs text-center mt-2" data-testid="text-lightbox-counter">
+              {lightboxIndex + 1} of {photos.length}
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

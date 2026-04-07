@@ -2723,10 +2723,31 @@ Respond with valid JSON only, no markdown:
       const project = await storage.getProject(Number(projectId));
       if (!project) return res.status(404).json({ message: "Project not found" });
 
-      const projectMilestones = await storage.getMilestones(project.id);
+      const [projectMilestones, projectPhotos] = await Promise.all([
+        storage.getMilestones(project.id),
+        storage.getPhotos(project.id),
+      ]);
       const milestoneList = projectMilestones
         .map((m: any) => `- ${m.title}${m.completed ? " (completed)" : ""}`)
         .join("\n");
+
+      let photoContext = "";
+      if (projectPhotos.length > 0) {
+        const photoDescriptions = projectPhotos
+          .slice(0, 20)
+          .map((p: any) => {
+            const parts: string[] = [];
+            if (p.caption) parts.push(p.caption);
+            if (p.tags && p.tags.length > 0) parts.push(`tags: ${p.tags.join(", ")}`);
+            if (p.isShowcase) parts.push("(showcase)");
+            if (p.isBeforeAfter) parts.push("(before/after)");
+            return parts.length > 0 ? `- ${parts.join(" | ")}` : null;
+          })
+          .filter(Boolean)
+          .join("\n");
+        photoContext = `\nProject photos: ${projectPhotos.length} photo(s) available.${photoDescriptions ? `\nPhoto details:\n${photoDescriptions}` : ""}
+The post should reference visual content where appropriate (e.g., "see the stunning reveal", "swipe through the transformation").`;
+      }
 
       const platformName = platform === "facebook" ? "Facebook" : "Instagram";
       const toneStyle = tone || "Warm";
@@ -2749,7 +2770,7 @@ Project details:
 - Description: ${project.description || "No description provided"}
 - Status: ${project.status}
 - Address: ${project.address || "Muskoka, Ontario"}
-${milestoneList ? `\nProject milestones:\n${milestoneList}` : ""}
+${milestoneList ? `\nProject milestones:\n${milestoneList}` : ""}${photoContext}
 ${focusHint}
 
 Platform: ${platformName}
@@ -2783,6 +2804,14 @@ Respond with valid JSON only, no markdown:
       res.json({
         title: String(aiResult.title || project.name),
         copy: String(aiResult.copy || ""),
+        photos: projectPhotos.map((p: any) => ({
+          id: p.id,
+          url: p.url,
+          caption: p.caption || null,
+          tags: p.tags || [],
+          isShowcase: p.isShowcase || false,
+          isBeforeAfter: p.isBeforeAfter || false,
+        })),
       });
     } catch (error: any) {
       console.error("Social media generation error:", error);
