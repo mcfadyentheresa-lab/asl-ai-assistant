@@ -308,14 +308,18 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
 
   const handleCreateBoard = async () => {
     try {
+      const selectedTemplate = selectedTemplateId ? templateCatalogue.find((template) => template.id === selectedTemplateId) : null;
       const board = await createBoard({
         projectId,
-        name: newBoardName || (selectedTemplateId ? (templateCatalogue.find((template) => template.id === selectedTemplateId)?.name || "Untitled Board") : "Untitled Board"),
+        name: newBoardName || (selectedTemplate?.name || "Untitled Board"),
         ...(selectedTemplateId ? { templateId: selectedTemplateId } : {}),
       });
       closeNewBoardDialog();
       setSelectedBoardId(board.id);
+      setBoardId(board.id);
+      setElements([]);
       queryClient.invalidateQueries({ queryKey: [api.planningBoards.list.path, projectId] });
+      queryClient.invalidateQueries({ queryKey: [api.planningBoards.detail.path, board.id] });
     } catch {
       toast({ title: "Error", description: "Failed to create board", variant: "destructive" });
     }
