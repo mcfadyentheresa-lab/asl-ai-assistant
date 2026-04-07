@@ -258,6 +258,25 @@ export const api = {
     },
   },
 
+  // Board Templates
+  boardTemplates: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/board-templates' as const,
+      responses: {
+        200: z.array(z.object({ id: z.string(), name: z.string(), description: z.string(), icon: z.string() })),
+      },
+    },
+    get: {
+      method: 'GET' as const,
+      path: '/api/board-templates/:templateId' as const,
+      responses: {
+        200: z.object({ id: z.string(), canvasData: z.any() }),
+        404: errorSchemas.notFound,
+      },
+    },
+  },
+
   // Planning Boards
   planningBoards: {
     list: {
@@ -277,7 +296,7 @@ export const api = {
     create: {
       method: 'POST' as const,
       path: '/api/projects/:projectId/planning-boards' as const,
-      input: insertPlanningBoardSchema.pick({ name: true, linkedMilestoneId: true, linkedChecklistItemId: true, linkedCalendarEventId: true, linkedUserIds: true, linkedProjectIds: true }).partial(),
+      input: insertPlanningBoardSchema.pick({ name: true, linkedMilestoneId: true, linkedChecklistItemId: true, linkedCalendarEventId: true, linkedUserIds: true, linkedProjectIds: true }).partial().extend({ templateId: z.string().optional() }),
       responses: {
         201: z.custom<typeof planningBoards.$inferSelect>(),
       },

@@ -1453,6 +1453,19 @@ Respond with valid JSON only:
     res.json(getTemplateCatalogue());
   });
 
+  app.get("/api/board-templates/:templateId", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const userRecord = await authStorage.getUser(userId);
+    if (userRecord?.role !== "admin") {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    const canvasData = getTemplateCanvasData(req.params.templateId);
+    if (!canvasData) {
+      return res.status(404).json({ message: "Template not found" });
+    }
+    res.json({ id: req.params.templateId, canvasData });
+  });
+
   app.post(api.planningBoards.create.path, isAuthenticated, async (req: any, res) => {
     try {
       const projectId = Number(req.params.projectId);
@@ -1461,7 +1474,7 @@ Respond with valid JSON only:
       const userId = req.user.claims.sub;
       const input = api.planningBoards.create.input.parse(req.body);
 
-      const templateId = req.body.templateId as string | undefined;
+      const templateId = input.templateId;
       let canvasData: any = undefined;
       if (templateId) {
         const userRecord = await authStorage.getUser(userId);
@@ -1474,8 +1487,9 @@ Respond with valid JSON only:
         }
       }
 
+      const { templateId: _tid, ...boardInput } = input;
       const board = await storage.createPlanningBoard({
-        ...input,
+        ...boardInput,
         projectId,
         updatedBy: userId,
         ...(canvasData ? { canvasData } : {}),
