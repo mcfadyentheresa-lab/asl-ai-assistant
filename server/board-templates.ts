@@ -256,5 +256,5 @@ export function getTemplateCatalogue() {
 
 export function getTemplateCanvasData(templateId: string): any | null {
   const t = boardTemplates.find((t) => t.id === templateId);
-  return t ? t.canvasData : null;
+  return t ? JSON.parse(JSON.stringify(t.canvasData)) : null;
 }
