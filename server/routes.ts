@@ -1466,6 +1466,68 @@ Respond with valid JSON only:
     res.json({ id: req.params.templateId, canvasData });
   });
 
+function templateObjectToCanvasElement(object: any, index: number, boardId: number, createdBy: string): any | null {
+  if (!object || typeof object !== "object") return null;
+  const base = {
+    boardId,
+    createdBy,
+    zIndex: index + 1,
+  };
+  if (object.type === "textbox") {
+    return {
+      ...base,
+      type: "section_header",
+      x: Math.round(object.left ?? 0),
+      y: Math.round(object.top ?? 0),
+      width: Math.round(object.width ?? 240),
+      height: Math.max(48, Math.round(object.fontSize ? object.fontSize * 3 : 60)),
+      content: {
+        text: object.text || "",
+        fontSize: object.fontSize || 16,
+        fontWeight: object.fontWeight || "bold",
+        fontFamily: object.fontFamily || "Inter, sans-serif",
+        fill: object.fill || "#1e3a2f",
+      },
+    };
+  }
+  if (object.type === "group") {
+    const innerText = object.objects?.find((o: any) => o.type === "textbox")?.text || "";
+    return {
+      ...base,
+      type: "note",
+      x: Math.round(object.left ?? 0),
+      y: Math.round(object.top ?? 0),
+      width: Math.round(object.width ?? 180),
+      height: Math.round(object.height ?? 100),
+      content: {
+        text: innerText,
+        color: object.objects?.find((o: any) => o.type === "rect")?.fill || "#fef9c3",
+      },
+    };
+  }
+  if (object.type === "rect") {
+    return {
+      ...base,
+      type: "column",
+      x: Math.round(object.left ?? 0),
+      y: Math.round(object.top ?? 0),
+      width: Math.round(object.width ?? 280),
+      height: Math.round(object.height ?? 260),
+      content: {
+        fill: object.fill,
+      },
+    };
+  }
+  return null;
+}
+
+function templateCanvasToElements(canvasData: any, boardId: number, createdBy: string) {
+  const objects = Array.isArray(canvasData?.objects) ? canvasData.objects : [];
+  return objects
+    .map((object: any, index: number) => templateObjectToCanvasElement(object, index, boardId, createdBy))
+    .filter(Boolean);
+}
+
   app.post(api.planningBoards.create.path, isAuthenticated, async (req: any, res) => {
     try {
       const projectId = Number(req.params.projectId);
@@ -1494,6 +1556,12 @@ Respond with valid JSON only:
         updatedBy: userId,
         ...(canvasData ? { canvasData } : {}),
       });
+      if (canvasData) {
+        const elements = templateCanvasToElements(canvasData, board.id, userId);
+        if (elements.length > 0) {
+          await storage.createCanvasElements(elements as any);
+        }
+      }
       res.status(201).json(board);
     } catch (err: any) {
       console.error("Planning board create error:", err.message);
