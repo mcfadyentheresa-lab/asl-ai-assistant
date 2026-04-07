@@ -3192,9 +3192,7 @@ function ChatTab({ projectId }: { projectId: number }) {
 }
 
 function CalendarTab({ projectId }: { projectId: number }) {
-  const { user } = useAuth();
-  const isClient = user?.role === "client";
-  return <CalendarPanel projectId={projectId} readOnly={isClient} />;
+  return <CalendarPanel projectId={projectId} />;
 }
 
 const docTypeLabels: Record<string, string> = {

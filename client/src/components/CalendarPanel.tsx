@@ -234,7 +234,7 @@ export default function CalendarPanel({ projectId, compact = false, readOnly = f
     e.preventDefault();
     let title = eventForm.title.trim();
     if (eventForm.type === "time_off" && timeOffCrewId) {
-      const member = crewMembers.find((u: any) => u.id === timeOffCrewId);
+      const member = crewMembers.find((u) => u.id === timeOffCrewId);
       if (member) {
         title = title || `${member.firstName} ${member.lastName} — Time Off`;
       }
@@ -249,7 +249,7 @@ export default function CalendarPanel({ projectId, compact = false, readOnly = f
         type: eventForm.type,
       },
       {
-        onSuccess: (created: any) => {
+        onSuccess: (created: CalendarEvent) => {
           if (eventImageFile && created?.id) {
             uploadEventImage(
               { eventId: created.id, file: eventImageFile, projectId },
@@ -616,8 +616,8 @@ export default function CalendarPanel({ projectId, compact = false, readOnly = f
                                     notifyTeam(
                                       { projectId, message: msg.slice(0, 300) },
                                       {
-                                        onSuccess: (data: any) => toast({ title: "Team notified", description: data.message }),
-                                        onError: (err: any) => toast({ title: "Failed to notify", description: err.message, variant: "destructive" }),
+                                        onSuccess: (data: { message: string }) => toast({ title: "Team notified", description: data.message }),
+                                        onError: (err: Error) => toast({ title: "Failed to notify", description: err.message, variant: "destructive" }),
                                       }
                                     );
                                   }}
@@ -736,7 +736,7 @@ export default function CalendarPanel({ projectId, compact = false, readOnly = f
                     <label className="text-sm font-medium mb-1 block">Crew Member</label>
                     <Select value={timeOffCrewId} onValueChange={(v) => {
                       setTimeOffCrewId(v);
-                      const member = crewMembers.find((u: any) => u.id === v);
+                      const member = crewMembers.find((u) => u.id === v);
                       if (member && !eventForm.title.trim()) {
                         setEventForm({ ...eventForm, title: `${member.firstName} ${member.lastName} — Time Off` });
                       }
@@ -745,7 +745,7 @@ export default function CalendarPanel({ projectId, compact = false, readOnly = f
                         <SelectValue placeholder="Select crew member..." />
                       </SelectTrigger>
                       <SelectContent>
-                        {crewMembers.map((u: any) => (
+                        {crewMembers.map((u) => (
                           <SelectItem key={u.id} value={u.id}>
                             {u.firstName} {u.lastName} ({u.role})
                           </SelectItem>
