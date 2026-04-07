@@ -113,6 +113,7 @@ export default function CalendarPanel({ projectId, compact = false, readOnly = f
   const [moveEvent, setMoveEvent] = useState<{ id: number; title: string } | null>(null);
   const [moveDate, setMoveDate] = useState("");
   const canEdit = !readOnly && (user?.role === "admin" || user?.role === "crew");
+  // Note: canEdit preserves the original CalendarTab behavior where only admin/crew could edit
   const canNotify = user?.role === "admin" || user?.role === "crew";
   const eventImageInputRef = useRef<HTMLInputElement>(null);
 
