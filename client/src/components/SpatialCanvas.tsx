@@ -1490,13 +1490,6 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   }, [drawingMode, drawTool, drawColor, drawStrokeWidth, pan, zoom, redrawOverlayCanvas, trySnapLastPath, tryAutoTextConvert]);
 
   const selectedBoard = boards.find((b: PlanningBoardType) => b.id === selectedBoardId);
-  const toggleLinkedProject = (pid: number) => {
-    const current = selectedBoard?.linkedProjectIds || [];
-    const next = current.includes(pid)
-      ? current.filter((id: number) => id !== pid)
-      : [...current, pid];
-    handleLinkUpdate("linkedProjectIds", next);
-  };
   const elementsList = Object.values(elements);
 
   // Card renderers
