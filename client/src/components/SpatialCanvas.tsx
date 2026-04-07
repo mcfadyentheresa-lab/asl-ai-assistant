@@ -175,6 +175,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   });
 
   const [selectedBoardId, setSelectedBoardId] = useState<number | null>(null);
+  const justCreatedBoardId = useRef<number | null>(null);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
@@ -278,6 +279,10 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   }, []);
 
   useEffect(() => {
+    if (justCreatedBoardId.current && boards.some((board) => board.id === justCreatedBoardId.current)) {
+      justCreatedBoardId.current = null;
+      return;
+    }
     if (boards.length > 0 && !selectedBoardId) {
       setSelectedBoardId(boards[0].id);
     }
@@ -318,6 +323,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       setSelectedBoardId(board.id);
       setBoardId(board.id);
       setElements([]);
+      justCreatedBoardId.current = board.id;
       queryClient.invalidateQueries({ queryKey: [api.planningBoards.list.path, projectId] });
       queryClient.invalidateQueries({ queryKey: [api.planningBoards.detail.path, board.id] });
     } catch {
