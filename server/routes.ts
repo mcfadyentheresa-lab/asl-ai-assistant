@@ -1557,9 +1557,13 @@ function templateCanvasToElements(canvasData: any, boardId: number, createdBy: s
         ...(canvasData ? { canvasData } : {}),
       });
       if (canvasData) {
-        const elements = templateCanvasToElements(canvasData, board.id, userId);
-        if (elements.length > 0) {
-          await storage.createCanvasElements(elements as any);
+        try {
+          const elements = templateCanvasToElements(canvasData, board.id, userId);
+          if (elements.length > 0) {
+            await storage.createCanvasElements(elements as any);
+          }
+        } catch (templateErr: any) {
+          console.error("Template element creation error:", templateErr.message);
         }
       }
       res.status(201).json(board);
