@@ -961,6 +961,56 @@ export async function registerRoutes(
 
       res.json(updated);
       broadcastProjectChange(updated.projectId, ["milestones"], "updated", updated.id, userId);
+
+      if (parsed.data.completed === true && !milestone.completed && project) {
+        (async () => {
+          try {
+            const OpenAI = (await import("openai")).default;
+            const openai = new OpenAI({
+              apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+              baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+            });
+            const projectPhotos = await storage.getPhotos(project.id);
+            const pairedPhoto = projectPhotos.find((p: any) => p.isShowcase) || projectPhotos[0] || null;
+            const milestonePrompt = `You are a social media copywriter for Aster & Spruce Living, a high-end Muskoka cottage renovation company.
+Always use Canadian English spelling (colour, favourite, centre, etc.).
+Brand voice: Warm minimalist, premium quality, nature-inspired.
+
+A milestone has just been completed! Create a celebratory Instagram post.
+Project: ${project.name}
+Milestone completed: ${updated.title}
+
+Write an engaging post celebrating this achievement (150-300 words, 15-25 hashtags).
+Respond with valid JSON only:
+{ "title": "<3-5 word title>", "copy": "<full post text>" }`;
+
+            const aiRes = await openai.chat.completions.create({
+              model: "gpt-5-mini",
+              messages: [
+                { role: "system", content: milestonePrompt },
+                { role: "user", content: `Celebrate the completion of "${updated.title}" for project "${project.name}".` },
+              ],
+              response_format: { type: "json_object" },
+            });
+            const content = aiRes.choices[0]?.message?.content;
+            if (content) {
+              const result = JSON.parse(content);
+              await storage.createSocialPost({
+                projectId: project.id,
+                title: String(result.title || `${updated.title} Complete`),
+                copy: String(result.copy || ""),
+                platform: "instagram",
+                tone: "Milestone Celebration",
+                photoUrl: pairedPhoto?.url || null,
+                photoId: pairedPhoto?.id || null,
+                status: "draft",
+              });
+            }
+          } catch (err) {
+            console.error("Milestone social post auto-generation failed:", err);
+          }
+        })();
+      }
     } catch (error) {
       res.status(500).json({ message: "Failed to update milestone" });
     }
@@ -2704,6 +2754,7 @@ Respond with valid JSON only, no markdown:
     tone: z.string().max(100).default("Warm"),
     focus: z.string().max(1000).default(""),
     random: z.boolean().optional(),
+    photoId: z.number().int().positive().optional(),
   });
 
   app.post("/api/social-media/generate", isAuthenticated, async (req: any, res) => {
@@ -2803,10 +2854,32 @@ Respond with valid JSON only, no markdown:
       }
 
       const aiResult = JSON.parse(content);
+      const postTitle = String(aiResult.title || project.name);
+      const postCopy = String(aiResult.copy || "");
+      const postPlatform = platformName.toLowerCase();
+
+      const selectedPhotoId = parsed.data.photoId;
+      let pairedPhoto = selectedPhotoId ? projectPhotos.find((p: any) => p.id === selectedPhotoId) : null;
+      if (!pairedPhoto && projectPhotos.length > 0) {
+        pairedPhoto = projectPhotos.find((p: any) => p.isShowcase) || projectPhotos[0];
+      }
+
+      const savedPost = await storage.createSocialPost({
+        projectId: project.id,
+        title: postTitle,
+        copy: postCopy,
+        platform: postPlatform,
+        tone: parsed.data.tone || "Warm",
+        photoUrl: pairedPhoto?.url || null,
+        photoId: pairedPhoto?.id || null,
+        status: "draft",
+      });
+
       res.json({
-        title: String(aiResult.title || project.name),
-        copy: String(aiResult.copy || ""),
-        platform: platformName.toLowerCase(),
+        id: savedPost.id,
+        title: postTitle,
+        copy: postCopy,
+        platform: postPlatform,
         photos: projectPhotos.map((p: any) => ({
           id: p.id,
           url: p.url,
@@ -2815,10 +2888,475 @@ Respond with valid JSON only, no markdown:
           isShowcase: p.isShowcase || false,
           isBeforeAfter: p.isBeforeAfter || false,
         })),
+        savedPostId: savedPost.id,
+        pairedPhotoId: pairedPhoto?.id || null,
+        pairedPhotoUrl: pairedPhoto?.url || null,
       });
     } catch (error: any) {
       console.error("Social media generation error:", error);
       res.status(500).json({ message: "Failed to generate social media post" });
+    }
+  });
+
+  // Social Posts CRUD
+  app.get("/api/social-posts", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await authStorage.getUser(userId);
+      if (!user || user.role !== "admin") return res.status(403).json({ message: "Admin only" });
+      const filters: any = {};
+      if (req.query.projectId) filters.projectId = Number(req.query.projectId);
+      if (req.query.platform) filters.platform = String(req.query.platform);
+      if (req.query.status) filters.status = String(req.query.status);
+      const posts = await storage.getSocialPosts(filters);
+      res.json(posts);
+    } catch { res.status(500).json({ message: "Failed to fetch social posts" }); }
+  });
+
+  app.get("/api/social-posts/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await authStorage.getUser(userId);
+      if (!user || user.role !== "admin") return res.status(403).json({ message: "Admin only" });
+      const post = await storage.getSocialPost(Number(req.params.id));
+      if (!post) return res.status(404).json({ message: "Post not found" });
+      res.json(post);
+    } catch { res.status(500).json({ message: "Failed to fetch social post" }); }
+  });
+
+  app.patch("/api/social-posts/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await authStorage.getUser(userId);
+      if (!user || user.role !== "admin") return res.status(403).json({ message: "Admin only" });
+      const updateSchema = z.object({
+        title: z.string().max(500).optional(),
+        copy: z.string().max(10000).optional(),
+        platform: z.enum(["instagram", "facebook"]).optional(),
+        tone: z.string().max(200).optional(),
+        photoUrl: z.string().nullable().optional(),
+        photoId: z.number().nullable().optional(),
+        status: z.enum(["draft", "ready", "posted"]).optional(),
+      });
+      const parsed = updateSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: "Invalid input" });
+      const updates: any = { ...parsed.data };
+      if (parsed.data.status === "posted") updates.postedAt = new Date();
+      const updated = await storage.updateSocialPost(Number(req.params.id), updates);
+      res.json(updated);
+    } catch { res.status(500).json({ message: "Failed to update social post" }); }
+  });
+
+  app.delete("/api/social-posts/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await authStorage.getUser(userId);
+      if (!user || user.role !== "admin") return res.status(403).json({ message: "Admin only" });
+      await storage.deleteSocialPost(Number(req.params.id));
+      res.json({ ok: true });
+    } catch { res.status(500).json({ message: "Failed to delete social post" }); }
+  });
+
+  // Batch generate social posts
+  app.post("/api/social-media/batch-generate", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await authStorage.getUser(userId);
+      if (!user || user.role !== "admin") return res.status(403).json({ message: "Admin only" });
+
+      const batchSchema = z.object({
+        projectId: z.number({ coerce: true }).int().positive(),
+        count: z.number().int().min(1).max(5).default(3),
+      });
+      const parsed = batchSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: "Invalid input" });
+
+      const project = await storage.getProject(parsed.data.projectId);
+      if (!project) return res.status(404).json({ message: "Project not found" });
+
+      const [projectMilestones, projectPhotos] = await Promise.all([
+        storage.getMilestones(project.id),
+        storage.getPhotos(project.id),
+      ]);
+      const milestoneList = projectMilestones.map((m: any) => `- ${m.title}${m.completed ? " (completed)" : ""}`).join("\n");
+
+      let photoContext = `\nProject photos: ${projectPhotos.length} photo(s) available.`;
+      if (projectPhotos.length > 0) {
+        const photoDescriptions = projectPhotos.slice(0, 20).map((p: any) => {
+          const parts: string[] = [];
+          if (p.caption) parts.push(p.caption);
+          if (p.tags && p.tags.length > 0) parts.push(`tags: ${p.tags.join(", ")}`);
+          if (p.isShowcase) parts.push("(showcase)");
+          if (p.isBeforeAfter) parts.push("(before/after)");
+          return parts.length > 0 ? `- ${parts.join(" | ")}` : null;
+        }).filter(Boolean).join("\n");
+        photoContext += photoDescriptions ? `\nPhoto details:\n${photoDescriptions}` : "";
+      }
+
+      const platforms = ["instagram", "facebook"];
+      const tonesList = ["Professional", "Warm", "Behind the scenes", "Polished", "Excited"];
+      const count = parsed.data.count;
+
+      const OpenAI = (await import("openai")).default;
+      const openai = new OpenAI({
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+      });
+
+      const batchPrompt = `You are a social media copywriter for Aster & Spruce Living, a high-end Muskoka cottage renovation company based in Ontario, Canada.
+Brand voice: Warm minimalist, premium quality, nature-inspired, community-focused.
+Always use Canadian English spelling (colour, favourite, centre, etc.).
+
+Project details:
+- Name: ${project.name}
+- Description: ${project.description || "No description provided"}
+- Status: ${project.status}
+- Address: ${project.address || "Muskoka, Ontario"}
+${milestoneList ? `\nProject milestones:\n${milestoneList}` : ""}${photoContext}
+
+Generate exactly ${count} unique social media posts for this project. Each post should have a different angle, tone, or platform.
+Mix between Instagram (longer, storytelling, 15-25 hashtags) and Facebook (shorter, conversational, 3-5 hashtags).
+
+Respond with valid JSON only:
+{
+  "posts": [
+    { "title": "<3-5 word title>", "copy": "<full post text>", "platform": "instagram|facebook", "tone": "<tone used>" }
+  ]
+}`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-5-mini",
+        messages: [
+          { role: "system", content: batchPrompt },
+          { role: "user", content: `Generate ${count} varied social media posts for "${project.name}".` },
+        ],
+        response_format: { type: "json_object" },
+      });
+
+      const content = response.choices[0]?.message?.content;
+      if (!content) return res.status(500).json({ message: "No response from AI" });
+
+      const aiResult = JSON.parse(content);
+      const posts = aiResult.posts || [];
+
+      const savedPosts = [];
+      for (const post of posts) {
+        const pairedPhoto = projectPhotos.length > 0
+          ? projectPhotos[Math.floor(Math.random() * projectPhotos.length)]
+          : null;
+        const saved = await storage.createSocialPost({
+          projectId: project.id,
+          title: String(post.title || project.name),
+          copy: String(post.copy || ""),
+          platform: String(post.platform || "instagram"),
+          tone: String(post.tone || "Warm"),
+          photoUrl: pairedPhoto?.url || null,
+          photoId: pairedPhoto?.id || null,
+          status: "draft",
+        });
+        savedPosts.push(saved);
+      }
+
+      res.json({ posts: savedPosts });
+    } catch (error: any) {
+      console.error("Batch generation error:", error);
+      res.status(500).json({ message: "Failed to batch generate posts" });
+    }
+  });
+
+  // Before/After post builder
+  app.post("/api/social-media/before-after", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await authStorage.getUser(userId);
+      if (!user || user.role !== "admin") return res.status(403).json({ message: "Admin only" });
+
+      const baSchema = z.object({
+        projectId: z.number({ coerce: true }).int().positive(),
+        platform: z.enum(["instagram", "facebook"]).default("instagram"),
+      });
+      const parsed = baSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: "Invalid input" });
+
+      const project = await storage.getProject(parsed.data.projectId);
+      if (!project) return res.status(404).json({ message: "Project not found" });
+
+      const projectPhotos = await storage.getPhotos(project.id);
+      const baPhotos = projectPhotos.filter((p: any) => p.isBeforeAfter);
+      if (baPhotos.length === 0) return res.status(400).json({ message: "No before/after photos found for this project" });
+
+      const photoDescriptions = baPhotos.slice(0, 10).map((p: any) => {
+        const parts: string[] = [];
+        if (p.caption) parts.push(p.caption);
+        if (p.tags && p.tags.length > 0) parts.push(`tags: ${p.tags.join(", ")}`);
+        return parts.length > 0 ? `- ${parts.join(" | ")}` : "- (untitled photo)";
+      }).join("\n");
+
+      const platformName = parsed.data.platform === "facebook" ? "Facebook" : "Instagram";
+
+      const OpenAI = (await import("openai")).default;
+      const openai = new OpenAI({
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+      });
+
+      const prompt = `You are a social media copywriter for Aster & Spruce Living, a high-end Muskoka cottage renovation company.
+Always use Canadian English spelling (colour, favourite, centre, etc.).
+Brand voice: Warm minimalist, premium quality, nature-inspired.
+
+This is a BEFORE & AFTER TRANSFORMATION post for ${platformName}.
+Project: ${project.name} — ${project.description || "A beautiful renovation"}
+Location: ${project.address || "Muskoka, Ontario"}
+
+Before/after photos:
+${photoDescriptions}
+
+Write a compelling transformation reveal post that builds anticipation, highlights the dramatic change, and showcases the craftsmanship.
+${platformName === "Instagram" ? "Include 15-25 hashtags. Use storytelling (150-300 words)." : "Keep it concise (50-120 words). Use 3-5 hashtags."}
+
+Respond with valid JSON only:
+{ "title": "<3-5 word title>", "copy": "<full post text>" }`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-5-mini",
+        messages: [
+          { role: "system", content: prompt },
+          { role: "user", content: `Write a before/after transformation post for "${project.name}".` },
+        ],
+        response_format: { type: "json_object" },
+      });
+
+      const content = response.choices[0]?.message?.content;
+      if (!content) return res.status(500).json({ message: "No response from AI" });
+
+      const aiResult = JSON.parse(content);
+      const pairedPhoto = baPhotos[0];
+
+      const savedPost = await storage.createSocialPost({
+        projectId: project.id,
+        title: String(aiResult.title || "Transformation Reveal"),
+        copy: String(aiResult.copy || ""),
+        platform: platformName.toLowerCase(),
+        tone: "Transformation",
+        photoUrl: pairedPhoto?.url || null,
+        photoId: pairedPhoto?.id || null,
+        status: "draft",
+      });
+
+      res.json({
+        ...savedPost,
+        beforeAfterPhotos: baPhotos.map((p: any) => ({
+          id: p.id, url: p.url, caption: p.caption, tags: p.tags || [],
+        })),
+      });
+    } catch (error: any) {
+      console.error("Before/after generation error:", error);
+      res.status(500).json({ message: "Failed to generate before/after post" });
+    }
+  });
+
+  // Seasonal prompts
+  app.get("/api/social-media/seasonal-prompts", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await authStorage.getUser(userId);
+      if (!user || user.role !== "admin") return res.status(403).json({ message: "Admin only" });
+
+      const now = new Date();
+      const month = now.getMonth();
+
+      const allPrompts = [
+        { id: "spring-reno", months: [2, 3, 4], title: "Spring Renovation Kickoff", description: "Fresh starts and new projects — showcase spring renovation beginnings.", icon: "🌱", theme: "renewal" },
+        { id: "cottage-opener", months: [4, 5], title: "Cottage Season Opener", description: "Muskoka comes alive — highlight cottage-ready transformations.", icon: "🏡", theme: "lakeside" },
+        { id: "summer-living", months: [5, 6, 7], title: "Summer Cottage Living", description: "Outdoor entertaining, lake views, and summer spaces.", icon: "☀️", theme: "outdoor" },
+        { id: "summer-entertaining", months: [6, 7], title: "Summer Entertaining Spaces", description: "Decks, patios, and gathering areas perfect for hosting.", icon: "🍽️", theme: "hosting" },
+        { id: "fall-prep", months: [8, 9], title: "Autumn Cottage Prep", description: "Getting spaces cozy and ready for the fall season.", icon: "🍂", theme: "cozy" },
+        { id: "thanksgiving", months: [9], title: "Thanksgiving Gathering Spaces", description: "Dining rooms and kitchens ready for Canadian Thanksgiving.", icon: "🦃", theme: "gathering" },
+        { id: "winter-cozy", months: [10, 11], title: "Winter Cottage Cozy", description: "Fireplaces, warm interiors, and winter-ready cottages.", icon: "❄️", theme: "warmth" },
+        { id: "holiday-entertaining", months: [11, 0], title: "Holiday Entertaining", description: "Stunning spaces for holiday celebrations and gatherings.", icon: "🎄", theme: "celebration" },
+        { id: "new-year", months: [0, 1], title: "New Year, New Space", description: "Fresh renovation inspiration for the new year.", icon: "✨", theme: "fresh-start" },
+        { id: "winter-escape", months: [1, 2], title: "Winter Escape Planning", description: "Dream cottage renovations for the coming season.", icon: "🏔️", theme: "planning" },
+      ];
+
+      const currentPrompts = allPrompts.filter(p => p.months.includes(month));
+      res.json(currentPrompts);
+    } catch { res.status(500).json({ message: "Failed to fetch seasonal prompts" }); }
+  });
+
+  // Generate from seasonal prompt
+  app.post("/api/social-media/seasonal-generate", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await authStorage.getUser(userId);
+      if (!user || user.role !== "admin") return res.status(403).json({ message: "Admin only" });
+
+      const seasonalSchema = z.object({
+        projectId: z.number({ coerce: true }).int().positive(),
+        platform: z.enum(["instagram", "facebook"]).default("instagram"),
+        seasonalTheme: z.string().max(200),
+        seasonalTitle: z.string().max(200),
+      });
+      const parsed = seasonalSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: "Invalid input" });
+
+      const project = await storage.getProject(parsed.data.projectId);
+      if (!project) return res.status(404).json({ message: "Project not found" });
+
+      const [projectMilestones, projectPhotos] = await Promise.all([
+        storage.getMilestones(project.id),
+        storage.getPhotos(project.id),
+      ]);
+
+      const platformName = parsed.data.platform === "facebook" ? "Facebook" : "Instagram";
+
+      const OpenAI = (await import("openai")).default;
+      const openai = new OpenAI({
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+      });
+
+      const prompt = `You are a social media copywriter for Aster & Spruce Living, a high-end Muskoka cottage renovation company.
+Always use Canadian English spelling (colour, favourite, centre, etc.).
+Brand voice: Warm minimalist, premium quality, nature-inspired.
+
+SEASONAL THEME: ${parsed.data.seasonalTitle}
+This post should tie the project to the seasonal theme of "${parsed.data.seasonalTheme}" — connecting the renovation work to the time of year, Muskoka lifestyle, and the feeling of the season.
+
+Project: ${project.name} — ${project.description || "A beautiful renovation"}
+Location: ${project.address || "Muskoka, Ontario"}
+Milestones: ${projectMilestones.map((m: any) => m.title).join(", ") || "None"}
+
+Platform: ${platformName}
+${platformName === "Instagram" ? "Write a storytelling-style caption (150-300 words) with 15-25 hashtags." : "Write a conversational post (50-120 words) with 3-5 hashtags."}
+
+Respond with valid JSON only:
+{ "title": "<3-5 word title>", "copy": "<full post text>" }`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-5-mini",
+        messages: [
+          { role: "system", content: prompt },
+          { role: "user", content: `Write a seasonal ${parsed.data.seasonalTitle} post for "${project.name}".` },
+        ],
+        response_format: { type: "json_object" },
+      });
+
+      const content = response.choices[0]?.message?.content;
+      if (!content) return res.status(500).json({ message: "No response from AI" });
+
+      const aiResult = JSON.parse(content);
+      const pairedPhoto = projectPhotos.length > 0
+        ? (projectPhotos.find((p: any) => p.isShowcase) || projectPhotos[0])
+        : null;
+
+      const savedPost = await storage.createSocialPost({
+        projectId: project.id,
+        title: String(aiResult.title || parsed.data.seasonalTitle),
+        copy: String(aiResult.copy || ""),
+        platform: platformName.toLowerCase(),
+        tone: parsed.data.seasonalTitle,
+        photoUrl: pairedPhoto?.url || null,
+        photoId: pairedPhoto?.id || null,
+        status: "draft",
+      });
+
+      res.json(savedPost);
+    } catch (error: any) {
+      console.error("Seasonal generation error:", error);
+      res.status(500).json({ message: "Failed to generate seasonal post" });
+    }
+  });
+
+  // Google Drive export — Replit Google Drive connector integration
+  app.post("/api/social-posts/export-drive", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await authStorage.getUser(userId);
+      if (!user || user.role !== "admin") return res.status(403).json({ message: "Admin only" });
+
+      const exportSchema = z.object({
+        postIds: z.array(z.number().int().positive()).max(20),
+      });
+      const parsed = exportSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: "Invalid input" });
+      if (parsed.data.postIds.length === 0) return res.json({ exported: [], folderId: null, folderName: "Aster & Spruce Social" });
+
+      const { ReplitConnectors } = await import("@replit/connectors-sdk");
+      const connectors = new ReplitConnectors();
+
+      const folderName = "Aster & Spruce Social";
+      let folderId: string | null = null;
+
+      const searchRes = await connectors.proxy("google-drive", `/drive/v3/files?q=name='${folderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false&fields=files(id,name)`, { method: "GET" });
+      if (!searchRes.ok) {
+        console.error("Drive search failed:", searchRes.status);
+        return res.status(502).json({ message: "Could not connect to Google Drive" });
+      }
+      const searchData = await searchRes.json();
+      if (searchData.files && searchData.files.length > 0) {
+        folderId = searchData.files[0].id;
+      } else {
+        const createFolderRes = await connectors.proxy("google-drive", "/drive/v3/files", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: folderName, mimeType: "application/vnd.google-apps.folder" }),
+        });
+        if (!createFolderRes.ok) {
+          console.error("Drive folder creation failed:", createFolderRes.status);
+          return res.status(502).json({ message: "Could not create folder in Google Drive" });
+        }
+        const folderData = await createFolderRes.json();
+        folderId = folderData.id;
+      }
+
+      const exported: any[] = [];
+      for (const postId of parsed.data.postIds) {
+        const post = await storage.getSocialPost(postId);
+        if (!post) continue;
+
+        const project = await storage.getProject(post.projectId);
+        const projectName = project?.name || "Unknown Project";
+        const timestamp = new Date().toISOString().slice(0, 10);
+        const fileName = `${projectName} - ${post.title} (${post.platform}) ${timestamp}.txt`;
+
+        const captionContent = `${post.title}\n\nPlatform: ${post.platform}\nTone: ${post.tone || "—"}\nProject: ${projectName}\n\n---\n\n${post.copy}`;
+
+        const boundary = "----FormBoundary" + randomUUID().replace(/-/g, "");
+        const metadata = JSON.stringify({
+          name: fileName,
+          parents: folderId ? [folderId] : [],
+          mimeType: "text/plain",
+        });
+
+        const bodyParts = [
+          `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n`,
+          `--${boundary}\r\nContent-Type: text/plain\r\n\r\n${captionContent}\r\n`,
+          `--${boundary}--`,
+        ];
+        const body = bodyParts.join("");
+
+        const uploadRes = await connectors.proxy("google-drive", "/upload/drive/v3/files?uploadType=multipart", {
+          method: "POST",
+          headers: { "Content-Type": `multipart/related; boundary=${boundary}` },
+          body,
+        });
+
+        if (uploadRes.ok) {
+          const uploadData = await uploadRes.json();
+          if (uploadData.id) {
+            exported.push({ postId, fileId: uploadData.id, fileName });
+          } else {
+            exported.push({ postId, error: "Upload succeeded but no file ID returned" });
+          }
+        } else {
+          exported.push({ postId, error: `Upload failed (${uploadRes.status})` });
+        }
+      }
+
+      res.json({ exported, folderId, folderName });
+    } catch (error: any) {
+      console.error("Google Drive export error:", error);
+      res.status(500).json({ message: "Failed to export to Google Drive" });
     }
   });
 

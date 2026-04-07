@@ -56,14 +56,15 @@ Replit Auth provides authentication via OpenID Connect, with session management 
 *   **Real-time Collaboration**: WebSocket-based project rooms for live updates across all project data, with active viewer tracking and conflict resolution.
 *   **Client Onboarding System**: Admin-initiated client invite flow via SMS, including invite validation and profile completion.
 *   **Unified Calendar View**: Per-project calendar shows timeline bars (milestones, rooms, tasks) from the Gantt chart alongside calendar events, with layer toggles. A Master Calendar page (`/master-calendar`) aggregates data across all projects for admin/crew, with project filtering.
-*   **Social Media Post Generator**: Admin-only page (`/social-media`) that uses AI (OpenAI/gpt-5-mini) to generate Instagram and Facebook captions from project data. Supports Controlled mode (pick project, platform, tone, focus) and Random mode (auto-generates from a random project). Copy-to-clipboard output.
+*   **Social Media Content Library**: Admin-only page (`/social-media`) with Generate and Library tabs. Generate tab: AI-powered caption generation (Controlled, Random, Before/After, Batch, Seasonal modes) using OpenAI gpt-5-mini. All generated posts auto-save to a `social_posts` DB table with paired project photos. Library tab: browsable grid of saved posts with project/platform/status filters, inline editing, status workflow (Draft → Ready → Posted), copy-to-clipboard, and Google Drive export. Milestone completions auto-trigger draft social posts. Seasonal prompts suggest timely Muskoka cottage content ideas.
 
 ## External Dependencies
 
 *   **PostgreSQL Database**: For all data storage.
 *   **Replit Auth**: For user authentication.
 *   **Twilio**: For SMS notifications.
-*   **OpenAI (via Replit AI Integrations)**: Powers the Cost Estimator's AI Scope Analyzer and the Social Media Post Generator (gpt-5-mini).
+*   **OpenAI (via Replit AI Integrations)**: Powers the Cost Estimator's AI Scope Analyzer and the Social Media Content Library (gpt-5-mini).
+*   **Google Drive (via Replit Connectors)**: Exports social media posts to Google Drive using `@replit/connectors-sdk` proxy pattern.
 
 ### Key NPM Packages
 

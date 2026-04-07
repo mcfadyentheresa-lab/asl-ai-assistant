@@ -1,11 +1,12 @@
 import { db } from "./db";
 import { 
-  users, projects, milestones, subMilestones, sections, tasks, photos, documents, timeEntries, messages, checklistItems, boardItems, calendarEvents, planningBoards, canvasElements, activityLog, activityViews, paintColors, boardSnapshots, costCategories, marketRates, projectEstimates, estimateItems, receipts, estimateWarnings, crewRates, subcontractors, suppliers, supplierPrices, clientInvites,
+  users, projects, milestones, subMilestones, sections, tasks, photos, documents, timeEntries, messages, checklistItems, boardItems, calendarEvents, planningBoards, canvasElements, activityLog, activityViews, paintColors, boardSnapshots, costCategories, marketRates, projectEstimates, estimateItems, receipts, estimateWarnings, crewRates, subcontractors, suppliers, supplierPrices, clientInvites, socialPosts,
   type Project, type Milestone, type SubMilestone, type Section, type Task, type Photo, type Document, type TimeEntry, type Message,
   type ChecklistItem, type BoardItem, type CalendarEvent, type PlanningBoard, type CanvasElement, type ActivityLog, type PaintColor, type BoardSnapshot, type CostCategory, type MarketRate, type ProjectEstimate, type EstimateItem, type Receipt, type EstimateWarning, type CrewRate, type Subcontractor,
   type InsertProject, type InsertMilestone, type InsertSubMilestone, type InsertSection, type InsertTask, type InsertPhoto, type InsertDocument, 
   type InsertTimeEntry, type InsertMessage, type InsertChecklistItem, type InsertBoardItem, type InsertCalendarEvent, type InsertPlanningBoard, type InsertCanvasElement, type InsertActivityLog, type InsertBoardSnapshot, type InsertCostCategory, type InsertMarketRate, type InsertProjectEstimate, type InsertEstimateItem, type InsertReceipt, type InsertEstimateWarning, type InsertCrewRate, type InsertSubcontractor, type Supplier, type SupplierPrice, type InsertSupplier, type InsertSupplierPrice,
-  type ClientInvite, type InsertClientInvite
+  type ClientInvite, type InsertClientInvite,
+  type SocialPost, type InsertSocialPost
 } from "@shared/schema";
 import { type User } from "@shared/models/auth";
 import { eq, desc, and, ilike, or, gte, lte, inArray, sql } from "drizzle-orm";
@@ -202,6 +203,13 @@ export interface IStorage {
   getClientInvitesByEmail(email: string): Promise<ClientInvite[]>;
   updateClientInvite(id: number, updates: Partial<InsertClientInvite>): Promise<ClientInvite>;
   deleteClientInvite(id: number): Promise<void>;
+
+  // Social Posts
+  getSocialPosts(filters?: { projectId?: number; platform?: string; status?: string }): Promise<SocialPost[]>;
+  getSocialPost(id: number): Promise<SocialPost | undefined>;
+  createSocialPost(post: InsertSocialPost): Promise<SocialPost>;
+  updateSocialPost(id: number, updates: Partial<InsertSocialPost>): Promise<SocialPost>;
+  deleteSocialPost(id: number): Promise<void>;
 
   // Cross-project calendar (admin/crew)
   getAllCalendarEvents(): Promise<(CalendarEvent & { projectName: string; projectColor: string | null })[]>;
@@ -846,6 +854,33 @@ export class DatabaseStorage implements IStorage {
   }
   async deleteClientInvite(id: number): Promise<void> {
     await db.delete(clientInvites).where(eq(clientInvites.id, id));
+  }
+
+  // Social Posts
+  async getSocialPosts(filters?: { projectId?: number; platform?: string; status?: string }): Promise<SocialPost[]> {
+    const conditions: any[] = [];
+    if (filters?.projectId) conditions.push(eq(socialPosts.projectId, filters.projectId));
+    if (filters?.platform) conditions.push(eq(socialPosts.platform, filters.platform));
+    if (filters?.status) conditions.push(eq(socialPosts.status, filters.status));
+    if (conditions.length > 0) {
+      return db.select().from(socialPosts).where(and(...conditions)).orderBy(desc(socialPosts.createdAt));
+    }
+    return db.select().from(socialPosts).orderBy(desc(socialPosts.createdAt));
+  }
+  async getSocialPost(id: number): Promise<SocialPost | undefined> {
+    const [post] = await db.select().from(socialPosts).where(eq(socialPosts.id, id));
+    return post;
+  }
+  async createSocialPost(post: InsertSocialPost): Promise<SocialPost> {
+    const [created] = await db.insert(socialPosts).values(post).returning();
+    return created;
+  }
+  async updateSocialPost(id: number, updates: Partial<InsertSocialPost>): Promise<SocialPost> {
+    const [updated] = await db.update(socialPosts).set({ ...updates, updatedAt: new Date() }).where(eq(socialPosts.id, id)).returning();
+    return updated;
+  }
+  async deleteSocialPost(id: number): Promise<void> {
+    await db.delete(socialPosts).where(eq(socialPosts.id, id));
   }
 
   // Cross-project calendar (admin/crew)

@@ -553,6 +553,22 @@ export const clientInvites = pgTable("client_invites", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Social Posts (content library)
+export const socialPosts = pgTable("social_posts", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => projects.id),
+  title: text("title").notNull(),
+  copy: text("copy").notNull(),
+  platform: text("platform").notNull().default("instagram"),
+  tone: text("tone").default("Warm"),
+  photoUrl: text("photo_url"),
+  photoId: integer("photo_id"),
+  status: text("status").notNull().default("draft"),
+  postedAt: timestamp("posted_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Supplier Prices (price book built from receipts)
 export const supplierPrices = pgTable("supplier_prices", {
   id: serial("id").primaryKey(),
@@ -599,6 +615,7 @@ export const insertSubcontractorSchema = createInsertSchema(subcontractors).omit
 export const insertSupplierSchema = createInsertSchema(suppliers).omit({ id: true, createdAt: true });
 export const insertClientInviteSchema = createInsertSchema(clientInvites).omit({ id: true, createdAt: true });
 export const insertSupplierPriceSchema = createInsertSchema(supplierPrices).omit({ id: true, createdAt: true, lastUpdated: true });
+export const insertSocialPostSchema = createInsertSchema(socialPosts).omit({ id: true, createdAt: true, updatedAt: true });
 
 // TYPES
 export type Project = typeof projects.$inferSelect;
@@ -660,3 +677,5 @@ export type SupplierPrice = typeof supplierPrices.$inferSelect;
 export type InsertSupplierPrice = z.infer<typeof insertSupplierPriceSchema>;
 export type ClientInvite = typeof clientInvites.$inferSelect;
 export type InsertClientInvite = z.infer<typeof insertClientInviteSchema>;
+export type SocialPost = typeof socialPosts.$inferSelect;
+export type InsertSocialPost = z.infer<typeof insertSocialPostSchema>;
