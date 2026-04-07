@@ -210,6 +210,8 @@ export interface IStorage {
   createSocialPost(post: InsertSocialPost): Promise<SocialPost>;
   updateSocialPost(id: number, updates: Partial<InsertSocialPost>): Promise<SocialPost>;
   deleteSocialPost(id: number): Promise<void>;
+  getUnseenMilestoneCount(): Promise<number>;
+  markMilestoneDraftsSeen(): Promise<void>;
 
   // Cross-project calendar (admin/crew)
   getAllCalendarEvents(): Promise<(CalendarEvent & { projectName: string; projectColor: string | null })[]>;
@@ -881,6 +883,25 @@ export class DatabaseStorage implements IStorage {
   }
   async deleteSocialPost(id: number): Promise<void> {
     await db.delete(socialPosts).where(eq(socialPosts.id, id));
+  }
+  async getUnseenMilestoneCount(): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)::int` })
+      .from(socialPosts)
+      .where(and(
+        eq(socialPosts.source, "milestone"),
+        eq(socialPosts.status, "draft"),
+        sql`${socialPosts.seenAt} IS NULL`
+      ));
+    return result[0]?.count ?? 0;
+  }
+  async markMilestoneDraftsSeen(): Promise<void> {
+    await db.update(socialPosts)
+      .set({ seenAt: new Date() })
+      .where(and(
+        eq(socialPosts.source, "milestone"),
+        eq(socialPosts.status, "draft"),
+        sql`${socialPosts.seenAt} IS NULL`
+      ));
   }
 
   // Cross-project calendar (admin/crew)

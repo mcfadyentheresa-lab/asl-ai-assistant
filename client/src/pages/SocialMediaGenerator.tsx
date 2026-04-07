@@ -130,7 +130,7 @@ export default function SocialMediaGenerator() {
     return params.toString();
   }, [filterProject, filterPlatform, filterStatus]);
 
-  const { data: libraryPosts = [], isLoading: libraryLoading } = useQuery<SocialPost[]>({
+  const { data: libraryData, isLoading: libraryLoading } = useQuery<{ posts: SocialPost[]; unseenMilestoneCount: number }>({
     queryKey: ["/api/social-posts", libraryQueryParams],
     queryFn: async () => {
       const res = await fetch(`/api/social-posts?${libraryQueryParams}`, { credentials: "include" });
@@ -139,13 +139,12 @@ export default function SocialMediaGenerator() {
     },
   });
 
+  const libraryPosts = libraryData?.posts ?? [];
+  const unseenMilestoneCount = libraryData?.unseenMilestoneCount ?? 0;
+
   const { data: seasonalPrompts = [] } = useQuery<SeasonalPrompt[]>({
     queryKey: ["/api/social-media/seasonal-prompts"],
   });
-
-  const newDraftCount = useMemo(() => {
-    return libraryPosts.filter(p => p.status === "draft" && p.source === "milestone").length;
-  }, [libraryPosts]);
 
   const updatePostMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: number; updates: any }) => {
@@ -352,9 +351,9 @@ export default function SocialMediaGenerator() {
               {libraryPosts.length > 0 && (
                 <Badge variant="secondary" className="ml-2 text-xs">{libraryPosts.length}</Badge>
               )}
-              {newDraftCount > 0 && (
+              {unseenMilestoneCount > 0 && (
                 <Badge variant="destructive" className="ml-1 text-xs" data-testid="badge-new-drafts">
-                  {newDraftCount} new
+                  {unseenMilestoneCount} new
                 </Badge>
               )}
             </TabsTrigger>
@@ -614,11 +613,11 @@ export default function SocialMediaGenerator() {
 
           {/* =================== LIBRARY TAB =================== */}
           <TabsContent value="library" className="space-y-6">
-            {newDraftCount > 0 && (
+            {unseenMilestoneCount > 0 && (
               <div className="flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3" data-testid="milestone-draft-notice">
                 <Star className="h-5 w-5 text-primary flex-shrink-0" />
                 <p className="text-sm">
-                  <strong>{newDraftCount} milestone-triggered draft{newDraftCount > 1 ? "s" : ""}</strong> — Milestone completions auto-generated {newDraftCount > 1 ? "these posts" : "this post"}. Review and publish when ready.
+                  <strong>{unseenMilestoneCount} new milestone-triggered draft{unseenMilestoneCount > 1 ? "s" : ""}</strong> — Milestone completions auto-generated {unseenMilestoneCount > 1 ? "these posts" : "this post"}. Review and publish when ready.
                 </p>
               </div>
             )}

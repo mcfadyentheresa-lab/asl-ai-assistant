@@ -565,6 +565,7 @@ export const socialPosts = pgTable("social_posts", {
   photoId: integer("photo_id"),
   status: text("status").notNull().default("draft"),
   source: text("source").default("manual"),
+  seenAt: timestamp("seen_at"),
   postedAt: timestamp("posted_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

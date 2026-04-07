@@ -2909,8 +2909,10 @@ Respond with valid JSON only, no markdown:
       if (req.query.projectId) filters.projectId = Number(req.query.projectId);
       if (req.query.platform) filters.platform = String(req.query.platform);
       if (req.query.status) filters.status = String(req.query.status);
+      const unseenMilestoneCount = await storage.getUnseenMilestoneCount();
       const posts = await storage.getSocialPosts(filters);
-      res.json(posts);
+      storage.markMilestoneDraftsSeen().catch(() => {});
+      res.json({ posts, unseenMilestoneCount });
     } catch { res.status(500).json({ message: "Failed to fetch social posts" }); }
   });
 
@@ -3364,15 +3366,14 @@ Respond with valid JSON only:
             const projectPhotos2 = await storage.getPhotos(post.projectId);
             const validPhoto = projectPhotos2.find((p: any) => p.id === post.photoId && p.url === post.photoUrl);
             if (!validPhoto) throw new Error("Photo URL does not match a valid project photo");
-            let absolutePhotoUrl = post.photoUrl;
-            if (absolutePhotoUrl.startsWith("/")) {
-              const port = process.env.PORT || "5000";
-              absolutePhotoUrl = `http://0.0.0.0:${port}${absolutePhotoUrl}`;
-            }
-            const imgRes = await fetch(absolutePhotoUrl);
-            if (imgRes.ok) {
-              const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
-              const imgContentType = imgRes.headers.get("content-type") || "image/jpeg";
+            const photoPath = post.photoUrl.startsWith("/")
+              ? path.join(process.cwd(), post.photoUrl)
+              : post.photoUrl;
+            if (photoPath.startsWith("/") && fs.existsSync(photoPath)) {
+              const imgBuffer = fs.readFileSync(photoPath);
+              const extLower = path.extname(photoPath).toLowerCase();
+              const mimeMap: Record<string, string> = { ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".gif": "image/gif", ".webp": "image/webp" };
+              const imgContentType = mimeMap[extLower] || "image/jpeg";
               const ext = imgContentType.includes("png") ? "png" : imgContentType.includes("webp") ? "webp" : "jpg";
               const imgBoundary = "----FormBoundary" + randomUUID().replace(/-/g, "");
               const imgMeta = JSON.stringify({
