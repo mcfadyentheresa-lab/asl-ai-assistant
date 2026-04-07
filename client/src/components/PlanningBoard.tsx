@@ -62,8 +62,14 @@ import {
   Maximize,
   Hand,
   Move,
+  ChefHat,
+  Bath,
+  Home,
+  FileText,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
+import { useQuery } from "@tanstack/react-query";
 import {
   usePlanningBoards,
   usePlanningBoard,
@@ -151,6 +157,15 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
   const [cardItemImageUrl, setCardItemImageUrl] = useState("");
   const [cardItemImageCaption, setCardItemImageCaption] = useState("");
   const [cardAddMode, setCardAddMode] = useState<"text" | "color" | "image" | null>(null);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
+
+  const { data: templateCatalogue = [] } = useQuery<{ id: string; name: string; description: string; icon: string }[]>({
+    queryKey: ["/api/board-templates"],
+    enabled: isAdmin,
+  });
 
   const { data: boards = [], isLoading: isLoadingBoards } = usePlanningBoards(projectId);
   const { data: boardData, isLoading: isLoadingBoard } = usePlanningBoard(selectedBoardId);
@@ -1036,11 +1051,16 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
 
   const handleCreateBoard = async () => {
     try {
-      const result = await createBoard({ projectId, name: newBoardName || "Untitled Board" });
+      const result = await createBoard({
+        projectId,
+        name: newBoardName || "Untitled Board",
+        ...(selectedTemplateId ? { templateId: selectedTemplateId } : {}),
+      });
       setSelectedBoardId(result.id);
       setNewBoardName("");
+      setSelectedTemplateId(null);
       setShowNewBoardDialog(false);
-      toast({ title: "Created", description: "New planning board created." });
+      toast({ title: "Created", description: selectedTemplateId ? "Board created from template." : "New planning board created." });
     } catch {
       toast({ title: "Error", description: "Failed to create board.", variant: "destructive" });
     }
@@ -1496,8 +1516,8 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
         </div>
       )}
 
-      <Dialog open={showNewBoardDialog} onOpenChange={setShowNewBoardDialog}>
-        <DialogContent>
+      <Dialog open={showNewBoardDialog} onOpenChange={(open) => { setShowNewBoardDialog(open); if (!open) { setSelectedTemplateId(null); setNewBoardName(""); } }}>
+        <DialogContent className={isAdmin && templateCatalogue.length > 0 ? "sm:max-w-lg" : ""}>
           <DialogHeader>
             <DialogTitle>Create New Board</DialogTitle>
           </DialogHeader>
@@ -1508,6 +1528,43 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
             onKeyDown={(e) => e.key === "Enter" && handleCreateBoard()}
             data-testid="input-new-board-name"
           />
+          {isAdmin && templateCatalogue.length > 0 && (
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground uppercase tracking-wide">Start from Template</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedTemplateId(null)}
+                  className={`flex items-center gap-2.5 rounded-md border p-2.5 text-left transition-colors hover:bg-accent/50 ${selectedTemplateId === null ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border"}`}
+                  data-testid="template-blank"
+                >
+                  <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <div className="min-w-0">
+                    <div className="text-xs font-medium truncate">Blank Board</div>
+                    <div className="text-[10px] text-muted-foreground truncate">Start from scratch</div>
+                  </div>
+                </button>
+                {templateCatalogue.map((t) => {
+                  const IconComp = t.icon === "ChefHat" ? ChefHat : t.icon === "Bath" ? Bath : t.icon === "Home" ? Home : Palette;
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => setSelectedTemplateId(t.id)}
+                      className={`flex items-center gap-2.5 rounded-md border p-2.5 text-left transition-colors hover:bg-accent/50 ${selectedTemplateId === t.id ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border"}`}
+                      data-testid={`template-${t.id}`}
+                    >
+                      <IconComp className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <div className="min-w-0">
+                        <div className="text-xs font-medium truncate">{t.name}</div>
+                        <div className="text-[10px] text-muted-foreground truncate">{t.description}</div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowNewBoardDialog(false)} data-testid="button-cancel-new-board">Cancel</Button>
             <Button onClick={handleCreateBoard} data-testid="button-confirm-new-board">Create</Button>

@@ -27,6 +27,7 @@ import {
 } from "./sms";
 import { heartbeat, getOnlineUsers, setVisibility, getVisibility } from "./presence";
 import { broadcastProjectChange } from "./websocket";
+import { getTemplateCatalogue, getTemplateCanvasData } from "./board-templates";
 
 const uploadDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadDir)) {
@@ -1443,6 +1444,15 @@ Respond with valid JSON only:
     res.json(board);
   });
 
+  app.get("/api/board-templates", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const userRecord = await authStorage.getUser(userId);
+    if (userRecord?.role !== "admin") {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    res.json(getTemplateCatalogue());
+  });
+
   app.post(api.planningBoards.create.path, isAuthenticated, async (req: any, res) => {
     try {
       const projectId = Number(req.params.projectId);
@@ -1450,7 +1460,26 @@ Respond with valid JSON only:
       if (!hasAccess) return;
       const userId = req.user.claims.sub;
       const input = api.planningBoards.create.input.parse(req.body);
-      const board = await storage.createPlanningBoard({ ...input, projectId, updatedBy: userId });
+
+      const templateId = req.body.templateId as string | undefined;
+      let canvasData: any = undefined;
+      if (templateId) {
+        const userRecord = await authStorage.getUser(userId);
+        if (userRecord?.role !== "admin") {
+          return res.status(403).json({ message: "Only admins can use board templates" });
+        }
+        canvasData = getTemplateCanvasData(templateId);
+        if (!canvasData) {
+          return res.status(400).json({ message: "Invalid template ID" });
+        }
+      }
+
+      const board = await storage.createPlanningBoard({
+        ...input,
+        projectId,
+        updatedBy: userId,
+        ...(canvasData ? { canvasData } : {}),
+      });
       res.status(201).json(board);
     } catch (err: any) {
       console.error("Planning board create error:", err.message);

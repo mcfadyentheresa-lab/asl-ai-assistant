@@ -586,12 +586,12 @@ export function usePlanningBoard(id: number | null) {
 export function useCreatePlanningBoard() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ projectId, name }: { projectId: number; name?: string }) => {
+    mutationFn: async ({ projectId, name, templateId }: { projectId: number; name?: string; templateId?: string }) => {
       const url = buildUrl(api.planningBoards.create.path, { projectId });
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name || "Untitled Board" }),
+        body: JSON.stringify({ name: name || "Untitled Board", ...(templateId ? { templateId } : {}) }),
         credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to create planning board");
