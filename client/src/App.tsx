@@ -14,7 +14,6 @@ import Profile from "@/pages/Profile";
 import ColorPortfolio from "@/pages/ColorPortfolio";
 import Timesheets from "@/pages/Timesheets";
 import Payroll from "@/pages/Payroll";
-import CostEstimator from "@/pages/CostEstimator";
 import MarketRates from "@/pages/MarketRates";
 import LaborRates from "@/pages/LaborRates";
 import TradeContacts from "@/pages/TradeContacts";
@@ -88,7 +87,6 @@ function Router() {
         <Route path="/welcome" component={Welcome} />
         <Route path="/invite/:token" component={InviteAccept} />
         <Route path="/profile" component={Profile} />
-        <Route path="/project/:id/estimate" component={CostEstimator} />
         <Route path="/project/:id" component={ProjectDetails} />
         <Route path="/colors" component={ColorPortfolio} />
         <Route path="/timesheets" component={Timesheets} />

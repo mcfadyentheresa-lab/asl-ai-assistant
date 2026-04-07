@@ -1026,15 +1026,6 @@ export default function ProjectDetails() {
                 </p>
               )}
             </div>
-            {userRole === "admin" && (
-              <div className="flex items-center gap-2">
-                <Link href={`/project/${projectId}/estimate`}>
-                  <Button variant="outline" size="sm" className="h-7 px-2.5 text-[11px]" data-testid="link-cost-estimator">
-                    <DollarSign className="h-3.5 w-3.5 mr-1" /> Cost Estimator
-                  </Button>
-                </Link>
-              </div>
-            )}
           </div>
         </div>
       </div>
