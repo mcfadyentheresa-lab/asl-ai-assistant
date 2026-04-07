@@ -337,7 +337,7 @@ export default function SocialMediaGenerator() {
               <ArrowLeft className="mr-2 h-4 w-4" /> Back to Dashboard
             </Button>
           </Link>
-          <h1 className="font-serif text-2xl uppercase tracking-wide text-foreground" data-testid="text-social-heading">
+          <h1 className="font-serif text-2xl uppercase tracking-normal text-foreground" data-testid="text-social-heading">
             Social Media Content
           </h1>
           <p className="text-muted-foreground">Generate, collect, and organise social content from your projects.</p>
@@ -368,7 +368,7 @@ export default function SocialMediaGenerator() {
                 {/* Create Post generation */}
                 <Card>
                   <CardHeader>
-                    <CardTitle className="uppercase tracking-wide text-base">Create Post</CardTitle>
+                    <CardTitle className="uppercase tracking-normal text-base">Create Post</CardTitle>
                     <CardDescription>Pick the project, platform, tone, and what to highlight.</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
@@ -465,7 +465,7 @@ export default function SocialMediaGenerator() {
                 {/* Batch generation */}
                 <Card>
                   <CardHeader>
-                    <CardTitle className="uppercase tracking-wide text-base flex items-center gap-2">
+                    <CardTitle className="uppercase tracking-normal text-base flex items-center gap-2">
                       <Layers className="h-5 w-5" /> Batch Generate
                     </CardTitle>
                     <CardDescription>Create multiple post ideas at once for a project.</CardDescription>
@@ -498,7 +498,7 @@ export default function SocialMediaGenerator() {
                 {seasonalPrompts.length > 0 && (
                   <Card>
                     <CardHeader>
-                      <CardTitle className="uppercase tracking-wide text-base flex items-center gap-2">
+                    <CardTitle className="uppercase tracking-normal text-base flex items-center gap-2">
                         <Leaf className="h-5 w-5" /> Seasonal Ideas
                       </CardTitle>
                       <CardDescription>Timely content ideas for the current season.</CardDescription>
@@ -532,7 +532,7 @@ export default function SocialMediaGenerator() {
               <div className="space-y-6">
                 <Card>
                   <CardHeader>
-                    <CardTitle className="uppercase tracking-wide text-base">Generated Post</CardTitle>
+                    <CardTitle className="uppercase tracking-normal text-base">Generated Post</CardTitle>
                     <CardDescription>Copy and paste this into Instagram or Facebook.</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
@@ -563,7 +563,7 @@ export default function SocialMediaGenerator() {
                 {generatedPost && photos.length > 0 && (
                   <Card>
                     <CardHeader>
-                      <CardTitle className="uppercase tracking-wide text-base flex items-center gap-2">
+                      <CardTitle className="uppercase tracking-normal text-base flex items-center gap-2">
                         <ImageIcon className="h-5 w-5" /> Project Photos
                       </CardTitle>
                       <CardDescription>Click a photo to select it for your post.</CardDescription>
@@ -764,7 +764,7 @@ export default function SocialMediaGenerator() {
       <Dialog open={!!editingPost} onOpenChange={(open) => !open && setEditingPost(null)}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle className="uppercase tracking-wide text-base">Edit Post</DialogTitle>
+            <DialogTitle className="uppercase tracking-normal text-base">Edit Post</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
