@@ -37,6 +37,7 @@ export default function SocialMediaGenerator() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedPost, setGeneratedPost] = useState("");
   const [generatedTitle, setGeneratedTitle] = useState("");
+  const [generatedPlatform, setGeneratedPlatform] = useState<string>("");
   const [photos, setPhotos] = useState<SocialPhoto[]>([]);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
@@ -82,6 +83,7 @@ export default function SocialMediaGenerator() {
       const data = await res.json();
       setGeneratedTitle(data.title || `${chosenProject.name} post`);
       setGeneratedPost(data.copy || "");
+      setGeneratedPlatform(data.platform || platform);
       setPhotos(data.photos || []);
     } catch {
       toast({ title: "Generation failed", description: "Could not create a social post.", variant: "destructive" });
@@ -183,7 +185,7 @@ export default function SocialMediaGenerator() {
                   <>
                     <div className="flex items-center gap-2">
                       <Badge variant="secondary" data-testid="badge-social-title">{generatedTitle}</Badge>
-                      <Badge variant="outline" data-testid="badge-social-platform">{platform}</Badge>
+                      <Badge variant="outline" data-testid="badge-social-platform">{generatedPlatform}</Badge>
                     </div>
                     <div className="whitespace-pre-wrap rounded-lg border border-border bg-muted/30 p-4 text-sm leading-6" data-testid="text-generated-social-post">
                       {generatedPost}

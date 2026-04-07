@@ -2731,7 +2731,7 @@ Respond with valid JSON only, no markdown:
         .map((m: any) => `- ${m.title}${m.completed ? " (completed)" : ""}`)
         .join("\n");
 
-      let photoContext = "";
+      let photoContext = `\nProject photos: ${projectPhotos.length} photo(s) available.`;
       if (projectPhotos.length > 0) {
         const photoDescriptions = projectPhotos
           .slice(0, 20)
@@ -2745,8 +2745,10 @@ Respond with valid JSON only, no markdown:
           })
           .filter(Boolean)
           .join("\n");
-        photoContext = `\nProject photos: ${projectPhotos.length} photo(s) available.${photoDescriptions ? `\nPhoto details:\n${photoDescriptions}` : ""}
+        photoContext += `${photoDescriptions ? `\nPhoto details:\n${photoDescriptions}` : ""}
 The post should reference visual content where appropriate (e.g., "see the stunning reveal", "swipe through the transformation").`;
+      } else {
+        photoContext += "\nNo photos have been uploaded yet, so do not reference specific images.";
       }
 
       const platformName = platform === "facebook" ? "Facebook" : "Instagram";
@@ -2804,6 +2806,7 @@ Respond with valid JSON only, no markdown:
       res.json({
         title: String(aiResult.title || project.name),
         copy: String(aiResult.copy || ""),
+        platform: platformName.toLowerCase(),
         photos: projectPhotos.map((p: any) => ({
           id: p.id,
           url: p.url,
