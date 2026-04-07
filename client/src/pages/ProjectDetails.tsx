@@ -517,7 +517,7 @@ function SidebarCards({
         </Card>
       )}
 
-      {userRole !== "client" && (
+      {(userRole === "admin" || userRole === "crew") && (
         <Card>
           <CardHeader>
             <CardTitle className="font-serif text-lg flex items-center gap-2" data-testid="text-access-heading">
