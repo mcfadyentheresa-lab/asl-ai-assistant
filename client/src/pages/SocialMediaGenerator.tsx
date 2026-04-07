@@ -18,7 +18,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   Loader2, Sparkles, Shuffle, Copy, RefreshCw, ArrowLeft, X, ImageIcon,
   ChevronLeft, ChevronRight, Layers, Library, Trash2, Check, Edit3,
-  CloudUpload, ArrowRightFromLine, Leaf, Snowflake, Sun, Star
+  CloudUpload, ArrowRightFromLine, Leaf, Star
 } from "lucide-react";
 import { Link } from "wouter";
 
@@ -43,6 +43,7 @@ interface SocialPost {
   photoUrl: string | null;
   photoId: number | null;
   status: string;
+  source: string | null;
   postedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -143,7 +144,7 @@ export default function SocialMediaGenerator() {
   });
 
   const newDraftCount = useMemo(() => {
-    return libraryPosts.filter(p => p.status === "draft" && p.tone === "Milestone Celebration").length;
+    return libraryPosts.filter(p => p.status === "draft" && p.source === "milestone").length;
   }, [libraryPosts]);
 
   const updatePostMutation = useMutation({
@@ -309,20 +310,6 @@ export default function SocialMediaGenerator() {
     } catch {
       setEditPhotos([]);
     }
-  }
-
-  function saveEdit() {
-    if (!editingPost) return;
-    updatePostMutation.mutate({
-      id: editingPost.id,
-      updates: {
-        title: editTitle,
-        copy: editCopy,
-        photoId: editPhotoId,
-        photoUrl: editPhotoUrl,
-      },
-    });
-    setEditingPost(null);
   }
 
   function getStatusColour(status: string) {

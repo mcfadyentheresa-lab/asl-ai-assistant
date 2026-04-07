@@ -1004,6 +1004,7 @@ Respond with valid JSON only:
                 photoUrl: pairedPhoto?.url || null,
                 photoId: pairedPhoto?.id || null,
                 status: "draft",
+                source: "milestone",
               });
             }
           } catch (err) {
@@ -2940,6 +2941,16 @@ Respond with valid JSON only, no markdown:
       });
       const parsed = updateSchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: "Invalid input" });
+      if (parsed.data.photoId != null && parsed.data.photoUrl != null) {
+        const post = await storage.getSocialPost(id);
+        if (post) {
+          const photos = await storage.getPhotos(post.projectId);
+          const matchedPhoto = photos.find((p: any) => p.id === parsed.data.photoId);
+          if (!matchedPhoto || matchedPhoto.url !== parsed.data.photoUrl) {
+            return res.status(400).json({ message: "Photo does not match project" });
+          }
+        }
+      }
       const updates: any = { ...parsed.data };
       if (parsed.data.status === "posted") updates.postedAt = new Date();
       const updated = await storage.updateSocialPost(Number(req.params.id), updates);
@@ -2993,8 +3004,6 @@ Respond with valid JSON only, no markdown:
         photoContext += photoDescriptions ? `\nPhoto details:\n${photoDescriptions}` : "";
       }
 
-      const platforms = ["instagram", "facebook"];
-      const tonesList = ["Professional", "Warm", "Behind the scenes", "Polished", "Excited"];
       const count = parsed.data.count;
 
       const OpenAI = (await import("openai")).default;
@@ -3287,7 +3296,8 @@ Respond with valid JSON only:
       const folderName = "Aster & Spruce Social";
       let folderId: string | null = null;
 
-      const searchRes = await connectors.proxy("google-drive", `/drive/v3/files?q=name='${folderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false&fields=files(id,name)`, { method: "GET" });
+      const driveQuery = encodeURIComponent(`name='${folderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`);
+      const searchRes = await connectors.proxy("google-drive", `/drive/v3/files?q=${driveQuery}&fields=files(id,name)`, { method: "GET" });
       if (!searchRes.ok) {
         console.error("Drive search failed:", searchRes.status);
         return res.status(502).json({ message: "Could not connect to Google Drive" });
@@ -3347,8 +3357,11 @@ Respond with valid JSON only:
         }
 
         let photoFileId: string | null = null;
-        if (post.photoUrl) {
+        if (post.photoUrl && post.photoId) {
           try {
+            const projectPhotos2 = await storage.getPhotos(post.projectId);
+            const validPhoto = projectPhotos2.find((p: any) => p.id === post.photoId && p.url === post.photoUrl);
+            if (!validPhoto) throw new Error("Photo URL does not match a valid project photo");
             const imgRes = await fetch(post.photoUrl);
             if (imgRes.ok) {
               const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
