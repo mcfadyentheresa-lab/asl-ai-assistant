@@ -2911,9 +2911,18 @@ Respond with valid JSON only, no markdown:
       if (req.query.status) filters.status = String(req.query.status);
       const unseenMilestoneCount = await storage.getUnseenMilestoneCount();
       const posts = await storage.getSocialPosts(filters);
-      storage.markMilestoneDraftsSeen().catch(() => {});
       res.json({ posts, unseenMilestoneCount });
     } catch { res.status(500).json({ message: "Failed to fetch social posts" }); }
+  });
+
+  app.post("/api/social-posts/mark-seen", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await authStorage.getUser(userId);
+      if (!user || user.role !== "admin") return res.status(403).json({ message: "Admin only" });
+      await storage.markMilestoneDraftsSeen();
+      res.json({ ok: true });
+    } catch { res.status(500).json({ message: "Failed to mark seen" }); }
   });
 
   app.get("/api/social-posts/:id", isAuthenticated, async (req: any, res) => {
@@ -3366,10 +3375,10 @@ Respond with valid JSON only:
             const projectPhotos2 = await storage.getPhotos(post.projectId);
             const validPhoto = projectPhotos2.find((p: any) => p.id === post.photoId && p.url === post.photoUrl);
             if (!validPhoto) throw new Error("Photo URL does not match a valid project photo");
-            const photoPath = post.photoUrl.startsWith("/")
-              ? path.join(process.cwd(), post.photoUrl)
-              : post.photoUrl;
-            if (photoPath.startsWith("/") && fs.existsSync(photoPath)) {
+            const uploadsRoot = path.resolve(process.cwd(), "uploads");
+            const filename = path.basename(post.photoUrl);
+            const photoPath = path.resolve(uploadsRoot, filename);
+            if (photoPath.startsWith(uploadsRoot + path.sep) && fs.existsSync(photoPath)) {
               const imgBuffer = fs.readFileSync(photoPath);
               const extLower = path.extname(photoPath).toLowerCase();
               const mimeMap: Record<string, string> = { ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".gif": "image/gif", ".webp": "image/webp" };

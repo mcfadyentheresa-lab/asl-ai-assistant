@@ -142,6 +142,16 @@ export default function SocialMediaGenerator() {
   const libraryPosts = libraryData?.posts ?? [];
   const unseenMilestoneCount = libraryData?.unseenMilestoneCount ?? 0;
 
+  useEffect(() => {
+    if (activeTab === "library" && unseenMilestoneCount > 0) {
+      apiRequest("POST", "/api/social-posts/mark-seen", {})
+        .then(() => {
+          queryClient.invalidateQueries({ queryKey: ["/api/social-posts"] });
+        })
+        .catch(() => {});
+    }
+  }, [activeTab, unseenMilestoneCount]);
+
   const { data: seasonalPrompts = [] } = useQuery<SeasonalPrompt[]>({
     queryKey: ["/api/social-media/seasonal-prompts"],
   });
