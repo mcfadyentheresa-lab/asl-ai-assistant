@@ -216,6 +216,7 @@ export interface BoardTemplate {
   name: string;
   description: string;
   icon: string;
+  image: string;
   canvasData: any;
 }
 
@@ -225,6 +226,7 @@ export const boardTemplates: BoardTemplate[] = [
     name: "Kitchen Renovation",
     description: "Cabinetry, countertops, appliances, backsplash, lighting, and finishes",
     icon: "ChefHat",
+    image: "/assets/images/template-kitchen-faux.png",
     canvasData: kitchenRenovation,
   },
   {
@@ -232,6 +234,7 @@ export const boardTemplates: BoardTemplate[] = [
     name: "Bathroom Renovation",
     description: "Fixtures, tile & flooring, vanity & storage, lighting, and plumbing",
     icon: "Bath",
+    image: "/assets/images/template-bathroom-faux.png",
     canvasData: bathroomRenovation,
   },
   {
@@ -239,6 +242,7 @@ export const boardTemplates: BoardTemplate[] = [
     name: "Full Cottage Build",
     description: "Exterior, interior rooms, landscaping, and mechanical/electrical",
     icon: "Home",
+    image: "/assets/images/template-cottage-faux.png",
     canvasData: fullCottageBuild,
   },
   {
@@ -246,12 +250,13 @@ export const boardTemplates: BoardTemplate[] = [
     name: "Moodboard",
     description: "Colours, materials & textures, inspiration images, and notes",
     icon: "Palette",
+    image: "/assets/images/template-moodboard-faux.png",
     canvasData: moodboard,
   },
 ];
 
 export function getTemplateCatalogue() {
-  return boardTemplates.map(({ id, name, description, icon }) => ({ id, name, description, icon }));
+  return boardTemplates.map(({ id, name, description, icon, image }) => ({ id, name, description, icon, image }));
 }
 
 export function getTemplateCanvasData(templateId: string): any | null {

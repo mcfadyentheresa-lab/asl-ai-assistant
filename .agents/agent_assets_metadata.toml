@@ -1,0 +1,26 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "Rbmh-XghgMERGSoZ6Ki6t"
+uri = "file://client/src/assets/images/template-moodboard-faux.png"
+type = "image"
+title = "Moodboard faux image"
+
+[[generated]]
+id = "mXxIrtJsQ2jCIelvNpamn"
+uri = "file://client/src/assets/images/template-kitchen-faux.png"
+type = "image"
+title = "Kitchen faux image"
+
+[[generated]]
+id = "nOuuyB2a7U7wbtYwS7T5V"
+uri = "file://client/src/assets/images/template-bathroom-faux.png"
+type = "image"
+title = "Bathroom faux image"
+
+[[generated]]
+id = "TQAH_AwY_OkwqBX2CJ1I9"
+uri = "file://client/src/assets/images/template-cottage-faux.png"
+type = "image"
+title = "Cottage faux image"

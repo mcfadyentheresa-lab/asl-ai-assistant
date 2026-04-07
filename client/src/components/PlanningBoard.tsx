@@ -162,7 +162,7 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
 
-  const { data: templateCatalogue = [] } = useQuery<{ id: string; name: string; description: string; icon: string }[]>({
+  const { data: templateCatalogue = [] } = useQuery<{ id: string; name: string; description: string; icon: string; image: string }[]>({
     queryKey: ["/api/board-templates"],
     enabled: isAdmin,
   });
@@ -1551,13 +1551,16 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
                       key={t.id}
                       type="button"
                       onClick={() => setSelectedTemplateId(t.id)}
-                      className={`flex items-center gap-2.5 rounded-md border p-2.5 text-left transition-colors hover:bg-accent/50 ${selectedTemplateId === t.id ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border"}`}
+                      className={`flex gap-2.5 rounded-md border p-2.5 text-left transition-colors hover:bg-accent/50 ${selectedTemplateId === t.id ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border"}`}
                       data-testid={`template-${t.id}`}
                     >
-                      <IconComp className="h-4 w-4 shrink-0 text-muted-foreground" />
-                      <div className="min-w-0">
-                        <div className="text-xs font-medium truncate">{t.name}</div>
-                        <div className="text-[10px] text-muted-foreground truncate">{t.description}</div>
+                      <img src={t.image} alt={t.name} className="h-16 w-20 shrink-0 rounded object-cover border border-border" data-testid={`img-template-${t.id}`} />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <IconComp className="h-4 w-4 shrink-0 text-muted-foreground" />
+                          <div className="text-xs font-medium truncate">{t.name}</div>
+                        </div>
+                        <div className="text-[10px] text-muted-foreground line-clamp-2">{t.description}</div>
                       </div>
                     </button>
                   );
