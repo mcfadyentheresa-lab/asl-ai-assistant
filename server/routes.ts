@@ -3317,39 +3317,74 @@ Respond with valid JSON only:
         const project = await storage.getProject(post.projectId);
         const projectName = project?.name || "Unknown Project";
         const timestamp = new Date().toISOString().slice(0, 10);
-        const fileName = `${projectName} - ${post.title} (${post.platform}) ${timestamp}.txt`;
+        const baseName = `${projectName} - ${post.title} (${post.platform}) ${timestamp}`;
 
         const captionContent = `${post.title}\n\nPlatform: ${post.platform}\nTone: ${post.tone || "—"}\nProject: ${projectName}\n\n---\n\n${post.copy}`;
 
-        const boundary = "----FormBoundary" + randomUUID().replace(/-/g, "");
-        const metadata = JSON.stringify({
-          name: fileName,
+        const captionBoundary = "----FormBoundary" + randomUUID().replace(/-/g, "");
+        const captionMeta = JSON.stringify({
+          name: `${baseName}.txt`,
           parents: folderId ? [folderId] : [],
           mimeType: "text/plain",
         });
 
-        const bodyParts = [
-          `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n`,
-          `--${boundary}\r\nContent-Type: text/plain\r\n\r\n${captionContent}\r\n`,
-          `--${boundary}--`,
+        const captionBodyParts = [
+          `--${captionBoundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${captionMeta}\r\n`,
+          `--${captionBoundary}\r\nContent-Type: text/plain\r\n\r\n${captionContent}\r\n`,
+          `--${captionBoundary}--`,
         ];
-        const body = bodyParts.join("");
 
-        const uploadRes = await connectors.proxy("google-drive", "/upload/drive/v3/files?uploadType=multipart", {
+        const captionUploadRes = await connectors.proxy("google-drive", "/upload/drive/v3/files?uploadType=multipart", {
           method: "POST",
-          headers: { "Content-Type": `multipart/related; boundary=${boundary}` },
-          body,
+          headers: { "Content-Type": `multipart/related; boundary=${captionBoundary}` },
+          body: captionBodyParts.join(""),
         });
 
-        if (uploadRes.ok) {
-          const uploadData = await uploadRes.json();
-          if (uploadData.id) {
-            exported.push({ postId, fileId: uploadData.id, fileName });
-          } else {
-            exported.push({ postId, error: "Upload succeeded but no file ID returned" });
+        let captionFileId: string | null = null;
+        if (captionUploadRes.ok) {
+          const d = await captionUploadRes.json();
+          captionFileId = d.id || null;
+        }
+
+        let photoFileId: string | null = null;
+        if (post.photoUrl) {
+          try {
+            const imgRes = await fetch(post.photoUrl);
+            if (imgRes.ok) {
+              const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
+              const imgContentType = imgRes.headers.get("content-type") || "image/jpeg";
+              const ext = imgContentType.includes("png") ? "png" : imgContentType.includes("webp") ? "webp" : "jpg";
+              const imgBoundary = "----FormBoundary" + randomUUID().replace(/-/g, "");
+              const imgMeta = JSON.stringify({
+                name: `${baseName}.${ext}`,
+                parents: folderId ? [folderId] : [],
+                mimeType: imgContentType,
+              });
+              const imgBody = Buffer.concat([
+                Buffer.from(`--${imgBoundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${imgMeta}\r\n--${imgBoundary}\r\nContent-Type: ${imgContentType}\r\nContent-Transfer-Encoding: base64\r\n\r\n`),
+                Buffer.from(imgBuffer.toString("base64")),
+                Buffer.from(`\r\n--${imgBoundary}--`),
+              ]);
+
+              const imgUploadRes = await connectors.proxy("google-drive", "/upload/drive/v3/files?uploadType=multipart", {
+                method: "POST",
+                headers: { "Content-Type": `multipart/related; boundary=${imgBoundary}` },
+                body: imgBody.toString(),
+              });
+              if (imgUploadRes.ok) {
+                const imgData = await imgUploadRes.json();
+                photoFileId = imgData.id || null;
+              }
+            }
+          } catch (photoErr) {
+            console.error("Photo upload to Drive failed for post", postId, photoErr);
           }
+        }
+
+        if (captionFileId || photoFileId) {
+          exported.push({ postId, captionFileId, photoFileId, fileName: `${baseName}.txt` });
         } else {
-          exported.push({ postId, error: `Upload failed (${uploadRes.status})` });
+          exported.push({ postId, error: "Upload failed" });
         }
       }
 

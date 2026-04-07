@@ -84,10 +84,24 @@ export default function SocialMediaGenerator() {
   const [editingPost, setEditingPost] = useState<SocialPost | null>(null);
   const [editCopy, setEditCopy] = useState("");
   const [editTitle, setEditTitle] = useState("");
+  const [editPhotoId, setEditPhotoId] = useState<number | null>(null);
+  const [editPhotoUrl, setEditPhotoUrl] = useState<string | null>(null);
+  const [editPhotos, setEditPhotos] = useState<SocialPhoto[]>([]);
 
   const [exportingIds, setExportingIds] = useState<Set<number>>(new Set());
 
   const selectedProject = useMemo(() => projects.find((p) => String(p.id) === projectId), [projects, projectId]);
+
+  const { data: projectPhotos = [] } = useQuery<SocialPhoto[]>({
+    queryKey: ["/api/projects", projectId, "photos"],
+    queryFn: async () => {
+      if (!projectId) return [];
+      const res = await fetch(`/api/projects/${projectId}/photos`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!projectId,
+  });
 
   useEffect(() => {
     if (user && (user as any).role !== "admin") {
@@ -127,6 +141,10 @@ export default function SocialMediaGenerator() {
   const { data: seasonalPrompts = [] } = useQuery<SeasonalPrompt[]>({
     queryKey: ["/api/social-media/seasonal-prompts"],
   });
+
+  const newDraftCount = useMemo(() => {
+    return libraryPosts.filter(p => p.status === "draft" && p.tone === "Milestone Celebration").length;
+  }, [libraryPosts]);
 
   const updatePostMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: number; updates: any }) => {
@@ -276,15 +294,34 @@ export default function SocialMediaGenerator() {
     toast({ title: "Copied", description: "Post copy was copied to your clipboard." });
   }
 
-  function openEditDialog(post: SocialPost) {
+  async function openEditDialog(post: SocialPost) {
     setEditingPost(post);
     setEditCopy(post.copy);
     setEditTitle(post.title);
+    setEditPhotoId(post.photoId);
+    setEditPhotoUrl(post.photoUrl);
+    try {
+      const res = await fetch(`/api/projects/${post.projectId}/photos`, { credentials: "include" });
+      if (res.ok) {
+        const data = await res.json();
+        setEditPhotos(data);
+      }
+    } catch {
+      setEditPhotos([]);
+    }
   }
 
   function saveEdit() {
     if (!editingPost) return;
-    updatePostMutation.mutate({ id: editingPost.id, updates: { title: editTitle, copy: editCopy } });
+    updatePostMutation.mutate({
+      id: editingPost.id,
+      updates: {
+        title: editTitle,
+        copy: editCopy,
+        photoId: editPhotoId,
+        photoUrl: editPhotoUrl,
+      },
+    });
     setEditingPost(null);
   }
 
@@ -326,6 +363,11 @@ export default function SocialMediaGenerator() {
               <Library className="mr-2 h-4 w-4" /> Library
               {libraryPosts.length > 0 && (
                 <Badge variant="secondary" className="ml-2 text-xs">{libraryPosts.length}</Badge>
+              )}
+              {newDraftCount > 0 && (
+                <Badge variant="destructive" className="ml-1 text-xs" data-testid="badge-new-drafts">
+                  {newDraftCount} new
+                </Badge>
               )}
             </TabsTrigger>
           </TabsList>
@@ -383,6 +425,39 @@ export default function SocialMediaGenerator() {
                       <Label>Focus</Label>
                       <Textarea value={focus} onChange={(e) => setFocus(e.target.value)} placeholder="Optional: mention a before/after, milestone, or design detail." data-testid="input-social-focus" />
                     </div>
+                    {projectId && (
+                      <div className="space-y-2">
+                        <Label>Pair a Photo</Label>
+                        {projectPhotos.length > 0 ? (
+                          <div className="flex gap-2 overflow-x-auto pb-1" data-testid="generate-photo-picker">
+                            <button
+                              onClick={() => setSelectedPhotoId(null)}
+                              className={`flex-shrink-0 rounded-lg border-2 p-2 text-xs text-muted-foreground ${!selectedPhotoId ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"}`}
+                              data-testid="generate-photo-auto"
+                            >
+                              Auto
+                            </button>
+                            {projectPhotos.map((photo) => (
+                              <button
+                                key={photo.id}
+                                onClick={() => setSelectedPhotoId(photo.id)}
+                                className={`relative flex-shrink-0 rounded-lg overflow-hidden border-2 transition-colors ${selectedPhotoId === photo.id ? "border-primary" : "border-border hover:border-primary/50"}`}
+                                data-testid={`generate-photo-${photo.id}`}
+                              >
+                                <img src={photo.url} alt={photo.caption || "Photo"} className="h-14 w-14 object-cover" />
+                                {selectedPhotoId === photo.id && (
+                                  <div className="absolute top-0.5 left-0.5 bg-primary text-primary-foreground rounded-full p-0.5">
+                                    <Check className="h-2.5 w-2.5" />
+                                  </div>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-muted-foreground" data-testid="text-no-project-photos">No photos uploaded for this project yet. A showcase photo will be paired automatically if available.</p>
+                        )}
+                      </div>
+                    )}
                     <div className="flex flex-wrap gap-3">
                       <Button onClick={() => generatePost(false)} disabled={isGenerating || !projectId} data-testid="button-generate-social">
                         {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
@@ -551,6 +626,14 @@ export default function SocialMediaGenerator() {
 
           {/* =================== LIBRARY TAB =================== */}
           <TabsContent value="library" className="space-y-6">
+            {newDraftCount > 0 && (
+              <div className="flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3" data-testid="milestone-draft-notice">
+                <Star className="h-5 w-5 text-primary flex-shrink-0" />
+                <p className="text-sm">
+                  <strong>{newDraftCount} milestone-triggered draft{newDraftCount > 1 ? "s" : ""}</strong> — Milestone completions auto-generated {newDraftCount > 1 ? "these posts" : "this post"}. Review and publish when ready.
+                </p>
+              </div>
+            )}
             {/* Filters */}
             <div className="flex flex-wrap gap-4 items-end">
               <div className="space-y-1">
@@ -721,6 +804,37 @@ export default function SocialMediaGenerator() {
                 </Select>
               </div>
             )}
+            <div className="space-y-2">
+              <Label>Paired Photo</Label>
+              {editPhotos.length > 0 ? (
+                <div className="flex gap-2 overflow-x-auto pb-2" data-testid="edit-photo-gallery">
+                  <button
+                    onClick={() => { setEditPhotoId(null); setEditPhotoUrl(null); }}
+                    className={`flex-shrink-0 rounded-lg border-2 p-2 text-xs text-muted-foreground ${!editPhotoId ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"}`}
+                    data-testid="edit-photo-none"
+                  >
+                    No Photo
+                  </button>
+                  {editPhotos.map((photo) => (
+                    <button
+                      key={photo.id}
+                      onClick={() => { setEditPhotoId(photo.id); setEditPhotoUrl(photo.url); }}
+                      className={`relative flex-shrink-0 rounded-lg overflow-hidden border-2 transition-colors ${editPhotoId === photo.id ? "border-primary" : "border-border hover:border-primary/50"}`}
+                      data-testid={`edit-photo-${photo.id}`}
+                    >
+                      <img src={photo.url} alt={photo.caption || "Photo"} className="h-16 w-16 object-cover" />
+                      {editPhotoId === photo.id && (
+                        <div className="absolute top-0.5 left-0.5 bg-primary text-primary-foreground rounded-full p-0.5">
+                          <Check className="h-2.5 w-2.5" />
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">No photos available for this project.</p>
+              )}
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditingPost(null)}>Cancel</Button>
@@ -728,7 +842,7 @@ export default function SocialMediaGenerator() {
               if (!editingPost) return;
               updatePostMutation.mutate({
                 id: editingPost.id,
-                updates: { title: editTitle, copy: editCopy, status: editingPost.status },
+                updates: { title: editTitle, copy: editCopy, status: editingPost.status, photoId: editPhotoId, photoUrl: editPhotoUrl },
               });
               setEditingPost(null);
             }} data-testid="button-save-edit">
