@@ -26,6 +26,7 @@ import { usePlanningBoards, useCreatePlanningBoard, useDeletePlanningBoard, useU
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import CalendarPanel from "@/components/CalendarPanel";
 import { useCanvasStore, debouncedSavePositions } from "@/stores/canvas-store";
 import { useBoardRealtime } from "@/hooks/use-board-realtime";
 import { useAuth } from "@/hooks/use-auth";
@@ -173,6 +174,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showNewBoardDialog, setShowNewBoardDialog] = useState(false);
   const [showLinkDialog, setShowLinkDialog] = useState(false);
+  const [showCalendarSheet, setShowCalendarSheet] = useState(false);
   const [notifyOnLink, setNotifyOnLink] = useState(true);
   const [linkDetailSheet, setLinkDetailSheet] = useState<{ type: "calendar" | "milestone" | "checklist"; id: number } | null>(null);
   const [editingEventTitle, setEditingEventTitle] = useState<string | null>(null);
@@ -1173,40 +1175,6 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
         .map((child) => ({ id: child.id, offsetX: child.x - el.x, offsetY: child.y - el.y }));
     } else {
       zoneChildrenRef.current = [];
-    }
-  };
-
-
-  // Template: Weekly planner
-  const createWeeklyPlanner = async () => {
-    if (!selectedBoardId) return;
-    const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
-    const elems: any[] = [];
-    elems.push({ type: "section_header", x: 40, y: 20, width: 1340, height: 40, zIndex: 0, content: { title: "Current week" } });
-    days.forEach((d, i) => {
-      elems.push({ type: "column", x: 40 + i * 260, y: 80, width: 240, height: 360, zIndex: 1, content: { title: d, subtitle: "0 cards" } });
-    });
-    elems.push({ type: "section_header", x: 40, y: 470, width: 1340, height: 40, zIndex: 0, content: { title: "Upcoming weeks" } });
-    for (let row = 0; row < 3; row++) {
-      days.forEach((d, i) => {
-        elems.push({ type: "column", x: 40 + i * 260, y: 530 + row * 200, width: 240, height: 180, zIndex: 1, content: { title: d, subtitle: "0 cards" } });
-      });
-    }
-    try {
-      const url = buildUrl(api.canvasElements.createBatch.path, { boardId: selectedBoardId });
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ elements: elems }),
-      });
-      const created = await res.json();
-      created.forEach((el: CanvasElement) => { addElement(el); sendElementAdd(el); });
-      setMaxZ(Math.max(...created.map((e: CanvasElement) => e.zIndex)) + 1);
-      fitToScreen();
-      toast({ title: "Weekly Planner created" });
-    } catch {
-      toast({ title: "Error", description: "Failed to create template", variant: "destructive" });
     }
   };
 
@@ -2523,8 +2491,8 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                 <DropdownMenuItem onClick={() => { setLinkCreateMode({ milestone: false, checklist: false, calendar: false }); setShowLinkDialog(true); }} data-testid="menu-link-board">
                   <Link2 className="h-4 w-4 mr-2" /> Link to...
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={createWeeklyPlanner} data-testid="menu-weekly-template">
-                  <Columns3 className="h-4 w-4 mr-2" /> Add Weekly Planner
+                <DropdownMenuItem onClick={() => setShowCalendarSheet(true)} data-testid="menu-view-calendar">
+                  <CalendarDays className="h-4 w-4 mr-2" /> View Calendar
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => { setNewSnapshotName(""); setShowSnapshotDialog(true); }} data-testid="menu-snapshots">
                   <Save className="h-4 w-4 mr-2" /> Versions
@@ -3726,6 +3694,29 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                 </div>
               );
             })()}
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <Sheet open={showCalendarSheet} onOpenChange={setShowCalendarSheet}>
+        <SheetContent side="right" className="w-[520px] sm:max-w-[520px] overflow-y-auto" data-testid="calendar-sheet">
+          <SheetHeader>
+            <SheetTitle className="font-serif text-lg uppercase tracking-wide flex items-center gap-2" data-testid="text-calendar-sheet-title">
+              <CalendarDays className="h-4 w-4" />
+              Project Calendar
+            </SheetTitle>
+            <SheetDescription>
+              {user?.role === "client"
+                ? "View your project schedule and upcoming events."
+                : "Manage events and view the project schedule."}
+            </SheetDescription>
+          </SheetHeader>
+          <div className="mt-4">
+            <CalendarPanel
+              projectId={projectId}
+              compact
+              readOnly={user?.role === "client"}
+            />
           </div>
         </SheetContent>
       </Sheet>
