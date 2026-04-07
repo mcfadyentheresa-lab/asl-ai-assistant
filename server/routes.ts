@@ -2912,9 +2912,9 @@ Respond with valid JSON only, no markdown:
       const unseenMilestoneCount = await storage.getUnseenMilestoneCount();
       const posts = await storage.getSocialPosts(filters);
       if (req.query.markSeen === "true" && unseenMilestoneCount > 0) {
-        storage.markMilestoneDraftsSeen().catch((err) => console.error("Failed to mark milestone drafts seen:", err));
+        await storage.markMilestoneDraftsSeen();
       }
-      res.json({ posts, unseenMilestoneCount });
+      res.json({ posts, unseenMilestoneCount: req.query.markSeen === "true" ? 0 : unseenMilestoneCount });
     } catch { res.status(500).json({ message: "Failed to fetch social posts" }); }
   });
 
