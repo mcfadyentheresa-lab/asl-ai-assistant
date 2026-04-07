@@ -322,7 +322,6 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       closeNewBoardDialog();
       setSelectedBoardId(board.id);
       setBoardId(board.id);
-      setElements([]);
       justCreatedBoardId.current = board.id;
       queryClient.invalidateQueries({ queryKey: [api.planningBoards.list.path, projectId] });
       queryClient.invalidateQueries({ queryKey: [api.planningBoards.detail.path, board.id] });
