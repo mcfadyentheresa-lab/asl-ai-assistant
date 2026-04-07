@@ -1586,7 +1586,6 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           onTouchStart={handleElementTouchStart(el.id)}
           onTouchEnd={handleLongPressEnd}
           onTouchCancel={handleLongPressEnd}
-          data-testid={`element-room-zone-${el.id}`}
         >
           <div className="p-3">
             {isSelected ? (
