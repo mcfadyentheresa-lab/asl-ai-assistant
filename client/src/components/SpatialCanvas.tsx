@@ -20,6 +20,7 @@ import {
   Bold, Italic, Strikethrough, Underline, List, ListOrdered, Code, Link as LinkIcon,
   Eraser, Undo2, Redo2, Save, PenTool, Sparkles, TypeIcon, Shapes,
   CalendarDays, Milestone, ListChecks, Bell, BellOff,
+  ChefHat, Bath, Home, FileText, LayoutPanelLeft,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { usePlanningBoards, useCreatePlanningBoard, useDeletePlanningBoard, useUpdatePlanningBoard, useUploadImage, useUsers, useProjects, useMilestones, useChecklistItems, useCalendarEvents, useUpdateCalendarEvent, useDeleteCalendarEvent, useCreateCalendarEvent, useCreateMilestone, useCreateChecklistItem, useBoardSnapshots, useCreateBoardSnapshot, useRestoreBoardSnapshot, useDeleteBoardSnapshot } from "@/hooks/use-projects";
@@ -164,8 +165,14 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   const { user } = useAuth();
   const { viewMode } = useViewMode();
   const actualRole = user?.role || "client";
-  const effectiveRole = actualRole === "admin" ? viewMode : actualRole;
+  const isAdmin = actualRole === "admin";
+  const effectiveRole = isAdmin ? viewMode : actualRole;
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const { data: templateCatalogue = [] } = useQuery<{ id: string; name: string; description: string; icon: string }[]>({
+    queryKey: ["/api/board-templates"],
+    enabled: isAdmin,
+  });
 
   const [selectedBoardId, setSelectedBoardId] = useState<number | null>(null);
   const [zoom, setZoom] = useState(1);
@@ -194,6 +201,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   const [newCalendarDate, setNewCalendarDate] = useState("");
   const [renameName, setRenameName] = useState("");
   const [newBoardName, setNewBoardName] = useState("");
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [showSnapshotDialog, setShowSnapshotDialog] = useState(false);
   const [newSnapshotName, setNewSnapshotName] = useState("");
 
@@ -294,10 +302,15 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
 
   const handleCreateBoard = async () => {
     try {
-      const board = await createBoard({ projectId, name: newBoardName || "Untitled Board" });
+      const board = await createBoard({
+        projectId,
+        name: newBoardName || "Untitled Board",
+        ...(selectedTemplateId ? { templateId: selectedTemplateId } : {}),
+      });
       setSelectedBoardId(board.id);
       setShowNewBoardDialog(false);
       setNewBoardName("");
+      setSelectedTemplateId(null);
       queryClient.invalidateQueries({ queryKey: [api.planningBoards.list.path, projectId] });
     } catch {
       toast({ title: "Error", description: "Failed to create board", variant: "destructive" });
@@ -3126,10 +3139,42 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       )}
 
       {/* Dialogs */}
-      <Dialog open={showNewBoardDialog} onOpenChange={setShowNewBoardDialog}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Create New Board</DialogTitle></DialogHeader>
+      <Dialog open={showNewBoardDialog} onOpenChange={(open) => { setShowNewBoardDialog(open); if (!open) { setSelectedTemplateId(null); setNewBoardName(""); } }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader><DialogTitle>CREATE NEW BOARD</DialogTitle></DialogHeader>
           <Input placeholder="Board name" value={newBoardName} onChange={(e) => setNewBoardName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") handleCreateBoard(); }} data-testid="input-new-board-name" autoFocus />
+          {isAdmin && templateCatalogue.length > 0 && (
+            <div className="space-y-2">
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground">Start from Template</Label>
+              <div className="grid grid-cols-2 gap-2" data-testid="template-picker-grid">
+                <button
+                  type="button"
+                  onClick={() => setSelectedTemplateId(null)}
+                  className={`flex flex-col items-center gap-1.5 rounded-lg border p-3 text-left transition-colors hover:bg-accent ${selectedTemplateId === null ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border"}`}
+                  data-testid="template-blank"
+                >
+                  <FileText className="h-5 w-5 text-muted-foreground" />
+                  <span className="text-xs font-medium">Blank Board</span>
+                </button>
+                {templateCatalogue.map((tmpl) => {
+                  const IconComp = tmpl.icon === "ChefHat" ? ChefHat : tmpl.icon === "Bath" ? Bath : tmpl.icon === "Home" ? Home : Palette;
+                  return (
+                    <button
+                      key={tmpl.id}
+                      type="button"
+                      onClick={() => setSelectedTemplateId(tmpl.id)}
+                      className={`flex flex-col items-center gap-1.5 rounded-lg border p-3 text-left transition-colors hover:bg-accent ${selectedTemplateId === tmpl.id ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border"}`}
+                      data-testid={`template-${tmpl.id}`}
+                    >
+                      <IconComp className="h-5 w-5 text-muted-foreground" />
+                      <span className="text-xs font-medium">{tmpl.name}</span>
+                      <span className="text-[10px] text-muted-foreground text-center leading-tight">{tmpl.description}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowNewBoardDialog(false)}>Cancel</Button>
             <Button onClick={handleCreateBoard} data-testid="button-confirm-new-board">Create</Button>
