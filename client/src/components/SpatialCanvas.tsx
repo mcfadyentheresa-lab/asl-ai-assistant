@@ -300,6 +300,12 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       .catch(() => setLoading(false));
   }, [selectedBoardId]);
 
+  const closeNewBoardDialog = () => {
+    setShowNewBoardDialog(false);
+    setNewBoardName("");
+    setSelectedTemplateId(null);
+  };
+
   const handleCreateBoard = async () => {
     try {
       const board = await createBoard({
@@ -308,9 +314,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
         ...(selectedTemplateId ? { templateId: selectedTemplateId } : {}),
       });
       setSelectedBoardId(board.id);
-      setShowNewBoardDialog(false);
-      setNewBoardName("");
-      setSelectedTemplateId(null);
+      closeNewBoardDialog();
       queryClient.invalidateQueries({ queryKey: [api.planningBoards.list.path, projectId] });
     } catch {
       toast({ title: "Error", description: "Failed to create board", variant: "destructive" });
@@ -3139,7 +3143,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       )}
 
       {/* Dialogs */}
-      <Dialog open={showNewBoardDialog} onOpenChange={(open) => { setShowNewBoardDialog(open); if (!open) { setSelectedTemplateId(null); setNewBoardName(""); } }}>
+      <Dialog open={showNewBoardDialog} onOpenChange={(open) => { if (!open) { closeNewBoardDialog(); } }}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader><DialogTitle>CREATE NEW BOARD</DialogTitle></DialogHeader>
           <Input placeholder="Board name" value={newBoardName} onChange={(e) => setNewBoardName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") handleCreateBoard(); }} data-testid="input-new-board-name" autoFocus />
@@ -3157,7 +3161,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                   <span className="text-xs font-medium">Blank Board</span>
                 </button>
                 {templateCatalogue.map((tmpl) => {
-                  const IconComp = tmpl.icon === "ChefHat" ? ChefHat : tmpl.icon === "Bath" ? Bath : tmpl.icon === "Home" ? Home : Palette;
+                  const IconComp = tmpl.icon === "ChefHat" ? ChefHat : tmpl.icon === "Bath" ? Bath : tmpl.icon === "Home" ? Home : tmpl.icon === "Palette" ? Palette : LayoutPanelLeft;
                   return (
                     <button
                       key={tmpl.id}
@@ -3176,7 +3180,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowNewBoardDialog(false)}>Cancel</Button>
+            <Button variant="outline" onClick={closeNewBoardDialog}>Cancel</Button>
             <Button onClick={handleCreateBoard} data-testid="button-confirm-new-board">Create</Button>
           </DialogFooter>
         </DialogContent>
