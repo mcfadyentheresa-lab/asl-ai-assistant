@@ -422,6 +422,14 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     handleLinkUpdate("linkedUserIds", next, isAdding && notifyOnLink ? { notifyUsers: true } : undefined);
   };
 
+  const clientProject = allProjects.find((p: any) => p.id === projectId);
+  const clientUser = allUsers.find((u: any) => u.id === clientProject?.clientId);
+  const clientIsLinked = clientUser ? (selectedBoard?.linkedUserIds || []).includes(clientUser.id) : false;
+  const toggleClientAccess = () => {
+    if (!clientUser) return;
+    toggleLinkedUser(clientUser.id);
+  };
+
   const toggleLinkedProject = (pid: number) => {
     const current = selectedBoard?.linkedProjectIds || [];
     const next = current.includes(pid)
@@ -3336,6 +3344,25 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             <DialogTitle className="text-base">Link Board</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 pt-1">
+            <div className="rounded border p-2">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide">Client Access</p>
+                  <p className="text-[11px] text-muted-foreground">Let the client view this board</p>
+                </div>
+                <Button
+                  type="button"
+                  variant={clientIsLinked ? "default" : "outline"}
+                  size="sm"
+                  onClick={toggleClientAccess}
+                  disabled={!clientUser}
+                  data-testid="button-toggle-client-access"
+                >
+                  {clientIsLinked ? "Shared with client" : "Share with client"}
+                </Button>
+              </div>
+            </div>
+
             <div>
               <div className="flex items-center justify-between gap-2 mb-1">
                 <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Collaborators</label>
