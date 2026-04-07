@@ -1229,6 +1229,9 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start">
+              <DropdownMenuItem onClick={() => { setShowNewBoardDialog(true); }} data-testid="menu-board-templates">
+                <LayoutPanelLeft className="h-4 w-4 mr-2" /> Templates
+              </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => { setRenameName(currentBoard?.name || ""); setShowRenameDialog(true); }}
                 data-testid="menu-rename-board"
