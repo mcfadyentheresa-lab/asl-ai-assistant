@@ -337,17 +337,31 @@ export default function CalendarPanel({ projectId, compact = false, readOnly = f
             )}
           </div>
           {canEdit && (
-            <Button
-              size={compact ? "sm" : "default"}
-              onClick={() => {
-                setSelectedDate(selectedDate || new Date());
-                setAddDialogOpen(true);
-              }}
-              data-testid="button-add-event"
-            >
-              <Plus className={`${compact ? "h-3.5 w-3.5" : "h-4 w-4"} mr-1.5`} />
-              Add Event
-            </Button>
+            <>
+              <Button
+                size={compact ? "sm" : "default"}
+                variant="outline"
+                onClick={() => {
+                  setSelectedDate(selectedDate || new Date());
+                  setAddDialogOpen(true);
+                }}
+                data-testid="button-admin-setup"
+              >
+                <CalendarIcon className={`${compact ? "h-3.5 w-3.5" : "h-4 w-4"} mr-1.5`} />
+                Admin Setup
+              </Button>
+              <Button
+                size={compact ? "sm" : "default"}
+                onClick={() => {
+                  setSelectedDate(selectedDate || new Date());
+                  setAddDialogOpen(true);
+                }}
+                data-testid="button-add-event"
+              >
+                <Plus className={`${compact ? "h-3.5 w-3.5" : "h-4 w-4"} mr-1.5`} />
+                Add Event
+              </Button>
+            </>
           )}
         </div>
       </div>
