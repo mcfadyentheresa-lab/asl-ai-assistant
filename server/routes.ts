@@ -1474,15 +1474,17 @@ function templateObjectToCanvasElement(object: any, index: number, boardId: numb
     zIndex: index + 1,
   };
   if (object.type === "textbox") {
+    const text = String(object.text || "");
+    const isTitle = text === text.toUpperCase() && text.length > 0;
     return {
       ...base,
-      type: "section_header",
+      type: isTitle ? "section_header" : "note",
       x: Math.round(object.left ?? 0),
       y: Math.round(object.top ?? 0),
       width: Math.round(object.width ?? 240),
       height: Math.max(48, Math.round(object.fontSize ? object.fontSize * 3 : 60)),
       content: {
-        text: object.text || "",
+        text,
         fontSize: object.fontSize || 16,
         fontWeight: object.fontWeight || "bold",
         fontFamily: object.fontFamily || "Inter, sans-serif",
