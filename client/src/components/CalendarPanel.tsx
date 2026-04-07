@@ -323,7 +323,7 @@ export default function CalendarPanel({ projectId, compact = false, readOnly = f
               <Switch checked={showEvents} onCheckedChange={setShowEvents} className="scale-75" />
               Events
             </label>
-            {canEdit && (
+            {!readOnly && canEdit && (
               <>
                 <label className={`flex items-center gap-1 text-muted-foreground cursor-pointer ${compact ? "text-[10px]" : "text-xs"}`} data-testid="toggle-team">
                   <Switch checked={showTeam} onCheckedChange={setShowTeam} className="scale-75" />
