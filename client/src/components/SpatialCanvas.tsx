@@ -3145,7 +3145,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       {/* Dialogs */}
       <Dialog open={showNewBoardDialog} onOpenChange={(open) => { if (!open) { closeNewBoardDialog(); } }}>
         <DialogContent className="sm:max-w-lg">
-          <DialogHeader><DialogTitle>CREATE NEW BOARD</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Create New Board</DialogTitle></DialogHeader>
           <Input placeholder="Board name" value={newBoardName} onChange={(e) => setNewBoardName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") handleCreateBoard(); }} data-testid="input-new-board-name" autoFocus />
           {isAdmin && templateCatalogue.length > 0 && (
             <div className="space-y-2">
@@ -3159,6 +3159,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                 >
                   <FileText className="h-5 w-5 text-muted-foreground" />
                   <span className="text-xs font-medium">Blank Board</span>
+                  <span className="text-[10px] text-muted-foreground text-center leading-tight">Start with an empty canvas</span>
                 </button>
                 {templateCatalogue.map((tmpl) => {
                   const IconComp = tmpl.icon === "ChefHat" ? ChefHat : tmpl.icon === "Bath" ? Bath : tmpl.icon === "Home" ? Home : tmpl.icon === "Palette" ? Palette : LayoutPanelLeft;
