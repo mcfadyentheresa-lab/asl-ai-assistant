@@ -185,7 +185,7 @@ export default function SocialMediaGenerator() {
                   <>
                     <div className="flex items-center gap-2">
                       <Badge variant="secondary" data-testid="badge-social-title">{generatedTitle}</Badge>
-                      <Badge variant="outline" data-testid="badge-social-platform">{generatedPlatform}</Badge>
+                      <Badge variant="outline" data-testid="badge-social-platform">{generatedPlatform.charAt(0).toUpperCase() + generatedPlatform.slice(1)}</Badge>
                     </div>
                     <div className="whitespace-pre-wrap rounded-lg border border-border bg-muted/30 p-4 text-sm leading-6" data-testid="text-generated-social-post">
                       {generatedPost}
@@ -313,8 +313,8 @@ export default function SocialMediaGenerator() {
                 )}
                 {photos[lightboxIndex].tags.length > 0 && (
                   <div className="flex justify-center gap-1.5 mt-1.5 flex-wrap" data-testid="lightbox-tags">
-                    {photos[lightboxIndex].tags.map((tag) => (
-                      <Badge key={tag} variant="secondary" className="text-xs" data-testid={`badge-lightbox-tag-${tag}`}>{tag}</Badge>
+                    {photos[lightboxIndex].tags.map((tag, idx) => (
+                      <Badge key={`${tag}-${idx}`} variant="secondary" className="text-xs" data-testid={`badge-lightbox-tag-${tag}-${idx}`}>{tag}</Badge>
                     ))}
                   </div>
                 )}
