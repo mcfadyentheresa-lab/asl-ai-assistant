@@ -240,6 +240,7 @@ export default function SocialMediaGenerator() {
       setGeneratedTitle(data.title || "Transformation Reveal");
       setGeneratedPost(data.copy || "");
       setGeneratedPlatform(data.platform || platform);
+      if (data.photos) setPhotos(data.photos);
       toast({ title: "Before/after post generated", description: "Saved to your content library." });
     } catch (err: any) {
       const msg = await err?.response?.json?.().catch(() => null);
