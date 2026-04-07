@@ -1490,13 +1490,6 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   }, [drawingMode, drawTool, drawColor, drawStrokeWidth, pan, zoom, redrawOverlayCanvas, trySnapLastPath, tryAutoTextConvert]);
 
   const selectedBoard = boards.find((b: PlanningBoardType) => b.id === selectedBoardId);
-  const clientProject = allProjects.find((p: any) => p.id === projectId);
-  const clientUser = allUsers.find((u: any) => u.id === clientProject?.clientId);
-  const clientIsLinked = clientUser ? (selectedBoard?.linkedUserIds || []).includes(clientUser.id) : false;
-  const toggleClientAccess = () => {
-    if (!clientUser) return;
-    toggleLinkedUser(clientUser.id);
-  };
   const toggleLinkedProject = (pid: number) => {
     const current = selectedBoard?.linkedProjectIds || [];
     const next = current.includes(pid)
