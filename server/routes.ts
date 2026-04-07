@@ -3155,8 +3155,9 @@ Respond with valid JSON only:
 
       res.json({
         ...savedPost,
-        beforeAfterPhotos: baPhotos.map((p: any) => ({
+        photos: baPhotos.map((p: any) => ({
           id: p.id, url: p.url, caption: p.caption, tags: p.tags || [],
+          isShowcase: false, isBeforeAfter: true,
         })),
       });
     } catch (error: any) {
@@ -3363,7 +3364,12 @@ Respond with valid JSON only:
             const projectPhotos2 = await storage.getPhotos(post.projectId);
             const validPhoto = projectPhotos2.find((p: any) => p.id === post.photoId && p.url === post.photoUrl);
             if (!validPhoto) throw new Error("Photo URL does not match a valid project photo");
-            const imgRes = await fetch(post.photoUrl);
+            let absolutePhotoUrl = post.photoUrl;
+            if (absolutePhotoUrl.startsWith("/")) {
+              const port = process.env.PORT || "5000";
+              absolutePhotoUrl = `http://0.0.0.0:${port}${absolutePhotoUrl}`;
+            }
+            const imgRes = await fetch(absolutePhotoUrl);
             if (imgRes.ok) {
               const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
               const imgContentType = imgRes.headers.get("content-type") || "image/jpeg";
