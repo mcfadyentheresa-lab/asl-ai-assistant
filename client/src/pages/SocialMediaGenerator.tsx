@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { Navbar } from "@/components/layout/Navbar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,12 +29,17 @@ export default function SocialMediaGenerator() {
   const [generatedPost, setGeneratedPost] = useState("");
   const [generatedTitle, setGeneratedTitle] = useState("");
 
+  const selectedProject = useMemo(() => projects.find((p) => String(p.id) === projectId), [projects, projectId]);
+
+  useEffect(() => {
+    if (user && (user as any).role !== "admin") {
+      navigate("/");
+    }
+  }, [user, navigate]);
+
   if (user && (user as any).role !== "admin") {
-    navigate("/");
     return null;
   }
-
-  const selectedProject = useMemo(() => projects.find((p) => String(p.id) === projectId), [projects, projectId]);
 
   async function generatePost(random = false) {
     const chosenProject = random ? projects[Math.floor(Math.random() * projects.length)] : selectedProject;

@@ -2698,6 +2698,14 @@ Respond with valid JSON only, no markdown:
   });
 
   // Social Media Post Generator
+  const socialMediaGenerateSchema = z.object({
+    projectId: z.number({ coerce: true }).int().positive(),
+    platform: z.enum(["instagram", "facebook"]).default("instagram"),
+    tone: z.string().max(100).default("Warm"),
+    focus: z.string().max(1000).default(""),
+    random: z.boolean().optional(),
+  });
+
   app.post("/api/social-media/generate", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -2706,8 +2714,11 @@ Respond with valid JSON only, no markdown:
         return res.status(403).json({ message: "Admin only" });
       }
 
-      const { projectId, platform, tone, focus } = req.body;
-      if (!projectId) return res.status(400).json({ message: "Project ID is required" });
+      const parsed = socialMediaGenerateSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid input", errors: parsed.error.flatten().fieldErrors });
+      }
+      const { projectId, platform, tone, focus } = parsed.data;
 
       const project = await storage.getProject(Number(projectId));
       if (!project) return res.status(404).json({ message: "Project not found" });
@@ -2768,10 +2779,10 @@ Respond with valid JSON only, no markdown:
         return res.status(500).json({ message: "No response from AI" });
       }
 
-      const parsed = JSON.parse(content);
+      const aiResult = JSON.parse(content);
       res.json({
-        title: String(parsed.title || project.name),
-        copy: String(parsed.copy || ""),
+        title: String(aiResult.title || project.name),
+        copy: String(aiResult.copy || ""),
       });
     } catch (error: any) {
       console.error("Social media generation error:", error);
