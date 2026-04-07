@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useLocation } from "wouter";
 import { Navbar } from "@/components/layout/Navbar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,13 +8,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 import { useProjects } from "@/hooks/use-projects";
 import { apiRequest } from "@/lib/queryClient";
-import { Loader2, Sparkles, Shuffle, Copy, RefreshCw } from "lucide-react";
+import { Loader2, Sparkles, Shuffle, Copy, RefreshCw, ArrowLeft } from "lucide-react";
+import { Link } from "wouter";
 
 const tones = ["Professional", "Warm", "Behind the scenes", "Polished", "Excited"] as const;
 
 export default function SocialMediaGenerator() {
+  const { user } = useAuth();
+  const [, navigate] = useLocation();
   const { toast } = useToast();
   const { data: projects = [], isLoading } = useProjects();
   const [projectId, setProjectId] = useState<string>("");
@@ -23,6 +28,11 @@ export default function SocialMediaGenerator() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedPost, setGeneratedPost] = useState("");
   const [generatedTitle, setGeneratedTitle] = useState("");
+
+  if (user && (user as any).role !== "admin") {
+    navigate("/");
+    return null;
+  }
 
   const selectedProject = useMemo(() => projects.find((p) => String(p.id) === projectId), [projects, projectId]);
 
@@ -62,7 +72,12 @@ export default function SocialMediaGenerator() {
       <Navbar />
       <main className="mx-auto max-w-6xl px-4 py-6 space-y-6">
         <div className="space-y-2">
-          <h1 className="font-serif text-3xl uppercase tracking-wide text-foreground">Social Media Generator</h1>
+          <Link href="/">
+            <Button variant="ghost" size="sm" className="mb-2" data-testid="button-back-social">
+              <ArrowLeft className="mr-2 h-4 w-4" /> Back to Dashboard
+            </Button>
+          </Link>
+          <h1 className="font-serif text-3xl uppercase tracking-wide text-foreground" data-testid="text-social-heading">Social Media Generator</h1>
           <p className="text-muted-foreground">Generate Instagram and Facebook copy from project details.</p>
         </div>
 

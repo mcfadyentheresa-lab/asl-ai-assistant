@@ -2697,6 +2697,88 @@ Respond with valid JSON only, no markdown:
     }
   });
 
+  // Social Media Post Generator
+  app.post("/api/social-media/generate", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await authStorage.getUser(userId);
+      if (!user || user.role !== "admin") {
+        return res.status(403).json({ message: "Admin only" });
+      }
+
+      const { projectId, platform, tone, focus } = req.body;
+      if (!projectId) return res.status(400).json({ message: "Project ID is required" });
+
+      const project = await storage.getProject(Number(projectId));
+      if (!project) return res.status(404).json({ message: "Project not found" });
+
+      const projectMilestones = await storage.getMilestones(project.id);
+      const milestoneList = projectMilestones
+        .map((m: any) => `- ${m.title}${m.completed ? " (completed)" : ""}`)
+        .join("\n");
+
+      const platformName = platform === "facebook" ? "Facebook" : "Instagram";
+      const toneStyle = tone || "Warm";
+      const focusHint = focus ? `\nSpecific focus the user wants to highlight: ${focus}` : "";
+
+      const OpenAI = (await import("openai")).default;
+      const openai = new OpenAI({
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+      });
+
+      const systemPrompt = `You are a social media copywriter for Aster & Spruce Living, a high-end Muskoka cottage renovation company based in Ontario, Canada. 
+You write engaging, authentic posts that showcase beautiful renovation work and the Muskoka lifestyle.
+
+Brand voice: Warm minimalist, premium quality, nature-inspired, community-focused.
+Always use Canadian English spelling (colour, favourite, centre, etc.).
+
+Project details:
+- Name: ${project.name}
+- Description: ${project.description || "No description provided"}
+- Status: ${project.status}
+- Address: ${project.address || "Muskoka, Ontario"}
+${milestoneList ? `\nProject milestones:\n${milestoneList}` : ""}
+${focusHint}
+
+Platform: ${platformName}
+Tone: ${toneStyle}
+
+Platform guidelines:
+- Instagram: Write a longer, storytelling-style caption (150-300 words). Include 15-25 relevant hashtags at the end. Use line breaks for readability. Include a call to action.
+- Facebook: Write a shorter, conversational post (50-120 words). Use 3-5 hashtags maximum. Be more direct and community-oriented.
+
+Respond with valid JSON only, no markdown:
+{
+  "title": "<short 3-5 word title for the post>",
+  "copy": "<the full social media post text including hashtags>"
+}`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-5-mini",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: `Write a ${platformName} post with a ${toneStyle} tone for the "${project.name}" project.` },
+        ],
+        response_format: { type: "json_object" },
+      });
+
+      const content = response.choices[0]?.message?.content;
+      if (!content) {
+        return res.status(500).json({ message: "No response from AI" });
+      }
+
+      const parsed = JSON.parse(content);
+      res.json({
+        title: String(parsed.title || project.name),
+        copy: String(parsed.copy || ""),
+      });
+    } catch (error: any) {
+      console.error("Social media generation error:", error);
+      res.status(500).json({ message: "Failed to generate social media post" });
+    }
+  });
+
   // Crew Rates
   app.get("/api/crew-rates", isAuthenticated, async (req: any, res) => {
     const userId = req.user.claims.sub;

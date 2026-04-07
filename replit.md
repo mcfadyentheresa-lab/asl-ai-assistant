@@ -56,13 +56,14 @@ Replit Auth provides authentication via OpenID Connect, with session management 
 *   **Real-time Collaboration**: WebSocket-based project rooms for live updates across all project data, with active viewer tracking and conflict resolution.
 *   **Client Onboarding System**: Admin-initiated client invite flow via SMS, including invite validation and profile completion.
 *   **Unified Calendar View**: Per-project calendar shows timeline bars (milestones, rooms, tasks) from the Gantt chart alongside calendar events, with layer toggles. A Master Calendar page (`/master-calendar`) aggregates data across all projects for admin/crew, with project filtering.
+*   **Social Media Post Generator**: Admin-only page (`/social-media`) that uses AI (OpenAI/gpt-5-mini) to generate Instagram and Facebook captions from project data. Supports Controlled mode (pick project, platform, tone, focus) and Random mode (auto-generates from a random project). Copy-to-clipboard output.
 
 ## External Dependencies
 
 *   **PostgreSQL Database**: For all data storage.
 *   **Replit Auth**: For user authentication.
 *   **Twilio**: For SMS notifications.
-*   **OpenAI (via Replit AI Integrations)**: Powers the Cost Estimator's AI Scope Analyzer (gpt-5-mini).
+*   **OpenAI (via Replit AI Integrations)**: Powers the Cost Estimator's AI Scope Analyzer and the Social Media Post Generator (gpt-5-mini).
 
 ### Key NPM Packages
 

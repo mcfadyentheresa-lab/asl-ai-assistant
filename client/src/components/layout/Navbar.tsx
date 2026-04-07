@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
-import { LogOut, UserCog, Eye, EyeOff, User, Palette, ZoomIn, Clock, DollarSign, Calculator, Users, BookUser, Store, CalendarDays } from "lucide-react";
+import { LogOut, UserCog, Eye, EyeOff, User, Palette, ZoomIn, Clock, DollarSign, Calculator, Users, BookUser, Store, CalendarDays, Sparkles } from "lucide-react";
 import { useTextZoom } from "@/hooks/use-text-zoom";
 import { Link } from "wouter";
 import { useOnlineUsers, useVisibilityToggle } from "@/hooks/use-presence";
@@ -173,6 +173,14 @@ export function Navbar() {
                 <DropdownMenuItem data-testid="link-supplier-prices">
                   <Store className="mr-2 h-4 w-4" />
                   Supplier Prices
+                </DropdownMenuItem>
+              </Link>
+            )}
+            {user.role === "admin" && (
+              <Link href="/social-media">
+                <DropdownMenuItem data-testid="link-social-media">
+                  <Sparkles className="mr-2 h-4 w-4" />
+                  Social Media
                 </DropdownMenuItem>
               </Link>
             )}
