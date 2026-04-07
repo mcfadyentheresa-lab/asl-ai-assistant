@@ -2918,16 +2918,6 @@ Respond with valid JSON only, no markdown:
     } catch { res.status(500).json({ message: "Failed to fetch social posts" }); }
   });
 
-  app.post("/api/social-posts/mark-seen", isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const user = await authStorage.getUser(userId);
-      if (!user || user.role !== "admin") return res.status(403).json({ message: "Admin only" });
-      await storage.markMilestoneDraftsSeen();
-      res.json({ ok: true });
-    } catch { res.status(500).json({ message: "Failed to mark seen" }); }
-  });
-
   app.get("/api/social-posts/:id", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
