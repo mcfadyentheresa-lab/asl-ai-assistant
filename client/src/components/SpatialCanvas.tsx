@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import templateKitchenPreview from "@assets/images/template-kitchen-faux.png";
-import templateBathroomPreview from "@assets/images/template-bathroom-faux.png";
-import templateCottagePreview from "@assets/images/template-cottage-faux.png";
+import templateKitchenPreview from "@assets/template-kitchen-faux.png";
+import templateBathroomPreview from "@assets/template-bathroom-faux.png";
+import templateCottagePreview from "@assets/template-cottage-faux.png";
 import templateMoodboardPreview from "@assets/Screenshot_2026-04-08_at_12.56.52_PM_1775667416114.png";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
