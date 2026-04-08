@@ -2601,11 +2601,9 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                 <DropdownMenuItem className="text-destructive" onClick={() => setShowDeleteConfirm(true)} data-testid="menu-delete-board">
                   <Trash2 className="h-4 w-4 mr-2" /> Delete Board
                 </DropdownMenuItem>
-                {boards.length > 1 && (
-                  <DropdownMenuItem onClick={() => { setBoardsToDelete(new Set()); setShowManageBoards(true); }} data-testid="menu-manage-boards">
-                    <ListChecks className="h-4 w-4 mr-2" /> Manage Boards
-                  </DropdownMenuItem>
-                )}
+                <DropdownMenuItem onClick={() => { setBoardsToDelete(new Set()); setShowManageBoards(true); }} data-testid="menu-manage-boards">
+                  <ListChecks className="h-4 w-4 mr-2" /> Manage Boards
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </>
