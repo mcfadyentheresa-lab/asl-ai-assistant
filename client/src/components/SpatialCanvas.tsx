@@ -193,7 +193,6 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   const spaceRef = useRef(false);
 
   const [showRenameDialog, setShowRenameDialog] = useState(false);
-  const [showBoardLinkDialog, setShowBoardLinkDialog] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showManageBoards, setShowManageBoards] = useState(false);
   const [boardsToDelete, setBoardsToDelete] = useState<Set<number>>(new Set());
@@ -1564,12 +1563,8 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
 
     const handleClick = (e: React.MouseEvent) => {
       e.stopPropagation();
-      if (el.type === "board_link") {
-        if (c.targetBoardId) {
-          setSelectedBoardId(c.targetBoardId);
-        } else {
-          setShowBoardLinkDialog(true);
-        }
+      if (el.type === "board_link" && c.targetBoardId) {
+        setSelectedBoardId(c.targetBoardId);
         return;
       }
       setEditingId(el.id);
@@ -3305,33 +3300,6 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             <Button variant="outline" onClick={closeNewBoardDialog}>Cancel</Button>
             <Button onClick={handleCreateBoard} data-testid="button-confirm-new-board">Create</Button>
           </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showBoardLinkDialog} onOpenChange={setShowBoardLinkDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Link Board</DialogTitle>
-            <DialogDescription>Choose which board this tile should open.</DialogDescription>
-          </DialogHeader>
-          <Select
-            value={c.targetBoardId ? String(c.targetBoardId) : ""}
-            onValueChange={(v) => {
-              handleUpdateContent(el.id, { ...c, targetBoardId: Number(v) });
-              setShowBoardLinkDialog(false);
-            }}
-          >
-            <SelectTrigger data-testid={`select-board-link-target-${el.id}`}>
-              <SelectValue placeholder="Select a board" />
-            </SelectTrigger>
-            <SelectContent>
-              {boards.map((b: PlanningBoardType) => (
-                <SelectItem key={b.id} value={String(b.id)}>
-                  {b.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </DialogContent>
       </Dialog>
 
