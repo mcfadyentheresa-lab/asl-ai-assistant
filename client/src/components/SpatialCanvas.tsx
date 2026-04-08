@@ -2519,6 +2519,22 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
         <Button variant="outline" size="sm" onClick={() => { setNewBoardName(""); setShowNewBoardDialog(true); }} data-testid="button-new-board">
           <Plus className="h-3.5 w-3.5 mobile-landscape:mr-0 mr-1" /> <span className="mobile-landscape:hidden">New Board</span>
         </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="secondary" size="sm" disabled={isUploading} data-testid="button-add-board-image">
+              {isUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <ImagePlus className="h-3.5 w-3.5 mr-1" />}
+              <span className="mobile-landscape:hidden">Add Image</span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            <DropdownMenuItem onClick={() => fileInputRef.current?.click()} data-testid="menu-add-image-device">
+              <ImagePlus className="h-4 w-4 mr-2" /> Upload from Device
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => { setImageUrl(""); setShowImageUrlDialog(true); }} data-testid="menu-add-image-url">
+              <Link2 className="h-4 w-4 mr-2" /> Paste Image URL
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
         {selectedBoardId && (
           <>
             <DropdownMenu>
