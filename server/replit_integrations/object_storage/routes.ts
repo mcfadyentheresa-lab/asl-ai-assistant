@@ -83,10 +83,10 @@ export function registerObjectStorageRoutes(app: Express): void {
     }
   });
 
-  app.get("/api/public-assets/{*filePath}", async (req, res) => {
+  app.get("/api/public-assets/{*filePath}", async (req: { params: Record<string, string | string[]> } & import("express").Request, res) => {
     try {
-      const rawPath = (req.params as any).filePath;
-      const filePath = Array.isArray(rawPath) ? rawPath.join("/") : rawPath;
+      const rawPath = req.params.filePath;
+      const filePath = Array.isArray(rawPath) ? rawPath.join("/") : String(rawPath || "");
       if (!filePath) {
         return res.status(400).json({ error: "Missing file path" });
       }
