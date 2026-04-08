@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import templateMoodboardPreview from "@assets/Screenshot_2026-04-08_at_12.41.42_PM_1775666504617.png";
-import templateKitchenPreview from "@assets/images/template-kitchen-faux.png";
-import templateBathroomPreview from "@assets/images/template-bathroom-faux.png";
-import templateCottagePreview from "@assets/images/template-cottage-faux.png";
+import templateKitchenPreview from "../assets/images/template-kitchen-faux.png";
+import templateBathroomPreview from "../assets/images/template-bathroom-faux.png";
+import templateCottagePreview from "../assets/images/template-cottage-faux.png";
 import * as fabric from "fabric";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
