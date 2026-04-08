@@ -53,6 +53,28 @@ const BASE_TYPES = [
   { value: "custom", label: "Custom" },
 ];
 
+const INTENDED_USES = [
+  { value: "dining", label: "Dining" },
+  { value: "occasional", label: "Occasional" },
+  { value: "display", label: "Display" },
+  { value: "high_use", label: "High-Use" },
+  { value: "decorative", label: "Decorative" },
+];
+
+const PRIORITY_CONSTRAINTS = [
+  { value: "aesthetic", label: "Aesthetic" },
+  { value: "durability", label: "Durability" },
+  { value: "budget", label: "Budget" },
+  { value: "timeline", label: "Timeline" },
+];
+
+const APPROVAL_STATUSES = [
+  { value: "draft", label: "Draft" },
+  { value: "ready_for_client", label: "Ready for Client" },
+  { value: "approved", label: "Approved" },
+  { value: "revise", label: "Revise" },
+];
+
 const HEAVY_MATERIALS = ["stone", "granite", "marble", "glass", "concrete", "quartz", "slate", "travertine"];
 
 function calculateBaseRange(
@@ -101,6 +123,7 @@ export default function TableRedesignPlanner() {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showShareView, setShowShareView] = useState(false);
   const [pushBoardId, setPushBoardId] = useState<string>("");
+  const [pushBoardTag, setPushBoardTag] = useState<string>("");
   const [showPushDialog, setShowPushDialog] = useState(false);
 
   const [form, setForm] = useState({
@@ -120,11 +143,12 @@ export default function TableRedesignPlanner() {
     proposedBaseType: "",
     styleDirection: "",
     finishDirection: "",
-    notes: "",
+    intendedUse: "",
+    priorityConstraint: "",
+    approvalStatus: "draft",
     conceptTitle: "",
     conceptDescription: "",
     buildNotes: "",
-    tag: "",
   });
 
   const { data: projects } = useQuery<any[]>({ queryKey: ["/api/projects"] });
@@ -215,12 +239,13 @@ export default function TableRedesignPlanner() {
   });
 
   const pushToBoard = useMutation({
-    mutationFn: async ({ planId, boardId }: { planId: number; boardId: number }) => {
-      const res = await apiRequest("POST", `/api/redesign-plans/${planId}/push-to-board`, { boardId });
+    mutationFn: async ({ planId, boardId, tag }: { planId: number; boardId: number; tag?: string }) => {
+      const res = await apiRequest("POST", `/api/redesign-plans/${planId}/push-to-board`, { boardId, tag: tag || undefined });
       return res.json();
     },
     onSuccess: () => {
       setShowPushDialog(false);
+      setPushBoardTag("");
       toast({ title: "Card added to Planning Board" });
     },
   });
@@ -265,6 +290,14 @@ export default function TableRedesignPlanner() {
       toast({ title: "Please select a project and enter a piece name", variant: "destructive" });
       return;
     }
+    if (!form.intendedUse) {
+      toast({ title: "Please select an intended use", variant: "destructive" });
+      return;
+    }
+    if (!form.priorityConstraint) {
+      toast({ title: "Please select a priority constraint", variant: "destructive" });
+      return;
+    }
     const base = calculateBaseRange(
       form.tableShape,
       form.lengthInches ? parseInt(form.lengthInches) : null,
@@ -290,20 +323,21 @@ export default function TableRedesignPlanner() {
       proposedBaseType: form.proposedBaseType || null,
       styleDirection: form.styleDirection || null,
       finishDirection: form.finishDirection || null,
-      notes: form.notes || null,
+      intendedUse: form.intendedUse,
+      priorityConstraint: form.priorityConstraint,
+      approvalStatus: form.approvalStatus,
       conceptTitle: form.conceptTitle || form.pieceName,
       conceptDescription: form.conceptDescription || null,
       baseSizeMinInches: base.min,
       baseSizeMaxInches: base.max,
       baseSizeNotes: base.notes,
       buildNotes: form.buildNotes || null,
-      tag: form.tag || null,
     });
   };
 
   const handleCopyShareText = () => {
     if (!selectedPlan) return;
-    const text = [
+    const lines = [
       selectedPlan.conceptTitle || selectedPlan.pieceName,
       "",
       selectedPlan.conceptDescription || "",
@@ -313,7 +347,7 @@ export default function TableRedesignPlanner() {
       "",
       "Concept and planning preview only. Final result may vary based on material availability, structural requirements, and on-site conditions.",
     ].filter(Boolean).join("\n");
-    navigator.clipboard.writeText(text);
+    navigator.clipboard.writeText(lines);
     toast({ title: "Copied to clipboard" });
   };
 
@@ -384,7 +418,7 @@ export default function TableRedesignPlanner() {
                     data-testid={`button-plan-${plan.id}`}
                   >
                     <div className="font-medium truncate">{plan.conceptTitle || plan.pieceName}</div>
-                    <div className="text-xs text-muted-foreground capitalize">{plan.pieceType.replace("_", " ")} · {plan.status}</div>
+                    <div className="text-xs text-muted-foreground capitalize">{plan.pieceType.replace("_", " ")} · {(plan.approvalStatus || plan.status || "draft").replace("_", " ")}</div>
                   </button>
                 ))}
               </CardContent>
@@ -534,6 +568,31 @@ export default function TableRedesignPlanner() {
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
+                      <Label>Intended Use *</Label>
+                      <Select value={form.intendedUse} onValueChange={v => setForm(f => ({ ...f, intendedUse: v }))}>
+                        <SelectTrigger data-testid="select-intended-use">
+                          <SelectValue placeholder="Select intended use" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {INTENDED_USES.map(u => <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Priority Constraint *</Label>
+                      <Select value={form.priorityConstraint} onValueChange={v => setForm(f => ({ ...f, priorityConstraint: v }))}>
+                        <SelectTrigger data-testid="select-priority-constraint">
+                          <SelectValue placeholder="Select priority" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {PRIORITY_CONSTRAINTS.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
                       <Label>Redesign Scope *</Label>
                       <Select value={form.redesignScope} onValueChange={v => setForm(f => ({ ...f, redesignScope: v }))}>
                         <SelectTrigger data-testid="select-scope">
@@ -587,18 +646,20 @@ export default function TableRedesignPlanner() {
                       <Input
                         value={form.conceptTitle}
                         onChange={e => setForm(f => ({ ...f, conceptTitle: e.target.value }))}
-                        placeholder="Auto-fills from piece name if empty"
+                        placeholder={form.pieceName || "Auto-fills from piece name if empty"}
                         data-testid="input-concept-title"
                       />
                     </div>
                     <div>
-                      <Label>Tag (optional)</Label>
-                      <Input
-                        value={form.tag}
-                        onChange={e => setForm(f => ({ ...f, tag: e.target.value }))}
-                        placeholder="e.g. Option A"
-                        data-testid="input-tag"
-                      />
+                      <Label>Approval Status</Label>
+                      <Select value={form.approvalStatus} onValueChange={v => setForm(f => ({ ...f, approvalStatus: v }))}>
+                        <SelectTrigger data-testid="select-approval-status">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {APPROVAL_STATUSES.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
 
@@ -614,24 +675,13 @@ export default function TableRedesignPlanner() {
                   </div>
 
                   <div>
-                    <Label>Build Notes</Label>
+                    <Label>Scope Notes</Label>
                     <Textarea
                       value={form.buildNotes}
                       onChange={e => setForm(f => ({ ...f, buildNotes: e.target.value }))}
                       rows={2}
                       placeholder="Construction notes, special considerations"
-                      data-testid="input-build-notes"
-                    />
-                  </div>
-
-                  <div>
-                    <Label>Notes</Label>
-                    <Textarea
-                      value={form.notes}
-                      onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
-                      rows={2}
-                      placeholder="Additional notes"
-                      data-testid="input-notes"
+                      data-testid="input-scope-notes"
                     />
                   </div>
 
@@ -657,15 +707,27 @@ export default function TableRedesignPlanner() {
                         <CardTitle className="uppercase tracking-wider" data-testid="text-plan-title">
                           {selectedPlan.conceptTitle || selectedPlan.pieceName}
                         </CardTitle>
-                        <div className="flex gap-2 mt-1">
+                        <div className="flex gap-2 mt-1 flex-wrap">
                           <Badge variant="secondary" className="capitalize">{selectedPlan.pieceType.replace("_", " ")}</Badge>
                           <Badge variant="outline" className="capitalize">{selectedPlan.redesignScope.replace("_", " ")}</Badge>
-                          {selectedPlan.tag && <Badge>{selectedPlan.tag}</Badge>}
+                          {selectedPlan.intendedUse && (
+                            <Badge variant="outline" className="capitalize">{selectedPlan.intendedUse.replace("_", " ")}</Badge>
+                          )}
+                          {selectedPlan.priorityConstraint && (
+                            <Badge variant="secondary" className="capitalize">Priority: {selectedPlan.priorityConstraint}</Badge>
+                          )}
                           {selectedPlan.proposedBaseType && (
                             <Badge variant="secondary" className="capitalize">
                               Base: {selectedPlan.proposedBaseType.replace("_", " ")}
                             </Badge>
                           )}
+                          <Badge className={`capitalize ${
+                            selectedPlan.approvalStatus === "approved" ? "bg-green-600" :
+                            selectedPlan.approvalStatus === "ready_for_client" ? "bg-blue-600" :
+                            selectedPlan.approvalStatus === "revise" ? "bg-amber-600" : ""
+                          }`}>
+                            {(selectedPlan.approvalStatus || "draft").replace("_", " ")}
+                          </Badge>
                         </div>
                       </div>
                       <div className="flex gap-2">
@@ -776,7 +838,7 @@ export default function TableRedesignPlanner() {
 
                     {selectedPlan.buildNotes && (
                       <div>
-                        <Label className="text-xs text-muted-foreground">Build Notes</Label>
+                        <Label className="text-xs text-muted-foreground">Scope Notes</Label>
                         <p className="text-sm mt-1">{selectedPlan.buildNotes}</p>
                       </div>
                     )}
@@ -854,19 +916,28 @@ export default function TableRedesignPlanner() {
                 </SelectContent>
               </Select>
             </div>
+            <div>
+              <Label>Tag (optional)</Label>
+              <Input
+                value={pushBoardTag}
+                onChange={e => setPushBoardTag(e.target.value)}
+                placeholder="e.g. Option A"
+                data-testid="input-push-tag"
+              />
+            </div>
             <div className="bg-muted/50 rounded p-3 text-sm">
               <p className="font-medium mb-1">Card will contain:</p>
               <ul className="text-muted-foreground text-xs space-y-1">
                 <li>• Image (concept or before photo)</li>
                 <li>• Title: {selectedPlan?.conceptTitle || selectedPlan?.pieceName}</li>
                 <li>• Description (1–2 lines)</li>
-                {selectedPlan?.tag && <li>• Tag: {selectedPlan.tag}</li>}
+                {pushBoardTag && <li>• Tag: {pushBoardTag}</li>}
               </ul>
             </div>
             <div className="flex gap-2 justify-end">
               <Button variant="outline" onClick={() => setShowPushDialog(false)}>Cancel</Button>
               <Button
-                onClick={() => pushToBoard.mutate({ planId: selectedPlan!.id, boardId: parseInt(pushBoardId) })}
+                onClick={() => pushToBoard.mutate({ planId: selectedPlan!.id, boardId: parseInt(pushBoardId), tag: pushBoardTag || undefined })}
                 disabled={!pushBoardId || pushToBoard.isPending}
                 data-testid="button-confirm-push"
               >
@@ -914,10 +985,10 @@ export default function TableRedesignPlanner() {
                   ))}
                 </div>
               )}
-              {selectedPlan.notes && (
+              {selectedPlan.buildNotes && (
                 <div>
-                  <h4 className="text-sm font-semibold uppercase tracking-wider mb-1">Notes</h4>
-                  <p className="text-sm text-muted-foreground">{selectedPlan.notes}</p>
+                  <h4 className="text-sm font-semibold uppercase tracking-wider mb-1">Scope Notes</h4>
+                  <p className="text-sm text-muted-foreground">{selectedPlan.buildNotes}</p>
                 </div>
               )}
               <p className="text-xs text-muted-foreground italic">

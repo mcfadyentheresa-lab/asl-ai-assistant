@@ -616,6 +616,9 @@ export const tableRedesignPlans = pgTable("table_redesign_plans", {
   baseSizeNotes: text("base_size_notes"),
   buildNotes: text("build_notes"),
   tag: text("tag"),
+  intendedUse: text("intended_use"),
+  priorityConstraint: text("priority_constraint"),
+  approvalStatus: text("approval_status").notNull().default("draft"),
   status: text("status").notNull().default("draft"), // draft, complete
   createdBy: text("created_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),

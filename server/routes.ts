@@ -4001,7 +4001,7 @@ Respond with valid JSON only:
     const plan = await storage.getRedesignPlan(parseInt(req.params.id));
     if (!plan) return res.status(404).json({ message: "Plan not found" });
 
-    const { boardId } = req.body;
+    const { boardId, tag } = req.body;
     if (!boardId) return res.status(400).json({ message: "boardId is required" });
 
     const board = await storage.getPlanningBoard(parseInt(boardId));
@@ -4010,7 +4010,7 @@ Respond with valid JSON only:
     const imageUrl = plan.conceptImageUrl || plan.beforeImageUrl || "";
     const title = plan.conceptTitle || plan.pieceName;
     const description = plan.conceptDescription || `${plan.pieceType} redesign — ${plan.redesignScope}`;
-    const tagLabel = plan.tag || "";
+    const tagLabel = tag || plan.tag || "";
 
     const element = await storage.createCanvasElement({
       boardId: parseInt(boardId),
