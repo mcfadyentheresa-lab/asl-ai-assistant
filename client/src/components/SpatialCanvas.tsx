@@ -3167,7 +3167,10 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       {/* Dialogs */}
       <Dialog open={showNewBoardDialog} onOpenChange={(open) => { if (!open) { closeNewBoardDialog(); } }}>
         <DialogContent className="sm:max-w-lg">
-          <DialogHeader><DialogTitle>Create New Board</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Create New Board</DialogTitle>
+            <DialogDescription>Create a new board or start from a template.</DialogDescription>
+          </DialogHeader>
           <Input placeholder="Board name" value={newBoardName} onChange={(e) => setNewBoardName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") handleCreateBoard(); }} data-testid="input-new-board-name" autoFocus />
           {isAdmin && templateCatalogue.length > 0 && (
             <div className="space-y-2">
@@ -3236,7 +3239,10 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
 
       <Dialog open={showRenameDialog} onOpenChange={setShowRenameDialog}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Rename Board</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Rename Board</DialogTitle>
+            <DialogDescription>Enter a new name for this board.</DialogDescription>
+          </DialogHeader>
           <Input value={renameName} onChange={(e) => setRenameName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") handleRename(); }} data-testid="input-rename-board" autoFocus />
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowRenameDialog(false)}>Cancel</Button>
@@ -3247,7 +3253,10 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
 
       <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Delete Board</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Delete Board</DialogTitle>
+            <DialogDescription>This permanently deletes the selected board.</DialogDescription>
+          </DialogHeader>
           <p className="text-sm text-muted-foreground">This will permanently delete &quot;{selectedBoard?.name}&quot; and all its elements. This cannot be undone.</p>
           {selectedBoard?.linkedCalendarEventId && (() => {
             const hasOtherLinks = !!(selectedBoard.linkedMilestoneId || selectedBoard.linkedChecklistItemId);

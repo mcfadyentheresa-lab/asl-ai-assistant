@@ -633,8 +633,12 @@ export function useDeletePlanningBoard() {
         method: "DELETE",
         credentials: "include",
       });
-      if (!res.ok) throw new Error("Failed to delete planning board");
-      return await res.json();
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || "Failed to delete planning board");
+      }
+      const text = await res.text();
+      return text ? JSON.parse(text) : null;
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', variables.projectId, 'planning-boards'] });
