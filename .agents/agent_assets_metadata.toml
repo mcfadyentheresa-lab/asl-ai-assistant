@@ -24,3 +24,93 @@ id = "TQAH_AwY_OkwqBX2CJ1I9"
 uri = "file://client/src/assets/images/template-cottage-faux.png"
 type = "image"
 title = "Cottage faux image"
+
+[[generated]]
+id = "iw0a7GLnsZ7VnloJ1dVXt"
+uri = "file://public/images/templates/kitchen-cabinets.png"
+type = "image"
+title = "kitchen shaker cabinets"
+
+[[generated]]
+id = "8NTmV9W4Qd9RjmOxeIwHp"
+uri = "file://public/images/templates/kitchen-countertop.png"
+type = "image"
+title = "marble countertop"
+
+[[generated]]
+id = "R0mv_N7rVPPwKPYbk5yqj"
+uri = "file://public/images/templates/kitchen-pendants.png"
+type = "image"
+title = "brass pendant lights"
+
+[[generated]]
+id = "Z2a8w9C3NA-V20qdeJivo"
+uri = "file://public/images/templates/kitchen-tile.png"
+type = "image"
+title = "zellige tile backsplash"
+
+[[generated]]
+id = "c4fEy_McI6Gzdt8igNhzZ"
+uri = "file://public/images/templates/kitchen-range.png"
+type = "image"
+title = "wolf range appliance"
+
+[[generated]]
+id = "cKdFuMChPp2pv3IGx-D0v"
+uri = "file://public/images/templates/bath-tub.png"
+type = "image"
+title = "freestanding bathtub"
+
+[[generated]]
+id = "DvSSdbGx40xz04VOd0VgE"
+uri = "file://public/images/templates/bath-vanity.png"
+type = "image"
+title = "floating vanity"
+
+[[generated]]
+id = "L7U0PAfc3rMXZUFkgAmEv"
+uri = "file://public/images/templates/bath-hex-tile.png"
+type = "image"
+title = "hex marble tile"
+
+[[generated]]
+id = "WQu6nBh-qA0v-aNMywsMp"
+uri = "file://public/images/templates/bath-sconce.png"
+type = "image"
+title = "brass wall sconce"
+
+[[generated]]
+id = "p-PwFllpqbyUlBJYu-fui"
+uri = "file://public/images/templates/cottage-exterior.png"
+type = "image"
+title = "cottage exterior"
+
+[[generated]]
+id = "jwXJoAIQQguECpJ2hI9UF"
+uri = "file://public/images/templates/cottage-trusses.png"
+type = "image"
+title = "timber trusses"
+
+[[generated]]
+id = "IPhXmm1MN1rAMv6teQb6l"
+uri = "file://public/images/templates/cottage-dock.png"
+type = "image"
+title = "lakeside dock"
+
+[[generated]]
+id = "3r8lIPEcVLOM_7yQ4Yi6c"
+uri = "file://public/images/templates/cottage-fireplace.png"
+type = "image"
+title = "stone fireplace"
+
+[[generated]]
+id = "iIvTkVICLUCmT7fteJfhX"
+uri = "file://public/images/templates/mood-sofa.png"
+type = "image"
+title = "linen sofa"
+
+[[generated]]
+id = "7mf2YEvczra5hxuRGhluu"
+uri = "file://public/images/templates/mood-oak-floor.png"
+type = "image"
+title = "white oak flooring"

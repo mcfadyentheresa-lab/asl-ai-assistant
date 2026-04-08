@@ -1548,6 +1548,58 @@ function templateCanvasToElements(canvasData: any, boardId: number, createdBy: s
       });
       continue;
     }
+
+    if (obj.type === "template_image") {
+      elements.push({
+        ...base,
+        type: "image",
+        x: Math.round(obj.left ?? 0),
+        y: Math.round(obj.top ?? 0),
+        width: Math.round(obj.width ?? 280),
+        height: Math.round(obj.height ?? 220),
+        content: { url: obj.url || "", caption: obj.caption || "" },
+      });
+      continue;
+    }
+
+    if (obj.type === "template_color_swatch") {
+      elements.push({
+        ...base,
+        type: "color_swatch",
+        x: Math.round(obj.left ?? 0),
+        y: Math.round(obj.top ?? 0),
+        width: Math.round(obj.width ?? 180),
+        height: Math.round(obj.height ?? 200),
+        content: { color: obj.color || "#1e3a2f", name: obj.name || "", hex: obj.hex || obj.color || "#1E3A2F", code: obj.code || "", brand: obj.brand || "" },
+      });
+      continue;
+    }
+
+    if (obj.type === "template_product") {
+      elements.push({
+        ...base,
+        type: "product",
+        x: Math.round(obj.left ?? 0),
+        y: Math.round(obj.top ?? 0),
+        width: Math.round(obj.width ?? 220),
+        height: Math.round(obj.height ?? 120),
+        content: { name: obj.name || "", price: obj.price || "", supplier: obj.supplier || "", url: obj.url || "" },
+      });
+      continue;
+    }
+
+    if (obj.type === "template_material") {
+      elements.push({
+        ...base,
+        type: "material",
+        x: Math.round(obj.left ?? 0),
+        y: Math.round(obj.top ?? 0),
+        width: Math.round(obj.width ?? 220),
+        height: Math.round(obj.height ?? 180),
+        content: { name: obj.name || "", supplier: obj.supplier || "", code: obj.code || "", imageUrl: obj.imageUrl || "", notes: obj.notes || "" },
+      });
+      continue;
+    }
   }
 
   for (let i = 0; i < elements.length; i++) {

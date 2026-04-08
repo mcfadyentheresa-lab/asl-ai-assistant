@@ -76,6 +76,62 @@ function makeSectionHeader(left: number, top: number, text: string) {
   return makeText(left, top, text.toUpperCase(), 18, "bold", "#1e3a2f");
 }
 
+function makeImage(left: number, top: number, url: string, caption: string, width = 280, height = 220) {
+  return {
+    type: "template_image",
+    left,
+    top,
+    width,
+    height,
+    url,
+    caption,
+  };
+}
+
+function makeColorSwatch(left: number, top: number, name: string, color: string, hex: string, code = "", brand = "", width = 180) {
+  return {
+    type: "template_color_swatch",
+    left,
+    top,
+    width,
+    height: 200,
+    name,
+    color,
+    hex,
+    code,
+    brand,
+  };
+}
+
+function makeProduct(left: number, top: number, name: string, price: string, supplier: string, url = "", width = 220) {
+  return {
+    type: "template_product",
+    left,
+    top,
+    width,
+    height: 120,
+    name,
+    price,
+    supplier,
+    url,
+  };
+}
+
+function makeMaterial(left: number, top: number, name: string, supplier: string, code: string, imageUrl = "", notes = "", width = 220) {
+  return {
+    type: "template_material",
+    left,
+    top,
+    width,
+    height: 180,
+    name,
+    supplier,
+    code,
+    imageUrl,
+    notes,
+  };
+}
+
 function wrap(objects: any[]) {
   return {
     version: "6.6.1",
@@ -84,131 +140,105 @@ function wrap(objects: any[]) {
   };
 }
 
+const IMG = "/images/templates";
+
 const kitchenRenovation = wrap([
-  makeSectionHeader(40, 30, "Kitchen Renovation"),
+  makeSectionHeader(40, 20, "Kitchen Renovation"),
 
-  makeRect(40, 80, 280, 260, "#f0fdf4"),
-  makeText(55, 90, "CABINETRY", 13, "bold", "#1e3a2f"),
-  makeSticky(60, 125, "Shaker-style maple uppers\nin BM White Dove OC-17.\nSoft-close hinges throughout."),
-  makeSticky(60, 240, "Lower bases: walnut stain\nBrass cup pulls — Emtek\nMorris 3\" centre-to-centre"),
+  makeImage(40, 70, `${IMG}/kitchen-cabinets.png`, "Shaker-style maple uppers", 320, 240),
+  makeImage(380, 70, `${IMG}/kitchen-countertop.png`, "Calacatta Nuvo waterfall island", 300, 200),
+  makeImage(700, 70, `${IMG}/kitchen-range.png`, "Wolf 48\" dual-fuel range", 260, 200),
 
-  makeRect(340, 80, 280, 260, "#eff6ff"),
-  makeText(355, 90, "COUNTERTOPS", 13, "bold", "#1e3a2f"),
-  makeSticky(360, 125, "Caesarstone Calacatta\nNuvo 5131 — 3 cm slab.\nIsland: waterfall edge."),
-  makeSticky(360, 240, "Perimeter: eased edge.\nColour-matched caulk.\nIntegrated drainboard area."),
+  makeColorSwatch(40, 330, "White Dove", "#f3efe6", "#F3EFE6", "OC-17", "Benjamin Moore", 160),
+  makeColorSwatch(220, 330, "Edgecomb Gray", "#d5cec4", "#D5CEC4", "HC-173", "Benjamin Moore", 160),
+  makeColorSwatch(400, 330, "Chantilly Lace", "#f5f2ed", "#F5F2ED", "OC-65", "Benjamin Moore", 160),
 
-  makeRect(640, 80, 280, 260, "#fefce8"),
-  makeText(655, 90, "APPLIANCES", 13, "bold", "#1e3a2f"),
-  makeSticky(660, 125, "Sub-Zero 36\" French door\nfridge — panel-ready.\nPlumbed ice & water.", "#fef9c3"),
-  makeSticky(660, 240, "Wolf 48\" dual-fuel range.\nZephyr Cypress 48\" hood\nin brushed stainless.", "#fef9c3"),
+  makeImage(580, 290, `${IMG}/kitchen-tile.png`, "Zellige 2×6\" running bond", 260, 180),
+  makeImage(860, 290, `${IMG}/kitchen-pendants.png`, "Schoolhouse Otis pendants", 200, 180),
 
-  makeRect(40, 370, 280, 260, "#fdf2f8"),
-  makeText(55, 380, "BACKSPLASH & TILE", 13, "bold", "#1e3a2f"),
-  makeSticky(60, 415, "Cle Tile zellige 2×6\"\nin Weathered White.\nRunning-bond pattern.", "#fce7f3"),
-  makeSticky(60, 530, "Mapei Keracolor U grout\nin Frost #77. Sealed finish.\nExtend to ceiling behind range.", "#fce7f3"),
+  makeProduct(40, 550, "Caesarstone Calacatta Nuvo", "$85/sq ft", "Caesarstone", "https://caesarstone.ca"),
+  makeProduct(280, 550, "Emtek Morris Cup Pull 3\"", "$32 each", "Emtek"),
+  makeProduct(520, 550, "Sub-Zero 36\" French Door", "$12,400", "Sub-Zero"),
 
-  makeRect(340, 370, 280, 260, "#f5f3ff"),
-  makeText(355, 380, "LIGHTING", 13, "bold", "#1e3a2f"),
-  makeSticky(360, 415, "WAC LED tape — 3000K\nwarm white under all uppers.\nDimmable Lutron Caseta.", "#f3e8ff"),
-  makeSticky(360, 530, "3× Schoolhouse Otis\npendants over island —\naged brass, 10\" globes.", "#f3e8ff"),
+  makeMaterial(760, 550, "White Oak Hardwood", "Local mill", "5\" plank", `${IMG}/mood-oak-floor.png`, "Wire-brushed, matte poly. Run continuous to dining."),
 
-  makeRect(640, 370, 280, 260, "#fff7ed"),
-  makeText(655, 380, "FINISHES", 13, "bold", "#1e3a2f"),
-  makeSticky(660, 415, "White oak hardwood 5\"\nplanks — matte poly finish.\nRun continuous to dining.", "#fed7aa"),
-  makeSticky(660, 530, "BM Edgecomb Gray HC-173\non walls. Trim & ceiling:\nChantilly Lace OC-65.", "#fed7aa"),
+  makeSticky(760, 490, "Soft-close hinges throughout.\nBrass cup pulls on all lowers.", "#fef9c3", 200, 50),
+  makeSticky(40, 690, "Budget note: Island is focal\npoint — allocate 40% of\ncabinetry budget here.", "#fef9c3", 200, 80),
+  makeSticky(260, 690, "Lead times: cabinets 12 wks,\ncountertops 6 wks. Order\nbefore framing complete.", "#fef9c3", 200, 80),
 ]);
 
 const bathroomRenovation = wrap([
-  makeSectionHeader(40, 30, "Bathroom Renovation"),
+  makeSectionHeader(40, 20, "Bathroom Renovation"),
 
-  makeRect(40, 80, 280, 260, "#eff6ff"),
-  makeText(55, 90, "FIXTURES", 13, "bold", "#1e3a2f"),
-  makeSticky(60, 125, "Victoria + Albert Napoli\nfreestanding tub — matte\nwhite. 65\" x 29\".", "#dbeafe"),
-  makeSticky(60, 240, "Toto Drake II elongated\n— ADA height. Concealed\ntrapway, SoftClose seat.", "#dbeafe"),
+  makeImage(40, 70, `${IMG}/bath-tub.png`, "Victoria + Albert freestanding", 300, 240),
+  makeImage(360, 70, `${IMG}/bath-vanity.png`, "60\" floating white oak vanity", 300, 200),
+  makeImage(680, 70, `${IMG}/bath-sconce.png`, "Cedar & Moss Alto sconce", 220, 200),
 
-  makeRect(340, 80, 280, 260, "#f0fdf4"),
-  makeText(355, 90, "TILE & FLOORING", 13, "bold", "#1e3a2f"),
-  makeSticky(360, 125, "Heated marble hex floor\n2\" Carrara mosaic.\nSchluter Ditra-Heat mat.", "#dcfce7"),
-  makeSticky(360, 240, "Shower walls: large-format\nporcelain 24×48\" Calacatta.\nNiche in accent stone.", "#dcfce7"),
+  makeImage(40, 330, `${IMG}/bath-hex-tile.png`, "Carrara hex mosaic floor", 260, 180),
 
-  makeRect(640, 80, 280, 260, "#fefce8"),
-  makeText(655, 90, "VANITY & STORAGE", 13, "bold", "#1e3a2f"),
-  makeSticky(660, 125, "60\" double vanity — white\noak floating. Quartz top\nw/ undermount basins.", "#fef9c3"),
-  makeSticky(660, 240, "Recessed medicine cabinet\nw/ LED surround. Full-\nlength linen tower beside.", "#fef9c3"),
+  makeColorSwatch(320, 330, "Pale Oak", "#e8e0d4", "#E8E0D4", "OC-20", "Benjamin Moore", 160),
+  makeColorSwatch(500, 330, "White Heron", "#f0ede6", "#F0EDE6", "OC-57", "Benjamin Moore", 160),
 
-  makeRect(40, 370, 280, 260, "#f5f3ff"),
-  makeText(55, 380, "LIGHTING", 13, "bold", "#1e3a2f"),
-  makeSticky(60, 415, "Cedar & Moss Alto sconces\neither side of mirror —\nbrushed brass, 3000K.", "#f3e8ff"),
-  makeSticky(60, 530, "4\" IC-rated recessed cans\nin shower (wet-rated).\nDimmable Lutron switch.", "#f3e8ff"),
+  makeProduct(680, 290, "Brizo Litze Widespread", "$680", "Brizo", "https://brizo.com"),
+  makeProduct(680, 420, "Toto Drake II ADA", "$520", "Toto"),
 
-  makeRect(340, 370, 280, 260, "#fff7ed"),
-  makeText(355, 380, "PLUMBING NOTES", 13, "bold", "#1e3a2f"),
-  makeSticky(360, 415, "Brizo Litze widespread —\nluxe gold finish. Matching\ntub filler w/ hand shower.", "#fed7aa"),
-  makeSticky(360, 530, "Thermostatic valve —\n2-function diverter.\nRough-in at 48\" centre.", "#fed7aa"),
+  makeMaterial(320, 530, "Carrara Marble Hex", "Stone Source", "2\" mosaic", `${IMG}/bath-hex-tile.png`, "Heated w/ Schluter Ditra-Heat mat."),
+  makeMaterial(560, 530, "Large-Format Porcelain", "Cle Tile", "24×48\" Calacatta", "", "Shower walls. Niche in accent stone."),
+
+  makeSticky(40, 530, "Heated floors mandatory.\nSchluter Ditra-Heat mat\nunder all tile areas.", "#dbeafe", 260, 80),
+  makeSticky(40, 625, "Thermostatic valve —\n2-function diverter.\nRough-in at 48\" centre.", "#dbeafe", 260, 80),
+  makeSticky(800, 530, "4\" IC-rated recessed cans\nin shower (wet-rated).\nDimmable Lutron switch.", "#f3e8ff", 200, 80),
 ]);
 
 const fullCottageBuild = wrap([
-  makeSectionHeader(40, 30, "Full Cottage Build"),
+  makeSectionHeader(40, 20, "Full Cottage Build"),
 
-  makeRect(40, 80, 430, 280, "#f0fdf4"),
-  makeText(55, 90, "EXTERIOR", 14, "bold", "#1e3a2f"),
-  makeSticky(60, 125, "Board-and-batten cedar\nsiding — semi-transparent\nstain in Driftwood Grey.", "#dcfce7"),
-  makeSticky(260, 125, "Standing-seam metal roof\nin matte black. 26-gauge\nGalvalume — 50-yr warranty.", "#dcfce7"),
-  makeSticky(60, 240, "Loewen Douglas fir triple-\nglaze windows. 8' sliding\ndoor to screened porch.", "#dcfce7"),
-  makeSticky(260, 240, "Wrap-around Muskoka deck\nTimberTech composite in\nDriftwood. Steel cable rail.", "#dcfce7"),
+  makeImage(40, 70, `${IMG}/cottage-exterior.png`, "Board-and-batten cedar siding", 340, 260),
+  makeImage(400, 70, `${IMG}/cottage-trusses.png`, "Exposed timber trusses", 300, 220),
+  makeImage(720, 70, `${IMG}/cottage-dock.png`, "Permanent dock — cedar decking", 280, 220),
 
-  makeRect(490, 80, 430, 280, "#eff6ff"),
-  makeText(505, 90, "INTERIOR ROOMS", 14, "bold", "#1e3a2f"),
-  makeSticky(510, 125, "Vaulted great room w/\nexposed timber trusses.\nFloor-to-ceiling lake view.", "#dbeafe"),
-  makeSticky(710, 125, "Open kitchen to dining —\nbutler's pantry behind.\n14' live-edge harvest table.", "#dbeafe"),
-  makeSticky(510, 240, "Primary suite: lake side.\nWalk-in closet + ensuite\nw/ heated floor & soaker.", "#dbeafe"),
-  makeSticky(710, 240, "3 guest bunkie rooms on\nlower level. Shared bath\nw/ double vanity.", "#dbeafe"),
+  makeImage(40, 350, `${IMG}/cottage-fireplace.png`, "Muskoka granite fieldstone", 280, 220),
+  makeImage(340, 350, `${IMG}/mood-sofa.png`, "Performance linen great room", 260, 200),
 
-  makeRect(40, 390, 430, 260, "#fefce8"),
-  makeText(55, 400, "LANDSCAPING", 14, "bold", "#1e3a2f"),
-  makeSticky(60, 435, "Crushed granite driveway\nw/ dry-laid flagstone\nwalkway to front entry.", "#fef9c3"),
-  makeSticky(260, 435, "Permanent dock — steel\nframe, cedar decking.\nBoat lift + swim ladder.", "#fef9c3"),
-  makeSticky(60, 545, "Native Muskoka plantings:\nwhite birch, ferns, juniper.\nLow-maintenance beds.", "#fef9c3"),
-  makeSticky(260, 545, "Path lighting: Kichler LED\nbollards along walkway.\nDeck rail strip lighting.", "#fef9c3"),
+  makeColorSwatch(620, 350, "Driftwood Grey", "#9e9689", "#9E9689", "Semi-transparent", "Siding stain", 160),
+  makeColorSwatch(800, 350, "Matte Black", "#2a2a2a", "#2A2A2A", "Metal roof", "Standing seam", 160),
 
-  makeRect(490, 390, 430, 260, "#fdf2f8"),
-  makeText(505, 400, "MECHANICAL & ELECTRICAL", 14, "bold", "#1e3a2f"),
-  makeSticky(510, 435, "Mitsubishi Hyper-Heat\nmini-split — 4 zones.\nIn-floor radiant backup.", "#fce7f3"),
-  makeSticky(710, 435, "200A panel — whole-home\nsurge. Pre-wire for EV\ncharger in carport.", "#fce7f3"),
-  makeSticky(510, 545, "PEX manifold system.\nRinnai tankless water\nheater — recirculating.", "#fce7f3"),
-  makeSticky(710, 545, "Engineered septic bed\n— Class 4 system.\nDrilled well, UV filter.", "#fce7f3"),
+  makeProduct(40, 590, "Loewen Douglas Fir Triple-Glaze", "$2,800/unit", "Loewen"),
+  makeProduct(280, 590, "TimberTech Composite Decking", "$14/sq ft", "TimberTech", "https://timbertech.com"),
+  makeProduct(520, 590, "Mitsubishi Hyper-Heat Mini-Split", "$8,200", "Mitsubishi"),
+
+  makeSticky(760, 590, "200A panel — whole-home\nsurge. Pre-wire for EV\ncharger in carport.", "#fef9c3", 220, 80),
+  makeSticky(620, 570, "PEX manifold system.\nRinnai tankless water\nheater — recirculating.", "#fce7f3", 120, 70),
+
+  makeMaterial(760, 690, "Cedar Board & Batten", "Local sawmill", "1×10 + 1×3 battens", "", "Semi-transparent stain in Driftwood Grey. Re-stain every 5 yrs."),
+
+  makeSticky(40, 590, "Confirm dock permit w/\ntownship. Check setback\nrules for screened porch.", "#fef9c3", 220, 80),
 ]);
 
 const moodboard = wrap([
-  makeSectionHeader(40, 30, "Moodboard"),
+  makeSectionHeader(40, 20, "Moodboard"),
 
-  makeRect(40, 80, 220, 520, "#f5f3ff"),
-  makeText(55, 90, "COLOURS", 13, "bold", "#1e3a2f"),
-  makeSticky(55, 125, "BM White Dove OC-17\nSW Alabaster 7008\nWarm whites throughout", "#f3e8ff", 190, 90),
-  makeSticky(55, 230, "BM Salamander 2050-10\ndeep forest green on\nisland & accent walls", "#f3e8ff", 190, 90),
-  makeSticky(55, 335, "Trim: BM Chantilly Lace\nOC-65. Ceiling: flat.\nAll trim semi-gloss.", "#f3e8ff", 190, 90),
-  makeSticky(55, 440, "Keep palette to 3-4\ncolours max. Let natural\nwood tones do the work.", "#f3e8ff", 190, 90),
+  makeImage(40, 70, `${IMG}/mood-sofa.png`, "Performance linen sofa — oatmeal", 320, 240),
+  makeImage(380, 70, `${IMG}/mood-oak-floor.png`, "Wire-brushed white oak flooring", 280, 200),
+  makeImage(680, 70, `${IMG}/cottage-fireplace.png`, "Muskoka granite fieldstone", 280, 220),
 
-  makeRect(280, 80, 220, 520, "#fff7ed"),
-  makeText(295, 90, "MATERIALS & TEXTURES", 13, "bold", "#1e3a2f"),
-  makeSticky(295, 125, "White oak — wire-brushed\nnatural finish. Use on\nfloors, vanity, shelving.", "#fed7aa", 190, 90),
-  makeSticky(295, 230, "Muskoka granite fieldstone\nfor fireplace surround.\nHoned Carrara in baths.", "#fed7aa", 190, 90),
-  makeSticky(295, 335, "Aged brass hardware\nthroughout. Matte black\non exterior doors only.", "#fed7aa", 190, 90),
-  makeSticky(295, 440, "Performance linen in\noatmeal for sofas. Wool\nbouclé accent chairs.", "#fed7aa", 190, 90),
+  makeImage(40, 330, `${IMG}/kitchen-cabinets.png`, "White oak + brass hardware", 260, 200),
+  makeImage(320, 330, `${IMG}/bath-sconce.png`, "Cedar & Moss sconce — aged brass", 220, 180),
 
-  makeRect(520, 80, 220, 520, "#eff6ff"),
-  makeText(535, 90, "INSPIRATION IMAGES", 13, "bold", "#1e3a2f"),
-  makeSticky(535, 125, "Lake Joseph cottage —\nArchitectural Digest\nMay 2024 feature.", "#dbeafe", 190, 90),
-  makeSticky(535, 230, "Studio McGee living\nroom — vaulted cedar\nceiling + linen palette.", "#dbeafe", 190, 90),
-  makeSticky(535, 335, "Amber Interiors kitchen\n— open shelving + brass\nhardware + white oak.", "#dbeafe", 190, 90),
-  makeSticky(535, 440, "Four Seasons Muskoka\nlobby — stone + timber\n+ warm lighting mood.", "#dbeafe", 190, 90),
+  makeColorSwatch(560, 310, "White Dove", "#f3efe6", "#F3EFE6", "OC-17", "Benjamin Moore", 150),
+  makeColorSwatch(730, 310, "Salamander", "#1e3a2f", "#1E3A2F", "2050-10", "Benjamin Moore", 150),
+  makeColorSwatch(560, 530, "Alabaster", "#f0ede5", "#F0EDE5", "SW 7008", "Sherwin-Williams", 150),
+  makeColorSwatch(730, 530, "Chantilly Lace", "#f5f2ed", "#F5F2ED", "OC-65", "Benjamin Moore", 150),
 
-  makeRect(760, 80, 220, 520, "#fefce8"),
-  makeText(775, 90, "NOTES", 13, "bold", "#1e3a2f"),
-  makeSticky(775, 125, "Client loves warm minimal.\nNo farmhouse or rustic.\nClean lines, natural feel.", "#fef9c3", 190, 90),
-  makeSticky(775, 230, "Budget: $450K reno +\n$80K furnishings.\nPrioritise kitchen & baths.", "#fef9c3", 190, 90),
-  makeSticky(775, 335, "Target: break ground May.\nCabinets 12-wk lead time\n— order by Feb 15.", "#fef9c3", 190, 90),
-  makeSticky(775, 440, "Confirm dock permit w/\ntownship. Check setback\nrules for screened porch.", "#fef9c3", 190, 90),
+  makeMaterial(40, 550, "White Oak", "Local mill", "Wire-brushed natural", `${IMG}/mood-oak-floor.png`, "Floors, vanity, shelving. Matte poly finish."),
+  makeMaterial(280, 550, "Muskoka Granite", "Local quarry", "Fieldstone", `${IMG}/cottage-fireplace.png`, "Fireplace surround. Honed Carrara in baths."),
+
+  makeProduct(40, 750, "Aged Brass Cup Pulls", "$32 each", "Emtek"),
+  makeProduct(280, 750, "Performance Linen Fabric", "$95/yd", "Kravet"),
+  makeProduct(520, 750, "Wool Bouclé Accent Chair", "$2,400", "Restoration Hardware"),
+
+  makeSticky(760, 750, "Client loves warm minimal.\nNo farmhouse or rustic.\nClean lines, natural feel.", "#fef9c3", 220, 80),
+  makeSticky(760, 845, "Budget: $450K reno +\n$80K furnishings.\nPrioritise kitchen & baths.", "#fef9c3", 220, 80),
 ]);
 
 export interface BoardTemplate {
