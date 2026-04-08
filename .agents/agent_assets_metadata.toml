@@ -114,3 +114,93 @@ id = "7mf2YEvczra5hxuRGhluu"
 uri = "file://public/images/templates/mood-oak-floor.png"
 type = "image"
 title = "white oak flooring"
+
+[[generated]]
+id = "7HO_qaiApYlYSNUZ4q8E7"
+uri = "file://attached_assets/template-images/kitchen-cabinets.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "7V0DEOqCMdEjPL3h4nL__"
+uri = "file://attached_assets/template-images/kitchen-countertop.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "zQzkqjY9jsgnJaM89gv8Q"
+uri = "file://attached_assets/template-images/kitchen-range.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "FqBWr_r_9KeAs8rv1goLy"
+uri = "file://attached_assets/template-images/kitchen-tile.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "zSEJzoJv7yMgtbFA6vwXA"
+uri = "file://attached_assets/template-images/kitchen-pendants.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "sHVpQCvYM_DK51PJWZ8Kr"
+uri = "file://attached_assets/template-images/bath-tub.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "bk3bkEJlngIXsmdvQsrSv"
+uri = "file://attached_assets/template-images/bath-vanity.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "AOcGSDOknEVwbtiEMmcyZ"
+uri = "file://attached_assets/template-images/bath-sconce.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "w1ttlyLw4ZO2XbvvjU0V2"
+uri = "file://attached_assets/template-images/bath-hex-tile.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "Bum0kQ8rn4W1wMdAnIZVS"
+uri = "file://attached_assets/template-images/cottage-exterior.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "lP2FsbqH0R6MXPxo3hIFd"
+uri = "file://attached_assets/template-images/cottage-trusses.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "qjxPXzKHUcf9pN0BN20To"
+uri = "file://attached_assets/template-images/cottage-dock.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "tFnUGHIcCA6zKMYs5RtNp"
+uri = "file://attached_assets/template-images/cottage-fireplace.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "nvdwCKFTjLqqZs2Mj4PRI"
+uri = "file://attached_assets/template-images/mood-sofa.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "0c1-EJ54i6Q2RSUQMuyXn"
+uri = "file://attached_assets/template-images/mood-oak-floor.png"
+type = "image"
+title = "generated_image"
