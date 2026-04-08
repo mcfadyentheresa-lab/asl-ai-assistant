@@ -1,12 +1,14 @@
 import { db } from "./db";
 import { 
-  users, projects, milestones, subMilestones, sections, tasks, photos, documents, timeEntries, messages, checklistItems, boardItems, calendarEvents, planningBoards, canvasElements, activityLog, activityViews, paintColors, boardSnapshots, costCategories, marketRates, projectEstimates, estimateItems, receipts, estimateWarnings, crewRates, subcontractors, suppliers, supplierPrices, clientInvites, socialPosts,
+  users, projects, milestones, subMilestones, sections, tasks, photos, documents, timeEntries, messages, checklistItems, boardItems, calendarEvents, planningBoards, canvasElements, activityLog, activityViews, paintColors, boardSnapshots, costCategories, marketRates, projectEstimates, estimateItems, receipts, estimateWarnings, crewRates, subcontractors, suppliers, supplierPrices, clientInvites, socialPosts, tableRedesignPlans, tableRedesignMaterials,
   type Project, type Milestone, type SubMilestone, type Section, type Task, type Photo, type Document, type TimeEntry, type Message,
   type ChecklistItem, type BoardItem, type CalendarEvent, type PlanningBoard, type CanvasElement, type ActivityLog, type PaintColor, type BoardSnapshot, type CostCategory, type MarketRate, type ProjectEstimate, type EstimateItem, type Receipt, type EstimateWarning, type CrewRate, type Subcontractor,
   type InsertProject, type InsertMilestone, type InsertSubMilestone, type InsertSection, type InsertTask, type InsertPhoto, type InsertDocument, 
   type InsertTimeEntry, type InsertMessage, type InsertChecklistItem, type InsertBoardItem, type InsertCalendarEvent, type InsertPlanningBoard, type InsertCanvasElement, type InsertActivityLog, type InsertBoardSnapshot, type InsertCostCategory, type InsertMarketRate, type InsertProjectEstimate, type InsertEstimateItem, type InsertReceipt, type InsertEstimateWarning, type InsertCrewRate, type InsertSubcontractor, type Supplier, type SupplierPrice, type InsertSupplier, type InsertSupplierPrice,
   type ClientInvite, type InsertClientInvite,
-  type SocialPost, type InsertSocialPost
+  type SocialPost, type InsertSocialPost,
+  type TableRedesignPlan, type InsertTableRedesignPlan,
+  type TableRedesignMaterial, type InsertTableRedesignMaterial
 } from "@shared/schema";
 import { type User } from "@shared/models/auth";
 import { eq, desc, and, ilike, or, gte, lte, inArray, sql } from "drizzle-orm";
@@ -212,6 +214,19 @@ export interface IStorage {
   deleteSocialPost(id: number): Promise<void>;
   getUnseenMilestoneCount(): Promise<number>;
   markMilestoneDraftsSeen(): Promise<void>;
+
+  // Table Redesign Plans
+  getRedesignPlans(projectId?: number): Promise<TableRedesignPlan[]>;
+  getRedesignPlan(id: number): Promise<TableRedesignPlan | undefined>;
+  createRedesignPlan(plan: InsertTableRedesignPlan): Promise<TableRedesignPlan>;
+  updateRedesignPlan(id: number, updates: Partial<InsertTableRedesignPlan>): Promise<TableRedesignPlan>;
+  deleteRedesignPlan(id: number): Promise<void>;
+
+  // Table Redesign Materials
+  getRedesignMaterials(planId: number): Promise<TableRedesignMaterial[]>;
+  createRedesignMaterial(material: InsertTableRedesignMaterial): Promise<TableRedesignMaterial>;
+  updateRedesignMaterial(id: number, updates: Partial<InsertTableRedesignMaterial>): Promise<TableRedesignMaterial>;
+  deleteRedesignMaterial(id: number): Promise<void>;
 
   // Cross-project calendar (admin/crew)
   getAllCalendarEvents(): Promise<(CalendarEvent & { projectName: string; projectColor: string | null })[]>;
@@ -947,6 +962,45 @@ export class DatabaseStorage implements IStorage {
       projectId: projects.id,
     }).from(tasks).innerJoin(projects, eq(tasks.projectId, projects.id)).orderBy(tasks.order);
     return rows.map(r => ({ ...r.task, projectName: r.projectName, projectColor: this.projectColorFromId(r.projectId) }));
+  }
+
+  // Table Redesign Plans
+  async getRedesignPlans(projectId?: number): Promise<TableRedesignPlan[]> {
+    if (projectId) {
+      return db.select().from(tableRedesignPlans).where(eq(tableRedesignPlans.projectId, projectId)).orderBy(desc(tableRedesignPlans.createdAt));
+    }
+    return db.select().from(tableRedesignPlans).orderBy(desc(tableRedesignPlans.createdAt));
+  }
+  async getRedesignPlan(id: number): Promise<TableRedesignPlan | undefined> {
+    const [plan] = await db.select().from(tableRedesignPlans).where(eq(tableRedesignPlans.id, id));
+    return plan;
+  }
+  async createRedesignPlan(plan: InsertTableRedesignPlan): Promise<TableRedesignPlan> {
+    const [created] = await db.insert(tableRedesignPlans).values(plan).returning();
+    return created;
+  }
+  async updateRedesignPlan(id: number, updates: Partial<InsertTableRedesignPlan>): Promise<TableRedesignPlan> {
+    const [updated] = await db.update(tableRedesignPlans).set({ ...updates, updatedAt: new Date() }).where(eq(tableRedesignPlans.id, id)).returning();
+    return updated;
+  }
+  async deleteRedesignPlan(id: number): Promise<void> {
+    await db.delete(tableRedesignPlans).where(eq(tableRedesignPlans.id, id));
+  }
+
+  // Table Redesign Materials
+  async getRedesignMaterials(planId: number): Promise<TableRedesignMaterial[]> {
+    return db.select().from(tableRedesignMaterials).where(eq(tableRedesignMaterials.planId, planId)).orderBy(tableRedesignMaterials.id);
+  }
+  async createRedesignMaterial(material: InsertTableRedesignMaterial): Promise<TableRedesignMaterial> {
+    const [created] = await db.insert(tableRedesignMaterials).values(material).returning();
+    return created;
+  }
+  async updateRedesignMaterial(id: number, updates: Partial<InsertTableRedesignMaterial>): Promise<TableRedesignMaterial> {
+    const [updated] = await db.update(tableRedesignMaterials).set(updates).where(eq(tableRedesignMaterials.id, id)).returning();
+    return updated;
+  }
+  async deleteRedesignMaterial(id: number): Promise<void> {
+    await db.delete(tableRedesignMaterials).where(eq(tableRedesignMaterials.id, id));
   }
 }
 

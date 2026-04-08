@@ -588,6 +588,54 @@ export const supplierPrices = pgTable("supplier_prices", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Table Redesign Plans
+export const tableRedesignPlans = pgTable("table_redesign_plans", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  pieceType: text("piece_type").notNull(), // table, desk, console, coffee_table
+  pieceName: text("piece_name").notNull(),
+  beforeImageUrl: text("before_image_url"),
+  inspirationImageUrl: text("inspiration_image_url"),
+  conceptImageUrl: text("concept_image_url"),
+  tableShape: text("table_shape").notNull(), // rectangular, round, oval, square
+  lengthInches: integer("length_inches"),
+  widthInches: integer("width_inches"),
+  heightInches: integer("height_inches"),
+  thicknessInches: integer("thickness_inches"),
+  weightClass: text("weight_class").notNull().default("unknown"), // light, medium, heavy, unknown
+  existingMaterial: text("existing_material"),
+  redesignScope: text("redesign_scope").notNull().default("full"), // base_only, finish, full
+  proposedBaseType: text("proposed_base_type"), // pedestal, trestle, four_leg, plinth, custom
+  styleDirection: text("style_direction"),
+  finishDirection: text("finish_direction"),
+  notes: text("notes"),
+  conceptTitle: text("concept_title"),
+  conceptDescription: text("concept_description"),
+  baseSizeMinInches: integer("base_size_min_inches"),
+  baseSizeMaxInches: integer("base_size_max_inches"),
+  baseSizeNotes: text("base_size_notes"),
+  buildNotes: text("build_notes"),
+  tag: text("tag"),
+  status: text("status").notNull().default("draft"), // draft, complete
+  createdBy: text("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Table Redesign Materials
+export const tableRedesignMaterials = pgTable("table_redesign_materials", {
+  id: serial("id").primaryKey(),
+  planId: integer("plan_id").notNull().references(() => tableRedesignPlans.id, { onDelete: "cascade" }),
+  component: text("component").notNull(),
+  material: text("material"),
+  finish: text("finish"),
+  dimensions: text("dimensions"),
+  quantity: integer("quantity").default(1),
+  notes: text("notes"),
+  supplier: text("supplier"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // SCHEMAS
 export const insertProjectSchema = createInsertSchema(projects).omit({ id: true, createdAt: true });
 export const insertMilestoneSchema = createInsertSchema(milestones).omit({ id: true });
@@ -618,6 +666,8 @@ export const insertSupplierSchema = createInsertSchema(suppliers).omit({ id: tru
 export const insertClientInviteSchema = createInsertSchema(clientInvites).omit({ id: true, createdAt: true });
 export const insertSupplierPriceSchema = createInsertSchema(supplierPrices).omit({ id: true, createdAt: true, lastUpdated: true });
 export const insertSocialPostSchema = createInsertSchema(socialPosts).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertTableRedesignPlanSchema = createInsertSchema(tableRedesignPlans).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertTableRedesignMaterialSchema = createInsertSchema(tableRedesignMaterials).omit({ id: true, createdAt: true });
 
 // TYPES
 export type Project = typeof projects.$inferSelect;
@@ -681,3 +731,7 @@ export type ClientInvite = typeof clientInvites.$inferSelect;
 export type InsertClientInvite = z.infer<typeof insertClientInviteSchema>;
 export type SocialPost = typeof socialPosts.$inferSelect;
 export type InsertSocialPost = z.infer<typeof insertSocialPostSchema>;
+export type TableRedesignPlan = typeof tableRedesignPlans.$inferSelect;
+export type InsertTableRedesignPlan = z.infer<typeof insertTableRedesignPlanSchema>;
+export type TableRedesignMaterial = typeof tableRedesignMaterials.$inferSelect;
+export type InsertTableRedesignMaterial = z.infer<typeof insertTableRedesignMaterialSchema>;

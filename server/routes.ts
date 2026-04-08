@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
-import { insertSubMilestoneSchema, insertSectionSchema, insertTimeEntrySchema, insertCostCategorySchema, insertMarketRateSchema, insertProjectEstimateSchema, insertEstimateItemSchema, insertReceiptSchema, insertCrewRateSchema, insertSubcontractorSchema, insertSupplierSchema, insertSupplierPriceSchema } from "@shared/schema";
+import { insertSubMilestoneSchema, insertSectionSchema, insertTimeEntrySchema, insertCostCategorySchema, insertMarketRateSchema, insertProjectEstimateSchema, insertEstimateItemSchema, insertReceiptSchema, insertCrewRateSchema, insertSubcontractorSchema, insertSupplierSchema, insertSupplierPriceSchema, insertTableRedesignPlanSchema, insertTableRedesignMaterialSchema } from "@shared/schema";
 import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
@@ -3890,6 +3890,143 @@ Respond with valid JSON only:
     }
     await storage.deleteSupplierPrice(parseInt(req.params.id));
     res.json({ message: "Supplier price deleted" });
+  });
+
+  // ==================== TABLE REDESIGN PLANNER ====================
+
+  app.get("/api/redesign-plans", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const user = await authStorage.getUser(userId);
+    if (!user || user.role !== "admin") {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+    const projectId = req.query.projectId ? parseInt(req.query.projectId) : undefined;
+    const plans = await storage.getRedesignPlans(projectId);
+    res.json(plans);
+  });
+
+  app.get("/api/redesign-plans/:id", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const user = await authStorage.getUser(userId);
+    if (!user || user.role !== "admin") {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+    const plan = await storage.getRedesignPlan(parseInt(req.params.id));
+    if (!plan) return res.status(404).json({ message: "Plan not found" });
+    res.json(plan);
+  });
+
+  app.post("/api/redesign-plans", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const user = await authStorage.getUser(userId);
+    if (!user || user.role !== "admin") {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+    const parsed = insertTableRedesignPlanSchema.safeParse({ ...req.body, createdBy: userId });
+    if (!parsed.success) return res.status(400).json({ message: "Invalid plan data", errors: parsed.error.errors });
+    const plan = await storage.createRedesignPlan(parsed.data);
+    res.status(201).json(plan);
+  });
+
+  app.patch("/api/redesign-plans/:id", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const user = await authStorage.getUser(userId);
+    if (!user || user.role !== "admin") {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+    const plan = await storage.updateRedesignPlan(parseInt(req.params.id), req.body);
+    res.json(plan);
+  });
+
+  app.delete("/api/redesign-plans/:id", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const user = await authStorage.getUser(userId);
+    if (!user || user.role !== "admin") {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+    await storage.deleteRedesignPlan(parseInt(req.params.id));
+    res.json({ message: "Plan deleted" });
+  });
+
+  // Redesign Materials
+  app.get("/api/redesign-plans/:planId/materials", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const user = await authStorage.getUser(userId);
+    if (!user || user.role !== "admin") {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+    const materials = await storage.getRedesignMaterials(parseInt(req.params.planId));
+    res.json(materials);
+  });
+
+  app.post("/api/redesign-plans/:planId/materials", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const user = await authStorage.getUser(userId);
+    if (!user || user.role !== "admin") {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+    const parsed = insertTableRedesignMaterialSchema.safeParse({ ...req.body, planId: parseInt(req.params.planId) });
+    if (!parsed.success) return res.status(400).json({ message: "Invalid material data", errors: parsed.error.errors });
+    const material = await storage.createRedesignMaterial(parsed.data);
+    res.status(201).json(material);
+  });
+
+  app.patch("/api/redesign-plans/:planId/materials/:id", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const user = await authStorage.getUser(userId);
+    if (!user || user.role !== "admin") {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+    const material = await storage.updateRedesignMaterial(parseInt(req.params.id), req.body);
+    res.json(material);
+  });
+
+  app.delete("/api/redesign-plans/:planId/materials/:id", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const user = await authStorage.getUser(userId);
+    if (!user || user.role !== "admin") {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+    await storage.deleteRedesignMaterial(parseInt(req.params.id));
+    res.json({ message: "Material deleted" });
+  });
+
+  // Push redesign card to planning board
+  app.post("/api/redesign-plans/:id/push-to-board", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const user = await authStorage.getUser(userId);
+    if (!user || user.role !== "admin") {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+    const plan = await storage.getRedesignPlan(parseInt(req.params.id));
+    if (!plan) return res.status(404).json({ message: "Plan not found" });
+
+    const { boardId } = req.body;
+    if (!boardId) return res.status(400).json({ message: "boardId is required" });
+
+    const board = await storage.getPlanningBoard(parseInt(boardId));
+    if (!board) return res.status(404).json({ message: "Board not found" });
+
+    const imageUrl = plan.conceptImageUrl || plan.beforeImageUrl || "";
+    const title = plan.conceptTitle || plan.pieceName;
+    const description = plan.conceptDescription || `${plan.pieceType} redesign — ${plan.redesignScope}`;
+    const tagLabel = plan.tag || "";
+
+    const element = await storage.createCanvasElement({
+      boardId: parseInt(boardId),
+      type: "image",
+      x: 100,
+      y: 100,
+      width: 280,
+      height: 320,
+      zIndex: 1,
+      content: {
+        url: imageUrl,
+        caption: `${title}${tagLabel ? ` [${tagLabel}]` : ""}\n${description}`,
+      },
+    });
+
+    res.status(201).json(element);
   });
 
   // Initialize seed data

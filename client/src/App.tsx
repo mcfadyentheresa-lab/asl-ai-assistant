@@ -20,6 +20,7 @@ import TradeContacts from "@/pages/TradeContacts";
 import SupplierPrices from "@/pages/SupplierPrices";
 import MasterCalendar from "@/pages/MasterCalendar";
 import SocialMediaGenerator from "@/pages/SocialMediaGenerator";
+import TableRedesignPlanner from "@/pages/TableRedesignPlanner";
 import InviteAccept from "@/pages/InviteAccept";
 import Welcome from "@/pages/Welcome";
 import SignIn from "@/pages/SignIn";
@@ -97,6 +98,7 @@ function Router() {
         <Route path="/supplier-prices" component={SupplierPrices} />
         <Route path="/master-calendar" component={MasterCalendar} />
         <Route path="/social-media" component={SocialMediaGenerator} />
+        <Route path="/table-redesign" component={TableRedesignPlanner} />
         <Route component={NotFound} />
       </Switch>
     </>
