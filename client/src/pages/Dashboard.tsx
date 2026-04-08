@@ -113,7 +113,7 @@ export default function Dashboard() {
     );
   }
 
-  const canCreateProjects = isAdminView;
+  const canCreateProjects = isAdmin;
   const clientSingleProject = isClient && filteredProjects && filteredProjects.length === 1 ? filteredProjects[0] : null;
 
   return (
@@ -233,7 +233,7 @@ export default function Dashboard() {
             </Link>
           </motion.div>
         ) : filteredProjects && filteredProjects.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
             {filteredProjects.map((project, idx) => (
               <motion.div
                 key={project.id}
