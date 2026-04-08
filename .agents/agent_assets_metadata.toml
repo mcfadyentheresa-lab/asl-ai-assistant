@@ -26,181 +26,91 @@ type = "image"
 title = "Cottage faux image"
 
 [[generated]]
-id = "iw0a7GLnsZ7VnloJ1dVXt"
-uri = "file://public/images/templates/kitchen-cabinets.png"
-type = "image"
-title = "kitchen shaker cabinets"
-
-[[generated]]
-id = "8NTmV9W4Qd9RjmOxeIwHp"
-uri = "file://public/images/templates/kitchen-countertop.png"
-type = "image"
-title = "marble countertop"
-
-[[generated]]
-id = "R0mv_N7rVPPwKPYbk5yqj"
-uri = "file://public/images/templates/kitchen-pendants.png"
-type = "image"
-title = "brass pendant lights"
-
-[[generated]]
-id = "Z2a8w9C3NA-V20qdeJivo"
-uri = "file://public/images/templates/kitchen-tile.png"
-type = "image"
-title = "zellige tile backsplash"
-
-[[generated]]
-id = "c4fEy_McI6Gzdt8igNhzZ"
-uri = "file://public/images/templates/kitchen-range.png"
-type = "image"
-title = "wolf range appliance"
-
-[[generated]]
-id = "cKdFuMChPp2pv3IGx-D0v"
-uri = "file://public/images/templates/bath-tub.png"
-type = "image"
-title = "freestanding bathtub"
-
-[[generated]]
-id = "DvSSdbGx40xz04VOd0VgE"
-uri = "file://public/images/templates/bath-vanity.png"
-type = "image"
-title = "floating vanity"
-
-[[generated]]
-id = "L7U0PAfc3rMXZUFkgAmEv"
-uri = "file://public/images/templates/bath-hex-tile.png"
-type = "image"
-title = "hex marble tile"
-
-[[generated]]
-id = "WQu6nBh-qA0v-aNMywsMp"
-uri = "file://public/images/templates/bath-sconce.png"
-type = "image"
-title = "brass wall sconce"
-
-[[generated]]
-id = "p-PwFllpqbyUlBJYu-fui"
-uri = "file://public/images/templates/cottage-exterior.png"
-type = "image"
-title = "cottage exterior"
-
-[[generated]]
-id = "jwXJoAIQQguECpJ2hI9UF"
-uri = "file://public/images/templates/cottage-trusses.png"
-type = "image"
-title = "timber trusses"
-
-[[generated]]
-id = "IPhXmm1MN1rAMv6teQb6l"
-uri = "file://public/images/templates/cottage-dock.png"
-type = "image"
-title = "lakeside dock"
-
-[[generated]]
-id = "3r8lIPEcVLOM_7yQ4Yi6c"
-uri = "file://public/images/templates/cottage-fireplace.png"
-type = "image"
-title = "stone fireplace"
-
-[[generated]]
-id = "iIvTkVICLUCmT7fteJfhX"
-uri = "file://public/images/templates/mood-sofa.png"
-type = "image"
-title = "linen sofa"
-
-[[generated]]
-id = "7mf2YEvczra5hxuRGhluu"
-uri = "file://public/images/templates/mood-oak-floor.png"
-type = "image"
-title = "white oak flooring"
-
-[[generated]]
 id = "7HO_qaiApYlYSNUZ4q8E7"
 uri = "file://attached_assets/template-images/kitchen-cabinets.png"
 type = "image"
-title = "generated_image"
+title = "Kitchen shaker cabinets — uploaded to object storage as images/templates/kitchen-cabinets.png"
 
 [[generated]]
 id = "7V0DEOqCMdEjPL3h4nL__"
 uri = "file://attached_assets/template-images/kitchen-countertop.png"
 type = "image"
-title = "generated_image"
+title = "Marble countertop — uploaded to object storage as images/templates/kitchen-countertop.png"
 
 [[generated]]
 id = "zQzkqjY9jsgnJaM89gv8Q"
 uri = "file://attached_assets/template-images/kitchen-range.png"
 type = "image"
-title = "generated_image"
+title = "Wolf range appliance — uploaded to object storage as images/templates/kitchen-range.png"
 
 [[generated]]
 id = "FqBWr_r_9KeAs8rv1goLy"
 uri = "file://attached_assets/template-images/kitchen-tile.png"
 type = "image"
-title = "generated_image"
+title = "Zellige tile backsplash — uploaded to object storage as images/templates/kitchen-tile.png"
 
 [[generated]]
 id = "zSEJzoJv7yMgtbFA6vwXA"
 uri = "file://attached_assets/template-images/kitchen-pendants.png"
 type = "image"
-title = "generated_image"
+title = "Brass pendant lights — uploaded to object storage as images/templates/kitchen-pendants.png"
 
 [[generated]]
 id = "sHVpQCvYM_DK51PJWZ8Kr"
 uri = "file://attached_assets/template-images/bath-tub.png"
 type = "image"
-title = "generated_image"
+title = "Freestanding bathtub — uploaded to object storage as images/templates/bath-tub.png"
 
 [[generated]]
 id = "bk3bkEJlngIXsmdvQsrSv"
 uri = "file://attached_assets/template-images/bath-vanity.png"
 type = "image"
-title = "generated_image"
+title = "Floating vanity — uploaded to object storage as images/templates/bath-vanity.png"
 
 [[generated]]
 id = "AOcGSDOknEVwbtiEMmcyZ"
 uri = "file://attached_assets/template-images/bath-sconce.png"
 type = "image"
-title = "generated_image"
+title = "Brass wall sconce — uploaded to object storage as images/templates/bath-sconce.png"
 
 [[generated]]
 id = "w1ttlyLw4ZO2XbvvjU0V2"
 uri = "file://attached_assets/template-images/bath-hex-tile.png"
 type = "image"
-title = "generated_image"
+title = "Hex marble tile — uploaded to object storage as images/templates/bath-hex-tile.png"
 
 [[generated]]
 id = "Bum0kQ8rn4W1wMdAnIZVS"
 uri = "file://attached_assets/template-images/cottage-exterior.png"
 type = "image"
-title = "generated_image"
+title = "Cottage exterior — uploaded to object storage as images/templates/cottage-exterior.png"
 
 [[generated]]
 id = "lP2FsbqH0R6MXPxo3hIFd"
 uri = "file://attached_assets/template-images/cottage-trusses.png"
 type = "image"
-title = "generated_image"
+title = "Timber trusses — uploaded to object storage as images/templates/cottage-trusses.png"
 
 [[generated]]
 id = "qjxPXzKHUcf9pN0BN20To"
 uri = "file://attached_assets/template-images/cottage-dock.png"
 type = "image"
-title = "generated_image"
+title = "Lakeside dock — uploaded to object storage as images/templates/cottage-dock.png"
 
 [[generated]]
 id = "tFnUGHIcCA6zKMYs5RtNp"
 uri = "file://attached_assets/template-images/cottage-fireplace.png"
 type = "image"
-title = "generated_image"
+title = "Stone fireplace — uploaded to object storage as images/templates/cottage-fireplace.png"
 
 [[generated]]
 id = "nvdwCKFTjLqqZs2Mj4PRI"
 uri = "file://attached_assets/template-images/mood-sofa.png"
 type = "image"
-title = "generated_image"
+title = "Linen sofa — uploaded to object storage as images/templates/mood-sofa.png"
 
 [[generated]]
 id = "0c1-EJ54i6Q2RSUQMuyXn"
 uri = "file://attached_assets/template-images/mood-oak-floor.png"
 type = "image"
-title = "generated_image"
+title = "White oak flooring — uploaded to object storage as images/templates/mood-oak-floor.png"
