@@ -1,4 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from "react";
+import templateKitchenPreview from "@assets/images/template-kitchen-faux.png";
+import templateBathroomPreview from "@assets/images/template-bathroom-faux.png";
+import templateCottagePreview from "@assets/images/template-cottage-faux.png";
+import templateMoodboardPreview from "@assets/Screenshot_2026-04-08_at_12.56.52_PM_1775667416114.png";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -173,6 +177,12 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     queryKey: ["/api/board-templates"],
     enabled: isAdmin,
   });
+  const templatePreviewById: Record<string, string> = {
+    kitchen: templateKitchenPreview,
+    bathroom: templateBathroomPreview,
+    cottage: templateCottagePreview,
+    moodboard: templateMoodboardPreview,
+  };
 
   const [selectedBoardId, setSelectedBoardId] = useState<number | null>(null);
   const justCreatedBoardId = useRef<number | null>(null);
@@ -3194,7 +3204,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                     >
                       <div className="relative h-20 overflow-hidden">
                         <img
-                          src={tmpl.image}
+                          src={templatePreviewById[tmpl.id] ?? tmpl.image}
                           alt={tmpl.name}
                           className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                           data-testid={`img-template-${tmpl.id}`}
