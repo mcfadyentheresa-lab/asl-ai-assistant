@@ -82,5 +82,23 @@ export function registerObjectStorageRoutes(app: Express): void {
       return res.status(500).json({ error: "Failed to serve object" });
     }
   });
+
+  app.get("/api/public-assets/{*filePath}", async (req, res) => {
+    try {
+      const rawPath = (req.params as any).filePath;
+      const filePath = Array.isArray(rawPath) ? rawPath.join("/") : rawPath;
+      if (!filePath) {
+        return res.status(400).json({ error: "Missing file path" });
+      }
+      const file = await objectStorageService.searchPublicObject(filePath);
+      if (!file) {
+        return res.status(404).json({ error: "File not found" });
+      }
+      await objectStorageService.downloadObject(file, res, 86400);
+    } catch (error) {
+      console.error("Error serving public asset:", error);
+      return res.status(500).json({ error: "Failed to serve file" });
+    }
+  });
 }
 
