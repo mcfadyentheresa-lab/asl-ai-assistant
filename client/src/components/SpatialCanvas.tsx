@@ -1563,6 +1563,10 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
 
     const handleClick = (e: React.MouseEvent) => {
       e.stopPropagation();
+      if (el.type === "board_link" && c.targetBoardId) {
+        setSelectedBoardId(c.targetBoardId);
+        return;
+      }
       setEditingId(el.id);
     };
 
