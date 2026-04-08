@@ -3162,16 +3162,25 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           {isAdmin && templateCatalogue.length > 0 && (
             <div className="space-y-2">
               <Label className="text-xs uppercase tracking-wider text-muted-foreground">Start from Template</Label>
-              <div className="grid grid-cols-2 gap-2" data-testid="template-picker-grid">
+              <div className="grid grid-cols-2 gap-3" data-testid="template-picker-grid">
                 <button
                   type="button"
                   onClick={() => setSelectedTemplateId(null)}
-                  className={`flex flex-col items-center gap-1.5 rounded-lg border p-3 text-left transition-colors hover:bg-accent ${selectedTemplateId === null ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border"}`}
+                  className={`group overflow-hidden rounded-xl border bg-card text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${selectedTemplateId === null ? "border-primary ring-1 ring-primary" : "border-border/70"}`}
                   data-testid="template-blank"
                 >
-                  <FileText className="h-5 w-5 text-muted-foreground" />
-                  <span className="text-xs font-medium">Blank Board</span>
-                  <span className="text-[10px] text-muted-foreground text-center leading-tight">Start with an empty canvas</span>
+                  <div className="flex h-20 items-center justify-center bg-gradient-to-br from-muted/80 to-muted/40">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-full border border-border/60 bg-background/90 shadow-sm">
+                      <FileText className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5 p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-semibold uppercase tracking-wide">Blank Board</span>
+                      {selectedTemplateId === null && <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">Selected</Badge>}
+                    </div>
+                    <span className="block text-[11px] leading-snug text-muted-foreground">Start with an empty canvas</span>
+                  </div>
                 </button>
                 {templateCatalogue.map((tmpl) => {
                   const IconComp = tmpl.icon === "ChefHat" ? ChefHat : tmpl.icon === "Bath" ? Bath : tmpl.icon === "Home" ? Home : tmpl.icon === "Palette" ? Palette : LayoutPanelLeft;
@@ -3180,12 +3189,28 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                       key={tmpl.id}
                       type="button"
                       onClick={() => setSelectedTemplateId(tmpl.id)}
-                      className={`flex flex-col items-center gap-1.5 rounded-lg border p-3 text-left transition-colors hover:bg-accent ${selectedTemplateId === tmpl.id ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border"}`}
+                      className={`group overflow-hidden rounded-xl border bg-card text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${selectedTemplateId === tmpl.id ? "border-primary ring-1 ring-primary" : "border-border/70"}`}
                       data-testid={`template-${tmpl.id}`}
                     >
-                      <IconComp className="h-5 w-5 text-muted-foreground" />
-                      <span className="text-xs font-medium">{tmpl.name}</span>
-                      <span className="text-[10px] text-muted-foreground text-center leading-tight">{tmpl.description}</span>
+                      <div className="relative h-20 overflow-hidden">
+                        <img
+                          src={tmpl.image}
+                          alt={tmpl.name}
+                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                          data-testid={`img-template-${tmpl.id}`}
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-background/85 via-background/20 to-transparent" />
+                        <div className="absolute left-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-background/85 shadow-sm">
+                          <IconComp className="h-4 w-4 text-foreground/70" />
+                        </div>
+                        {selectedTemplateId === tmpl.id && (
+                          <Badge className="absolute right-2 top-2 h-5 px-1.5 text-[10px]">Selected</Badge>
+                        )}
+                      </div>
+                      <div className="space-y-1.5 p-3">
+                        <span className="block text-xs font-semibold uppercase tracking-wide">{tmpl.name}</span>
+                        <span className="block text-[11px] leading-snug text-muted-foreground">{tmpl.description}</span>
+                      </div>
                     </button>
                   );
                 })}
