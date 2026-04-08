@@ -157,7 +157,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {viewMode === "admin" && (
+        {isAdmin && (
           <div className="flex items-center gap-4 mb-6 flex-wrap" data-testid="admin-stats-strip">
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted/50 border border-border/40">
               <FolderOpen className="h-3.5 w-3.5 text-muted-foreground" />
