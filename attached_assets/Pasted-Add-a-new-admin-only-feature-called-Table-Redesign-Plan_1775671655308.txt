@@ -1,0 +1,119 @@
+Add a new admin-only feature called “Table Redesign Planner” and integrate it with the Planning Board correctly.
+
+Goal:
+Create a structured tool that generates redesign concepts (image, description, base size planning range, materials list), but does NOT clutter the Planning Board. The Planning Board must remain clean and client-facing.
+
+Core requirement:
+The redesign tool must exist as a separate module/page. It should output a clean, simplified “card” that can be pushed to the Planning Board.
+
+-----------------------------------
+PART 1 — TOOL (ADMIN SIDE)
+-----------------------------------
+
+Create a standalone module called:
+“Table Redesign Planner”
+
+Inputs:
+- Project / client
+- Piece name
+- Upload existing image
+- Optional inspiration image
+- Table shape (rectangular, round, oval, square)
+- Dimensions (length, width, height, thickness)
+- Weight class (light, medium, heavy, unknown)
+- Existing material
+- Desired redesign (base only / finish / full)
+- Style direction
+- Finish direction
+- Notes
+
+Outputs:
+- Concept title
+- Short redesign description
+- Visual concept (image or placeholder system)
+- Recommended base size range (planning only, editable)
+- Materials / components list
+- Build notes
+- Disclaimer:
+  “Concept and planning preview only. Final result may vary…”
+
+IMPORTANT:
+- Show how base-range logic is calculated
+- Flag heavy/stone/glass tops as needing review
+- Keep all outputs editable
+- Do NOT change any existing app features
+
+-----------------------------------
+PART 2 — PLANNING BOARD INTEGRATION
+-----------------------------------
+
+Add a button inside the tool:
+“Add to Planning Board”
+
+When clicked:
+Create a CLEAN visual card on the Planning Board with ONLY:
+- Image
+- Title
+- 1–2 line description
+- Optional tag (e.g. “Option A”)
+
+DO NOT include:
+- Inputs
+- Dimensions
+- Calculations
+- Full material list
+
+The board must remain minimal and client-friendly.
+
+-----------------------------------
+PART 3 — MATERIALS PANEL (IN TOOL ONLY)
+-----------------------------------
+
+Inside the tool (NOT the board), include a side panel:
+“Materials / Spec List”
+
+Fields:
+- Component
+- Material
+- Finish
+- Dimensions
+- Quantity
+- Notes
+- Optional supplier
+
+-----------------------------------
+PART 4 — CLIENT SHARE VIEW
+-----------------------------------
+
+Allow export/share version that includes:
+- Before image
+- Concept image
+- Description
+- Selected material examples
+- Optional notes
+
+Keep it clean and presentation-ready.
+
+-----------------------------------
+PART 5 — CONSTRAINTS
+-----------------------------------
+
+- Do NOT modify login, routing, or existing UI
+- Do NOT embed tool logic inside the Planning Board
+- Keep tool and board separate
+- Show all files created or changed
+- If image generation is used, explain the service clearly
+- If no image service exists, use placeholder workflow
+
+-----------------------------------
+BEFORE BUILDING:
+-----------------------------------
+
+First inspect my app and explain:
+1. Where this tool should live
+2. How it connects to project data
+3. How Planning Board cards are created
+4. What logic will drive base size recommendations
+5. What services (if any) are required
+
+Do NOT build yet. Provide the plan first.
