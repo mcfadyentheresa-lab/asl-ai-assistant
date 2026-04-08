@@ -1552,7 +1552,7 @@ function templateCanvasToElements(canvasData: any, boardId: number, createdBy: s
 
   for (let i = 0; i < elements.length; i++) {
     const el = elements[i];
-    if (el.type === "column" || el.type === "section_header") continue;
+    if (el.type === "column") continue;
     const cx = el.x + (el.width || 0) / 2;
     const cy = el.y + (el.height || 0) / 2;
     for (const col of columnBounds) {
