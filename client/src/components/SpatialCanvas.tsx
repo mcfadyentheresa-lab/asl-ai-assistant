@@ -194,6 +194,8 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
 
   const [showRenameDialog, setShowRenameDialog] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showManageBoards, setShowManageBoards] = useState(false);
+  const [boardsToDelete, setBoardsToDelete] = useState<Set<number>>(new Set());
   const [showNewBoardDialog, setShowNewBoardDialog] = useState(false);
   const [showLinkDialog, setShowLinkDialog] = useState(false);
   const [showCalendarSheet, setShowCalendarSheet] = useState(false);
@@ -372,6 +374,30 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     if (eventIdToDelete) {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'activity'] });
     }
+  };
+
+  const handleDeleteSelectedBoards = async () => {
+    if (boardsToDelete.size === 0) return;
+    for (const id of boardsToDelete) {
+      const board = boards.find((b: any) => b.id === id);
+      if (!board) continue;
+      const shouldDeleteEvent = board.linkedCalendarEventId && !(board.linkedMilestoneId || board.linkedChecklistItemId);
+      const eventIdToDelete = shouldDeleteEvent ? board.linkedCalendarEventId : null;
+      try {
+        await deleteBoard({ id, projectId });
+        if (eventIdToDelete) {
+          try { await deleteCalendarEvent(eventIdToDelete); } catch {}
+        }
+      } catch {}
+    }
+    if (boardsToDelete.has(selectedBoardId!)) {
+      setSelectedBoardId(null);
+    }
+    setBoardsToDelete(new Set());
+    setShowManageBoards(false);
+    queryClient.invalidateQueries({ queryKey: [api.planningBoards.list.path, projectId] });
+    queryClient.invalidateQueries({ queryKey: [api.calendar.list.path] });
+    toast({ title: "Boards deleted", description: `${boardsToDelete.size} board(s) removed.` });
   };
 
   const handleLinkUpdate = async (field: string, value: any, extraFields?: Record<string, any>) => {
@@ -2566,6 +2592,11 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                 <DropdownMenuItem className="text-destructive" onClick={() => setShowDeleteConfirm(true)} data-testid="menu-delete-board">
                   <Trash2 className="h-4 w-4 mr-2" /> Delete Board
                 </DropdownMenuItem>
+                {boards.length > 1 && (
+                  <DropdownMenuItem onClick={() => { setBoardsToDelete(new Set()); setShowManageBoards(true); }} data-testid="menu-manage-boards">
+                    <ListChecks className="h-4 w-4 mr-2" /> Manage Boards
+                  </DropdownMenuItem>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           </>
@@ -3299,6 +3330,57 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>Cancel</Button>
             <Button variant="destructive" onClick={handleDeleteBoard} data-testid="button-confirm-delete-board">Delete</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showManageBoards} onOpenChange={setShowManageBoards}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Manage Boards</DialogTitle>
+            <DialogDescription>Select boards to delete.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1 max-h-[320px] overflow-y-auto">
+            {boards.map((b: any) => {
+              const checked = boardsToDelete.has(b.id);
+              return (
+                <label
+                  key={b.id}
+                  className={`flex items-center gap-3 p-2.5 rounded-md cursor-pointer transition-colors ${checked ? "bg-destructive/10" : "hover:bg-muted"}`}
+                  data-testid={`manage-board-row-${b.id}`}
+                >
+                  <Checkbox
+                    checked={checked}
+                    onCheckedChange={(v) => {
+                      const next = new Set(boardsToDelete);
+                      v ? next.add(b.id) : next.delete(b.id);
+                      setBoardsToDelete(next);
+                    }}
+                    data-testid={`manage-board-checkbox-${b.id}`}
+                  />
+                  <span className="text-sm flex-1 truncate">{b.name}</span>
+                  {b.id === selectedBoardId && (
+                    <span className="text-xs text-muted-foreground">Current</span>
+                  )}
+                </label>
+              );
+            })}
+          </div>
+          {boardsToDelete.size > 0 && (
+            <p className="text-sm text-destructive">
+              {boardsToDelete.size} board{boardsToDelete.size > 1 ? "s" : ""} will be permanently deleted with all elements.
+            </p>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowManageBoards(false)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              disabled={boardsToDelete.size === 0}
+              onClick={handleDeleteSelectedBoards}
+              data-testid="button-delete-selected-boards"
+            >
+              Delete {boardsToDelete.size > 0 ? `(${boardsToDelete.size})` : ""}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
