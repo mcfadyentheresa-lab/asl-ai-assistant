@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
-import { AlertTriangle, ArrowLeft, Plus, Trash2, Upload, Image, Send, Copy, Eye, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Check, Loader2, Plus, Trash2, Upload, Image, Send, Copy, Eye, X } from "lucide-react";
 import { Link } from "wouter";
 import type { TableRedesignPlan, TableRedesignMaterial } from "@shared/schema";
 
@@ -126,7 +126,13 @@ export default function TableRedesignPlanner() {
   const [pushBoardTag, setPushBoardTag] = useState<string>("");
   const [showPushDialog, setShowPushDialog] = useState(false);
 
-  const [form, setForm] = useState({
+  const [draftPlanId, setDraftPlanId] = useState<number | null>(null);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const draftIdRef = useRef<number | null>(null);
+  const creatingRef = useRef(false);
+
+  const initialForm = {
     pieceType: "table",
     pieceName: "",
     beforeImageUrl: "",
@@ -149,7 +155,9 @@ export default function TableRedesignPlanner() {
     conceptTitle: "",
     conceptDescription: "",
     buildNotes: "",
-  });
+  };
+
+  const [form, setForm] = useState(initialForm);
 
   const { data: projects } = useQuery<any[]>({ queryKey: ["/api/projects"] });
   const { data: plans, isLoading: plansLoading } = useQuery<TableRedesignPlan[]>({
@@ -182,19 +190,6 @@ export default function TableRedesignPlanner() {
       return res.json();
     },
     enabled: !!selectedPlan?.projectId,
-  });
-
-  const createPlan = useMutation({
-    mutationFn: async (data: any) => {
-      const res = await apiRequest("POST", "/api/redesign-plans", data);
-      return res.json();
-    },
-    onSuccess: (created: TableRedesignPlan) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/redesign-plans"] });
-      setSelectedPlanId(created.id);
-      setShowCreateForm(false);
-      toast({ title: "Plan created" });
-    },
   });
 
   const updatePlan = useMutation({
@@ -250,6 +245,78 @@ export default function TableRedesignPlanner() {
     },
   });
 
+  const buildPayload = () => {
+    const base = calculateBaseRange(
+      form.tableShape,
+      form.lengthInches ? parseInt(form.lengthInches) : null,
+      form.widthInches ? parseInt(form.widthInches) : null,
+      form.weightClass,
+      form.existingMaterial
+    );
+    return {
+      projectId: parseInt(selectedProjectId),
+      pieceType: form.pieceType,
+      pieceName: form.pieceName,
+      beforeImageUrl: form.beforeImageUrl || null,
+      inspirationImageUrl: form.inspirationImageUrl || null,
+      conceptImageUrl: form.conceptImageUrl || null,
+      tableShape: form.tableShape,
+      lengthInches: form.lengthInches ? parseInt(form.lengthInches) : null,
+      widthInches: form.widthInches ? parseInt(form.widthInches) : null,
+      heightInches: form.heightInches ? parseInt(form.heightInches) : null,
+      thicknessInches: form.thicknessInches ? parseInt(form.thicknessInches) : null,
+      weightClass: form.weightClass,
+      existingMaterial: form.existingMaterial || null,
+      redesignScope: form.redesignScope,
+      proposedBaseType: form.proposedBaseType || null,
+      styleDirection: form.styleDirection || null,
+      finishDirection: form.finishDirection || null,
+      intendedUse: form.intendedUse || null,
+      priorityConstraint: form.priorityConstraint || null,
+      approvalStatus: form.approvalStatus,
+      conceptTitle: form.conceptTitle || form.pieceName,
+      conceptDescription: form.conceptDescription || null,
+      baseSizeMinInches: base.min,
+      baseSizeMaxInches: base.max,
+      baseSizeNotes: base.notes,
+      buildNotes: form.buildNotes || null,
+    };
+  };
+
+  useEffect(() => {
+    if (!showCreateForm) return;
+    if (!selectedProjectId || !form.pieceName.trim()) return;
+
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    const delay = draftIdRef.current ? 800 : 300;
+    debounceRef.current = setTimeout(async () => {
+      const payload = buildPayload();
+      setSaveStatus("saving");
+      try {
+        if (draftIdRef.current) {
+          await apiRequest("PATCH", `/api/redesign-plans/${draftIdRef.current}`, payload);
+        } else if (!creatingRef.current) {
+          creatingRef.current = true;
+          const res = await apiRequest("POST", "/api/redesign-plans", payload);
+          const created = await res.json();
+          setDraftPlanId(created.id);
+          draftIdRef.current = created.id;
+          creatingRef.current = false;
+        }
+        queryClient.invalidateQueries({ queryKey: ["/api/redesign-plans"] });
+        setSaveStatus("saved");
+      } catch {
+        setSaveStatus("idle");
+        creatingRef.current = false;
+      }
+    }, delay);
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [form, selectedProjectId, showCreateForm]);
+
   const handleUpload = async (field: "beforeImageUrl" | "inspirationImageUrl" | "conceptImageUrl") => {
     const input = document.createElement("input");
     input.type = "file";
@@ -260,10 +327,14 @@ export default function TableRedesignPlanner() {
       const result = await uploadFile(file);
       if (result) {
         const publicUrl = `/api/uploads/object/${encodeURIComponent(result.objectPath)}`;
-        if (selectedPlanId) {
+        setForm(prev => ({ ...prev, [field]: publicUrl }));
+        if (selectedPlanId && !showCreateForm) {
           updatePlan.mutate({ id: selectedPlanId, data: { [field]: publicUrl } });
-        } else {
-          setForm(prev => ({ ...prev, [field]: publicUrl }));
+        } else if (draftIdRef.current) {
+          try {
+            await apiRequest("PATCH", `/api/redesign-plans/${draftIdRef.current}`, { [field]: publicUrl });
+            queryClient.invalidateQueries({ queryKey: ["/api/redesign-plans"] });
+          } catch {}
         }
       }
     };
@@ -285,54 +356,26 @@ export default function TableRedesignPlanner() {
     HEAVY_MATERIALS.some(m => (selectedPlan.existingMaterial || "").toLowerCase().includes(m))
   );
 
-  const handleCreate = () => {
-    if (!selectedProjectId || !form.pieceName) {
-      toast({ title: "Please select a project and enter a piece name", variant: "destructive" });
-      return;
+  const handleNewPlan = () => {
+    setForm(initialForm);
+    setDraftPlanId(null);
+    draftIdRef.current = null;
+    creatingRef.current = false;
+    setSaveStatus("idle");
+    setShowCreateForm(true);
+    setSelectedPlanId(null);
+  };
+
+  const handleDoneCreate = () => {
+    if (draftPlanId) {
+      setSelectedPlanId(draftPlanId);
     }
-    if (!form.intendedUse) {
-      toast({ title: "Please select an intended use", variant: "destructive" });
-      return;
-    }
-    if (!form.priorityConstraint) {
-      toast({ title: "Please select a priority constraint", variant: "destructive" });
-      return;
-    }
-    const base = calculateBaseRange(
-      form.tableShape,
-      form.lengthInches ? parseInt(form.lengthInches) : null,
-      form.widthInches ? parseInt(form.widthInches) : null,
-      form.weightClass,
-      form.existingMaterial
-    );
-    createPlan.mutate({
-      projectId: parseInt(selectedProjectId),
-      pieceType: form.pieceType,
-      pieceName: form.pieceName,
-      beforeImageUrl: form.beforeImageUrl || null,
-      inspirationImageUrl: form.inspirationImageUrl || null,
-      conceptImageUrl: form.conceptImageUrl || null,
-      tableShape: form.tableShape,
-      lengthInches: form.lengthInches ? parseInt(form.lengthInches) : null,
-      widthInches: form.widthInches ? parseInt(form.widthInches) : null,
-      heightInches: form.heightInches ? parseInt(form.heightInches) : null,
-      thicknessInches: form.thicknessInches ? parseInt(form.thicknessInches) : null,
-      weightClass: form.weightClass,
-      existingMaterial: form.existingMaterial || null,
-      redesignScope: form.redesignScope,
-      proposedBaseType: form.proposedBaseType || null,
-      styleDirection: form.styleDirection || null,
-      finishDirection: form.finishDirection || null,
-      intendedUse: form.intendedUse,
-      priorityConstraint: form.priorityConstraint,
-      approvalStatus: form.approvalStatus,
-      conceptTitle: form.conceptTitle || form.pieceName,
-      conceptDescription: form.conceptDescription || null,
-      baseSizeMinInches: base.min,
-      baseSizeMaxInches: base.max,
-      baseSizeNotes: base.notes,
-      buildNotes: form.buildNotes || null,
-    });
+    setShowCreateForm(false);
+    setDraftPlanId(null);
+    draftIdRef.current = null;
+    creatingRef.current = false;
+    setSaveStatus("idle");
+    setForm(initialForm);
   };
 
   const handleCopyShareText = () => {
@@ -395,7 +438,7 @@ export default function TableRedesignPlanner() {
               </SelectContent>
             </Select>
           </div>
-          <Button onClick={() => { setShowCreateForm(true); setSelectedPlanId(null); }} data-testid="button-new-plan">
+          <Button onClick={handleNewPlan} data-testid="button-new-plan">
             <Plus className="h-4 w-4 mr-2" /> New Plan
           </Button>
         </div>
@@ -413,8 +456,22 @@ export default function TableRedesignPlanner() {
                 {plans?.map(plan => (
                   <button
                     key={plan.id}
-                    onClick={() => { setSelectedPlanId(plan.id); setShowCreateForm(false); }}
-                    className={`w-full text-left px-3 py-2 rounded-md text-sm hover:bg-accent transition-colors ${selectedPlanId === plan.id ? "bg-accent" : ""}`}
+                    onClick={() => {
+                      if (showCreateForm && draftPlanId === plan.id) {
+                        handleDoneCreate();
+                      } else {
+                        setSelectedPlanId(plan.id);
+                        setShowCreateForm(false);
+                        setDraftPlanId(null);
+                        draftIdRef.current = null;
+                        creatingRef.current = false;
+                        setSaveStatus("idle");
+                        setForm(initialForm);
+                      }
+                    }}
+                    className={`w-full text-left px-3 py-2 rounded-md text-sm hover:bg-accent transition-colors ${
+                      selectedPlanId === plan.id || (showCreateForm && draftPlanId === plan.id) ? "bg-accent" : ""
+                    }`}
                     data-testid={`button-plan-${plan.id}`}
                   >
                     <div className="font-medium truncate">{plan.conceptTitle || plan.pieceName}</div>
@@ -685,12 +742,24 @@ export default function TableRedesignPlanner() {
                     />
                   </div>
 
-                  <div className="flex gap-3">
-                    <Button onClick={handleCreate} disabled={createPlan.isPending} data-testid="button-create-plan">
-                      {createPlan.isPending ? "Creating…" : "Create Plan"}
-                    </Button>
-                    <Button variant="outline" onClick={() => setShowCreateForm(false)} data-testid="button-cancel-create">
-                      Cancel
+                  <div className="flex items-center gap-3">
+                    {saveStatus === "saving" && (
+                      <span className="flex items-center gap-1 text-sm text-muted-foreground" data-testid="text-save-status">
+                        <Loader2 className="h-3 w-3 animate-spin" /> Saving…
+                      </span>
+                    )}
+                    {saveStatus === "saved" && (
+                      <span className="flex items-center gap-1 text-sm text-green-600" data-testid="text-save-status">
+                        <Check className="h-3 w-3" /> Saved
+                      </span>
+                    )}
+                    {saveStatus === "idle" && !draftPlanId && (
+                      <span className="text-sm text-muted-foreground" data-testid="text-save-status">
+                        Select a project and enter a piece name to start
+                      </span>
+                    )}
+                    <Button variant="outline" onClick={handleDoneCreate} data-testid="button-done-create">
+                      {draftPlanId ? "Done" : "Cancel"}
                     </Button>
                   </div>
                 </CardContent>
