@@ -1,0 +1,71 @@
+Run a full system audit of my app. Do NOT modify anything.
+
+Goal:
+Verify that all features, data connections, and workflows are functioning correctly and consistently.
+
+-----------------------------------
+CHECK AREAS
+-----------------------------------
+
+1. ROUTING
+- List all routes
+- Confirm each route loads correctly
+- Identify any broken or duplicate routes
+
+2. AUTHENTICATION
+- Verify admin, client, and crew roles
+- Confirm correct redirects after login
+- Identify any incorrect routing (e.g. admin landing on client page)
+
+3. DATABASE
+- List all tables
+- Confirm relationships (projects, plans, materials, boards, etc.)
+- Identify missing links, unused tables, or inconsistent schema
+
+4. API ENDPOINTS
+- List all endpoints
+- Confirm each is used by the frontend
+- Identify unused, broken, or duplicate endpoints
+
+5. FEATURE WORKFLOWS
+Test and explain each full workflow:
+- Create redesign plan → save → retrieve
+- Add to Planning Board → confirm element created
+- Upload images → confirm storage + retrieval
+- Materials list → save + load correctly
+- Any AI/image endpoints → confirm status (working or placeholder)
+
+6. PLANNING BOARD
+- Confirm element creation works correctly
+- Confirm no unintended data is being passed
+- Confirm layout stability (no overlap issues or broken rendering)
+
+7. ERROR HANDLING
+- Identify areas with no error handling
+- Identify silent failures or weak validation
+
+8. PERFORMANCE RISKS
+- Identify heavy components or inefficient logic
+- Flag anything that could cause crashes or slowdowns
+
+-----------------------------------
+OUTPUT FORMAT
+-----------------------------------
+
+Provide:
+1. Summary of overall system health
+2. List of confirmed working areas
+3. List of issues or risks (ranked by severity)
+4. Exact file locations for each issue
+5. Recommended fixes (do NOT apply yet)
+
+-----------------------------------
+CONSTRAINTS
+-----------------------------------
+
+- Do NOT change any code
+- Do NOT refactor
+- Do NOT “auto-fix”
+- Only inspect and report
+
+If something is unclear, state uncertainty instead of guessing.
