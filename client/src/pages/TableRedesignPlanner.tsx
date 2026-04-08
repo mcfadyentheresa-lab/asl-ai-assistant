@@ -131,6 +131,7 @@ export default function TableRedesignPlanner() {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const draftIdRef = useRef<number | null>(null);
   const creatingRef = useRef(false);
+  const pendingUpdateRef = useRef(false);
 
   const initialForm = {
     pieceType: "table",
@@ -291,18 +292,27 @@ export default function TableRedesignPlanner() {
 
     const delay = draftIdRef.current ? 800 : 300;
     debounceRef.current = setTimeout(async () => {
-      const payload = buildPayload();
       setSaveStatus("saving");
       try {
         if (draftIdRef.current) {
+          const payload = buildPayload();
           await apiRequest("PATCH", `/api/redesign-plans/${draftIdRef.current}`, payload);
         } else if (!creatingRef.current) {
           creatingRef.current = true;
+          pendingUpdateRef.current = false;
+          const payload = buildPayload();
           const res = await apiRequest("POST", "/api/redesign-plans", payload);
           const created = await res.json();
           setDraftPlanId(created.id);
           draftIdRef.current = created.id;
           creatingRef.current = false;
+          if (pendingUpdateRef.current) {
+            pendingUpdateRef.current = false;
+            const freshPayload = buildPayload();
+            await apiRequest("PATCH", `/api/redesign-plans/${created.id}`, freshPayload);
+          }
+        } else {
+          pendingUpdateRef.current = true;
         }
         queryClient.invalidateQueries({ queryKey: ["/api/redesign-plans"] });
         setSaveStatus("saved");
@@ -709,7 +719,17 @@ export default function TableRedesignPlanner() {
                     </div>
                     <div>
                       <Label>Approval Status</Label>
-                      <Select value={form.approvalStatus} onValueChange={v => setForm(f => ({ ...f, approvalStatus: v }))}>
+                      <Select value={form.approvalStatus} onValueChange={v => {
+                        if (v !== "draft" && !form.intendedUse) {
+                          toast({ title: "Please select an intended use before changing status", variant: "destructive" });
+                          return;
+                        }
+                        if (v !== "draft" && !form.priorityConstraint) {
+                          toast({ title: "Please select a priority constraint before changing status", variant: "destructive" });
+                          return;
+                        }
+                        setForm(f => ({ ...f, approvalStatus: v }));
+                      }}>
                         <SelectTrigger data-testid="select-approval-status">
                           <SelectValue />
                         </SelectTrigger>

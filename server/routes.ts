@@ -3934,6 +3934,20 @@ Respond with valid JSON only:
     if (!user || user.role !== "admin") {
       return res.status(403).json({ message: "Admin access required" });
     }
+    const newStatus = req.body.approvalStatus;
+    if (newStatus && newStatus !== "draft") {
+      const existing = await storage.getRedesignPlan(parseInt(req.params.id));
+      if (existing) {
+        const intendedUse = req.body.intendedUse ?? existing.intendedUse;
+        const priorityConstraint = req.body.priorityConstraint ?? existing.priorityConstraint;
+        if (!intendedUse) {
+          return res.status(400).json({ message: "Intended use is required before changing status from draft" });
+        }
+        if (!priorityConstraint) {
+          return res.status(400).json({ message: "Priority constraint is required before changing status from draft" });
+        }
+      }
+    }
     const plan = await storage.updateRedesignPlan(parseInt(req.params.id), req.body);
     res.json(plan);
   });
