@@ -1600,6 +1600,32 @@ function templateCanvasToElements(canvasData: any, boardId: number, createdBy: s
       });
       continue;
     }
+
+    if (obj.type === "template_room_zone") {
+      elements.push({
+        ...base,
+        type: "room_zone",
+        x: Math.round(obj.left ?? 0),
+        y: Math.round(obj.top ?? 0),
+        width: Math.round(obj.width ?? 500),
+        height: Math.round(obj.height ?? 400),
+        content: { title: obj.title || "Zone", color: obj.color || "#f0ede8", opacity: obj.opacity ?? 0.5 },
+      });
+      continue;
+    }
+
+    if (obj.type === "template_callout") {
+      elements.push({
+        ...base,
+        type: "callout",
+        x: Math.round(obj.left ?? 0),
+        y: Math.round(obj.top ?? 0),
+        width: Math.round(obj.width ?? 200),
+        height: Math.round(obj.height ?? 80),
+        content: { text: obj.text || "", color: obj.color || "#fef9c3" },
+      });
+      continue;
+    }
   }
 
   for (let i = 0; i < elements.length; i++) {
