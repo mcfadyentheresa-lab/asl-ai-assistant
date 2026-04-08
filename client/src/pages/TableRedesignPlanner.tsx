@@ -336,7 +336,7 @@ export default function TableRedesignPlanner() {
       if (!file) return;
       const result = await uploadFile(file);
       if (result) {
-        const publicUrl = `/api/uploads/object/${encodeURIComponent(result.objectPath)}`;
+        const publicUrl = result.objectPath;
         setForm(prev => ({ ...prev, [field]: publicUrl }));
         if (selectedPlanId && !showCreateForm) {
           updatePlan.mutate({ id: selectedPlanId, data: { [field]: publicUrl } });
