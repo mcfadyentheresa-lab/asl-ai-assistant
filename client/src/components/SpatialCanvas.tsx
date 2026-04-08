@@ -234,6 +234,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showImagePopup, setShowImagePopup] = useState(false);
   const [imageUrlInput, setImageUrlInput] = useState("");
+  const imageUrlInputRef = useRef<HTMLInputElement | null>(null);
   const noteTextareaRefs = useRef<Record<string, HTMLTextAreaElement | HTMLInputElement | null>>({});
   const [focusedTodoItem, setFocusedTodoItem] = useState<{ elementId: number; itemIdx: number } | null>(null);
   const [drawingMode, setDrawingMode] = useState(false);
@@ -939,6 +940,12 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       toast({ title: "Error", description: "Failed to add image", variant: "destructive" });
     }
   };
+
+  useEffect(() => {
+    if (!showImagePopup) return;
+    const timer = setTimeout(() => imageUrlInputRef.current?.focus(), 0);
+    return () => clearTimeout(timer);
+  }, [showImagePopup]);
 
   const drawPathsRef = useRef<any[]>([]);
   const isDrawingRef = useRef(false);
@@ -2530,7 +2537,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             <DropdownMenuItem onClick={() => fileInputRef.current?.click()} data-testid="menu-add-image-device">
               <ImagePlus className="h-4 w-4 mr-2" /> Upload from Device
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => { setImageUrl(""); setShowImageUrlDialog(true); }} data-testid="menu-add-image-url">
+            <DropdownMenuItem onClick={() => { setImageUrlInput(""); setShowImagePopup(true); }} data-testid="menu-add-image-url">
               <Link2 className="h-4 w-4 mr-2" /> Paste Image URL
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -2786,6 +2793,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                   <div className="text-xs font-medium text-muted-foreground mb-1.5">URL</div>
                   <div className="flex gap-1.5">
                     <input
+                      ref={imageUrlInputRef}
                       className="flex-1 bg-transparent border border-border rounded-md px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-primary"
                       placeholder="Paste image URL..."
                       value={imageUrlInput}
@@ -2793,7 +2801,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                       onKeyDown={(e) => { if (e.key === "Enter") handleAddImageByUrl(imageUrlInput); }}
                       data-testid="image-popup-url-input"
                     />
-                    <Button size="sm" className="h-7 px-2 text-xs" onClick={() => handleAddImageByUrl(imageUrlInput)} data-testid="image-popup-url-add">Add</Button>
+                <Button size="sm" className="h-7 px-2 text-xs" onClick={() => handleAddImageByUrl(imageUrlInput)} data-testid="image-popup-url-add">Add</Button>
                   </div>
                 </div>
               </div>
