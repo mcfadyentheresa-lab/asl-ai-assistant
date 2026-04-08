@@ -378,6 +378,8 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
 
   const handleDeleteSelectedBoards = async () => {
     if (boardsToDelete.size === 0) return;
+    let deleted = 0;
+    let failed = 0;
     for (const id of boardsToDelete) {
       const board = boards.find((b: any) => b.id === id);
       if (!board) continue;
@@ -385,19 +387,26 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       const eventIdToDelete = shouldDeleteEvent ? board.linkedCalendarEventId : null;
       try {
         await deleteBoard({ id, projectId });
+        deleted++;
         if (eventIdToDelete) {
           try { await deleteCalendarEvent(eventIdToDelete); } catch {}
         }
-      } catch {}
+      } catch {
+        failed++;
+      }
     }
-    if (boardsToDelete.has(selectedBoardId!)) {
+    if (boardsToDelete.has(selectedBoardId!) && deleted > 0) {
       setSelectedBoardId(null);
     }
     setBoardsToDelete(new Set());
     setShowManageBoards(false);
     queryClient.invalidateQueries({ queryKey: [api.planningBoards.list.path, projectId] });
     queryClient.invalidateQueries({ queryKey: [api.calendar.list.path] });
-    toast({ title: "Boards deleted", description: `${boardsToDelete.size} board(s) removed.` });
+    if (failed > 0) {
+      toast({ title: "Some boards could not be deleted", description: `${deleted} deleted, ${failed} failed.`, variant: "destructive" });
+    } else {
+      toast({ title: "Boards deleted", description: `${deleted} board${deleted !== 1 ? "s" : ""} removed.` });
+    }
   };
 
   const handleLinkUpdate = async (field: string, value: any, extraFields?: Record<string, any>) => {
