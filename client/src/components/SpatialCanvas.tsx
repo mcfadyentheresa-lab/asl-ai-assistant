@@ -319,14 +319,19 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
         name: newBoardName || (selectedTemplate?.name || "Untitled Board"),
         ...(selectedTemplateId ? { templateId: selectedTemplateId } : {}),
       });
+      if (!board || !board.id) {
+        toast({ title: "Error", description: "Failed to create board", variant: "destructive" });
+        return;
+      }
       closeNewBoardDialog();
       queryClient.invalidateQueries({ queryKey: [api.planningBoards.list.path, projectId] });
       queryClient.invalidateQueries({ queryKey: [api.planningBoards.detail.path, board.id] });
       setSelectedBoardId(board.id);
       setBoardId(board.id);
       justCreatedBoardId.current = board.id;
-      return;
-    } catch {
+      toast({ title: "Board created", description: board.name || "New board" });
+    } catch (err: any) {
+      console.error("Board creation error:", err);
       toast({ title: "Error", description: "Failed to create board", variant: "destructive" });
     }
   };

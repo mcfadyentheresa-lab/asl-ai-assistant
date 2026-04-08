@@ -1466,68 +1466,104 @@ Respond with valid JSON only:
     res.json({ id: req.params.templateId, canvasData });
   });
 
-function templateObjectToCanvasElement(object: any, index: number, boardId: number, createdBy: string): any | null {
-  if (!object || typeof object !== "object") return null;
-  const base = {
-    boardId,
-    createdBy,
-    zIndex: index + 1,
-  };
-  if (object.type === "textbox") {
-    const text = String(object.text || "");
-    const isTitle = text === text.toUpperCase() && text.length > 0;
-    return {
-      ...base,
-      type: isTitle ? "section_header" : "note",
-      x: Math.round(object.left ?? 0),
-      y: Math.round(object.top ?? 0),
-      width: Math.round(object.width ?? 240),
-      height: Math.max(48, Math.round(object.fontSize ? object.fontSize * 3 : 60)),
-      content: {
-        text,
-        fontSize: object.fontSize || 16,
-        fontWeight: object.fontWeight || "bold",
-        fontFamily: object.fontFamily || "Inter, sans-serif",
-        fill: object.fill || "#1e3a2f",
-      },
-    };
-  }
-  if (object.type === "group") {
-    const innerText = object.objects?.find((o: any) => o.type === "textbox")?.text || "";
-    return {
-      ...base,
-      type: "note",
-      x: Math.round(object.left ?? 0),
-      y: Math.round(object.top ?? 0),
-      width: Math.round(object.width ?? 180),
-      height: Math.round(object.height ?? 100),
-      content: {
-        text: innerText,
-        color: object.objects?.find((o: any) => o.type === "rect")?.fill || "#fef9c3",
-      },
-    };
-  }
-  if (object.type === "rect") {
-    return {
-      ...base,
-      type: "column",
-      x: Math.round(object.left ?? 0),
-      y: Math.round(object.top ?? 0),
-      width: Math.round(object.width ?? 280),
-      height: Math.round(object.height ?? 260),
-      content: {
-        fill: object.fill,
-      },
-    };
-  }
-  return null;
-}
-
 function templateCanvasToElements(canvasData: any, boardId: number, createdBy: string) {
   const objects = Array.isArray(canvasData?.objects) ? canvasData.objects : [];
-  return objects
-    .map((object: any, index: number) => templateObjectToCanvasElement(object, index, boardId, createdBy))
-    .filter(Boolean);
+  const elements: any[] = [];
+  let zIndex = 1;
+
+  const columnBounds: { idx: number; x: number; y: number; w: number; h: number }[] = [];
+
+  for (let i = 0; i < objects.length; i++) {
+    const obj = objects[i];
+    if (!obj || typeof obj !== "object") continue;
+    const base = { boardId, createdBy, zIndex: zIndex++ };
+
+    if (obj.type === "rect") {
+      const x = Math.round(obj.left ?? 0);
+      const y = Math.round(obj.top ?? 0);
+      const w = Math.round(obj.width ?? 280);
+      const h = Math.round(obj.height ?? 260);
+      let columnTitle = "";
+      const next = objects[i + 1];
+      if (next?.type === "textbox") {
+        const nx = Math.round(next.left ?? 0);
+        const ny = Math.round(next.top ?? 0);
+        if (nx >= x && nx <= x + w && ny >= y && ny <= y + h) {
+          columnTitle = String(next.text || "");
+          i++;
+        }
+      }
+      const elIdx = elements.length;
+      elements.push({
+        ...base,
+        type: "column",
+        x, y, width: w, height: h,
+        content: { title: columnTitle, backgroundColor: obj.fill },
+      });
+      columnBounds.push({ idx: elIdx, x, y, w, h });
+      continue;
+    }
+
+    if (obj.type === "textbox") {
+      const text = String(obj.text || "");
+      const fontSize = obj.fontSize || 16;
+      const isSectionTitle = fontSize >= 16 && text === text.toUpperCase() && text.length > 0;
+      if (isSectionTitle) {
+        elements.push({
+          ...base,
+          type: "section_header",
+          x: Math.round(obj.left ?? 0),
+          y: Math.round(obj.top ?? 0),
+          width: Math.round(obj.width ?? 240),
+          height: Math.max(48, Math.round(fontSize * 3)),
+          content: { title: text },
+        });
+      } else {
+        elements.push({
+          ...base,
+          type: "note",
+          x: Math.round(obj.left ?? 0),
+          y: Math.round(obj.top ?? 0),
+          width: Math.round(obj.width ?? 240),
+          height: Math.max(48, Math.round(fontSize * 3)),
+          content: { text },
+        });
+      }
+      continue;
+    }
+
+    if (obj.type === "group") {
+      const innerText = obj.objects?.find((o: any) => o.type === "textbox")?.text || "";
+      elements.push({
+        ...base,
+        type: "note",
+        x: Math.round(obj.left ?? 0),
+        y: Math.round(obj.top ?? 0),
+        width: Math.round(obj.width ?? 180),
+        height: Math.round(obj.height ?? 100),
+        content: {
+          text: innerText,
+          color: obj.objects?.find((o: any) => o.type === "rect")?.fill || "#fef9c3",
+        },
+      });
+      continue;
+    }
+  }
+
+  for (let i = 0; i < elements.length; i++) {
+    const el = elements[i];
+    if (el.type === "column" || el.type === "section_header") continue;
+    const cx = el.x + (el.width || 0) / 2;
+    const cy = el.y + (el.height || 0) / 2;
+    for (const col of columnBounds) {
+      if (cx >= col.x && cx <= col.x + col.w && cy >= col.y && cy <= col.y + col.h) {
+        el.parentColumnId = -1 - col.idx;
+        break;
+      }
+    }
+  }
+
+  return { elements, columnBounds };
 }
 
   app.post(api.planningBoards.create.path, isAuthenticated, async (req: any, res) => {
@@ -1560,9 +1596,31 @@ function templateCanvasToElements(canvasData: any, boardId: number, createdBy: s
       });
       if (canvasData) {
         try {
-          const elements = templateCanvasToElements(canvasData, board.id, userId);
+          const { elements, columnBounds } = templateCanvasToElements(canvasData, board.id, userId);
           if (elements.length > 0) {
-            await storage.createCanvasElements(elements as any);
+            const rawElements = elements.map(({ parentColumnId: _p, ...rest }: any) => rest);
+            const created = await storage.createCanvasElements(rawElements as any);
+            const columnIdMap = new Map<number, number>();
+            for (const col of columnBounds) {
+              const realId = created[col.idx]?.id;
+              if (realId) columnIdMap.set(col.idx, realId);
+            }
+            const updates: { id: number; parentColumnId: number }[] = [];
+            for (let i = 0; i < elements.length; i++) {
+              const marker = elements[i].parentColumnId;
+              if (marker !== undefined && marker < 0) {
+                const colIdx = -1 - marker;
+                const realColId = columnIdMap.get(colIdx);
+                if (realColId && created[i]?.id) {
+                  updates.push({ id: created[i].id, parentColumnId: realColId });
+                }
+              }
+            }
+            if (updates.length > 0) {
+              for (const u of updates) {
+                await storage.updateCanvasElement(u.id, { parentColumnId: u.parentColumnId });
+              }
+            }
           }
         } catch (templateErr: any) {
           console.error("Template element creation error:", templateErr.message);
