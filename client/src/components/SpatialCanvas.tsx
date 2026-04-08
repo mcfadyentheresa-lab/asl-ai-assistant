@@ -1422,6 +1422,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     };
 
     const handleDown = (clientX: number, clientY: number) => {
+      if (!canvas || canvas.width === 0 || canvas.height === 0) return;
       clearHoldTimer();
       if (handwritingTimerRef.current) {
         clearTimeout(handwritingTimerRef.current);
