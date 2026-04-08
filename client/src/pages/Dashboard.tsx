@@ -81,7 +81,7 @@ export default function Dashboard() {
   const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(" ") || "there";
   const isClient = user?.role === "client";
   const isAdmin = user?.role === "admin";
-  const isAdminView = viewMode === "admin";
+  const isAdminView = isAdmin && viewMode === "admin";
   const isClientView = viewMode === "client";
 
   const handleArchive = (id: number) => {
