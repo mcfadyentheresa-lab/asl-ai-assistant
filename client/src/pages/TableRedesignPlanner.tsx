@@ -286,7 +286,7 @@ export default function TableRedesignPlanner() {
 
   useEffect(() => {
     if (!showCreateForm) return;
-    if (!selectedProjectId || !form.pieceName.trim()) return;
+    if (!selectedProjectId || selectedProjectId === "all" || !form.pieceName.trim()) return;
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
