@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
-import { AlertTriangle, ArrowLeft, Check, Loader2, Plus, Trash2, Upload, Image, Send, Copy, Eye, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Check, ExternalLink, Loader2, Plus, Trash2, Upload, Image, Send, Copy, Eye, X } from "lucide-react";
 import { Link } from "wouter";
 import type { TableRedesignPlan, TableRedesignMaterial } from "@shared/schema";
 
@@ -396,7 +396,7 @@ export default function TableRedesignPlanner() {
       selectedPlan.conceptDescription || "",
       "",
       materials?.length ? "Materials:" : "",
-      ...(materials || []).map(m => `• ${m.component}${m.material ? ` — ${m.material}` : ""}${m.finish ? ` (${m.finish})` : ""}`),
+      ...(materials || []).map(m => `• ${m.component}${m.material ? ` — ${m.material}` : ""}${m.finish ? ` (${m.finish})` : ""}${m.webLink ? ` [${m.webLink}]` : ""}`),
       "",
       "Concept and planning preview only. Final result may vary based on material availability, structural requirements, and on-site conditions.",
     ].filter(Boolean).join("\n");
@@ -1104,6 +1104,7 @@ function MaterialRow({ material, planId, onDelete }: { material: TableRedesignMa
     quantity: String(material.quantity || 1),
     notes: material.notes || "",
     supplier: material.supplier || "",
+    webLink: material.webLink || "",
   });
 
   const updateMaterial = useMutation({
@@ -1120,13 +1121,21 @@ function MaterialRow({ material, planId, onDelete }: { material: TableRedesignMa
   if (!editing) {
     return (
       <div className="flex items-center gap-3 p-2 rounded border text-sm group" data-testid={`material-row-${material.id}`}>
-        <div className="flex-1 grid grid-cols-6 gap-2">
-          <div><span className="text-xs text-muted-foreground block">Component</span>{material.component}</div>
-          <div><span className="text-xs text-muted-foreground block">Material</span>{material.material || "—"}</div>
-          <div><span className="text-xs text-muted-foreground block">Finish</span>{material.finish || "—"}</div>
-          <div><span className="text-xs text-muted-foreground block">Dimensions</span>{material.dimensions || "—"}</div>
-          <div><span className="text-xs text-muted-foreground block">Qty</span>{material.quantity || 1}</div>
-          <div><span className="text-xs text-muted-foreground block">Supplier</span>{material.supplier || "—"}</div>
+        <div className="flex-1 space-y-1">
+          <div className="grid grid-cols-6 gap-2">
+            <div><span className="text-xs text-muted-foreground block">Component</span>{material.component}</div>
+            <div><span className="text-xs text-muted-foreground block">Material</span>{material.material || "—"}</div>
+            <div><span className="text-xs text-muted-foreground block">Finish</span>{material.finish || "—"}</div>
+            <div><span className="text-xs text-muted-foreground block">Dimensions</span>{material.dimensions || "—"}</div>
+            <div><span className="text-xs text-muted-foreground block">Qty</span>{material.quantity || 1}</div>
+            <div><span className="text-xs text-muted-foreground block">Supplier</span>{material.supplier || "—"}</div>
+          </div>
+          {material.webLink && (
+            <div className="flex items-center gap-1 text-xs">
+              <ExternalLink className="h-3 w-3 text-muted-foreground" />
+              <a href={material.webLink} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline truncate max-w-xs" data-testid={`link-material-${material.id}`}>{material.webLink}</a>
+            </div>
+          )}
         </div>
         <Button variant="ghost" size="sm" onClick={() => setEditing(true)} className="opacity-0 group-hover:opacity-100 h-7 text-xs">Edit</Button>
         <Button variant="ghost" size="sm" onClick={onDelete} className="opacity-0 group-hover:opacity-100 h-7 text-xs text-destructive"><Trash2 className="h-3 w-3" /></Button>
@@ -1146,6 +1155,9 @@ function MaterialRow({ material, planId, onDelete }: { material: TableRedesignMa
         <Input placeholder="Qty" type="number" value={form.quantity} onChange={e => setForm(f => ({ ...f, quantity: e.target.value }))} />
         <Input placeholder="Supplier" value={form.supplier} onChange={e => setForm(f => ({ ...f, supplier: e.target.value }))} />
         <Input placeholder="Notes" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
+      </div>
+      <div>
+        <Input placeholder="Web link (e.g. supplier URL or cost estimator link)" value={form.webLink} onChange={e => setForm(f => ({ ...f, webLink: e.target.value }))} data-testid="input-material-weblink" />
       </div>
       <div className="flex gap-2">
         <Button size="sm" onClick={() => updateMaterial.mutate({ ...form, quantity: parseInt(form.quantity) || 1 })} disabled={updateMaterial.isPending}>Save</Button>

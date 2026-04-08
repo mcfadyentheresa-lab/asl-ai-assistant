@@ -636,6 +636,7 @@ export const tableRedesignMaterials = pgTable("table_redesign_materials", {
   quantity: integer("quantity").default(1),
   notes: text("notes"),
   supplier: text("supplier"),
+  webLink: text("web_link"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
