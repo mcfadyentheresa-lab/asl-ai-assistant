@@ -511,6 +511,30 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     } catch {}
   };
 
+  const handleDeleteRoomZone = async (id: number) => {
+    const zone = elements[id];
+    if (!zone || zone.type !== "room_zone") {
+      await handleDeleteElement(id);
+      return;
+    }
+    const zoneRight = zone.x + (zone.width || 500);
+    const zoneBottom = zone.y + (zone.height || 400);
+    const childIds = Object.values(elements)
+      .filter((child) => child.id !== id && child.x >= zone.x && child.y >= zone.y && child.x < zoneRight && child.y < zoneBottom)
+      .map((child) => child.id);
+    for (const childId of childIds) {
+      const child = elements[childId];
+      if (child) pushUndo({ type: "delete", element: { ...child } });
+      removeElement(childId);
+      sendElementRemove(childId);
+      try {
+        const childUrl = buildUrl(api.canvasElements.delete.path, { id: childId });
+        await fetch(childUrl, { method: "DELETE", credentials: "include" });
+      } catch {}
+    }
+    await handleDeleteElement(id);
+  };
+
   const handleUpdateContent = async (id: number, content: any) => {
     const prev = elements[id];
     if (prev) pushUndo({ type: "update", elementId: id, prevUpdates: { content: prev.content } });
