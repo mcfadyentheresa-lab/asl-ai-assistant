@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import templateMoodboardPreview from "@assets/Screenshot_2026-04-08_at_12.41.42_PM_1775666504617.png";
 import templateFurnitureRefinishingPreview from "@assets/Screenshot_2026-04-09_at_10.29.34_AM_1775744978712.png";
+import templateCollageConceptPreview from "@assets/Screenshot_2026-04-09_at_10.54.53_AM_1775746499391.png";
+import templateMaterialInspirationPreview from "@assets/Screenshot_2026-04-09_at_10.57.06_AM_1775746631248.png";
 import templateKitchenPreview from "../assets/images/template-kitchen-faux.png";
 import templateBathroomPreview from "../assets/images/template-bathroom-faux.png";
 import templateCottagePreview from "../assets/images/template-cottage-faux.png";
@@ -177,6 +179,8 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
     cottage: templateCottagePreview,
     moodboard: templateMoodboardPreview,
     "furniture-refinishing-working": templateFurnitureRefinishingPreview,
+    "collage-concept": templateCollageConceptPreview,
+    "material-inspiration": templateMaterialInspirationPreview,
   };
 
   const { data: boards = [], isLoading: isLoadingBoards } = usePlanningBoards(projectId);
