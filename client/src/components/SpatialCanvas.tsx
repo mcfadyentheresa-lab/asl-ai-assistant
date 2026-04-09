@@ -1729,15 +1729,15 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           )}
           {isSelected ? (
             <input
-              className="w-full bg-transparent border-none text-lg font-serif font-semibold text-foreground/70 outline-none"
-              style={{ borderBottom: "2px dashed hsl(var(--border))" }}
+              className="w-full bg-transparent border-none text-lg font-serif font-semibold text-foreground/70 outline-none pb-1"
+              style={{ borderBottom: "1px solid hsl(var(--border))" }}
               defaultValue={c.title}
               onBlur={(e) => handleUpdateContent(el.id, { ...c, title: e.target.value })}
               autoFocus
               data-testid={`input-section-title-${el.id}`}
             />
           ) : (
-            <div className="text-lg font-serif font-semibold text-foreground/70 border-b-2 border-dashed border-border pb-1 cursor-grab" data-testid={`text-section-title-${el.id}`}>
+            <div className="text-lg font-serif font-semibold text-foreground/70 border-b border-border pb-1 cursor-grab" data-testid={`text-section-title-${el.id}`}>
               {c.title || "Section Title"}
             </div>
           )}
