@@ -434,38 +434,6 @@ export interface BoardTemplate {
 
 export const boardTemplates: BoardTemplate[] = [
   {
-    id: "kitchen",
-    name: "Kitchen Renovation",
-    description: "Cabinetry, countertops, appliances, backsplash, lighting, and finishes",
-    icon: "ChefHat",
-    image: "/assets/images/template-kitchen-faux.png",
-    canvasData: kitchenRenovation,
-  },
-  {
-    id: "bathroom",
-    name: "Bathroom Renovation",
-    description: "Fixtures, tile & flooring, vanity & storage, lighting, and plumbing",
-    icon: "Bath",
-    image: "/assets/images/template-bathroom-faux.png",
-    canvasData: bathroomRenovation,
-  },
-  {
-    id: "cottage",
-    name: "Full Cottage Build",
-    description: "Exterior, interior rooms, landscaping, and mechanical/electrical",
-    icon: "Home",
-    image: "/assets/images/template-cottage-faux.png",
-    canvasData: fullCottageBuild,
-  },
-  {
-    id: "moodboard",
-    name: "Moodboard",
-    description: "Colours, materials & textures, inspiration images, and notes",
-    icon: "Palette",
-    image: "/assets/images/template-moodboard-faux.png",
-    canvasData: moodboard,
-  },
-  {
     id: "collage-concept",
     name: "Collage Concept Board",
     description: "Multi-column presentation board with plan, notes, swatches, and feature images",
