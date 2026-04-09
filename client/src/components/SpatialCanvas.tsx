@@ -331,11 +331,12 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     try {
       const selectedTemplate = selectedTemplateId ? templateCatalogue.find((template) => template.id === selectedTemplateId) : null;
       const boardName = newBoardName.trim() || (selectedTemplate?.name || "Untitled Board");
-      const board = await createBoard({
+      const boardResult = await createBoard({
         projectId,
         name: boardName,
         ...(selectedTemplateId ? { templateId: selectedTemplateId } : {}),
       });
+      const board = boardResult && typeof boardResult === "object" && "id" in boardResult ? boardResult : null;
       if (!board || !board.id) {
         toast({ title: "Error", description: "Failed to create board", variant: "destructive" });
         return;
