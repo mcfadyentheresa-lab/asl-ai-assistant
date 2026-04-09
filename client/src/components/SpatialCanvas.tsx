@@ -2616,9 +2616,6 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
         <Button variant="outline" size="sm" onClick={() => { setNewBoardName(""); setShowNewBoardDialog(true); }} data-testid="button-new-board">
           <Plus className="h-3.5 w-3.5 mobile-landscape:mr-0 mr-1" /> <span className="mobile-landscape:hidden">New Board</span>
         </Button>
-        <Button variant="outline" size="sm" onClick={() => setShowImagePopup(true)} data-testid="button-add-image-toolbar">
-          <ImagePlus className="h-3.5 w-3.5 mobile-landscape:mr-0 mr-1" /> <span className="mobile-landscape:hidden">Add Image</span>
-        </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="secondary" size="sm" disabled={isUploading} data-testid="button-add-board-image">
