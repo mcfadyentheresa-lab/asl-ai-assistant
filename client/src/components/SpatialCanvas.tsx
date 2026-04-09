@@ -3322,6 +3322,10 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                       key={tmpl.id}
                       type="button"
                       onClick={() => setSelectedTemplateId(tmpl.id)}
+                      onDoubleClick={() => {
+                        setSelectedTemplateId(tmpl.id);
+                        void handleCreateBoard();
+                      }}
                       className={`group overflow-hidden rounded-xl border bg-card text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${selectedTemplateId === tmpl.id ? "border-primary ring-1 ring-primary" : "border-border/70"}`}
                       data-testid={`template-${tmpl.id}`}
                     >
