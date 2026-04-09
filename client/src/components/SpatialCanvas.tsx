@@ -142,7 +142,7 @@ interface SpatialCanvasProps {
 const GRID_SIZE = 20;
 
 const ELEMENT_DEFAULTS: Record<string, { width: number; height: number; content: any }> = {
-  note: { width: 240, height: 140, content: { title: "", text: "Type your note here..." } },
+  note: { width: 240, height: 140, content: { title: "", text: "Type your note here...", plain: false } },
   todo: { width: 240, height: 200, content: { title: "To-do", items: [{ text: "Add a task...", checked: false }] } },
   column: { width: 240, height: 400, content: { title: "New Column", subtitle: "0 cards" } },
   board_link: { width: 180, height: 80, content: { title: "Board", targetBoardId: null } },
@@ -1383,7 +1383,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
               width: noteWidth,
               height: noteHeight,
               zIndex: topMaxZ + 1,
-              content: { title: "", text: text.trim() },
+              content: { title: "", text: text.trim(), plain: true },
             }),
           });
           const el = await res.json();
@@ -1776,7 +1776,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       return (
         <div
           key={el.id}
-          className={`${cardBase} bg-card border border-border cursor-grab`}
+          className={`${cardBase} ${c.plain ? "bg-transparent border-0 shadow-none" : "bg-card border border-border"} cursor-grab`}
           style={{ left: el.x, top: el.y, width: el.width, minHeight: el.height, zIndex: effectiveZ }}
           onMouseDown={(e) => {
             const tag = (e.target as HTMLElement).tagName.toLowerCase();
@@ -1791,7 +1791,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           data-testid={`element-note-${el.id}`}
         >
           {isSelected && renderFormattingToolbar(el.id)}
-          <div className="p-3.5">
+          <div className={c.plain ? "p-0" : "p-3.5"}>
             {isSelected ? (
               <div className="space-y-2">
                 <input
