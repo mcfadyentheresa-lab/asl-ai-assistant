@@ -2564,7 +2564,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       label: "Content",
       tools: [
         { type: "note", icon: StickyNote, label: "Note" },
-        { type: "plain_text", icon: Type, label: "Plain Text" },
+        { type: "plain_text", icon: FileText, label: "Plain Text" },
         { type: "link", icon: Link2, label: "Link" },
         { type: "todo", icon: CheckSquare, label: "To-do" },
         { type: "image", icon: ImagePlus, label: "Image" },
