@@ -171,6 +171,14 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
     queryKey: ["/api/board-templates"],
     enabled: isAdmin,
   });
+  const templatePreviewById: Record<string, string> = {
+    kitchen: templateKitchenPreview,
+    bathroom: templateBathroomPreview,
+    cottage: templateCottagePreview,
+    moodboard: templateMoodboardPreview,
+    "furniture-refinishing-presentation": templateFurnitureRefinishingPreview,
+    "furniture-refinishing-working": templateFurnitureRefinishingPreview,
+  };
 
   const { data: boards = [], isLoading: isLoadingBoards } = usePlanningBoards(projectId);
   const { data: boardData, isLoading: isLoadingBoard } = usePlanningBoard(selectedBoardId);
@@ -1559,7 +1567,7 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
                       className={`flex gap-2.5 rounded-md border p-2.5 text-left transition-colors hover:bg-accent/50 ${selectedTemplateId === t.id ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border"}`}
                       data-testid={`template-${t.id}`}
                     >
-                      <img src={({ kitchen: templateKitchenPreview, bathroom: templateBathroomPreview, cottage: templateCottagePreview, moodboard: templateMoodboardPreview, "furniture-refinishing-presentation": templateFurnitureRefinishingPreview, "furniture-refinishing-working": templateFurnitureRefinishingPreview } as Record<string, string>)[t.id] ?? t.image} alt={t.name} className="h-16 w-20 shrink-0 rounded object-cover border border-border" data-testid={`img-template-${t.id}`} />
+                      <img src={templatePreviewById[t.id] ?? t.image} alt={t.name} className="h-16 w-20 shrink-0 rounded object-cover border border-border" data-testid={`img-template-${t.id}`} />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
                           <IconComp className="h-4 w-4 shrink-0 text-muted-foreground" />
