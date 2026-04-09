@@ -2515,13 +2515,23 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           <div className="p-3 flex flex-col items-center justify-center h-full gap-1.5">
             <LayoutGrid className="h-6 w-6 text-primary/75" />
             {isSelected ? (
-              <input
-                className="w-full bg-transparent border-none text-sm font-medium text-center outline-none"
-                defaultValue={c.title}
-                placeholder="Board name"
-                onBlur={(e) => handleUpdateContent(el.id, { ...c, title: e.target.value })}
-                data-testid={`input-board-link-title-${el.id}`}
-              />
+              <div className="w-full space-y-1">
+                <input
+                  className="w-full bg-transparent border-none text-sm font-medium text-center outline-none"
+                  defaultValue={c.title}
+                  placeholder="Board name"
+                  onBlur={(e) => handleUpdateContent(el.id, { ...c, title: e.target.value })}
+                  data-testid={`input-board-link-title-${el.id}`}
+                />
+                <button
+                  type="button"
+                  className="w-full text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                  onClick={() => setShowLinkDialog(true)}
+                  data-testid={`button-link-board-${el.id}`}
+                >
+                  Link this card in Board settings
+                </button>
+              </div>
             ) : (
               <span className="text-sm font-medium text-foreground">{c.title || "Board"}</span>
             )}
