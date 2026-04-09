@@ -426,14 +426,6 @@ export const boardTemplates: BoardTemplate[] = [
   },
   {
     id: "furniture-refinishing-presentation",
-    name: "Furniture Refinishing Concept Board",
-    description: "A polished presentation board for before/after direction, swatches, references, and notes",
-    icon: "Palette",
-    image: "/assets/images/template-moodboard-faux.png",
-    canvasData: furnitureRefinishingConceptBoardPresentation,
-  },
-  {
-    id: "furniture-refinishing-working",
     name: "Furniture Refinishing Concept Board — Working",
     description: "A practical working board with the same layout for active refinishing planning",
     icon: "Palette",

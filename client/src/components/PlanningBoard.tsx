@@ -176,7 +176,6 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
     bathroom: templateBathroomPreview,
     cottage: templateCottagePreview,
     moodboard: templateMoodboardPreview,
-    "furniture-refinishing-presentation": templateFurnitureRefinishingPreview,
     "furniture-refinishing-working": templateFurnitureRefinishingPreview,
   };
 

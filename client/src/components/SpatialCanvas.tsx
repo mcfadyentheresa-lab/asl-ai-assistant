@@ -183,7 +183,6 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     bathroom: templateBathroomPreview,
     cottage: templateCottagePreview,
     moodboard: templateMoodboardPreview,
-    "furniture-refinishing-presentation": templateFurnitureRefinishingPreview,
     "furniture-refinishing-working": templateFurnitureRefinishingPreview,
   };
 
