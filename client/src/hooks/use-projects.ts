@@ -595,7 +595,9 @@ export function useCreatePlanningBoard() {
         credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to create planning board");
-      return await res.json();
+      const data = await res.json();
+      if (data && typeof data === "object" && "id" in data) return data;
+      throw new Error("Failed to create planning board");
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', variables.projectId, 'planning-boards'] });
