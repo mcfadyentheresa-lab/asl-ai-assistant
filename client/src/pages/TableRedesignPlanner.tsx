@@ -249,8 +249,8 @@ export default function TableRedesignPlanner() {
   const buildPayload = () => {
     const base = calculateBaseRange(
       form.tableShape,
-      form.lengthInches ? parseInt(form.lengthInches) : null,
-      form.widthInches ? parseInt(form.widthInches) : null,
+      form.lengthInches ? parseInt(form.lengthInches, 10) || null : null,
+      form.widthInches ? parseInt(form.widthInches, 10) || null : null,
       form.weightClass,
       form.existingMaterial
     );
@@ -262,10 +262,10 @@ export default function TableRedesignPlanner() {
       inspirationImageUrl: form.inspirationImageUrl || null,
       conceptImageUrl: form.conceptImageUrl || null,
       tableShape: form.tableShape,
-      lengthInches: form.lengthInches ? parseInt(form.lengthInches) : null,
-      widthInches: form.widthInches ? parseInt(form.widthInches) : null,
-      heightInches: form.heightInches ? parseInt(form.heightInches) : null,
-      thicknessInches: form.thicknessInches ? parseInt(form.thicknessInches) : null,
+      lengthInches: form.lengthInches ? parseInt(form.lengthInches, 10) || null : null,
+      widthInches: form.widthInches ? parseInt(form.widthInches, 10) || null : null,
+      heightInches: form.heightInches ? parseInt(form.heightInches, 10) || null : null,
+      thicknessInches: form.thicknessInches ? parseInt(form.thicknessInches, 10) || null : null,
       weightClass: form.weightClass,
       existingMaterial: form.existingMaterial || null,
       redesignScope: form.redesignScope,

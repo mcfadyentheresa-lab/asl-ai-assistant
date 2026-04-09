@@ -28,6 +28,13 @@ import {
 import { heartbeat, getOnlineUsers, setVisibility, getVisibility } from "./presence";
 import { broadcastProjectChange } from "./websocket";
 import { getTemplateCatalogue, getTemplateCanvasData } from "./board-templates";
+import type { Request, Response, NextFunction, RequestHandler } from "express";
+
+function asyncHandler(fn: (req: any, res: Response, next: NextFunction) => Promise<any>): RequestHandler {
+  return (req, res, next) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+  };
+}
 
 const uploadDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadDir)) {
@@ -335,7 +342,7 @@ export async function registerRoutes(
   });
 
   // Projects
-  app.get(api.projects.list.path, isAuthenticated, async (req, res) => {
+  app.get(api.projects.list.path, isAuthenticated, asyncHandler(async (req, res) => {
     const user = req.user as any;
     const userId = user.claims.sub;
     const dbUser = await authStorage.getUser(userId);
@@ -348,7 +355,7 @@ export async function registerRoutes(
       const projects = await storage.getProjects();
       res.json(projects);
     }
-  });
+  }));
 
   app.get(api.projects.get.path, isAuthenticated, async (req: any, res) => {
     const project = await storage.getProject(Number(req.params.id));
@@ -380,7 +387,7 @@ export async function registerRoutes(
     }
   });
 
-  app.put(api.projects.update.path, isAuthenticated, async (req: any, res) => {
+  app.put(api.projects.update.path, isAuthenticated, asyncHandler(async (req: any, res) => {
     const existing = await storage.getProject(Number(req.params.id));
     if (!existing) return res.status(404).json({ message: "Project not found" });
     const input = api.projects.update.input.parse(req.body);
@@ -388,15 +395,15 @@ export async function registerRoutes(
     const project = await storage.updateProject(Number(req.params.id), safeInput);
     res.json(project);
     broadcastProjectChange(Number(req.params.id), ["project"], "updated", undefined, req.user.claims.sub);
-  });
+  }));
 
-  app.delete("/api/projects/:id", isAuthenticated, async (req: any, res) => {
+  app.delete("/api/projects/:id", isAuthenticated, asyncHandler(async (req: any, res) => {
     const project = await storage.getProject(Number(req.params.id));
     if (!project) return res.status(404).json({ message: "Project not found" });
     await storage.deleteProject(Number(req.params.id));
     res.json({ success: true });
     broadcastProjectChange(Number(req.params.id), ["project"], "deleted", undefined, req.user.claims.sub);
-  });
+  }));
 
   // Client Invites
   const inviteClientSchema = z.object({
@@ -793,12 +800,12 @@ export async function registerRoutes(
   });
 
   // Tasks
-  app.get(api.tasks.list.path, isAuthenticated, async (req, res) => {
+  app.get(api.tasks.list.path, isAuthenticated, asyncHandler(async (req, res) => {
     const tasks = await storage.getTasks(Number(req.params.projectId));
     res.json(tasks);
-  });
+  }));
 
-  app.post(api.tasks.create.path, isAuthenticated, async (req: any, res) => {
+  app.post(api.tasks.create.path, isAuthenticated, asyncHandler(async (req: any, res) => {
     const input = api.tasks.create.input.parse(req.body);
     const projectId = Number(req.params.projectId);
 
@@ -823,9 +830,9 @@ export async function registerRoutes(
     if (project && input.assignedTo) {
       notifyTaskAssigned(project.name, input.title, input.assignedTo).catch(() => {});
     }
-  });
+  }));
 
-  app.put(api.tasks.update.path, isAuthenticated, async (req: any, res) => {
+  app.put(api.tasks.update.path, isAuthenticated, asyncHandler(async (req: any, res) => {
     const taskId = Number(req.params.id);
 
     if (req.body.sectionId) {
@@ -856,15 +863,15 @@ export async function registerRoutes(
         notifyTaskStatusChange(project.name, task.title, task.status || "updated", project.clientId, userId).catch(() => {});
       }
     }
-  });
+  }));
 
   // Milestones
-  app.get(api.milestones.list.path, isAuthenticated, async (req, res) => {
+  app.get(api.milestones.list.path, isAuthenticated, asyncHandler(async (req, res) => {
     const milestones = await storage.getMilestones(Number(req.params.projectId));
     res.json(milestones);
-  });
+  }));
 
-  app.post(api.milestones.create.path, isAuthenticated, async (req: any, res) => {
+  app.post(api.milestones.create.path, isAuthenticated, asyncHandler(async (req: any, res) => {
     const input = api.milestones.create.input.parse(req.body);
     const projectId = Number(req.params.projectId);
     const milestone = await storage.createMilestone({ ...input, projectId });
@@ -887,7 +894,7 @@ export async function registerRoutes(
       notifyMilestoneCreated(project.name, input.title, project.clientId).catch(() => {});
       storage.createActivityLog({ projectId, userId: (req as any).user?.claims?.sub, type: "milestone_created", title: `Milestone added: ${input.title}` }).catch(() => {});
     }
-  });
+  }));
 
   app.patch("/api/milestones/:id", isAuthenticated, async (req: any, res) => {
     try {
@@ -1055,10 +1062,10 @@ Respond with valid JSON only:
   });
 
   // Sub-Milestones
-  app.get("/api/milestones/:milestoneId/sub-milestones", isAuthenticated, async (req, res) => {
+  app.get("/api/milestones/:milestoneId/sub-milestones", isAuthenticated, asyncHandler(async (req, res) => {
     const subs = await storage.getSubMilestones(Number(req.params.milestoneId));
     res.json(subs);
-  });
+  }));
 
   app.post("/api/milestones/:milestoneId/sub-milestones", isAuthenticated, async (req: any, res) => {
     const milestoneId = Number(req.params.milestoneId);
@@ -1197,12 +1204,12 @@ Respond with valid JSON only:
   });
 
   // Photos
-  app.get(api.photos.list.path, isAuthenticated, async (req, res) => {
+  app.get(api.photos.list.path, isAuthenticated, asyncHandler(async (req, res) => {
     const photos = await storage.getPhotos(Number(req.params.projectId));
     res.json(photos);
-  });
+  }));
 
-  app.post(api.photos.create.path, isAuthenticated, async (req: any, res) => {
+  app.post(api.photos.create.path, isAuthenticated, asyncHandler(async (req: any, res) => {
     const input = api.photos.create.input.parse(req.body);
     const projectId = Number(req.params.projectId);
     const photo = await storage.createPhoto({ ...input, projectId });
@@ -1215,7 +1222,7 @@ Respond with valid JSON only:
       notifyPhotoUploaded(project.name, project.clientId, userId).catch(() => {});
       storage.createActivityLog({ projectId, userId, type: "photo_uploaded", title: "Photo uploaded", description: input.caption || undefined }).catch(() => {});
     }
-  });
+  }));
 
   app.delete("/api/photos/:id", isAuthenticated, async (req, res) => {
     try {
@@ -1238,10 +1245,10 @@ Respond with valid JSON only:
   });
 
   // Documents
-  app.get(api.documents.list.path, isAuthenticated, async (req, res) => {
+  app.get(api.documents.list.path, isAuthenticated, asyncHandler(async (req, res) => {
     const docs = await storage.getDocuments(Number(req.params.projectId));
     res.json(docs);
-  });
+  }));
 
   app.post("/api/projects/:projectId/documents/upload", isAuthenticated, (req: any, res) => {
     docUpload.single("file")(req, res, async (err: any) => {
@@ -1290,12 +1297,12 @@ Respond with valid JSON only:
   });
 
   // Messages
-  app.get(api.messages.list.path, isAuthenticated, async (req, res) => {
+  app.get(api.messages.list.path, isAuthenticated, asyncHandler(async (req, res) => {
     const messages = await storage.getMessages(Number(req.params.projectId));
     res.json(messages);
-  });
+  }));
 
-  app.post(api.messages.create.path, isAuthenticated, async (req, res) => {
+  app.post(api.messages.create.path, isAuthenticated, asyncHandler(async (req, res) => {
     const input = api.messages.create.input.parse(req.body);
     const user = req.user as any;
     const userId = user.claims.sub;
@@ -1314,15 +1321,15 @@ Respond with valid JSON only:
       notifyNewMessage(project.id, project.name, senderName, input.content, userId, project.clientId).catch(() => {});
       storage.createActivityLog({ projectId: project.id, userId, type: "message_sent", title: `Message from ${senderName}`, description: input.content.slice(0, 100) }).catch(() => {});
     }
-  });
+  }));
 
   // Time Entries
-  app.get(api.timeEntries.list.path, isAuthenticated, async (req, res) => {
+  app.get(api.timeEntries.list.path, isAuthenticated, asyncHandler(async (req, res) => {
     const entries = await storage.getTimeEntries(Number(req.params.projectId));
     res.json(entries);
-  });
+  }));
 
-  app.post(api.timeEntries.create.path, isAuthenticated, async (req, res) => {
+  app.post(api.timeEntries.create.path, isAuthenticated, asyncHandler(async (req, res) => {
     const input = api.timeEntries.create.input.parse(req.body);
     const user = req.user as any;
     const entry = await storage.createTimeEntry({ 
@@ -1331,15 +1338,15 @@ Respond with valid JSON only:
       userId: user.claims.sub
     });
     res.status(201).json(entry);
-  });
+  }));
 
   // Checklist Items
-  app.get(api.checklist.list.path, isAuthenticated, async (req, res) => {
+  app.get(api.checklist.list.path, isAuthenticated, asyncHandler(async (req, res) => {
     const items = await storage.getChecklistItems(Number(req.params.projectId));
     res.json(items);
-  });
+  }));
 
-  app.post(api.checklist.create.path, isAuthenticated, async (req: any, res) => {
+  app.post(api.checklist.create.path, isAuthenticated, asyncHandler(async (req: any, res) => {
     const input = api.checklist.create.input.parse(req.body);
     const userId = req.user.claims.sub;
     const item = await storage.createChecklistItem({
@@ -1349,9 +1356,9 @@ Respond with valid JSON only:
     });
     res.status(201).json(item);
     broadcastProjectChange(Number(req.params.projectId), ["checklist"], "created", item.id, userId);
-  });
+  }));
 
-  app.put("/api/checklist/:id", isAuthenticated, async (req: any, res) => {
+  app.put("/api/checklist/:id", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub;
     const input = api.checklist.update.input.parse(req.body);
     const item = await storage.updateChecklistItem(Number(req.params.id), input);
@@ -1360,20 +1367,20 @@ Respond with valid JSON only:
     if (item.projectId) {
       broadcastProjectChange(item.projectId, ["checklist"], "updated", item.id, userId);
     }
-  });
+  }));
 
-  app.delete("/api/checklist/:id", isAuthenticated, async (req, res) => {
+  app.delete("/api/checklist/:id", isAuthenticated, asyncHandler(async (req, res) => {
     await storage.deleteChecklistItem(Number(req.params.id));
     res.json({ success: true });
-  });
+  }));
 
   // Board Items (Moodboard)
-  app.get(api.board.list.path, isAuthenticated, async (req, res) => {
+  app.get(api.board.list.path, isAuthenticated, asyncHandler(async (req, res) => {
     const items = await storage.getBoardItems(Number(req.params.projectId));
     res.json(items);
-  });
+  }));
 
-  app.post(api.board.create.path, isAuthenticated, async (req: any, res) => {
+  app.post(api.board.create.path, isAuthenticated, asyncHandler(async (req: any, res) => {
     const input = api.board.create.input.parse(req.body);
     const userId = req.user.claims.sub;
     const item = await storage.createBoardItem({
@@ -1383,9 +1390,9 @@ Respond with valid JSON only:
     });
     res.status(201).json(item);
     broadcastProjectChange(Number(req.params.projectId), ["board"], "created", item.id, userId);
-  });
+  }));
 
-  app.put("/api/board/:id", isAuthenticated, async (req: any, res) => {
+  app.put("/api/board/:id", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub;
     const input = api.board.update.input.parse(req.body);
     const item = await storage.updateBoardItem(Number(req.params.id), input);
@@ -1394,15 +1401,15 @@ Respond with valid JSON only:
     if (item.projectId) {
       broadcastProjectChange(item.projectId, ["board"], "updated", item.id, userId);
     }
-  });
+  }));
 
-  app.delete("/api/board/:id", isAuthenticated, async (req, res) => {
+  app.delete("/api/board/:id", isAuthenticated, asyncHandler(async (req, res) => {
     await storage.deleteBoardItem(Number(req.params.id));
     res.json({ success: true });
-  });
+  }));
 
   // Planning Boards
-  app.get(api.planningBoards.list.path, isAuthenticated, async (req: any, res) => {
+  app.get(api.planningBoards.list.path, isAuthenticated, asyncHandler(async (req: any, res) => {
     const projectId = Number(req.params.projectId);
     const userId = req.user.claims.sub;
     const userRecord = await authStorage.getUser(userId);
@@ -1414,7 +1421,7 @@ Respond with valid JSON only:
     }
     const boards = await storage.getPlanningBoards(projectId);
     res.json(boards);
-  });
+  }));
 
   async function checkBoardAccess(req: any, res: any, boardId: number) {
     const board = await storage.getPlanningBoard(boardId);
@@ -1438,22 +1445,22 @@ Respond with valid JSON only:
     return true;
   }
 
-  app.get(api.planningBoards.get.path, isAuthenticated, async (req: any, res) => {
+  app.get(api.planningBoards.get.path, isAuthenticated, asyncHandler(async (req: any, res) => {
     const board = await checkBoardAccess(req, res, Number(req.params.id));
     if (!board) return;
     res.json(board);
-  });
+  }));
 
-  app.get("/api/board-templates", isAuthenticated, async (req: any, res) => {
+  app.get("/api/board-templates", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub;
     const userRecord = await authStorage.getUser(userId);
     if (userRecord?.role !== "admin") {
       return res.status(403).json({ message: "Access denied" });
     }
     res.json(getTemplateCatalogue());
-  });
+  }));
 
-  app.get("/api/board-templates/:templateId", isAuthenticated, async (req: any, res) => {
+  app.get("/api/board-templates/:templateId", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub;
     const userRecord = await authStorage.getUser(userId);
     if (userRecord?.role !== "admin") {
@@ -1464,7 +1471,7 @@ Respond with valid JSON only:
       return res.status(404).json({ message: "Template not found" });
     }
     res.json({ id: req.params.templateId, canvasData });
-  });
+  }));
 
 function templateCanvasToElements(canvasData: any, boardId: number, createdBy: string) {
   const objects = Array.isArray(canvasData?.objects) ? canvasData.objects : [];
@@ -1953,12 +1960,12 @@ function templateCanvasToElements(canvasData: any, boardId: number, createdBy: s
   });
 
   // Calendar Events
-  app.get(api.calendar.list.path, isAuthenticated, async (req, res) => {
+  app.get(api.calendar.list.path, isAuthenticated, asyncHandler(async (req, res) => {
     const events = await storage.getCalendarEvents(Number(req.params.projectId));
     res.json(events);
-  });
+  }));
 
-  app.post(api.calendar.create.path, isAuthenticated, async (req: any, res) => {
+  app.post(api.calendar.create.path, isAuthenticated, asyncHandler(async (req: any, res) => {
     const input = api.calendar.create.input.parse(req.body);
     const userId = req.user.claims.sub;
     const projectId = Number(req.params.projectId);
@@ -1975,9 +1982,9 @@ function templateCanvasToElements(canvasData: any, boardId: number, createdBy: s
       notifyCalendarEventCreated(project.name, input.title, input.date || "TBD", project.clientId, userId).catch(() => {});
       storage.createActivityLog({ projectId, userId, type: "calendar_event_created", title: `Event added: ${input.title}`, description: input.date || undefined }).catch(() => {});
     }
-  });
+  }));
 
-  app.put("/api/calendar/:id", isAuthenticated, async (req: any, res) => {
+  app.put("/api/calendar/:id", isAuthenticated, asyncHandler(async (req: any, res) => {
     const input = api.calendar.update.input.parse(req.body);
     const event = await storage.updateCalendarEvent(Number(req.params.id), input);
     if (!event) return res.status(404).json({ message: "Calendar event not found" });
@@ -1999,7 +2006,7 @@ function templateCanvasToElements(canvasData: any, boardId: number, createdBy: s
         ).catch(() => {});
       }
     }
-  });
+  }));
 
   app.post("/api/calendar/:id/image", isAuthenticated, (req: any, res) => {
     imageUpload.single("image")(req, res, async (err: any) => {
@@ -2026,7 +2033,7 @@ function templateCanvasToElements(canvasData: any, boardId: number, createdBy: s
     });
   });
 
-  app.delete("/api/calendar/:id", isAuthenticated, async (req: any, res) => {
+  app.delete("/api/calendar/:id", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub;
     const eventId = Number(req.params.id);
     const event = await storage.getCalendarEvent(eventId);
@@ -2038,17 +2045,17 @@ function templateCanvasToElements(canvasData: any, boardId: number, createdBy: s
     if (event?.projectId) {
       broadcastProjectChange(event.projectId, ["calendar"], "deleted", eventId, userId);
     }
-  });
+  }));
 
   // Weather & PDF Reports Stubs
-  app.get('/api/projects/:projectId/weather', isAuthenticated, async (req, res) => {
+  app.get('/api/projects/:projectId/weather', isAuthenticated, asyncHandler(async (req, res) => {
     // In a real app, we'd call a weather API. For now, we'll return mock data based on "Muskoka"
     res.json({
       temp: 18,
       condition: "Partly Cloudy",
       impact: "No immediate impact on outdoor framing. Keep materials covered for potential evening showers."
     });
-  });
+  }));
 
   app.post('/api/projects/:projectId/reports', isAuthenticated, async (req, res) => {
     const project = await storage.getProject(Number(req.params.projectId));
@@ -2107,18 +2114,18 @@ function templateCanvasToElements(canvasData: any, boardId: number, createdBy: s
     }
   });
 
-  app.post("/api/presence/heartbeat", isAuthenticated, async (req: any, res) => {
+  app.post("/api/presence/heartbeat", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub;
     const dbUser = await authStorage.getUser(userId);
     if (dbUser) {
       heartbeat(userId, dbUser.firstName, dbUser.lastName, dbUser.role, dbUser.profileImageUrl);
     }
     res.json({ ok: true });
-  });
+  }));
 
-  app.get("/api/presence/online", isAuthenticated, async (_req: any, res) => {
+  app.get("/api/presence/online", isAuthenticated, asyncHandler(async (_req: any, res) => {
     res.json(getOnlineUsers());
-  });
+  }));
 
   app.post("/api/presence/visibility", isAuthenticated, async (req: any, res) => {
     const userId = req.user.claims.sub;
@@ -2196,7 +2203,7 @@ function templateCanvasToElements(canvasData: any, boardId: number, createdBy: s
   });
 
   // Activity Log
-  app.get("/api/projects/:projectId/activity", isAuthenticated, async (req: any, res) => {
+  app.get("/api/projects/:projectId/activity", isAuthenticated, asyncHandler(async (req: any, res) => {
     const entries = await storage.getActivityLog(Number(req.params.projectId), 30);
     const activityIds = entries.map((e) => e.id);
     const views = await storage.getActivityViews(activityIds);
@@ -2210,18 +2217,18 @@ function templateCanvasToElements(canvasData: any, boardId: number, createdBy: s
       views: viewsByActivity[e.id] || [],
     }));
     res.json(enriched);
-  });
+  }));
 
-  app.post("/api/activity/:activityId/view", isAuthenticated, async (req: any, res) => {
+  app.post("/api/activity/:activityId/view", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub;
     const activityId = Number(req.params.activityId);
     await storage.markActivityViewed(activityId, userId);
     res.json({ ok: true });
-  });
+  }));
 
 
   // ── Paint Colors ──
-  app.get("/api/paint-colors", isAuthenticated, async (req, res) => {
+  app.get("/api/paint-colors", isAuthenticated, asyncHandler(async (req, res) => {
     const { brand, colorFamily, search, popular } = req.query;
     const filters: { brand?: string; colorFamily?: string; search?: string; popular?: boolean } = {};
     if (typeof brand === "string") filters.brand = brand;
@@ -2230,13 +2237,13 @@ function templateCanvasToElements(canvasData: any, boardId: number, createdBy: s
     if (popular === "true") filters.popular = true;
     const colors = await storage.getPaintColors(filters);
     res.json(colors);
-  });
+  }));
 
-  app.get("/api/paint-colors/families", isAuthenticated, async (req, res) => {
+  app.get("/api/paint-colors/families", isAuthenticated, asyncHandler(async (req, res) => {
     const brand = typeof req.query.brand === "string" ? req.query.brand : undefined;
     const families = await storage.getPaintColorFamilies(brand);
     res.json(families);
-  });
+  }));
 
   app.get("/api/paint-colors/:id", isAuthenticated, async (req, res) => {
     const color = await storage.getPaintColor(Number(req.params.id));
@@ -2421,21 +2428,21 @@ function templateCanvasToElements(canvasData: any, boardId: number, createdBy: s
   // ============ COST ESTIMATOR ROUTES ============
 
   // Cost Categories
-  app.get("/api/cost-categories", isAuthenticated, async (_req, res) => {
+  app.get("/api/cost-categories", isAuthenticated, asyncHandler(async (_req, res) => {
     const categories = await storage.getCostCategories();
     res.json(categories);
-  });
+  }));
 
-  app.post("/api/cost-categories", isAuthenticated, async (req: any, res) => {
+  app.post("/api/cost-categories", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub;
     const dbUser = await authStorage.getUser(userId);
     if (dbUser?.role !== "admin") return res.status(403).json({ message: "Admin access required" });
     const input = insertCostCategorySchema.parse(req.body);
     const created = await storage.createCostCategory(input);
     res.status(201).json(created);
-  });
+  }));
 
-  app.patch("/api/cost-categories/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/cost-categories/:id", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub;
     const dbUser = await authStorage.getUser(userId);
     if (dbUser?.role !== "admin") return res.status(403).json({ message: "Admin access required" });
@@ -2443,53 +2450,53 @@ function templateCanvasToElements(canvasData: any, boardId: number, createdBy: s
     const input = insertCostCategorySchema.partial().parse(req.body);
     const updated = await storage.updateCostCategory(id, input);
     res.json(updated);
-  });
+  }));
 
-  app.delete("/api/cost-categories/:id", isAuthenticated, async (req: any, res) => {
+  app.delete("/api/cost-categories/:id", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub;
     const dbUser = await authStorage.getUser(userId);
     if (dbUser?.role !== "admin") return res.status(403).json({ message: "Admin access required" });
     await storage.deleteCostCategory(parseInt(req.params.id));
     res.json({ message: "Deleted" });
-  });
+  }));
 
   // Market Rates
-  app.get("/api/market-rates", isAuthenticated, async (req, res) => {
+  app.get("/api/market-rates", isAuthenticated, asyncHandler(async (req, res) => {
     const categoryId = req.query.categoryId ? parseInt(req.query.categoryId as string) : undefined;
     const activeOnly = req.query.active === "true";
     const rates = await storage.getMarketRates(categoryId, activeOnly);
     res.json(rates);
-  });
+  }));
 
-  app.post("/api/market-rates", isAuthenticated, async (req: any, res) => {
+  app.post("/api/market-rates", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub;
     const dbUser = await authStorage.getUser(userId);
     if (dbUser?.role !== "admin") return res.status(403).json({ message: "Admin access required" });
     const input = insertMarketRateSchema.parse(req.body);
     const created = await storage.createMarketRate(input);
     res.status(201).json(created);
-  });
+  }));
 
-  app.patch("/api/market-rates/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/market-rates/:id", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub;
     const dbUser = await authStorage.getUser(userId);
     if (dbUser?.role !== "admin") return res.status(403).json({ message: "Admin access required" });
     const input = insertMarketRateSchema.partial().parse(req.body);
     const updated = await storage.updateMarketRate(parseInt(req.params.id), input);
     res.json(updated);
-  });
+  }));
 
   // Project Estimates
-  app.get("/api/projects/:projectId/estimates", isAuthenticated, async (req: any, res) => {
+  app.get("/api/projects/:projectId/estimates", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub;
     const dbUser = await authStorage.getUser(userId);
     if (dbUser?.role !== "admin") return res.status(403).json({ message: "Admin access required" });
     const projectId = parseInt(req.params.projectId);
     const estimates = await storage.getProjectEstimates(projectId);
     res.json(estimates);
-  });
+  }));
 
-  app.post("/api/projects/:projectId/estimates", isAuthenticated, async (req: any, res) => {
+  app.post("/api/projects/:projectId/estimates", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub as string;
     const dbUser = await authStorage.getUser(userId);
     if (!dbUser) return res.status(404).json({ message: "User not found" });
@@ -2499,18 +2506,18 @@ function templateCanvasToElements(canvasData: any, boardId: number, createdBy: s
     const created = await storage.createEstimate(input);
     res.status(201).json(created);
     broadcastProjectChange(parseInt(req.params.projectId), ["estimates"], "created", undefined, userId);
-  });
+  }));
 
-  app.get("/api/estimates/:id", isAuthenticated, async (req: any, res) => {
+  app.get("/api/estimates/:id", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub;
     const dbUser = await authStorage.getUser(userId);
     if (dbUser?.role !== "admin") return res.status(403).json({ message: "Admin access required" });
     const estimate = await storage.getEstimate(parseInt(req.params.id));
     if (!estimate) return res.status(404).json({ message: "Estimate not found" });
     res.json(estimate);
-  });
+  }));
 
-  app.patch("/api/estimates/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/estimates/:id", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub as string;
     const dbUser = await authStorage.getUser(userId);
     if (!dbUser) return res.status(404).json({ message: "User not found" });
@@ -2521,26 +2528,26 @@ function templateCanvasToElements(canvasData: any, boardId: number, createdBy: s
     if (updated.projectId) {
       broadcastProjectChange(updated.projectId, ["estimates"], "updated", updated.id, userId);
     }
-  });
+  }));
 
-  app.delete("/api/estimates/:id", isAuthenticated, async (req: any, res) => {
+  app.delete("/api/estimates/:id", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub;
     const dbUser = await authStorage.getUser(userId);
     if (dbUser?.role !== "admin") return res.status(403).json({ message: "Admin access required" });
     await storage.deleteEstimate(parseInt(req.params.id));
     res.json({ message: "Deleted" });
-  });
+  }));
 
   // Estimate Items
-  app.get("/api/estimates/:id/items", isAuthenticated, async (req: any, res) => {
+  app.get("/api/estimates/:id/items", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub;
     const dbUser = await authStorage.getUser(userId);
     if (dbUser?.role !== "admin") return res.status(403).json({ message: "Admin access required" });
     const items = await storage.getEstimateItems(parseInt(req.params.id));
     res.json(items);
-  });
+  }));
 
-  app.post("/api/estimates/:id/items", isAuthenticated, async (req: any, res) => {
+  app.post("/api/estimates/:id/items", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub as string;
     const dbUser = await authStorage.getUser(userId);
     if (!dbUser) return res.status(404).json({ message: "User not found" });
@@ -2586,9 +2593,9 @@ function templateCanvasToElements(canvasData: any, boardId: number, createdBy: s
     }
 
     res.status(201).json(created);
-  });
+  }));
 
-  app.patch("/api/estimate-items/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/estimate-items/:id", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub as string;
     const dbUser = await authStorage.getUser(userId);
     if (!dbUser) return res.status(404).json({ message: "User not found" });
@@ -2635,9 +2642,9 @@ function templateCanvasToElements(canvasData: any, boardId: number, createdBy: s
         broadcastProjectChange(estimateForBroadcast.projectId, ["estimates", "estimate-items"], "updated", updated.id, userId);
       }
     }
-  });
+  }));
 
-  app.delete("/api/estimate-items/:id", isAuthenticated, async (req: any, res) => {
+  app.delete("/api/estimate-items/:id", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub as string;
     const dbUser = await authStorage.getUser(userId);
     if (!dbUser) return res.status(404).json({ message: "User not found" });
@@ -2646,15 +2653,15 @@ function templateCanvasToElements(canvasData: any, boardId: number, createdBy: s
     await storage.deleteWarningsByItem(id);
     await storage.deleteEstimateItem(id);
     res.json({ message: "Deleted" });
-  });
+  }));
 
   // Receipts
-  app.get("/api/projects/:projectId/receipts", isAuthenticated, async (req, res) => {
+  app.get("/api/projects/:projectId/receipts", isAuthenticated, asyncHandler(async (req, res) => {
     const receipts = await storage.getReceipts(parseInt(req.params.projectId));
     res.json(receipts);
-  });
+  }));
 
-  app.post("/api/projects/:projectId/receipts", isAuthenticated, async (req: any, res) => {
+  app.post("/api/projects/:projectId/receipts", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub as string;
     const dbUser = await authStorage.getUser(userId);
     if (!dbUser) return res.status(404).json({ message: "User not found" });
@@ -2664,16 +2671,16 @@ function templateCanvasToElements(canvasData: any, boardId: number, createdBy: s
     const created = await storage.createReceipt(input);
     res.status(201).json(created);
     broadcastProjectChange(parseInt(req.params.projectId), ["receipts"], "created", undefined, userId);
-  });
+  }));
 
-  app.delete("/api/receipts/:id", isAuthenticated, async (req: any, res) => {
+  app.delete("/api/receipts/:id", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub as string;
     const dbUser = await authStorage.getUser(userId);
     if (!dbUser) return res.status(404).json({ message: "User not found" });
     if (dbUser.role === "client") return res.status(403).json({ message: "Crew or admin access required" });
     await storage.deleteReceipt(parseInt(req.params.id));
     res.json({ message: "Deleted" });
-  });
+  }));
 
   // Estimate Warnings
   app.get("/api/estimates/:id/warnings", isAuthenticated, async (req, res) => {
@@ -2735,7 +2742,7 @@ function templateCanvasToElements(canvasData: any, boardId: number, createdBy: s
   });
 
   // AI Scope Analyzer
-  app.post("/api/estimates/:estimateId/ai-analyze", isAuthenticated, async (req: any, res) => {
+  app.post("/api/estimates/:estimateId/ai-analyze", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub;
     const user = await authStorage.getUser(userId);
     if (!user || (user.role !== "admin" && user.role !== "crew")) {
@@ -2846,7 +2853,7 @@ Respond with valid JSON only, no markdown. Format:
       console.error("AI analysis error:", error);
       res.status(500).json({ message: "Failed to analyze project scope" });
     }
-  });
+  }));
 
   // Suggest Material Alternatives
   app.post("/api/estimates/:id/suggest-alternatives", isAuthenticated, async (req: any, res) => {
@@ -3672,7 +3679,7 @@ Respond with valid JSON only:
   });
 
   // Crew Rates
-  app.get("/api/crew-rates", isAuthenticated, async (req: any, res) => {
+  app.get("/api/crew-rates", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub;
     const user = await authStorage.getUser(userId);
     if (!user || (user.role !== "admin" && user.role !== "crew")) {
@@ -3680,9 +3687,9 @@ Respond with valid JSON only:
     }
     const rates = await storage.getCrewRates();
     res.json(rates);
-  });
+  }));
 
-  app.post("/api/crew-rates", isAuthenticated, async (req: any, res) => {
+  app.post("/api/crew-rates", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub;
     const user = await authStorage.getUser(userId);
     if (!user || user.role !== "admin") {
@@ -3692,9 +3699,9 @@ Respond with valid JSON only:
     if (!parsed.success) return res.status(400).json({ message: "Invalid data", errors: parsed.error.issues });
     const created = await storage.createCrewRate(parsed.data);
     res.json(created);
-  });
+  }));
 
-  app.patch("/api/crew-rates/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/crew-rates/:id", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub;
     const user = await authStorage.getUser(userId);
     if (!user || user.role !== "admin") {
@@ -3704,7 +3711,7 @@ Respond with valid JSON only:
     if (!parsed.success) return res.status(400).json({ message: "Invalid data", errors: parsed.error.issues });
     const updated = await storage.updateCrewRate(parseInt(req.params.id), parsed.data);
     res.json(updated);
-  });
+  }));
 
   app.delete("/api/crew-rates/:id", isAuthenticated, async (req: any, res) => {
     const userId = req.user.claims.sub;
@@ -3756,7 +3763,7 @@ Respond with valid JSON only:
   });
 
   // Subcontractors
-  app.get("/api/subcontractors", isAuthenticated, async (req: any, res) => {
+  app.get("/api/subcontractors", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub;
     const user = await authStorage.getUser(userId);
     if (!user || (user.role !== "admin" && user.role !== "crew")) {
@@ -3765,9 +3772,9 @@ Respond with valid JSON only:
     const categoryId = req.query.categoryId ? parseInt(req.query.categoryId as string) : undefined;
     const subs = await storage.getSubcontractors(categoryId);
     res.json(subs);
-  });
+  }));
 
-  app.post("/api/subcontractors", isAuthenticated, async (req: any, res) => {
+  app.post("/api/subcontractors", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub;
     const user = await authStorage.getUser(userId);
     if (!user || user.role !== "admin") {
@@ -3777,9 +3784,9 @@ Respond with valid JSON only:
     if (!parsed.success) return res.status(400).json({ message: "Invalid data", errors: parsed.error.issues });
     const created = await storage.createSubcontractor(parsed.data);
     res.json(created);
-  });
+  }));
 
-  app.patch("/api/subcontractors/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/subcontractors/:id", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub;
     const user = await authStorage.getUser(userId);
     if (!user || user.role !== "admin") {
@@ -3789,9 +3796,9 @@ Respond with valid JSON only:
     if (!parsed.success) return res.status(400).json({ message: "Invalid data", errors: parsed.error.issues });
     const updated = await storage.updateSubcontractor(parseInt(req.params.id), parsed.data);
     res.json(updated);
-  });
+  }));
 
-  app.delete("/api/subcontractors/:id", isAuthenticated, async (req: any, res) => {
+  app.delete("/api/subcontractors/:id", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub;
     const user = await authStorage.getUser(userId);
     if (!user || user.role !== "admin") {
@@ -3799,10 +3806,10 @@ Respond with valid JSON only:
     }
     await storage.deleteSubcontractor(parseInt(req.params.id));
     res.json({ success: true });
-  });
+  }));
 
   // === Suppliers ===
-  app.get("/api/suppliers", isAuthenticated, async (req: any, res) => {
+  app.get("/api/suppliers", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub;
     const user = await authStorage.getUser(userId);
     if (!user || (user.role !== "admin" && user.role !== "crew")) {
@@ -3810,9 +3817,9 @@ Respond with valid JSON only:
     }
     const suppliers = await storage.getSuppliers();
     res.json(suppliers);
-  });
+  }));
 
-  app.post("/api/suppliers", isAuthenticated, async (req: any, res) => {
+  app.post("/api/suppliers", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub;
     const user = await authStorage.getUser(userId);
     if (!user || user.role !== "admin") {
@@ -3822,9 +3829,9 @@ Respond with valid JSON only:
     if (!parsed.success) return res.status(400).json({ message: "Invalid supplier data", errors: parsed.error.errors });
     const supplier = await storage.createSupplier(parsed.data);
     res.status(201).json(supplier);
-  });
+  }));
 
-  app.patch("/api/suppliers/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/suppliers/:id", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub;
     const user = await authStorage.getUser(userId);
     if (!user || user.role !== "admin") {
@@ -3834,9 +3841,9 @@ Respond with valid JSON only:
     if (!parsed.success) return res.status(400).json({ message: "Invalid supplier data", errors: parsed.error.errors });
     const supplier = await storage.updateSupplier(parseInt(req.params.id), parsed.data);
     res.json(supplier);
-  });
+  }));
 
-  app.delete("/api/suppliers/:id", isAuthenticated, async (req: any, res) => {
+  app.delete("/api/suppliers/:id", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub;
     const user = await authStorage.getUser(userId);
     if (!user || user.role !== "admin") {
@@ -3844,10 +3851,10 @@ Respond with valid JSON only:
     }
     await storage.deleteSupplier(parseInt(req.params.id));
     res.json({ message: "Supplier deleted" });
-  });
+  }));
 
   // === Supplier Prices ===
-  app.get("/api/supplier-prices", isAuthenticated, async (req: any, res) => {
+  app.get("/api/supplier-prices", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub;
     const user = await authStorage.getUser(userId);
     if (!user || (user.role !== "admin" && user.role !== "crew")) {
@@ -3856,9 +3863,9 @@ Respond with valid JSON only:
     const supplierId = req.query.supplierId ? parseInt(req.query.supplierId as string) : undefined;
     const prices = await storage.getSupplierPrices(supplierId);
     res.json(prices);
-  });
+  }));
 
-  app.post("/api/supplier-prices", isAuthenticated, async (req: any, res) => {
+  app.post("/api/supplier-prices", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub;
     const user = await authStorage.getUser(userId);
     if (!user || user.role !== "admin") {
@@ -3868,9 +3875,9 @@ Respond with valid JSON only:
     if (!parsed.success) return res.status(400).json({ message: "Invalid price data", errors: parsed.error.errors });
     const price = await storage.createSupplierPrice(parsed.data);
     res.status(201).json(price);
-  });
+  }));
 
-  app.patch("/api/supplier-prices/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/supplier-prices/:id", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub;
     const user = await authStorage.getUser(userId);
     if (!user || user.role !== "admin") {
@@ -3880,9 +3887,9 @@ Respond with valid JSON only:
     if (!parsed.success) return res.status(400).json({ message: "Invalid price data", errors: parsed.error.errors });
     const price = await storage.updateSupplierPrice(parseInt(req.params.id), parsed.data);
     res.json(price);
-  });
+  }));
 
-  app.delete("/api/supplier-prices/:id", isAuthenticated, async (req: any, res) => {
+  app.delete("/api/supplier-prices/:id", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub;
     const user = await authStorage.getUser(userId);
     if (!user || user.role !== "admin") {
@@ -3890,11 +3897,11 @@ Respond with valid JSON only:
     }
     await storage.deleteSupplierPrice(parseInt(req.params.id));
     res.json({ message: "Supplier price deleted" });
-  });
+  }));
 
   // ==================== TABLE REDESIGN PLANNER ====================
 
-  app.get("/api/redesign-plans", isAuthenticated, async (req: any, res) => {
+  app.get("/api/redesign-plans", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub;
     const user = await authStorage.getUser(userId);
     if (!user || user.role !== "admin") {
@@ -3903,9 +3910,9 @@ Respond with valid JSON only:
     const projectId = req.query.projectId ? parseInt(req.query.projectId) : undefined;
     const plans = await storage.getRedesignPlans(projectId);
     res.json(plans);
-  });
+  }));
 
-  app.get("/api/redesign-plans/:id", isAuthenticated, async (req: any, res) => {
+  app.get("/api/redesign-plans/:id", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub;
     const user = await authStorage.getUser(userId);
     if (!user || user.role !== "admin") {
@@ -3914,9 +3921,9 @@ Respond with valid JSON only:
     const plan = await storage.getRedesignPlan(parseInt(req.params.id));
     if (!plan) return res.status(404).json({ message: "Plan not found" });
     res.json(plan);
-  });
+  }));
 
-  app.post("/api/redesign-plans", isAuthenticated, async (req: any, res) => {
+  app.post("/api/redesign-plans", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub;
     const user = await authStorage.getUser(userId);
     if (!user || user.role !== "admin") {
@@ -3926,9 +3933,9 @@ Respond with valid JSON only:
     if (!parsed.success) return res.status(400).json({ message: "Invalid plan data", errors: parsed.error.errors });
     const plan = await storage.createRedesignPlan(parsed.data);
     res.status(201).json(plan);
-  });
+  }));
 
-  app.patch("/api/redesign-plans/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/redesign-plans/:id", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub;
     const user = await authStorage.getUser(userId);
     if (!user || user.role !== "admin") {
@@ -3950,9 +3957,9 @@ Respond with valid JSON only:
     }
     const plan = await storage.updateRedesignPlan(parseInt(req.params.id), req.body);
     res.json(plan);
-  });
+  }));
 
-  app.delete("/api/redesign-plans/:id", isAuthenticated, async (req: any, res) => {
+  app.delete("/api/redesign-plans/:id", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub;
     const user = await authStorage.getUser(userId);
     if (!user || user.role !== "admin") {
@@ -3960,10 +3967,10 @@ Respond with valid JSON only:
     }
     await storage.deleteRedesignPlan(parseInt(req.params.id));
     res.json({ message: "Plan deleted" });
-  });
+  }));
 
   // Redesign Materials
-  app.get("/api/redesign-plans/:planId/materials", isAuthenticated, async (req: any, res) => {
+  app.get("/api/redesign-plans/:planId/materials", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub;
     const user = await authStorage.getUser(userId);
     if (!user || user.role !== "admin") {
@@ -3971,9 +3978,9 @@ Respond with valid JSON only:
     }
     const materials = await storage.getRedesignMaterials(parseInt(req.params.planId));
     res.json(materials);
-  });
+  }));
 
-  app.post("/api/redesign-plans/:planId/materials", isAuthenticated, async (req: any, res) => {
+  app.post("/api/redesign-plans/:planId/materials", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub;
     const user = await authStorage.getUser(userId);
     if (!user || user.role !== "admin") {
@@ -3983,9 +3990,9 @@ Respond with valid JSON only:
     if (!parsed.success) return res.status(400).json({ message: "Invalid material data", errors: parsed.error.errors });
     const material = await storage.createRedesignMaterial(parsed.data);
     res.status(201).json(material);
-  });
+  }));
 
-  app.patch("/api/redesign-plans/:planId/materials/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/redesign-plans/:planId/materials/:id", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub;
     const user = await authStorage.getUser(userId);
     if (!user || user.role !== "admin") {
@@ -3993,9 +4000,9 @@ Respond with valid JSON only:
     }
     const material = await storage.updateRedesignMaterial(parseInt(req.params.id), req.body);
     res.json(material);
-  });
+  }));
 
-  app.delete("/api/redesign-plans/:planId/materials/:id", isAuthenticated, async (req: any, res) => {
+  app.delete("/api/redesign-plans/:planId/materials/:id", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub;
     const user = await authStorage.getUser(userId);
     if (!user || user.role !== "admin") {
@@ -4003,10 +4010,10 @@ Respond with valid JSON only:
     }
     await storage.deleteRedesignMaterial(parseInt(req.params.id));
     res.json({ message: "Material deleted" });
-  });
+  }));
 
   // Push redesign card to planning board
-  app.post("/api/redesign-plans/:id/push-to-board", isAuthenticated, async (req: any, res) => {
+  app.post("/api/redesign-plans/:id/push-to-board", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub;
     const user = await authStorage.getUser(userId);
     if (!user || user.role !== "admin") {
@@ -4026,22 +4033,24 @@ Respond with valid JSON only:
     const description = plan.conceptDescription || `${plan.pieceType} redesign — ${plan.redesignScope}`;
     const tagLabel = tag || plan.tag || "";
 
+    const elementType = imageUrl ? "image" : "note";
+    const content = imageUrl
+      ? { url: imageUrl, caption: `${title}${tagLabel ? ` [${tagLabel}]` : ""}\n${description}` }
+      : { text: `${title}${tagLabel ? ` [${tagLabel}]` : ""}\n${description}`, color: "#f0ede8" };
+
     const element = await storage.createCanvasElement({
       boardId: parseInt(boardId),
-      type: "image",
+      type: elementType,
       x: 100,
       y: 100,
       width: 280,
-      height: 320,
+      height: elementType === "image" ? 320 : 200,
       zIndex: 1,
-      content: {
-        url: imageUrl,
-        caption: `${title}${tagLabel ? ` [${tagLabel}]` : ""}\n${description}`,
-      },
+      content,
     });
 
     res.status(201).json(element);
-  });
+  }));
 
   // Initialize seed data
   await seedDatabase();
