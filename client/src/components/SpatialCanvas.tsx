@@ -182,6 +182,8 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     bathroom: templateBathroomPreview,
     cottage: templateCottagePreview,
     moodboard: templateMoodboardPreview,
+    "furniture-refinishing-presentation": templateMoodboardPreview,
+    "furniture-refinishing-working": templateMoodboardPreview,
   };
 
   const [selectedBoardId, setSelectedBoardId] = useState<number | null>(null);

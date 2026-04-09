@@ -326,6 +326,62 @@ const moodboard = wrap([
   makeSticky(570, 840, "Confirm dock permit w/\ntownship. Check setback\nrules for screened porch.", "#fef9c3", 220, 80),
 ]);
 
+const furnitureRefinishingConceptBoardPresentation = wrap([
+  makeSectionHeader(40, 20, "Furniture Refinishing Concept Board"),
+  makeText(40, 54, "PROJECT NAME", 13, "600", "#6b7280"),
+  makeText(40, 76, "Finish Concept Board", 18, "bold", "#1e3a2f"),
+
+  makeRoomZone(30, 110, 300, 520, "Before + Inspiration", "#f3efe8", 0.42),
+  makeRoomZone(350, 110, 380, 520, "Proposed Direction", "#ede8e1", 0.42),
+  makeRoomZone(750, 110, 210, 320, "Swatches", "#f4f0ea", 0.42),
+  makeRoomZone(750, 450, 210, 260, "Material References", "#ece7df", 0.42),
+  makeRoomZone(30, 650, 930, 170, "Planning Notes", "#f7f4ef", 0.35),
+
+  makeImage(50, 140, "", "Before", 250, 160),
+  makeImage(50, 330, "", "Client Inspiration", 250, 200),
+  makeImage(375, 140, "", "Proposed Direction", 330, 250),
+
+  makeColorSwatch(770, 140, "Paint Colour", "#f3efe6", "#F3EFE6", "Placeholder", "", 160),
+  makeColorSwatch(770, 250, "Stain Colour", "#b58a63", "#B58A63", "Placeholder", "", 160),
+  makeColorSwatch(770, 360, "Finish Sample", "#d9d4cb", "#D9D4CB", "Placeholder", "", 160),
+
+  makeMaterial(770, 480, "Wood Grain", "", "", "", "Visible grain to remain. Use for close-up reference."),
+  makeMaterial(770, 570, "Texture Reference", "", "", "", "Brushed metal, linen, aged brass, or matte finish."),
+
+  makeSticky(50, 675, "Visible grain to remain.\nReduce orange/red undertone.\nMatte protective topcoat.", "#f7f4ef", 210, 70),
+  makeSticky(280, 675, "Durability for high-use piece.\nSample approval before final.\nKeep colour warm but refined.", "#f7f4ef", 210, 70),
+  makeSticky(510, 675, "Project Name\nPiece Name\nPlanning Notes", "#f7f4ef", 210, 70),
+  makeCallout(390, 410, "Minimal arrow markup only", "#f7f4ef", 170, 45),
+]);
+
+const furnitureRefinishingConceptBoardWorking = wrap([
+  makeSectionHeader(40, 20, "Furniture Refinishing Concept Board"),
+  makeText(40, 54, "PROJECT NAME", 13, "600", "#6b7280"),
+  makeText(40, 76, "Working Board", 18, "bold", "#1e3a2f"),
+
+  makeRoomZone(30, 110, 320, 520, "Before + Client Ideas", "#f3efe8", 0.42),
+  makeRoomZone(370, 110, 360, 520, "Proposed Direction", "#ede8e1", 0.42),
+  makeRoomZone(750, 110, 210, 230, "Swatches", "#f4f0ea", 0.42),
+  makeRoomZone(750, 360, 210, 310, "Materials + Notes", "#ece7df", 0.42),
+  makeRoomZone(30, 650, 930, 170, "Planning Notes", "#f7f4ef", 0.35),
+
+  makeImage(50, 140, "", "Before", 270, 170),
+  makeImage(50, 335, "", "Client Inspiration", 270, 200),
+  makeImage(390, 140, "", "Proposed Direction", 300, 230),
+  makeCallout(420, 390, "Add one clean arrow callout if needed", "#f7f4ef", 180, 45),
+
+  makeColorSwatch(770, 140, "Paint Colour", "#f3efe6", "#F3EFE6", "Placeholder", "", 160),
+  makeColorSwatch(770, 220, "Stain Colour", "#b58a63", "#B58A63", "Placeholder", "", 160),
+  makeColorSwatch(770, 300, "Finish Sample", "#d9d4cb", "#D9D4CB", "Placeholder", "", 160),
+
+  makeMaterial(770, 380, "Wood Grain", "", "", "", "Use for grain direction, edges, and repair notes."),
+  makeMaterial(770, 485, "Texture Reference", "", "", "", "Secondary materials, hardware, or finish close-ups."),
+
+  makeSticky(50, 675, "Visible grain to remain.\nReduce orange/red undertone.", "#f7f4ef", 210, 70),
+  makeSticky(280, 675, "Matte protective topcoat.\nSample approval before final.", "#f7f4ef", 210, 70),
+  makeSticky(510, 675, "Durability for high-use piece.\nKeep notes short and clear.", "#f7f4ef", 210, 70),
+]);
+
 export interface BoardTemplate {
   id: string;
   name: string;
@@ -367,6 +423,22 @@ export const boardTemplates: BoardTemplate[] = [
     icon: "Palette",
     image: "/assets/images/template-moodboard-faux.png",
     canvasData: moodboard,
+  },
+  {
+    id: "furniture-refinishing-presentation",
+    name: "Furniture Refinishing Concept Board",
+    description: "A polished presentation board for before/after direction, swatches, references, and notes",
+    icon: "Palette",
+    image: "/assets/images/template-moodboard-faux.png",
+    canvasData: furnitureRefinishingConceptBoardPresentation,
+  },
+  {
+    id: "furniture-refinishing-working",
+    name: "Furniture Refinishing Concept Board — Working",
+    description: "A practical working board with the same layout for active refinishing planning",
+    icon: "Palette",
+    image: "/assets/images/template-moodboard-faux.png",
+    canvasData: furnitureRefinishingConceptBoardWorking,
   },
 ];
 
