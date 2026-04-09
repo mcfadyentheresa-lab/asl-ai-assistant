@@ -1720,6 +1720,13 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           onMouseDown={(e) => startDrag(el.id, e)}
           data-testid={`element-section-header-${el.id}`}
         >
+          {isSelected && (
+            <div className="absolute -top-8 right-0 flex gap-1">
+              <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleDeleteElement(el.id)} data-testid={`button-delete-${el.id}`}>
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            </div>
+          )}
           {isSelected ? (
             <input
               className="w-full bg-transparent border-none text-lg font-serif font-semibold text-foreground/70 outline-none"
