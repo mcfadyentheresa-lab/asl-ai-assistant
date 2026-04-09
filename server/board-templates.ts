@@ -387,6 +387,42 @@ const collageConceptBoard = wrap([
   makeSticky(490, 590, "Reserve room for arrows and callouts.", "#ffffff", 250, 70),
 ]);
 
+const materialInspirationBoard = wrap([
+  makeSectionHeader(40, 20, "Material Inspiration Board"),
+
+  makeRoomZone(140, 60, 260, 360, "Fabric Samples", "#f5f3ef", 0.45),
+  makeRoomZone(420, 60, 220, 220, "Stone / Pattern", "#f5f3ef", 0.45),
+  makeRoomZone(650, 60, 220, 180, "Dark Wood", "#f5f3ef", 0.45),
+  makeRoomZone(650, 260, 220, 140, "Label", "#f5f3ef", 0.45),
+  makeRoomZone(890, 170, 240, 290, "Oak Veneer", "#f5f3ef", 0.45),
+  makeRoomZone(420, 300, 240, 250, "Lighting + Objects", "#f5f3ef", 0.45),
+  makeRoomZone(680, 430, 180, 120, "Colour Chip", "#f5f3ef", 0.45),
+  makeRoomZone(885, 470, 220, 170, "Door Handles", "#f5f3ef", 0.45),
+
+  makeImage(150, 80, "", "European fabric samples", 220, 180),
+  makeCallout(80, 110, "European fabric\nsamples", "#5a443d", 90, 80),
+
+  makeImage(430, 70, "", "Herringbone pattern", 210, 180),
+  makeText(500, 220, "Herringbone pattern", 18, "bold", "#2f2a28"),
+
+  makeImage(660, 70, "", "Dark wood grain", 180, 120),
+  makeText(715, 165, "Wenge spruce", 14, "400", "#1f1f1f"),
+
+  makeImage(430, 220, "", "Textured lamp", 240, 230),
+  makeCallout(470, 330, "Hemlock", "#556b3f", 120, 60),
+
+  makeImage(650, 290, "", "Oak veneer finish", 210, 190),
+  makeCallout(920, 370, "Bar top oak veneer finish", "#f5f3ef", 170, 55),
+
+  makeImage(900, 180, "", "Oak veneer finish", 200, 220),
+  makeImage(910, 490, "", "Door handles", 190, 120),
+  makeCallout(900, 500, "Entry door handles", "#f5f3ef", 150, 55),
+
+  makeSticky(430, 500, "Oak side tables", "#ffffff", 150, 60),
+  makeSticky(650, 540, "Keep the palette grounded.", "#ffffff", 150, 60),
+  makeSticky(920, 610, "Use a single dark accent piece.", "#ffffff", 150, 60),
+]);
+
 export interface BoardTemplate {
   id: string;
   name: string;
@@ -436,6 +472,14 @@ export const boardTemplates: BoardTemplate[] = [
     icon: "LayoutPanelLeft",
     image: "/assets/images/Screenshot_2026-04-09_at_10.54.53_AM_1775746499391.png",
     canvasData: collageConceptBoard,
+  },
+  {
+    id: "material-inspiration",
+    name: "Material Inspiration Board",
+    description: "Layered collage board for fabrics, finishes, wood tones, and product inspiration",
+    icon: "Palette",
+    image: "/assets/images/Screenshot_2026-04-09_at_10.57.06_AM_1775746631248.png",
+    canvasData: materialInspirationBoard,
   },
 ];
 
