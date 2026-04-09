@@ -3,6 +3,7 @@ import templateKitchenPreview from "../assets/images/template-kitchen-faux.png";
 import templateBathroomPreview from "../assets/images/template-bathroom-faux.png";
 import templateCottagePreview from "../assets/images/template-cottage-faux.png";
 import templateMoodboardPreview from "@assets/Screenshot_2026-04-08_at_12.56.52_PM_1775667416114.png";
+import templateFurnitureRefinishingPreview from "@assets/Screenshot_2026-04-09_at_10.29.34_AM_1775744978712.png";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -182,8 +183,8 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     bathroom: templateBathroomPreview,
     cottage: templateCottagePreview,
     moodboard: templateMoodboardPreview,
-    "furniture-refinishing-presentation": templateMoodboardPreview,
-    "furniture-refinishing-working": templateMoodboardPreview,
+    "furniture-refinishing-presentation": templateFurnitureRefinishingPreview,
+    "furniture-refinishing-working": templateFurnitureRefinishingPreview,
   };
 
   const [selectedBoardId, setSelectedBoardId] = useState<number | null>(null);

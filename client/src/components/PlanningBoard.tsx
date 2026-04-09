@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import templateMoodboardPreview from "@assets/Screenshot_2026-04-08_at_12.41.42_PM_1775666504617.png";
+import templateFurnitureRefinishingPreview from "@assets/Screenshot_2026-04-09_at_10.29.34_AM_1775744978712.png";
 import templateKitchenPreview from "../assets/images/template-kitchen-faux.png";
 import templateBathroomPreview from "../assets/images/template-bathroom-faux.png";
 import templateCottagePreview from "../assets/images/template-cottage-faux.png";
@@ -1558,7 +1559,7 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
                       className={`flex gap-2.5 rounded-md border p-2.5 text-left transition-colors hover:bg-accent/50 ${selectedTemplateId === t.id ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border"}`}
                       data-testid={`template-${t.id}`}
                     >
-                      <img src={({ kitchen: templateKitchenPreview, bathroom: templateBathroomPreview, cottage: templateCottagePreview, moodboard: templateMoodboardPreview } as Record<string, string>)[t.id] ?? t.image} alt={t.name} className="h-16 w-20 shrink-0 rounded object-cover border border-border" data-testid={`img-template-${t.id}`} />
+                      <img src={({ kitchen: templateKitchenPreview, bathroom: templateBathroomPreview, cottage: templateCottagePreview, moodboard: templateMoodboardPreview, "furniture-refinishing-presentation": templateFurnitureRefinishingPreview, "furniture-refinishing-working": templateFurnitureRefinishingPreview } as Record<string, string>)[t.id] ?? t.image} alt={t.name} className="h-16 w-20 shrink-0 rounded object-cover border border-border" data-testid={`img-template-${t.id}`} />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
                           <IconComp className="h-4 w-4 shrink-0 text-muted-foreground" />
