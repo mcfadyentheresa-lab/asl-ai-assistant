@@ -19,7 +19,7 @@ import { format, parseISO } from "date-fns";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  StickyNote, Type, ImagePlus, Square, Columns3, LayoutGrid, Link2, Palette, Trash2, Plus,
+  StickyNote, Type, ImagePlus, Square, Columns3, Link2, Palette, Trash2, Plus,
   ZoomIn, ZoomOut, Maximize, Loader2, MoreVertical, Edit3, Download, CheckSquare, GripVertical,
   X, ChevronDown, ExternalLink, Pencil, Upload, Copy, ArrowUpFromLine,
   Bold, Italic, Strikethrough, Underline, List, ListOrdered, Code, Link as LinkIcon,
@@ -2569,7 +2569,6 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       label: "Layout",
       tools: [
         { type: "column", icon: Columns3, label: "Column" },
-        { type: "board_link", icon: LayoutGrid, label: "Board" },
         { type: "section_header", icon: Type, label: "Header" },
         { type: "room_zone", icon: Square, label: "Zone" },
       ],
