@@ -268,7 +268,7 @@ export default function Timesheets() {
         </div>
 
         <Card className="mb-6">
-          <CardContent className="py-4 flex items-center gap-3 flex-wrap">
+          <CardContent className="py-4 flex items-center justify-between gap-3 flex-wrap">
             <User className="h-5 w-5 text-muted-foreground" />
             <span className="text-sm font-medium text-foreground" data-testid="text-crew-name">
               {user?.firstName || user?.lastName ? `${user?.firstName || ""} ${user?.lastName || ""}`.trim() : user?.email || "Unknown"}
@@ -279,6 +279,17 @@ export default function Timesheets() {
             <span className="text-sm font-medium text-foreground">
               {formatPeriodDate(period.start)} &mdash; {formatPeriodDate(period.end)}
             </span>
+            <Button
+              type="button"
+              className="ml-auto"
+              onClick={() => {
+                document.getElementById("entry-date")?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }}
+              data-testid="button-new-time-entry"
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              New Time Entry
+            </Button>
           </CardContent>
         </Card>
 
