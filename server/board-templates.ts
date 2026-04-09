@@ -354,6 +354,39 @@ const furnitureRefinishingConceptBoardWorking = wrap([
   makeSticky(510, 675, "Durability for high-use piece.\nKeep notes short and clear.", "#f7f4ef", 210, 70),
 ]);
 
+const collageConceptBoard = wrap([
+  makeSectionHeader(40, 20, "Concept Board"),
+
+  makeRoomZone(30, 60, 200, 540, "Renovation", "#f6f3ee", 0.48),
+  makeRoomZone(250, 60, 220, 260, "Design & construction", "#f6f3ee", 0.48),
+  makeRoomZone(490, 60, 390, 540, "Floor Plan", "#f6f3ee", 0.48),
+  makeRoomZone(900, 60, 220, 220, "Feature Desk", "#f6f3ee", 0.48),
+  makeRoomZone(900, 300, 220, 220, "Swatches", "#f6f3ee", 0.48),
+  makeRoomZone(900, 540, 220, 180, "Display Shelf", "#f6f3ee", 0.48),
+
+  makeImage(40, 80, "", "Renovation", 180, 140),
+  makeText(55, 238, "Objectives", 16, "bold", "#1e1e1e"),
+  makeSticky(50, 275, "Emphasise the home’s existing architectural character.\nUse soft, warm materials.\nKeep the palette calm and timeless.", "#ffffff", 160, 95),
+
+  makeText(270, 86, "1. Livngroom Moodboard", 14, "bold", "#1e1e1e"),
+  makeText(270, 138, "2. Study Moodboard", 14, "bold", "#1e1e1e"),
+  makeText(270, 190, "3. Kitchen moodboard", 14, "bold", "#1e1e1e"),
+  makeText(270, 235, "Things to buy", 16, "bold", "#1e1e1e"),
+  makeSticky(270, 280, "Materials checklist\nAdd product references\nMark anything still to source.", "#ffffff", 180, 88),
+
+  makeImage(520, 80, "", "House floorplan", 340, 420),
+  makeCallout(560, 510, "Use a clean plan with a few highlighted zones", "#ffffff", 240, 54),
+
+  makeImage(920, 80, "", "Bright feature desk", 180, 120),
+  makeColorSwatch(920, 330, "Horizon", "#6fa7b4", "#6FA7B4", "", "", 90),
+  makeColorSwatch(1015, 330, "Birchwood", "#e5d3b4", "#E5D3B4", "", "", 90),
+  makeImage(920, 570, "", "Floating display unit", 180, 110),
+
+  makeSticky(40, 590, "Add client notes and approvals here.", "#ffffff", 170, 70),
+  makeSticky(250, 590, "Keep the board airy and presentation-ready.", "#ffffff", 170, 70),
+  makeSticky(490, 590, "Reserve room for arrows and callouts.", "#ffffff", 250, 70),
+]);
+
 export interface BoardTemplate {
   id: string;
   name: string;
@@ -395,6 +428,14 @@ export const boardTemplates: BoardTemplate[] = [
     icon: "Palette",
     image: "/assets/images/template-moodboard-faux.png",
     canvasData: moodboard,
+  },
+  {
+    id: "collage-concept",
+    name: "Collage Concept Board",
+    description: "Multi-column presentation board with plan, notes, swatches, and feature images",
+    icon: "LayoutPanelLeft",
+    image: "/assets/images/Screenshot_2026-04-09_at_10.54.53_AM_1775746499391.png",
+    canvasData: collageConceptBoard,
   },
 ];
 
