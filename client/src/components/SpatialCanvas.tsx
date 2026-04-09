@@ -143,6 +143,7 @@ const GRID_SIZE = 20;
 
 const ELEMENT_DEFAULTS: Record<string, { width: number; height: number; content: any }> = {
   note: { width: 240, height: 140, content: { title: "", text: "Type your note here...", plain: false } },
+  plain_text: { width: 240, height: 120, content: { title: "", text: "Type your text here...", plain: true } },
   todo: { width: 240, height: 200, content: { title: "To-do", items: [{ text: "Add a task...", checked: false }] } },
   column: { width: 240, height: 400, content: { title: "New Column", subtitle: "0 cards" } },
   board_link: { width: 180, height: 80, content: { title: "Board", targetBoardId: null } },
@@ -491,7 +492,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ type, x: centerX, y: centerY, width: def.width, height: def.height, zIndex: newZ, content: def.content }),
+        body: JSON.stringify({ type: type === "plain_text" ? "note" : type, x: centerX, y: centerY, width: def.width, height: def.height, zIndex: newZ, content: { ...def.content, plain: type === "plain_text" } }),
       });
       const el = await res.json();
       addElement(el);
@@ -2558,6 +2559,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       label: "Content",
       tools: [
         { type: "note", icon: StickyNote, label: "Note" },
+        { type: "plain_text", icon: Type, label: "Plain Text" },
         { type: "link", icon: Link2, label: "Link" },
         { type: "todo", icon: CheckSquare, label: "To-do" },
         { type: "image", icon: ImagePlus, label: "Image" },
