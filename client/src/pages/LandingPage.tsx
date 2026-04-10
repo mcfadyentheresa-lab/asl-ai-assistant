@@ -58,7 +58,7 @@ export default function LandingPage() {
                   size="lg"
                   data-testid="button-portal"
                 >
-                  Access Your Portal
+                  View My Project
                   <ArrowRight className="ml-2" />
                 </Button>
               </div>

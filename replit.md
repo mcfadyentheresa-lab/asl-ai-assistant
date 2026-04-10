@@ -84,3 +84,8 @@ Replit Auth provides authentication via OpenID Connect, with session management 
 *   `TWILIO_ACCOUNT_SID`
 *   `TWILIO_AUTH_TOKEN`
 *   `TWILIO_PHONE_NUMBER`
+
+## Manual Setup Steps
+
+### Rename Replit Project
+The Replit project should be renamed from "AI Assistant Helper" to "Aster & Spruce Living" so the Replit login screen shows the correct brand name. To do this: go to Replit project settings and change the project name to "Aster & Spruce Living".

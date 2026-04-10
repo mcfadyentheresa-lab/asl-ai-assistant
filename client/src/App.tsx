@@ -24,7 +24,7 @@ import TableRedesignPlanner from "@/pages/TableRedesignPlanner";
 import CostEstimator from "@/pages/CostEstimator";
 import InviteAccept from "@/pages/InviteAccept";
 import Welcome from "@/pages/Welcome";
-import SignIn from "@/pages/SignIn";
+import LandingPage from "@/pages/LandingPage";
 import NotFound from "@/pages/not-found";
 
 function PresenceTracker() {
@@ -76,7 +76,7 @@ function Router() {
     return (
       <Switch>
         <Route path="/invite/:token" component={InviteAccept} />
-        <Route component={SignIn} />
+        <Route component={LandingPage} />
       </Switch>
     );
   }
