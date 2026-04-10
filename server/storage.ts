@@ -44,6 +44,7 @@ export interface IStorage {
 
   // Tasks
   getTasks(projectId: number): Promise<Task[]>;
+  getTasksByAssignee(userId: string): Promise<(Task & { projectName: string })[]>;
   getTask(id: number): Promise<Task | undefined>;
   createTask(task: InsertTask): Promise<Task>;
   updateTask(id: number, updates: Partial<InsertTask>): Promise<Task>;
@@ -319,6 +320,29 @@ export class DatabaseStorage implements IStorage {
   // Tasks
   async getTasks(projectId: number): Promise<Task[]> {
     return await db.select().from(tasks).where(eq(tasks.projectId, projectId)).orderBy(tasks.order, tasks.dueDate);
+  }
+  async getTasksByAssignee(userId: string): Promise<(Task & { projectName: string })[]> {
+    const rows = await db
+      .select({
+        id: tasks.id,
+        projectId: tasks.projectId,
+        milestoneId: tasks.milestoneId,
+        sectionId: tasks.sectionId,
+        title: tasks.title,
+        description: tasks.description,
+        status: tasks.status,
+        assignedTo: tasks.assignedTo,
+        startDate: tasks.startDate,
+        dueDate: tasks.dueDate,
+        order: tasks.order,
+        createdAt: tasks.createdAt,
+        projectName: projects.name,
+      })
+      .from(tasks)
+      .innerJoin(projects, eq(tasks.projectId, projects.id))
+      .where(eq(tasks.assignedTo, userId))
+      .orderBy(tasks.dueDate, tasks.order);
+    return rows as (Task & { projectName: string })[];
   }
   async getTask(id: number): Promise<Task | undefined> {
     const [task] = await db.select().from(tasks).where(eq(tasks.id, id));

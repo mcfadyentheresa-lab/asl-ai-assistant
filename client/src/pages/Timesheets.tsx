@@ -23,7 +23,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Clock, Calendar, Briefcase, Send, Trash2, Plus, CheckCircle2, Loader2, User, Pencil, ArrowLeft } from "lucide-react";
+import { Clock, Calendar, Briefcase, Send, Trash2, Plus, CheckCircle2, Loader2, User, Pencil, ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
 import { Link } from "wouter";
 import { format } from "date-fns";
 import type { Project, Milestone, CalendarEvent, TimeEntry } from "@shared/schema";
@@ -48,14 +48,32 @@ function formatPeriodDate(dateStr: string) {
   return format(new Date(y, m - 1, d), "MMM d, yyyy");
 }
 
+function getPayPeriodForOffset(offset: number) {
+  const anchor = new Date(2025, 0, 6);
+  const today = new Date();
+  const diff = today.getTime() - anchor.getTime();
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const periodNum = Math.floor(days / 14) + offset;
+  const periodStart = new Date(anchor);
+  periodStart.setDate(anchor.getDate() + periodNum * 14);
+  const periodEnd = new Date(periodStart);
+  periodEnd.setDate(periodStart.getDate() + 13);
+  return {
+    start: periodStart.toISOString().split("T")[0],
+    end: periodEnd.toISOString().split("T")[0],
+  };
+}
+
 export default function Timesheets() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const today = new Date();
-  const period = getPayPeriod(today);
   const todayStr = today.toISOString().split("T")[0];
+  const [periodOffset, setPeriodOffset] = useState(0);
+  const period = getPayPeriodForOffset(periodOffset);
+  const isCurrentPeriod = periodOffset === 0;
 
   const nowHour = today.getHours();
   const nowMin = today.getMinutes();
@@ -268,28 +286,63 @@ export default function Timesheets() {
         </div>
 
         <Card className="mb-6">
-          <CardContent className="py-4 flex items-center justify-between gap-3 flex-wrap">
-            <User className="h-5 w-5 text-muted-foreground" />
-            <span className="text-sm font-medium text-foreground" data-testid="text-crew-name">
-              {user?.firstName || user?.lastName ? `${user?.firstName || ""} ${user?.lastName || ""}`.trim() : user?.email || "Unknown"}
-            </span>
-            <span className="text-xs text-muted-foreground">&middot;</span>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm text-muted-foreground">Pay Period:</span>
-            <span className="text-sm font-medium text-foreground">
-              {formatPeriodDate(period.start)} &mdash; {formatPeriodDate(period.end)}
-            </span>
-            <Button
-              type="button"
-              className="ml-auto"
-              onClick={() => {
-                document.getElementById("entry-date")?.scrollIntoView({ behavior: "smooth", block: "start" });
-              }}
-              data-testid="button-new-time-entry"
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              New Time Entry
-            </Button>
+          <CardContent className="py-4 space-y-3">
+            <div className="flex items-center gap-3 flex-wrap">
+              <User className="h-5 w-5 text-muted-foreground" />
+              <span className="text-sm font-medium text-foreground" data-testid="text-crew-name">
+                {user?.firstName || user?.lastName ? `${user?.firstName || ""} ${user?.lastName || ""}`.trim() : user?.email || "Unknown"}
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => setPeriodOffset(periodOffset - 1)}
+                  data-testid="button-prev-period"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium text-foreground">
+                  {formatPeriodDate(period.start)} &mdash; {formatPeriodDate(period.end)}
+                </span>
+                {!isCurrentPeriod && (
+                  <Badge variant="secondary" className="text-xs no-default-hover-elevate no-default-active-elevate">Past Period</Badge>
+                )}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => setPeriodOffset(periodOffset + 1)}
+                  disabled={periodOffset >= 0}
+                  data-testid="button-next-period"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                {!isCurrentPeriod && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPeriodOffset(0)}
+                    data-testid="button-current-period"
+                  >
+                    Current Period
+                  </Button>
+                )}
+              </div>
+              <Button
+                type="button"
+                onClick={() => {
+                  document.getElementById("entry-date")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                }}
+                data-testid="button-new-time-entry"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Log Hours
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
@@ -297,7 +350,7 @@ export default function Timesheets() {
           <CardHeader>
             <CardTitle className="font-serif text-lg flex items-center gap-2">
               <Plus className="h-5 w-5" />
-              New Time Entry
+              Log Your Hours
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -394,7 +447,7 @@ export default function Timesheets() {
               <Label htmlFor="entry-details">Details <span className="text-destructive">*</span></Label>
               <Textarea
                 id="entry-details"
-                placeholder="What did you work on today?"
+                placeholder="What did you work on? (e.g., framing, trim install, tile layout)"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 className="mt-1.5 resize-none"
@@ -525,7 +578,7 @@ export default function Timesheets() {
             {(!entries || entries.length === 0) && (
               <div className="text-center py-12 text-muted-foreground">
                 <Clock className="h-8 w-8 mx-auto mb-3 opacity-50" />
-                <p className="text-sm">No time entries for this pay period yet.</p>
+                <p className="text-sm">No time entries for this pay period yet. Tap "Log Hours" to get started.</p>
               </div>
             )}
           </div>

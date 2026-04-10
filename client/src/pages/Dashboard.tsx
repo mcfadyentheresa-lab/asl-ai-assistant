@@ -3,10 +3,11 @@ import { useProjects, useDeleteProject, useArchiveProject, useUsers } from "@/ho
 import { Navbar } from "@/components/layout/Navbar";
 import { ProjectCard } from "@/components/project/ProjectCard";
 import { Button } from "@/components/ui/button";
-import { Plus, Loader2, Eye, EyeOff, Upload, X, UserPlus, ArrowRight, FolderOpen, Briefcase } from "lucide-react";
+import { Plus, Loader2, Eye, EyeOff, Upload, X, UserPlus, ArrowRight, FolderOpen, Briefcase, Clock, CalendarDays, CheckCircle2, Circle, PlayCircle } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { apiRequest, queryClient as qc } from "@/lib/queryClient";
 import { motion } from "framer-motion";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
@@ -78,6 +79,23 @@ export default function Dashboard() {
   const completedProjects = projects?.filter((p) => p.status === "completed") || [];
   const onlineCrew = onlineUsers?.filter((u) => u.role === "crew" || u.role === "admin") || [];
 
+  const isCrewView = viewMode === "crew";
+
+  const { data: myTasks } = useQuery<any[]>({
+    queryKey: ["/api/my-tasks"],
+    enabled: isCrewView || user?.role === "crew",
+  });
+
+  const updateTaskStatus = useMutation({
+    mutationFn: async ({ id, status }: { id: number; status: string }) => {
+      const res = await apiRequest("PUT", `/api/tasks/${id}`, { status });
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/my-tasks"] });
+    },
+  });
+
   const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(" ") || "there";
   const isClient = user?.role === "client";
   const isAdmin = user?.role === "admin";
@@ -127,13 +145,15 @@ export default function Dashboard() {
               Welcome back, <span className="font-serif">{fullName}</span>
             </h1>
             <p className="text-sm text-muted-foreground" data-testid="text-subtitle">
-              {isClientView && clientSingleProject
-                ? `Your project is ${statusLabel[clientSingleProject.status]?.toLowerCase() || "active"}.`
-                : isClientView
-                  ? `You have ${activeProjects.length} active ${activeProjects.length === 1 ? "project" : "projects"}.`
-                  : isAdminView
-                    ? `${activeProjects.length} active ${activeProjects.length === 1 ? "project" : "projects"}${completedProjects.length > 0 ? ` · ${completedProjects.length} completed` : ""}${onlineCrew.length > 0 ? ` · ${onlineCrew.length} team online` : ""}`
-                    : "Here is an overview of your active projects."
+              {isCrewView
+                ? `Here's your day at a glance. ${(myTasks?.filter(t => t.status !== "done") || []).length} open ${(myTasks?.filter(t => t.status !== "done") || []).length === 1 ? "assignment" : "assignments"}.`
+                : isClientView && clientSingleProject
+                  ? `Your project is ${statusLabel[clientSingleProject.status]?.toLowerCase() || "active"}.`
+                  : isClientView
+                    ? `You have ${activeProjects.length} active ${activeProjects.length === 1 ? "project" : "projects"}.`
+                    : isAdminView
+                      ? `${activeProjects.length} active ${activeProjects.length === 1 ? "project" : "projects"}${completedProjects.length > 0 ? ` · ${completedProjects.length} completed` : ""}${onlineCrew.length > 0 ? ` · ${onlineCrew.length} team online` : ""}`
+                      : "Here is an overview of your active projects."
               }
             </p>
           </div>
@@ -178,6 +198,89 @@ export default function Dashboard() {
               )}
               <span className="text-xs font-medium text-foreground">{onlineCrew.length} Team Online</span>
             </div>
+          </div>
+        )}
+
+        {isCrewView && (
+          <div className="space-y-4 mb-8" data-testid="crew-my-day">
+            <div className="flex items-center gap-3 flex-wrap">
+              <Link href="/timesheets">
+                <Button variant="default" size="sm" data-testid="button-crew-timesheets">
+                  <Clock className="mr-2 h-4 w-4" />
+                  Log Your Hours
+                </Button>
+              </Link>
+              <Link href="/master-calendar">
+                <Button variant="outline" size="sm" data-testid="button-crew-calendar">
+                  <CalendarDays className="mr-2 h-4 w-4" />
+                  Master Calendar
+                </Button>
+              </Link>
+            </div>
+
+            <Card>
+              <CardContent className="py-4">
+                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3" data-testid="text-my-assignments">
+                  Your Assignments
+                </h2>
+                {myTasks && myTasks.length > 0 ? (
+                  <div className="space-y-2">
+                    {Object.entries(
+                      myTasks.reduce((groups: Record<string, any[]>, task: any) => {
+                        const key = task.projectName || "Unknown Project";
+                        if (!groups[key]) groups[key] = [];
+                        groups[key].push(task);
+                        return groups;
+                      }, {})
+                    ).map(([projectName, projectTasks]) => (
+                      <div key={projectName}>
+                        <p className="text-xs font-medium text-muted-foreground mb-1.5">{projectName}</p>
+                        <div className="space-y-1">
+                          {(projectTasks as any[]).map((task: any) => (
+                            <div
+                              key={task.id}
+                              className="flex items-center gap-2 px-3 py-2 rounded-md border border-border/40 bg-muted/20"
+                              data-testid={`crew-task-${task.id}`}
+                            >
+                              <button
+                                onClick={() => {
+                                  const nextStatus = task.status === "todo" ? "in_progress" : task.status === "in_progress" ? "done" : "todo";
+                                  updateTaskStatus.mutate({ id: task.id, status: nextStatus });
+                                }}
+                                className="shrink-0"
+                                data-testid={`button-toggle-task-${task.id}`}
+                              >
+                                {task.status === "done" ? (
+                                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                                ) : task.status === "in_progress" ? (
+                                  <PlayCircle className="h-4 w-4 text-blue-500" />
+                                ) : (
+                                  <Circle className="h-4 w-4 text-muted-foreground" />
+                                )}
+                              </button>
+                              <span className={`text-sm flex-1 ${task.status === "done" ? "line-through text-muted-foreground" : "text-foreground"}`}>
+                                {task.title}
+                              </span>
+                              <Badge
+                                variant={task.status === "done" ? "default" : task.status === "in_progress" ? "secondary" : "outline"}
+                                className="text-xs no-default-hover-elevate no-default-active-elevate"
+                              >
+                                {task.status === "done" ? "Done" : task.status === "in_progress" ? "In Progress" : "To Do"}
+                              </Badge>
+                              {task.dueDate && (
+                                <span className="text-xs text-muted-foreground whitespace-nowrap">{task.dueDate}</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No tasks assigned to you right now. Check back with your team lead.</p>
+                )}
+              </CardContent>
+            </Card>
           </div>
         )}
 
@@ -264,7 +367,9 @@ export default function Dashboard() {
             ) : (
               <>
                 <h3 className="font-serif text-xl font-semibold text-foreground mb-2">No projects yet</h3>
-                <p className="text-muted-foreground mb-6">Your team will add you to a project soon.</p>
+                <p className="text-muted-foreground mb-6">
+                  {isCrewView ? "Your crew lead will assign you to a project soon." : "Your team will add you to a project soon."}
+                </p>
               </>
             )}
           </div>

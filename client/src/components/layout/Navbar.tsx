@@ -114,12 +114,14 @@ export function Navbar() {
                 Your Profile
               </DropdownMenuItem>
             </Link>
-            <Link href="/colors">
-              <DropdownMenuItem data-testid="link-colors">
-                <Palette className="mr-2 h-4 w-4" />
-                Colour Portfolio
-              </DropdownMenuItem>
-            </Link>
+            {user.role !== "crew" && (
+              <Link href="/colors">
+                <DropdownMenuItem data-testid="link-colors">
+                  <Palette className="mr-2 h-4 w-4" />
+                  Colour Portfolio
+                </DropdownMenuItem>
+              </Link>
+            )}
             {(user.role === "crew" || user.role === "admin") && (
               <Link href="/master-calendar">
                 <DropdownMenuItem data-testid="link-master-calendar">

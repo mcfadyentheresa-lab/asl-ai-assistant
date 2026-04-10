@@ -799,6 +799,13 @@ export async function registerRoutes(
     }
   });
 
+  // My Tasks (cross-project, assigned to current user)
+  app.get("/api/my-tasks", isAuthenticated, asyncHandler(async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const myTasks = await storage.getTasksByAssignee(userId);
+    res.json(myTasks);
+  }));
+
   // Tasks
   app.get(api.tasks.list.path, isAuthenticated, asyncHandler(async (req, res) => {
     const tasks = await storage.getTasks(Number(req.params.projectId));

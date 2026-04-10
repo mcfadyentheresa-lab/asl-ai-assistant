@@ -43,9 +43,10 @@ Replit Auth provides authentication via OpenID Connect, with session management 
 *   **Paint Colour Portfolio**: Manages a database of paint colours for browsing. The colour tag feature (tagging boards with paint colours) has been removed.
 *   **Planning Board Designer Tools**: A spatial canvas for design collaboration with various element types and drawing tools.
 *   **Board Version Snapshots**: Allows saving and restoring planning board versions.
-*   **Planning Board Templates**: Admin-only feature providing four pre-built board templates (Kitchen Renovation, Bathroom Renovation, Full Cottage Build, Moodboard) that seed new boards with labelled zones and placeholder sticky notes. Template data is defined in `server/board-templates.ts` as Fabric.js JSON.
+*   **Planning Board Templates**: Two pre-built board templates (Collage Concept Board, Material Inspiration Board) that seed new boards with labelled zones and placeholder elements. Template data is defined in `server/board-templates.ts` as Fabric.js JSON.
 *   **Text Size Accessibility**: Provides a persistent text zoom feature.
-*   **Crew Timesheets & Admin Payroll**: Bi-weekly timesheet system with draft/submitted/approved workflow and admin payroll view.
+*   **Crew Timesheets & Admin Payroll**: Bi-weekly timesheet system with draft/submitted/approved workflow, pay period navigation (prev/next), crew-friendly language, and admin payroll view.
+*   **Crew "My Day" Dashboard**: When in crew view mode, the dashboard shows a "Your Assignments" panel with tasks grouped by project, inline status toggling (To Do → In Progress → Done), quick links to Timesheets and Master Calendar, and a personalised subtitle with open assignment count. Backend `GET /api/my-tasks` endpoint fetches tasks assigned to the logged-in user.
 *   **Cost Estimator**: Per-project estimation tool with line items, material markup, market rate auto-fill, variance warnings, and receipt tracking. Includes an AI Scope Analyzer (OpenAI/gpt-5-mini) and an "Import from Board" feature.
 *   **Labor & Contractors**: Admin page for managing crew pay/billable rates and a subcontractor directory.
 *   **Supplier Price Book**: Admin-only material pricing database with supplier and product management, integrated with the Cost Estimator.
