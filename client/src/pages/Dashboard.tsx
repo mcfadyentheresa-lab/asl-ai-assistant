@@ -177,11 +177,13 @@ export default function Dashboard() {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex items-center rounded-md border border-border overflow-hidden" data-testid="view-mode-toggle">
-              <Button type="button" size="sm" variant={viewMode === "admin" ? "default" : "ghost"} onClick={() => setViewMode("admin")} data-testid="button-view-admin">Admin</Button>
-              <Button type="button" size="sm" variant={viewMode === "crew" ? "default" : "ghost"} onClick={() => setViewMode("crew")} data-testid="button-view-crew">Crew</Button>
-              <Button type="button" size="sm" variant={viewMode === "client" ? "default" : "ghost"} onClick={() => setViewMode("client")} data-testid="button-view-client">Client</Button>
-            </div>
+            {isAdmin && (
+              <div className="flex items-center rounded-md border border-border overflow-hidden" data-testid="view-mode-toggle">
+                <Button type="button" size="sm" variant={viewMode === "admin" ? "default" : "ghost"} onClick={() => setViewMode("admin")} data-testid="button-view-admin">Admin</Button>
+                <Button type="button" size="sm" variant={viewMode === "crew" ? "default" : "ghost"} onClick={() => setViewMode("crew")} data-testid="button-view-crew">Crew</Button>
+                <Button type="button" size="sm" variant={viewMode === "client" ? "default" : "ghost"} onClick={() => setViewMode("client")} data-testid="button-view-client">Client</Button>
+              </div>
+            )}
             <Button
               variant="outline"
               size="sm"

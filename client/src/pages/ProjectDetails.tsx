@@ -119,6 +119,8 @@ function BudgetSnapshot({ projectId, userRole }: { projectId: number; userRole: 
 
   if (!data) return null;
 
+  if (userRole === "crew") return null;
+
   const budgetVisibleToClient = data.budgetVisibleToClient ?? false;
   if (userRole === "client" && !budgetVisibleToClient) return null;
 
@@ -144,7 +146,7 @@ function BudgetSnapshot({ projectId, userRole }: { projectId: number; userRole: 
               </Button>
             </Link>
           )}
-          {(userRole === "admin" || userRole === "crew") && (
+          {userRole === "admin" && (
             <div className="flex items-center justify-between pt-2 border-t border-border/60">
               <label htmlFor="budget-visibility-toggle-empty" className="text-xs text-muted-foreground flex items-center gap-1.5">
                 {budgetVisibleToClient ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
@@ -225,7 +227,7 @@ function BudgetSnapshot({ projectId, userRole }: { projectId: number; userRole: 
           </div>
         )}
 
-        {(userRole === "admin" || userRole === "crew") && (
+        {userRole === "admin" && (
           <div className="flex items-center justify-between pt-2 border-t border-border/60">
             <label htmlFor="budget-visibility-toggle" className="text-xs text-muted-foreground flex items-center gap-1.5">
               {budgetVisibleToClient ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
@@ -518,7 +520,7 @@ function SidebarCards({
         </Card>
       )}
 
-      {userRole !== "client" && (
+      {userRole === "admin" && (
         <Card>
           <CardHeader>
             <CardTitle className="font-serif text-lg flex items-center gap-2" data-testid="text-access-heading">
@@ -606,7 +608,7 @@ function SidebarCards({
                 </Button>
               </div>
             )}
-            {(userRole === "admin" || userRole === "crew") && (
+            {userRole === "admin" && (
               <div className="pt-2 border-t space-y-2">
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">SMS Notifications</p>
                 <div className="flex items-center gap-2 flex-wrap">

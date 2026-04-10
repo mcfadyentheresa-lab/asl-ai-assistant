@@ -26,6 +26,9 @@ export function Navbar() {
 
   if (!user) return null;
 
+  const isAdmin = user.role === "admin";
+  const effectiveRole = isAdmin ? viewMode : user.role;
+
   const initials =
     `${(user.firstName || "")[0] || ""}${(user.lastName || "")[0] || ""}`.toUpperCase() || "U";
 
@@ -41,7 +44,7 @@ export function Navbar() {
       </Link>
 
       <div className="flex items-center gap-3">
-        {onlineUsers && onlineUsers.length > 0 && (
+        {effectiveRole === "admin" && onlineUsers && onlineUsers.length > 0 && (
           <Tooltip>
             <TooltipTrigger asChild>
               <div className="flex items-center gap-1.5" data-testid="indicator-online-users">
@@ -62,29 +65,31 @@ export function Navbar() {
             </TooltipContent>
           </Tooltip>
         )}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" data-testid="button-role-switch">
-              <UserCog className="mr-2 h-4 w-4" />
-              {viewMode === "admin" ? "Admin" : viewMode === "crew" ? "Crew" : "Client"}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-40">
-            <DropdownMenuLabel className="text-xs text-muted-foreground">
-              Switch View
-            </DropdownMenuLabel>
-            {(["admin", "crew", "client"] as const).map((role) => (
-              <DropdownMenuItem
-                key={role}
-                onClick={() => setViewMode(role)}
-                data-testid={`button-role-${role}`}
-                className={viewMode === role ? "font-semibold" : ""}
-              >
-                {role === "admin" ? "Admin" : role === "crew" ? "Crew" : "Client"}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {isAdmin && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" data-testid="button-role-switch">
+                <UserCog className="mr-2 h-4 w-4" />
+                {viewMode === "admin" ? "Admin" : viewMode === "crew" ? "Crew" : "Client"}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-40">
+              <DropdownMenuLabel className="text-xs text-muted-foreground">
+                Switch View
+              </DropdownMenuLabel>
+              {(["admin", "crew", "client"] as const).map((role) => (
+                <DropdownMenuItem
+                  key={role}
+                  onClick={() => setViewMode(role)}
+                  data-testid={`button-role-${role}`}
+                  className={viewMode === role ? "font-semibold" : ""}
+                >
+                  {role === "admin" ? "Admin" : role === "crew" ? "Crew" : "Client"}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -114,7 +119,7 @@ export function Navbar() {
                 Your Profile
               </DropdownMenuItem>
             </Link>
-            {user.role !== "crew" && (
+            {effectiveRole === "client" && (
               <Link href="/colors">
                 <DropdownMenuItem data-testid="link-colors">
                   <Palette className="mr-2 h-4 w-4" />
@@ -122,7 +127,15 @@ export function Navbar() {
                 </DropdownMenuItem>
               </Link>
             )}
-            {(user.role === "crew" || user.role === "admin") && (
+            {effectiveRole === "admin" && (
+              <Link href="/colors">
+                <DropdownMenuItem data-testid="link-colors">
+                  <Palette className="mr-2 h-4 w-4" />
+                  Colour Portfolio
+                </DropdownMenuItem>
+              </Link>
+            )}
+            {(effectiveRole === "crew" || effectiveRole === "admin") && (
               <Link href="/master-calendar">
                 <DropdownMenuItem data-testid="link-master-calendar">
                   <CalendarDays className="mr-2 h-4 w-4" />
@@ -130,7 +143,7 @@ export function Navbar() {
                 </DropdownMenuItem>
               </Link>
             )}
-            {(user.role === "crew" || user.role === "admin") && (
+            {(effectiveRole === "crew" || effectiveRole === "admin") && (
               <Link href="/timesheets">
                 <DropdownMenuItem data-testid="link-timesheets">
                   <Clock className="mr-2 h-4 w-4" />
@@ -138,7 +151,7 @@ export function Navbar() {
                 </DropdownMenuItem>
               </Link>
             )}
-            {user.role === "admin" && (
+            {effectiveRole === "admin" && (
               <Link href="/payroll">
                 <DropdownMenuItem data-testid="link-payroll">
                   <DollarSign className="mr-2 h-4 w-4" />
@@ -146,7 +159,7 @@ export function Navbar() {
                 </DropdownMenuItem>
               </Link>
             )}
-            {user.role === "admin" && (
+            {effectiveRole === "admin" && (
               <Link href="/market-rates">
                 <DropdownMenuItem data-testid="link-market-rates">
                   <Calculator className="mr-2 h-4 w-4" />
@@ -154,7 +167,7 @@ export function Navbar() {
                 </DropdownMenuItem>
               </Link>
             )}
-            {user.role === "admin" && (
+            {effectiveRole === "admin" && (
               <Link href="/labor-rates">
                 <DropdownMenuItem data-testid="link-labor-rates">
                   <Users className="mr-2 h-4 w-4" />
@@ -162,7 +175,7 @@ export function Navbar() {
                 </DropdownMenuItem>
               </Link>
             )}
-            {(user.role === "admin" || user.role === "crew") && (
+            {(effectiveRole === "admin" || effectiveRole === "crew") && (
               <Link href="/trade-contacts">
                 <DropdownMenuItem data-testid="link-trade-contacts">
                   <BookUser className="mr-2 h-4 w-4" />
@@ -170,7 +183,7 @@ export function Navbar() {
                 </DropdownMenuItem>
               </Link>
             )}
-            {user.role === "admin" && (
+            {effectiveRole === "admin" && (
               <Link href="/supplier-prices">
                 <DropdownMenuItem data-testid="link-supplier-prices">
                   <Store className="mr-2 h-4 w-4" />
@@ -178,7 +191,7 @@ export function Navbar() {
                 </DropdownMenuItem>
               </Link>
             )}
-            {user.role === "admin" && (
+            {effectiveRole === "admin" && (
               <Link href="/social-media">
                 <DropdownMenuItem data-testid="link-social-media">
                   <Sparkles className="mr-2 h-4 w-4" />
@@ -186,7 +199,7 @@ export function Navbar() {
                 </DropdownMenuItem>
               </Link>
             )}
-            {user.role === "admin" && (
+            {effectiveRole === "admin" && (
               <Link href="/table-redesign">
                 <DropdownMenuItem data-testid="link-table-redesign">
                   <Armchair className="mr-2 h-4 w-4" />
@@ -204,10 +217,12 @@ export function Navbar() {
               <ZoomIn className="mr-2 h-4 w-4" />
               Text Size: {zoom}%
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={toggleVisibility} data-testid="button-toggle-visibility">
-              {visible ? <Eye className="mr-2 h-4 w-4" /> : <EyeOff className="mr-2 h-4 w-4" />}
-              {visible ? "Appear Offline" : "Go Online"}
-            </DropdownMenuItem>
+            {effectiveRole === "admin" && (
+              <DropdownMenuItem onClick={toggleVisibility} data-testid="button-toggle-visibility">
+                {visible ? <Eye className="mr-2 h-4 w-4" /> : <EyeOff className="mr-2 h-4 w-4" />}
+                {visible ? "Appear Offline" : "Go Online"}
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem onClick={() => logout()} data-testid="button-logout">
               <LogOut className="mr-2" />
               Sign Out
