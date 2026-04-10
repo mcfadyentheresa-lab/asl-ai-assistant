@@ -242,6 +242,15 @@ function BudgetSnapshot({ projectId, userRole }: { projectId: number; userRole: 
             />
           </div>
         )}
+
+        {userRole === "admin" && (
+          <Link href={`/project/${projectId}/estimate`}>
+            <Button variant="outline" size="sm" className="w-full gap-1.5" data-testid="link-view-cost-estimator">
+              <ExternalLink className="h-3.5 w-3.5" />
+              View in Cost Estimator
+            </Button>
+          </Link>
+        )}
       </CardContent>
     </Card>
   );

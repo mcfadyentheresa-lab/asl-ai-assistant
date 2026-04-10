@@ -21,6 +21,7 @@ import SupplierPrices from "@/pages/SupplierPrices";
 import MasterCalendar from "@/pages/MasterCalendar";
 import SocialMediaGenerator from "@/pages/SocialMediaGenerator";
 import TableRedesignPlanner from "@/pages/TableRedesignPlanner";
+import CostEstimator from "@/pages/CostEstimator";
 import InviteAccept from "@/pages/InviteAccept";
 import Welcome from "@/pages/Welcome";
 import SignIn from "@/pages/SignIn";
@@ -89,6 +90,7 @@ function Router() {
         <Route path="/invite/:token" component={InviteAccept} />
         <Route path="/profile" component={Profile} />
         <Route path="/project/:id" component={ProjectDetails} />
+        <Route path="/project/:id/estimate" component={CostEstimator} />
         <Route path="/colors" component={ColorPortfolio} />
         <Route path="/timesheets" component={Timesheets} />
         <Route path="/payroll" component={Payroll} />
