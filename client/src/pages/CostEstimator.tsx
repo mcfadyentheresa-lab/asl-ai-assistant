@@ -203,6 +203,8 @@ export default function CostEstimator() {
   const [applyingAlt, setApplyingAlt] = useState<number | null>(null);
   const [editingWarningItem, setEditingWarningItem] = useState<number | null>(null);
   const [warningEditCost, setWarningEditCost] = useState("");
+  const [editingItemId, setEditingItemId] = useState<number | null>(null);
+  const [editItemForm, setEditItemForm] = useState({ quantity: "", unitCost: "", materialCost: "", laborCost: "" });
 
   async function applyAlternative(suggestion: any) {
     setApplyingAlt(suggestion.itemId);
@@ -825,6 +827,51 @@ export default function CostEstimator() {
                     {(() => {
                       const renderItem = (item: typeof filteredItems[0]) => {
                         const itemWarnings = warnings.filter(w => w.estimateItemId === item.id && !w.ignored);
+                        const isEditing = editingItemId === item.id;
+
+                        if (isEditing && canEdit) {
+                          return (
+                            <div key={item.id} className="grid grid-cols-2 md:grid-cols-12 gap-2 items-center p-2 rounded-md border border-primary/40 bg-primary/5" data-testid={`estimate-item-${item.id}`}>
+                              <div className="col-span-2 md:col-span-2 text-sm font-medium flex items-center gap-1 flex-wrap">
+                                <span className="truncate">{item.categoryName}</span>
+                              </div>
+                              <div className="hidden md:block md:col-span-1">
+                                <Badge variant="outline" className="text-[10px]">
+                                  {item.unitType === "sq_ft" ? "sq ft" : item.unitType === "hour" ? "hr" : "unit"}
+                                </Badge>
+                              </div>
+                              <div className="md:col-span-2">
+                                <Input type="number" className="h-7 text-sm text-right" value={editItemForm.quantity} onChange={(e) => setEditItemForm(f => ({ ...f, quantity: e.target.value }))} data-testid={`input-edit-qty-${item.id}`} />
+                              </div>
+                              <div className="md:col-span-2">
+                                <Input type="number" step="0.01" className="h-7 text-sm text-right" value={editItemForm.unitCost} onChange={(e) => setEditItemForm(f => ({ ...f, unitCost: e.target.value }))} data-testid={`input-edit-unit-cost-${item.id}`} />
+                              </div>
+                              <div className="md:col-span-1">
+                                <Input type="number" step="0.01" className="h-7 text-sm text-right" value={editItemForm.materialCost} onChange={(e) => setEditItemForm(f => ({ ...f, materialCost: e.target.value }))} data-testid={`input-edit-material-${item.id}`} />
+                              </div>
+                              <div className="md:col-span-1">
+                                <Input type="number" step="1" className="h-7 text-sm text-right" value={editItemForm.laborCost} onChange={(e) => setEditItemForm(f => ({ ...f, laborCost: e.target.value }))} data-testid={`input-edit-labor-${item.id}`} />
+                              </div>
+                              <div className="md:col-span-2 text-right">
+                                <div className="flex items-center justify-end gap-1">
+                                  <Button size="sm" className="h-7 px-2 text-xs" onClick={() => {
+                                    updateItemMutation.mutate({
+                                      id: item.id,
+                                      quantity: editItemForm.quantity,
+                                      unitCost: editItemForm.unitCost,
+                                      materialCost: editItemForm.materialCost || "0",
+                                      laborCost: editItemForm.laborCost || "0",
+                                    });
+                                    setEditingItemId(null);
+                                  }} data-testid={`button-save-edit-${item.id}`}>Save</Button>
+                                  <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setEditingItemId(null)} data-testid={`button-cancel-edit-${item.id}`}>Cancel</Button>
+                                </div>
+                              </div>
+                              <div className="md:col-span-1"></div>
+                            </div>
+                          );
+                        }
+
                         return (
                           <div key={item.id} className={`grid grid-cols-2 md:grid-cols-12 gap-2 items-center p-2 rounded-md border ${itemWarnings.length > 0 ? 'border-amber-300 bg-amber-50/50 dark:border-amber-700 dark:bg-amber-950/30' : 'border-border'}`} data-testid={`estimate-item-${item.id}`}>
                             <div className="col-span-2 md:col-span-2 text-sm font-medium flex items-center gap-1 flex-wrap">
@@ -850,11 +897,24 @@ export default function CostEstimator() {
                             <div className="text-right text-sm font-medium md:col-span-2">
                               ${item.totalWithMarkup.toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </div>
-                            <div className="text-right md:col-span-1">
+                            <div className="text-right md:col-span-1 flex items-center justify-end gap-0.5">
                               {canEdit && (
-                                <Button variant="ghost" size="sm" className="h-6 w-6 p-0 ml-1" onClick={() => deleteItemMutation.mutate(item.id)} data-testid={`button-delete-item-${item.id}`}>
-                                  <Trash2 className="h-3 w-3 text-muted-foreground" />
-                                </Button>
+                                <>
+                                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => {
+                                    setEditingItemId(item.id);
+                                    setEditItemForm({
+                                      quantity: item.quantity,
+                                      unitCost: item.unitCost,
+                                      materialCost: item.materialCost,
+                                      laborCost: item.laborCost,
+                                    });
+                                  }} data-testid={`button-edit-item-${item.id}`}>
+                                    <Pencil className="h-3 w-3 text-muted-foreground" />
+                                  </Button>
+                                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => deleteItemMutation.mutate(item.id)} data-testid={`button-delete-item-${item.id}`}>
+                                    <Trash2 className="h-3 w-3 text-muted-foreground" />
+                                  </Button>
+                                </>
                               )}
                             </div>
                           </div>
@@ -913,6 +973,14 @@ export default function CostEstimator() {
                         <div className="md:col-span-8 text-sm text-muted-foreground">Contingency ({activeEstimate.contingencyPercent || "0"}%)</div>
                         <div className="md:col-span-4 text-right text-sm text-muted-foreground" data-testid="text-contingency-amount">
                           +${contingencyAmount.toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </div>
+                      </div>
+                    )}
+                    {managementFeeAmount > 0 && (
+                      <div className="grid grid-cols-2 md:grid-cols-12 gap-2 px-2">
+                        <div className="md:col-span-8 text-sm text-muted-foreground">Management Fee ({activeEstimate.managementFeePercent || "25"}%)</div>
+                        <div className="md:col-span-4 text-right text-sm text-muted-foreground" data-testid="text-management-fee-amount">
+                          +${managementFeeAmount.toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </div>
                       </div>
                     )}
