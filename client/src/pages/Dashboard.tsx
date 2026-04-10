@@ -97,8 +97,12 @@ export default function Dashboard() {
 
   const todayStr = new Date().toISOString().split("T")[0];
   const todayTasks = myTasks?.filter(
-    (t) => t.status !== "done" && (!t.dueDate || t.dueDate <= todayStr)
+    (t) => t.status !== "done" && (t.dueDate === todayStr || (!t.dueDate && t.status === "in_progress"))
   ) || [];
+  const overdueTasks = myTasks?.filter(
+    (t) => t.status !== "done" && t.dueDate && t.dueDate < todayStr
+  ) || [];
+  const allOpenTasks = myTasks?.filter(t => t.status !== "done") || [];
 
   const updateTaskStatus = useMutation({
     mutationFn: async ({ id, status }: { id: number; status: string }) => {
@@ -160,7 +164,7 @@ export default function Dashboard() {
             </h1>
             <p className="text-sm text-muted-foreground" data-testid="text-subtitle">
               {isCrewView
-                ? `Here's your day at a glance. ${todayTasks.length} ${todayTasks.length === 1 ? "task" : "tasks"} for today.`
+                ? `Here's your day at a glance. ${todayTasks.length} ${todayTasks.length === 1 ? "task" : "tasks"} for today${overdueTasks.length > 0 ? `, ${overdueTasks.length} overdue` : ""}.`
                 : isClientView && clientSingleProject
                   ? `Your project is ${statusLabel[clientSingleProject.status]?.toLowerCase() || "active"}.`
                   : isClientView
@@ -235,7 +239,7 @@ export default function Dashboard() {
             <Card>
               <CardContent className="py-4">
                 <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3" data-testid="text-todays-tasks">
-                  Today's Tasks
+                  Your Tasks for Today
                 </h2>
                 {todayTasks.length > 0 ? (
                   <div className="space-y-2">
@@ -291,20 +295,20 @@ export default function Dashboard() {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground">No tasks due today. Check back with your team lead.</p>
+                  <p className="text-sm text-muted-foreground">No tasks due today. You're all caught up!</p>
                 )}
               </CardContent>
             </Card>
 
-            {myTasks && myTasks.filter(t => t.status !== "done").length > todayTasks.length && (
+            {allOpenTasks.length > todayTasks.length && (
               <Card>
                 <CardContent className="py-4">
                   <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3" data-testid="text-all-assignments">
-                    All Assignments
+                    Your Assignments
                   </h2>
                   <div className="space-y-2">
                     {Object.entries(
-                      myTasks.filter(t => t.status !== "done").reduce((groups: Record<string, TaskWithProject[]>, task) => {
+                      allOpenTasks.reduce((groups: Record<string, TaskWithProject[]>, task) => {
                         const key = task.projectName || "Unknown Project";
                         if (!groups[key]) groups[key] = [];
                         groups[key].push(task);
