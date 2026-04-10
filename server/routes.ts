@@ -809,7 +809,7 @@ export async function registerRoutes(
   // Upcoming events across all projects (for crew/admin My Day)
   app.get("/api/upcoming-events", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub;
-    const dbUser = await storage.getUser(userId);
+    const dbUser = await authStorage.getUser(userId);
     if (!dbUser || (dbUser.role !== "crew" && dbUser.role !== "admin")) {
       return res.status(403).json({ message: "Forbidden" });
     }
