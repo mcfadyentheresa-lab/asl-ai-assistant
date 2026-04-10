@@ -806,8 +806,13 @@ export async function registerRoutes(
     res.json(myTasks);
   }));
 
-  // Upcoming events across all projects (for crew My Day)
+  // Upcoming events across all projects (for crew/admin My Day)
   app.get("/api/upcoming-events", isAuthenticated, asyncHandler(async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const dbUser = await storage.getUser(userId);
+    if (!dbUser || (dbUser.role !== "crew" && dbUser.role !== "admin")) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
     const days = Number(req.query.days) || 7;
     const events = await storage.getUpcomingEventsAllProjects(days);
     res.json(events);

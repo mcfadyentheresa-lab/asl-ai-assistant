@@ -91,7 +91,7 @@ export default function Dashboard() {
   });
 
   const { data: upcomingEvents } = useQuery<EventWithProject[]>({
-    queryKey: ["/api/upcoming-events", 7],
+    queryKey: ["/api/upcoming-events?days=7"],
     enabled: isCrewView || user?.role === "crew",
   });
 
@@ -295,6 +295,64 @@ export default function Dashboard() {
                 )}
               </CardContent>
             </Card>
+
+            {myTasks && myTasks.filter(t => t.status !== "done").length > todayTasks.length && (
+              <Card>
+                <CardContent className="py-4">
+                  <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3" data-testid="text-all-assignments">
+                    All Assignments
+                  </h2>
+                  <div className="space-y-2">
+                    {Object.entries(
+                      myTasks.filter(t => t.status !== "done").reduce((groups: Record<string, TaskWithProject[]>, task) => {
+                        const key = task.projectName || "Unknown Project";
+                        if (!groups[key]) groups[key] = [];
+                        groups[key].push(task);
+                        return groups;
+                      }, {} as Record<string, TaskWithProject[]>)
+                    ).map(([projectName, projectTasks]) => (
+                      <div key={projectName}>
+                        <p className="text-xs font-medium text-muted-foreground mb-1.5">{projectName}</p>
+                        <div className="space-y-1">
+                          {projectTasks.map((task) => (
+                            <div
+                              key={task.id}
+                              className="flex items-center gap-2 px-3 py-2 rounded-md border border-border/40 bg-muted/20"
+                              data-testid={`crew-all-task-${task.id}`}
+                            >
+                              <button
+                                onClick={() => {
+                                  const nextStatus = task.status === "todo" ? "in_progress" : task.status === "in_progress" ? "done" : "todo";
+                                  updateTaskStatus.mutate({ id: task.id, status: nextStatus });
+                                }}
+                                className="shrink-0"
+                                data-testid={`button-toggle-all-task-${task.id}`}
+                              >
+                                {task.status === "in_progress" ? (
+                                  <PlayCircle className="h-4 w-4 text-blue-500" />
+                                ) : (
+                                  <Circle className="h-4 w-4 text-muted-foreground" />
+                                )}
+                              </button>
+                              <span className="text-sm flex-1 text-foreground">{task.title}</span>
+                              <Badge
+                                variant={task.status === "in_progress" ? "secondary" : "outline"}
+                                className="text-xs no-default-hover-elevate no-default-active-elevate"
+                              >
+                                {task.status === "in_progress" ? "In Progress" : "To Do"}
+                              </Badge>
+                              {task.dueDate && (
+                                <span className="text-xs text-muted-foreground whitespace-nowrap">{task.dueDate}</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             <Card>
               <CardContent className="py-4">
