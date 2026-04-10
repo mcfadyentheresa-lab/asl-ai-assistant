@@ -806,6 +806,13 @@ export async function registerRoutes(
     res.json(myTasks);
   }));
 
+  // Upcoming events across all projects (for crew My Day)
+  app.get("/api/upcoming-events", isAuthenticated, asyncHandler(async (req: any, res) => {
+    const days = Number(req.query.days) || 7;
+    const events = await storage.getUpcomingEventsAllProjects(days);
+    res.json(events);
+  }));
+
   // Tasks
   app.get(api.tasks.list.path, isAuthenticated, asyncHandler(async (req, res) => {
     const tasks = await storage.getTasks(Number(req.params.projectId));

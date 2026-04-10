@@ -96,6 +96,7 @@ export interface IStorage {
   updateCalendarEvent(id: number, updates: Partial<InsertCalendarEvent>): Promise<CalendarEvent>;
   deleteCalendarEvent(id: number): Promise<void>;
   getCalendarEventsByType(projectId: number, type: string): Promise<CalendarEvent[]>;
+  getUpcomingEventsAllProjects(days: number): Promise<(CalendarEvent & { projectName: string })[]>;
 
   // Planning Boards
   getPlanningBoards(projectId: number): Promise<PlanningBoard[]>;
@@ -531,6 +532,29 @@ export class DatabaseStorage implements IStorage {
   async getCalendarEventsByType(projectId: number, type: string): Promise<CalendarEvent[]> {
     return await db.select().from(calendarEvents)
       .where(and(eq(calendarEvents.projectId, projectId), eq(calendarEvents.type, type)));
+  }
+  async getUpcomingEventsAllProjects(days: number): Promise<(CalendarEvent & { projectName: string })[]> {
+    const today = new Date().toISOString().split("T")[0];
+    const future = new Date(Date.now() + days * 86400000).toISOString().split("T")[0];
+    const rows = await db
+      .select({
+        id: calendarEvents.id,
+        projectId: calendarEvents.projectId,
+        title: calendarEvents.title,
+        description: calendarEvents.description,
+        date: calendarEvents.date,
+        endDate: calendarEvents.endDate,
+        type: calendarEvents.type,
+        imageUrl: calendarEvents.imageUrl,
+        createdBy: calendarEvents.createdBy,
+        createdAt: calendarEvents.createdAt,
+        projectName: projects.name,
+      })
+      .from(calendarEvents)
+      .innerJoin(projects, eq(calendarEvents.projectId, projects.id))
+      .where(and(gte(calendarEvents.date, today), lte(calendarEvents.date, future)))
+      .orderBy(calendarEvents.date);
+    return rows as (CalendarEvent & { projectName: string })[];
   }
 
   // Planning Boards

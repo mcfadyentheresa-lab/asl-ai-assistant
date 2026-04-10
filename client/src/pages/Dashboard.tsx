@@ -3,11 +3,12 @@ import { useProjects, useDeleteProject, useArchiveProject, useUsers } from "@/ho
 import { Navbar } from "@/components/layout/Navbar";
 import { ProjectCard } from "@/components/project/ProjectCard";
 import { Button } from "@/components/ui/button";
-import { Plus, Loader2, Eye, EyeOff, Upload, X, UserPlus, ArrowRight, FolderOpen, Briefcase, Clock, CalendarDays, CheckCircle2, Circle, PlayCircle } from "lucide-react";
+import { Plus, Loader2, Eye, EyeOff, Upload, X, UserPlus, ArrowRight, FolderOpen, Briefcase, Clock, CalendarDays, CheckCircle2, Circle, PlayCircle, Calendar } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { apiRequest, queryClient as qc } from "@/lib/queryClient";
 import { motion } from "framer-motion";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import type { Task, CalendarEvent } from "@shared/schema";
 import {
   Dialog,
   DialogContent,
@@ -81,10 +82,23 @@ export default function Dashboard() {
 
   const isCrewView = viewMode === "crew";
 
-  const { data: myTasks } = useQuery<any[]>({
+  type TaskWithProject = Task & { projectName: string };
+  type EventWithProject = CalendarEvent & { projectName: string };
+
+  const { data: myTasks } = useQuery<TaskWithProject[]>({
     queryKey: ["/api/my-tasks"],
     enabled: isCrewView || user?.role === "crew",
   });
+
+  const { data: upcomingEvents } = useQuery<EventWithProject[]>({
+    queryKey: ["/api/upcoming-events", 7],
+    enabled: isCrewView || user?.role === "crew",
+  });
+
+  const todayStr = new Date().toISOString().split("T")[0];
+  const todayTasks = myTasks?.filter(
+    (t) => t.status !== "done" && (!t.dueDate || t.dueDate <= todayStr)
+  ) || [];
 
   const updateTaskStatus = useMutation({
     mutationFn: async ({ id, status }: { id: number; status: string }) => {
@@ -146,7 +160,7 @@ export default function Dashboard() {
             </h1>
             <p className="text-sm text-muted-foreground" data-testid="text-subtitle">
               {isCrewView
-                ? `Here's your day at a glance. ${(myTasks?.filter(t => t.status !== "done") || []).length} open ${(myTasks?.filter(t => t.status !== "done") || []).length === 1 ? "assignment" : "assignments"}.`
+                ? `Here's your day at a glance. ${todayTasks.length} ${todayTasks.length === 1 ? "task" : "tasks"} for today.`
                 : isClientView && clientSingleProject
                   ? `Your project is ${statusLabel[clientSingleProject.status]?.toLowerCase() || "active"}.`
                   : isClientView
@@ -220,23 +234,23 @@ export default function Dashboard() {
 
             <Card>
               <CardContent className="py-4">
-                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3" data-testid="text-my-assignments">
-                  Your Assignments
+                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3" data-testid="text-todays-tasks">
+                  Today's Tasks
                 </h2>
-                {myTasks && myTasks.length > 0 ? (
+                {todayTasks.length > 0 ? (
                   <div className="space-y-2">
                     {Object.entries(
-                      myTasks.reduce((groups: Record<string, any[]>, task: any) => {
+                      todayTasks.reduce((groups: Record<string, TaskWithProject[]>, task) => {
                         const key = task.projectName || "Unknown Project";
                         if (!groups[key]) groups[key] = [];
                         groups[key].push(task);
                         return groups;
-                      }, {})
+                      }, {} as Record<string, TaskWithProject[]>)
                     ).map(([projectName, projectTasks]) => (
                       <div key={projectName}>
                         <p className="text-xs font-medium text-muted-foreground mb-1.5">{projectName}</p>
                         <div className="space-y-1">
-                          {(projectTasks as any[]).map((task: any) => (
+                          {projectTasks.map((task) => (
                             <div
                               key={task.id}
                               className="flex items-center gap-2 px-3 py-2 rounded-md border border-border/40 bg-muted/20"
@@ -277,7 +291,37 @@ export default function Dashboard() {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground">No tasks assigned to you right now. Check back with your team lead.</p>
+                  <p className="text-sm text-muted-foreground">No tasks due today. Check back with your team lead.</p>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="py-4">
+                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3" data-testid="text-upcoming-events">
+                  Upcoming Events (Next 7 Days)
+                </h2>
+                {upcomingEvents && upcomingEvents.length > 0 ? (
+                  <div className="space-y-1.5">
+                    {upcomingEvents.map((event) => (
+                      <div
+                        key={event.id}
+                        className="flex items-center gap-3 px-3 py-2 rounded-md border border-border/40 bg-muted/20"
+                        data-testid={`crew-event-${event.id}`}
+                      >
+                        <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-foreground truncate">{event.title}</p>
+                          <p className="text-xs text-muted-foreground">{event.projectName}</p>
+                        </div>
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">
+                          {event.date === todayStr ? "Today" : new Date(event.date + "T00:00:00").toLocaleDateString("en-CA", { weekday: "short", month: "short", day: "numeric" })}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No upcoming events this week.</p>
                 )}
               </CardContent>
             </Card>
