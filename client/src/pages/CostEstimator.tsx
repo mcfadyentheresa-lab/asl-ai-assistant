@@ -299,9 +299,12 @@ export default function CostEstimator() {
   const grandTotalWithMarkup = grandTotal + totalMarkup;
   const contingencyRate = parseFloat(activeEstimate?.contingencyPercent || "0") / 100;
   const contingencyAmount = grandTotalWithMarkup * contingencyRate;
+  const managementFeeRate = activeEstimate?.managementFeeEnabled ? parseFloat(activeEstimate.managementFeePercent || "25") / 100 : 0;
+  const managementFeeAmount = (grandTotalWithMarkup + contingencyAmount) * managementFeeRate;
   const hstRate = 0.13;
-  const hstAmount = (grandTotalWithMarkup + contingencyAmount) * hstRate;
-  const grandTotalWithHST = (grandTotalWithMarkup + contingencyAmount) + hstAmount;
+  const subtotalBeforeHST = grandTotalWithMarkup + contingencyAmount + managementFeeAmount;
+  const hstAmount = subtotalBeforeHST * hstRate;
+  const grandTotalWithHST = subtotalBeforeHST + hstAmount;
   const totalReceipts = receipts.reduce((sum, r) => sum + (parseFloat(r.amount) || 0), 0);
   const variance = grandTotalWithHST > 0 ? ((totalReceipts - grandTotalWithHST) / grandTotalWithHST) * 100 : 0;
   const activeWarnings = warnings.filter(w => !w.ignored);
@@ -468,6 +471,9 @@ export default function CostEstimator() {
                   )}
                   {contingencyAmount > 0 && (
                     <div className="text-xs text-muted-foreground">incl. ${contingencyAmount.toLocaleString("en-CA", { minimumFractionDigits: 2 })} contingency</div>
+                  )}
+                  {managementFeeAmount > 0 && (
+                    <div className="text-xs text-muted-foreground">incl. ${managementFeeAmount.toLocaleString("en-CA", { minimumFractionDigits: 2 })} management fee ({activeEstimate?.managementFeePercent || "25"}%)</div>
                   )}
                   <div className="text-xs text-muted-foreground">incl. ${hstAmount.toLocaleString("en-CA", { minimumFractionDigits: 2 })} HST (13%)</div>
                   {(() => {
@@ -685,6 +691,33 @@ export default function CostEstimator() {
                     <Button variant="outline" size="sm" onClick={() => { setContingencyInput(activeEstimate.contingencyPercent || "0"); setEditingContingency(true); }} data-testid="button-edit-contingency">
                       <Pencil className="h-3 w-3 mr-1" /> Edit
                     </Button>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {canEdit && (
+              <Card data-testid="card-management-fee">
+                <CardContent className="py-3 flex items-center justify-between flex-wrap gap-3">
+                  <div className="flex items-center gap-3">
+                    <Switch
+                      checked={activeEstimate.managementFeeEnabled ?? false}
+                      onCheckedChange={(checked) => updateEstimateMutation.mutate({ managementFeeEnabled: checked })}
+                      data-testid="switch-management-fee"
+                    />
+                    <Label>Apply {activeEstimate.managementFeePercent || "25"}% management fee</Label>
+                  </div>
+                  {activeEstimate.managementFeeEnabled && (
+                    <div className="flex items-center gap-2">
+                      <Label className="text-sm">Fee %:</Label>
+                      <Input
+                        type="number"
+                        className="w-20"
+                        value={activeEstimate.managementFeePercent || "25"}
+                        onChange={(e) => updateEstimateMutation.mutate({ managementFeePercent: e.target.value })}
+                        data-testid="input-management-fee-percent"
+                      />
+                    </div>
                   )}
                 </CardContent>
               </Card>

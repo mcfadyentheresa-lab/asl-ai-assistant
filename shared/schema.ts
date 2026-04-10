@@ -438,6 +438,8 @@ export const projectEstimates = pgTable("project_estimates", {
   markupPercent: text("markup_percent").notNull().default("25"),
   budget: text("budget"),
   contingencyPercent: text("contingency_percent").default("0"),
+  managementFeeEnabled: boolean("management_fee_enabled").default(false),
+  managementFeePercent: text("management_fee_percent").notNull().default("25"),
   createdBy: text("created_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
 });
