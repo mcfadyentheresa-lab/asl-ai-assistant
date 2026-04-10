@@ -80,7 +80,10 @@ export default function Dashboard() {
   const completedProjects = projects?.filter((p) => p.status === "completed") || [];
   const onlineCrew = onlineUsers?.filter((u) => u.role === "crew" || u.role === "admin") || [];
 
-  const isCrewView = viewMode === "crew";
+  const isAdmin = user?.role === "admin";
+  const isClient = user?.role === "client";
+  const effectiveRole = isAdmin ? viewMode : (user?.role || "client");
+  const isCrewView = effectiveRole === "crew";
 
   type TaskWithProject = Task & { projectName: string };
   type EventWithProject = CalendarEvent & { projectName: string };
@@ -115,10 +118,8 @@ export default function Dashboard() {
   });
 
   const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(" ") || "there";
-  const isClient = user?.role === "client";
-  const isAdmin = user?.role === "admin";
-  const isAdminView = isAdmin && viewMode === "admin";
-  const isClientView = viewMode === "client";
+  const isAdminView = effectiveRole === "admin";
+  const isClientView = effectiveRole === "client";
 
   const handleArchive = (id: number) => {
     archiveProject(id, {
