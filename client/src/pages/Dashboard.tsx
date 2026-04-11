@@ -522,7 +522,7 @@ export default function Dashboard() {
             <div className="bg-background p-4 rounded-full shadow-sm mb-4">
               <Plus className="h-6 w-6 text-muted-foreground" />
             </div>
-            {canCreateProjects ? (
+            {canCreateProjects && !isClientView ? (
               <>
                 <h3 className="font-serif text-xl font-semibold text-foreground mb-2">No projects yet</h3>
                 <p className="text-muted-foreground mb-6">Create your first project to get started.</p>
