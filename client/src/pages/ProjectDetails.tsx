@@ -1924,7 +1924,7 @@ function ChecklistTab({ projectId, compact = false }: { projectId: number; compa
             <div className="flex items-center gap-2 mb-3">
               <Flag className="h-4 w-4 text-muted-foreground" />
                       <span className="font-serif font-semibold text-foreground" data-testid="text-milestones-heading">
-                Discussion Notes
+                Wish List
               </span>
               <span className="text-xs text-muted-foreground">
                 ({checklistMilestones.length})
