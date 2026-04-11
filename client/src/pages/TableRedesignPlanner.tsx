@@ -427,7 +427,7 @@ export default function TableRedesignPlanner() {
           </Link>
           <div>
             <h1 className="text-2xl font-bold uppercase tracking-wide" data-testid="text-page-title">
-              TABLE REDESIGN PLANNER
+              FURNITURE PLANNER
             </h1>
             <p className="text-sm text-muted-foreground">Create and manage furniture redesign concepts</p>
           </div>

@@ -190,7 +190,7 @@ export function Navbar() {
               <Link href="/table-redesign">
                 <DropdownMenuItem data-testid="link-table-redesign">
                   <Armchair className="mr-2 h-4 w-4" />
-                  Table Redesign
+                  Furniture
                 </DropdownMenuItem>
               </Link>
             )}
