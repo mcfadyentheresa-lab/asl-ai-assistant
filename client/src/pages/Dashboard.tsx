@@ -179,36 +179,38 @@ export default function Dashboard() {
 
           <div className="flex items-center gap-2 flex-wrap">
             {isAdmin && (
-              <div className="flex items-center rounded-md border border-border overflow-hidden" data-testid="view-mode-toggle">
-                <Button type="button" size="sm" variant={viewMode === "admin" ? "default" : "ghost"} onClick={() => setViewMode("admin")} data-testid="button-view-admin">Admin</Button>
-                <Button type="button" size="sm" variant={viewMode === "crew" ? "default" : "ghost"} onClick={() => setViewMode("crew")} data-testid="button-view-crew">Crew</Button>
-                <Button type="button" size="sm" variant={viewMode === "client" ? "default" : "ghost"} onClick={() => setViewMode("client")} data-testid="button-view-client">Client</Button>
+              <div className="flex items-center rounded-full border border-border/70 bg-muted/30 p-0.5 overflow-hidden shadow-sm" data-testid="view-mode-toggle">
+                <Button type="button" size="sm" variant={viewMode === "admin" ? "default" : "ghost"} className="h-8 rounded-full px-3 text-xs" onClick={() => setViewMode("admin")} data-testid="button-view-admin">Admin</Button>
+                <Button type="button" size="sm" variant={viewMode === "crew" ? "default" : "ghost"} className="h-8 rounded-full px-3 text-xs" onClick={() => setViewMode("crew")} data-testid="button-view-crew">Crew</Button>
+                <Button type="button" size="sm" variant={viewMode === "client" ? "default" : "ghost"} className="h-8 rounded-full px-3 text-xs" onClick={() => setViewMode("client")} data-testid="button-view-client">Client</Button>
               </div>
             )}
             <Button
               variant="outline"
               size="sm"
               onClick={() => setShowArchived(!showArchived)}
+              className="h-8 rounded-full px-3 text-xs"
               data-testid="button-toggle-archived"
             >
-              {showArchived ? <EyeOff className="mr-2 h-3.5 w-3.5" /> : <Eye className="mr-2 h-3.5 w-3.5" />}
-              {showArchived ? "Hide Archived" : "Show Archived"}
+              {showArchived ? <EyeOff className="mr-1.5 h-3.5 w-3.5" /> : <Eye className="mr-1.5 h-3.5 w-3.5" />}
+              <span className="hidden sm:inline">{showArchived ? "Hide Archived" : "Show Archived"}</span>
+              <span className="sm:hidden">{showArchived ? "Hide" : "Archived"}</span>
             </Button>
             {canCreateProjects && <CreateProjectDialog />}
           </div>
         </div>
 
         {isAdmin && (
-          <div className="flex items-center gap-4 mb-6 flex-wrap" data-testid="admin-stats-strip">
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted/50 border border-border/40">
+          <div className="grid grid-cols-3 gap-2 mb-5" data-testid="admin-stats-strip">
+            <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-muted/40 border border-border/40">
               <FolderOpen className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-xs font-medium text-foreground">{activeProjects.length} Active</span>
+              <span className="text-xs font-medium text-foreground whitespace-nowrap">{activeProjects.length} Active</span>
             </div>
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted/50 border border-border/40">
+            <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-muted/40 border border-border/40">
               <Briefcase className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-xs font-medium text-foreground">{completedProjects.length} Completed</span>
+              <span className="text-xs font-medium text-foreground whitespace-nowrap">{completedProjects.length} Completed</span>
             </div>
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted/50 border border-border/40">
+            <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-muted/40 border border-border/40">
               {onlineCrew.length > 0 ? (
                 <div className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75" />
@@ -217,7 +219,7 @@ export default function Dashboard() {
               ) : (
                 <div className="h-2 w-2 rounded-full bg-muted-foreground/30" />
               )}
-              <span className="text-xs font-medium text-foreground">{onlineCrew.length} Team Online</span>
+              <span className="text-xs font-medium text-foreground whitespace-nowrap">{onlineCrew.length} Online</span>
             </div>
           </div>
         )}
