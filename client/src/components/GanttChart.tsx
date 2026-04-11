@@ -641,6 +641,13 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
     );
   };
 
+  const startNewTask = (milestoneId: number, sectionId: number | null = null) => {
+    setAddingTask({ milestoneId, sectionId });
+    setNewTaskTitle("");
+    setNewTaskStartDate("");
+    setNewTaskDueDate("");
+  };
+
   const handleToggleTask = (taskId: number, currentStatus: string | null) => {
     const newStatus = currentStatus === "done" ? "todo" : "done";
     updateTask({ id: taskId, status: newStatus }, {
@@ -1192,7 +1199,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                                 <FolderPlus className="h-3.5 w-3.5 mr-2" />
                                 Add Folder
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => { setAddingTask({ milestoneId: building.id, sectionId: null }); setNewTaskTitle(""); setNewTaskStartDate(""); setNewTaskDueDate(""); }} data-testid={`button-add-task-building-${building.id}`}>
+                              <DropdownMenuItem onClick={() => startNewTask(building.id)} data-testid={`button-add-task-building-${building.id}`}>
                                 <ListPlus className="h-3.5 w-3.5 mr-2" />
                                 Add Task
                               </DropdownMenuItem>
@@ -1268,7 +1275,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                               <Pencil className="h-3.5 w-3.5 mr-2" />
                               Edit Room
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => { if (parentBuilding) { setAddingTask({ milestoneId: parentBuilding.id, sectionId: roomData.id }); setNewTaskTitle(""); setNewTaskStartDate(""); setNewTaskDueDate(""); } }} data-testid={`button-add-task-room-${roomData.id}`}>
+                            <DropdownMenuItem onClick={() => { if (parentBuilding) startNewTask(parentBuilding.id, roomData.id); }} data-testid={`button-add-task-room-${roomData.id}`}>
                               <ListPlus className="h-3.5 w-3.5 mr-2" />
                               Add Task
                             </DropdownMenuItem>
