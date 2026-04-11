@@ -369,9 +369,12 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
       window.addEventListener("keydown", handleKeyDown);
       window.addEventListener("keyup", handleKeyUp);
 
-      // Touch handlers for mobile pan/zoom (view-only mode)
+      // Touch handlers for pan/zoom (view-only mode: non-admins always; admins on mobile unless edit unlocked)
       let touchDist: number | null = null;
-      const isViewOnly = () => window.innerWidth < 640 && !(canvas as any).__mobileEditMode;
+      const isViewOnly = () => {
+        const c = canvas as any;
+        return !c.__isAdmin || (window.innerWidth < 640 && !c.__mobileEditMode);
+      };
 
       const handleTouchStart = (e: TouchEvent) => {
         if (!isViewOnly()) return;
@@ -549,13 +552,17 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
     }
   }, [tool, brushSize, brushColor, canvasReady]);
 
-  // Lock/unlock canvas objects for mobile view-only mode
-  const isViewOnly = isMobileView && !mobileEditMode;
+  // Lock/unlock canvas objects:
+  // - Non-admins: always view-only (pan/zoom only, no editing)
+  // - Admins on mobile: view-only unless they toggle edit mode on
+  // - Admins on desktop: always editable
+  const isViewOnly = !isAdmin || (isMobileView && !mobileEditMode);
   useEffect(() => {
     const canvas = fabricRef.current;
     if (!canvas || !canvasReady) return;
-    // Keep the __mobileEditMode flag in sync so touch handlers can read it
+    // Keep flags in sync so touch handlers can read them without closure staleness
     (canvas as any).__mobileEditMode = mobileEditMode;
+    (canvas as any).__isAdmin = isAdmin;
     if (isViewOnly) {
       canvas.selection = false;
       canvas.defaultCursor = "grab";
@@ -574,7 +581,7 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
       }
     }
     canvas.renderAll();
-  }, [isMobileView, mobileEditMode, canvasReady, isViewOnly, tool]);
+  }, [isMobileView, mobileEditMode, isAdmin, canvasReady, isViewOnly, tool]);
 
   const handleUndo = () => {
     const canvas = fabricRef.current;
