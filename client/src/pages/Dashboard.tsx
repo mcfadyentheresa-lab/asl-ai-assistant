@@ -176,6 +176,8 @@ export default function Dashboard() {
                 ? `Here's your day at a glance. ${todayTasks.length} ${todayTasks.length === 1 ? "task" : "tasks"} for today${overdueTasks.length > 0 ? `, ${overdueTasks.length} overdue` : ""}.`
                 : isClientView && clientSingleProject
                   ? `Your project is ${statusLabel[clientSingleProject.status]?.toLowerCase() || "active"}.`
+                  : isClientView && !isClient
+                    ? "Client view — this is what clients see once they've been invited to a project."
                   : isClientView
                     ? `You have ${activeProjects.length} active ${activeProjects.length === 1 ? "project" : "projects"}.`
                     : isAdminView
@@ -247,7 +249,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {isAdmin && (
+        {isAdmin && !isClientView && (
           <div className="grid grid-cols-3 gap-2 mb-5" data-testid="admin-stats-strip">
             <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-muted/40 border border-border/40">
               <FolderOpen className="h-3.5 w-3.5 text-muted-foreground" />
@@ -493,7 +495,7 @@ export default function Dashboard() {
               </Card>
             </Link>
           </motion.div>
-        ) : filteredProjects && filteredProjects.length > 0 ? (
+        ) : !(isAdmin && isClientView) && filteredProjects && filteredProjects.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
             {filteredProjects.map((project, idx) => (
               <motion.div
@@ -524,9 +526,15 @@ export default function Dashboard() {
               </>
             ) : (
               <>
-                <h3 className="font-serif text-xl font-semibold text-foreground mb-2">No projects yet</h3>
+                <h3 className="font-serif text-xl font-semibold text-foreground mb-2">
+                  {isClientView ? "Your project will appear here" : "No projects yet"}
+                </h3>
                 <p className="text-muted-foreground mb-6">
-                  {isCrewView ? "Your crew lead will assign you to a project soon." : "Your team will add you to a project soon."}
+                  {isClientView
+                    ? "Once you've been invited to a project, it will show up here."
+                    : isCrewView
+                      ? "Your crew lead will assign you to a project soon."
+                      : "Your team will add you to a project soon."}
                 </p>
               </>
             )}
