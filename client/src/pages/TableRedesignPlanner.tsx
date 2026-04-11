@@ -561,17 +561,6 @@ export default function TableRedesignPlanner() {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <Label>Shape *</Label>
-                      <Select value={form.tableShape} onValueChange={v => setForm(f => ({ ...f, tableShape: v }))}>
-                        <SelectTrigger data-testid="select-shape">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {TABLE_SHAPES.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
                       <Label>Weight Class *</Label>
                       <Select value={form.weightClass} onValueChange={v => setForm(f => ({ ...f, weightClass: v }))}>
                         <SelectTrigger data-testid="select-weight">
@@ -859,11 +848,7 @@ export default function TableRedesignPlanner() {
                     </div>
 
                     {/* Dimensions summary */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-                      <div className="bg-muted/50 rounded p-2">
-                        <div className="text-xs text-muted-foreground">Shape</div>
-                        <div className="font-medium capitalize">{selectedPlan.tableShape}</div>
-                      </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
                       <div className="bg-muted/50 rounded p-2">
                         <div className="text-xs text-muted-foreground">Dimensions</div>
                         <div className="font-medium">
