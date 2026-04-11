@@ -73,6 +73,7 @@ import {
   Bath,
   Home,
   FileText,
+  Lock,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -155,6 +156,8 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
   const isPanningRef = useRef(false);
   const lastPanPoint = useRef<{ x: number; y: number } | null>(null);
   const spaceHeld = useRef(false);
+  const [isMobileView, setIsMobileView] = useState(() => window.innerWidth < 640);
+  const [mobileEditMode, setMobileEditMode] = useState(false);
   const [showCardDialog, setShowCardDialog] = useState(false);
   const [cardTitle, setCardTitle] = useState("New Column");
   const [cardItems, setCardItems] = useState<CardContentItem[]>([]);
@@ -205,6 +208,12 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
       setSelectedBoardId(boards[0].id);
     }
   }, [boards, selectedBoardId]);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobileView(window.innerWidth < 640);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   const saveStateRef = useRef<() => void>(() => {});
   const autoSaveRef = useRef<() => void>(() => {});
@@ -360,10 +369,67 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
       window.addEventListener("keydown", handleKeyDown);
       window.addEventListener("keyup", handleKeyUp);
 
+      // Touch handlers for mobile pan/zoom (view-only mode)
+      let touchDist: number | null = null;
+      const isViewOnly = () => window.innerWidth < 640 && !(canvas as any).__mobileEditMode;
+
+      const handleTouchStart = (e: TouchEvent) => {
+        if (!isViewOnly()) return;
+        e.preventDefault();
+        if (e.touches.length === 2) {
+          touchDist = Math.hypot(
+            e.touches[0].clientX - e.touches[1].clientX,
+            e.touches[0].clientY - e.touches[1].clientY
+          );
+        } else if (e.touches.length === 1) {
+          lastPanPoint.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        }
+      };
+
+      const handleTouchMove = (e: TouchEvent) => {
+        if (!isViewOnly()) return;
+        e.preventDefault();
+        if (e.touches.length === 2 && touchDist !== null) {
+          const newDist = Math.hypot(
+            e.touches[0].clientX - e.touches[1].clientX,
+            e.touches[0].clientY - e.touches[1].clientY
+          );
+          const delta = (newDist - touchDist) / 200;
+          let newZoom = canvas.getZoom() + delta;
+          newZoom = Math.max(0.1, Math.min(5, newZoom));
+          const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+          const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+          const rect = canvasEl.getBoundingClientRect();
+          const point = new fabric.Point(midX - rect.left, midY - rect.top);
+          canvas.zoomToPoint(point, newZoom);
+          setZoom(newZoom);
+          touchDist = newDist;
+        } else if (e.touches.length === 1 && lastPanPoint.current) {
+          const vpt = canvas.viewportTransform!;
+          vpt[4] += e.touches[0].clientX - lastPanPoint.current.x;
+          vpt[5] += e.touches[0].clientY - lastPanPoint.current.y;
+          canvas.setViewportTransform(vpt);
+          canvas.renderAll();
+          lastPanPoint.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        }
+      };
+
+      const handleTouchEnd = () => {
+        touchDist = null;
+        lastPanPoint.current = null;
+      };
+
+      canvasEl.addEventListener("touchstart", handleTouchStart, { passive: false });
+      canvasEl.addEventListener("touchmove", handleTouchMove, { passive: false });
+      canvasEl.addEventListener("touchend", handleTouchEnd);
+
       (canvas as any).__wheelHandler = handleWheel;
       (canvas as any).__keyDownHandler = handleKeyDown;
       (canvas as any).__keyUpHandler = handleKeyUp;
       (canvas as any).__canvasEl = canvasEl;
+      (canvas as any).__touchStartHandler = handleTouchStart;
+      (canvas as any).__touchMoveHandler = handleTouchMove;
+      (canvas as any).__touchEndHandler = handleTouchEnd;
 
       const initialState = JSON.stringify(canvas.toJSON());
       undoStack.current = [initialState];
@@ -392,6 +458,11 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
         const c = fabricRef.current as any;
         if (c.__canvasEl && c.__wheelHandler) {
           c.__canvasEl.removeEventListener("wheel", c.__wheelHandler);
+        }
+        if (c.__canvasEl && c.__touchStartHandler) {
+          c.__canvasEl.removeEventListener("touchstart", c.__touchStartHandler);
+          c.__canvasEl.removeEventListener("touchmove", c.__touchMoveHandler);
+          c.__canvasEl.removeEventListener("touchend", c.__touchEndHandler);
         }
         if (c.__keyDownHandler) window.removeEventListener("keydown", c.__keyDownHandler);
         if (c.__keyUpHandler) window.removeEventListener("keyup", c.__keyUpHandler);
@@ -477,6 +548,33 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
       canvas.selection = tool === "select";
     }
   }, [tool, brushSize, brushColor, canvasReady]);
+
+  // Lock/unlock canvas objects for mobile view-only mode
+  const isViewOnly = isMobileView && !mobileEditMode;
+  useEffect(() => {
+    const canvas = fabricRef.current;
+    if (!canvas || !canvasReady) return;
+    // Keep the __mobileEditMode flag in sync so touch handlers can read it
+    (canvas as any).__mobileEditMode = mobileEditMode;
+    if (isViewOnly) {
+      canvas.selection = false;
+      canvas.defaultCursor = "grab";
+      canvas.isDrawingMode = false;
+      canvas.getObjects().forEach((o) => o.set({ selectable: false, evented: false }));
+    } else {
+      canvas.defaultCursor = "default";
+      canvas.getObjects().forEach((o) => o.set({ selectable: true, evented: true }));
+      // Re-apply current tool state
+      if (tool === "draw" || tool === "eraser") {
+        canvas.isDrawingMode = true;
+        canvas.selection = false;
+      } else {
+        canvas.isDrawingMode = false;
+        canvas.selection = tool === "select";
+      }
+    }
+    canvas.renderAll();
+  }, [isMobileView, mobileEditMode, canvasReady, isViewOnly, tool]);
 
   const handleUndo = () => {
     const canvas = fabricRef.current;
@@ -1475,6 +1573,24 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
         {toolBtn("fitScreen", <Maximize className="h-4 w-4" />, "Fit to Screen", fitToScreen, false)}
 
         <Separator orientation="vertical" className="h-6 mx-1" />
+
+        {isMobileView && isAdmin && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="icon"
+                variant={mobileEditMode ? "default" : "ghost"}
+                onClick={() => setMobileEditMode((m) => !m)}
+                data-testid="button-mobile-edit-toggle"
+              >
+                {mobileEditMode ? <Lock className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-xs">
+              {mobileEditMode ? "Lock (view only)" : "Unlock editing"}
+            </TooltipContent>
+          </Tooltip>
+        )}
 
         <Tooltip>
           <TooltipTrigger asChild>
