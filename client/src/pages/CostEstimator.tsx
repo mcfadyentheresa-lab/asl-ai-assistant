@@ -420,31 +420,28 @@ export default function CostEstimator() {
     <div className="min-h-screen bg-background">
       <Navbar />
       <div className="max-w-6xl mx-auto px-4 py-6 space-y-6">
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-3">
           <Link href={`/project/${projectId}`}>
             <Button variant="ghost" size="sm" data-testid="button-back-to-project">
               <ArrowLeft className="h-4 w-4 mr-1" /> Back
             </Button>
           </Link>
           <div className="flex-1 min-w-0">
-            <h1 className="text-2xl font-semibold tracking-tight" data-testid="text-page-title">Cost Estimator</h1>
-            <p className="text-sm text-muted-foreground" data-testid="text-project-name">{project.name} <span className="text-xs ml-1">All pricing in CAD</span></p>
+            <h1 className="text-base font-semibold normal-case tracking-normal leading-tight" data-testid="text-page-title">Cost Estimator</h1>
+            <p className="text-xs text-muted-foreground" data-testid="text-project-name">{project.name} · CAD</p>
           </div>
-            <div className="flex items-center gap-2">
-              <Label className="text-sm">View:</Label>
-              <Select value={viewMode} onValueChange={(v: any) => setViewMode(v)}>
-                <SelectTrigger className="w-[140px]" data-testid="select-view-mode">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Items</SelectItem>
-                  <SelectItem value="room">By Room</SelectItem>
-                  <SelectItem value="sq_ft">Per Sq Ft</SelectItem>
-                  <SelectItem value="hour">Per Hour</SelectItem>
-                  <SelectItem value="board">Per Board/Unit</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          <Select value={viewMode} onValueChange={(v: any) => setViewMode(v)}>
+            <SelectTrigger className="w-[130px] h-8 text-sm" data-testid="select-view-mode">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Items</SelectItem>
+              <SelectItem value="room">By Room</SelectItem>
+              <SelectItem value="sq_ft">Per Sq Ft</SelectItem>
+              <SelectItem value="hour">Per Hour</SelectItem>
+              <SelectItem value="board">Per Board/Unit</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         {!activeEstimate && canEdit && (
