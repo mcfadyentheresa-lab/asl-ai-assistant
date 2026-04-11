@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { ChevronLeft, ChevronDown, ChevronUp, ChevronRight, ZoomIn, ZoomOut, Plus, Trash2, Pencil, FolderPlus, Check, X, MoreVertical, CheckSquare, Square, GripVertical, Palette } from "lucide-react";
+import { ChevronLeft, ChevronDown, ChevronUp, ChevronRight, ZoomIn, ZoomOut, Plus, Trash2, Pencil, FolderPlus, Check, X, MoreVertical, CheckSquare, Square, GripVertical, Palette, Copy } from "lucide-react";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useCreateSection, useUpdateSection, useDeleteSection, useCreateMilestone, useUpdateMilestone, useDeleteMilestone, useCreateTask, useUpdateTask } from "@/hooks/use-projects";
 import { useToast } from "@/hooks/use-toast";
+import { queryClient } from "@/lib/queryClient";
 import type { InsertMilestone } from "@shared/schema";
 import { ListPlus } from "lucide-react";
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
@@ -623,6 +624,50 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
     if (!sec) return;
     setEditingSection(sec);
     setEditSectionForm({ title: sec.title, startDate: sec.startDate || "", endDate: sec.endDate || "" });
+  };
+
+  const handleDuplicateSection = async (sec: SectionData) => {
+    try {
+      const res = await fetch(`/api/projects/${projectId}/sections`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          milestoneId: sec.milestoneId,
+          projectId,
+          title: `Copy of ${sec.title}`,
+          startDate: sec.startDate,
+          endDate: sec.endDate,
+          completed: false,
+          order: (sec.order || 0) + 1,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to create section");
+      const newSection = await res.json();
+      const sectionTasks = tasks.filter(t => t.sectionId === sec.id);
+      await Promise.all(
+        sectionTasks.map(t =>
+          fetch(`/api/projects/${projectId}/tasks`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              projectId,
+              milestoneId: sec.milestoneId,
+              sectionId: newSection.id,
+              title: t.title,
+              status: t.status || "todo",
+              startDate: t.startDate || null,
+              dueDate: t.dueDate || null,
+              assignedTo: t.assignedTo || null,
+            }),
+          })
+        )
+      );
+      queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "sections"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/projects/:projectId/tasks", projectId] });
+      toast({ title: "Section duplicated" });
+    } catch {
+      toast({ title: "Failed to duplicate section", variant: "destructive" });
+    }
   };
 
   const handleAddTask = () => {
@@ -1278,6 +1323,10 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                             <DropdownMenuItem onClick={() => { if (parentBuilding) startNewTask(parentBuilding.id, roomData.id); }} data-testid={`button-add-task-room-${roomData.id}`}>
                               <ListPlus className="h-3.5 w-3.5 mr-2" />
                               Add Task
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => { const sec = sections.find(s => s.id === roomData.id); if (sec) handleDuplicateSection(sec); }} data-testid={`button-duplicate-room-${roomData.id}`}>
+                              <Copy className="h-3.5 w-3.5 mr-2" />
+                              Duplicate
                             </DropdownMenuItem>
                             <DropdownMenuItem className="text-destructive" onClick={() => deleteSection({ id: roomData.id, projectId }, { onSuccess: () => toast({ title: "Room deleted" }), onError: () => toast({ title: "Failed to delete room", variant: "destructive" }) })} data-testid={`button-delete-room-${roomData.id}`}>
                               <Trash2 className="h-3.5 w-3.5 mr-2" />
