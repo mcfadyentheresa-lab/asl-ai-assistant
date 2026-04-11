@@ -3,7 +3,7 @@ import { useProjects, useDeleteProject, useArchiveProject, useUsers } from "@/ho
 import { Navbar } from "@/components/layout/Navbar";
 import { ProjectCard } from "@/components/project/ProjectCard";
 import { Button } from "@/components/ui/button";
-import { Plus, Loader2, Eye, EyeOff, Upload, X, UserPlus, ArrowRight, FolderOpen, Briefcase, Clock, CalendarDays, CheckCircle2, Circle, PlayCircle, Calendar } from "lucide-react";
+import { Plus, Loader2, Eye, EyeOff, Upload, X, UserPlus, ArrowRight, FolderOpen, Briefcase, Clock, CalendarDays, CheckCircle2, Circle, PlayCircle, Calendar, MoreHorizontal } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { apiRequest, queryClient as qc } from "@/lib/queryClient";
 import { motion } from "framer-motion";
@@ -50,6 +50,13 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Link } from "wouter";
 import { useViewMode } from "@/hooks/use-view-mode";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const statusLabel: Record<string, string> = {
   planning: "Planning",
@@ -66,6 +73,7 @@ export default function Dashboard() {
   const { mutate: archiveProject } = useArchiveProject();
   const { toast } = useToast();
   const [showArchived, setShowArchived] = useState(false);
+  const [openCreateProject, setOpenCreateProject] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const { viewMode, setViewMode } = useViewMode();
   const { data: onlineUsers } = useOnlineUsers();
@@ -177,7 +185,7 @@ export default function Dashboard() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
             {isAdmin && (
               <div className="inline-flex items-center border border-border/70 rounded-md overflow-hidden bg-muted/20" data-testid="view-mode-toggle">
                 {(["admin", "crew", "client"] as const).map((role) => (
@@ -198,18 +206,44 @@ export default function Dashboard() {
                 ))}
               </div>
             )}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowArchived(!showArchived)}
-              className="h-8 rounded-full px-3 text-xs"
-              data-testid="button-toggle-archived"
-            >
-              {showArchived ? <EyeOff className="mr-1.5 h-3.5 w-3.5" /> : <Eye className="mr-1.5 h-3.5 w-3.5" />}
-              <span className="hidden sm:inline">{showArchived ? "Hide Archived" : "Show Archived"}</span>
-              <span className="sm:hidden">{showArchived ? "Hide" : "Archived"}</span>
-            </Button>
-            {canCreateProjects && <CreateProjectDialog />}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8 w-8 p-0" data-testid="button-dashboard-actions">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-44">
+                {canCreateProjects && (
+                  <>
+                    <DropdownMenuItem
+                      data-testid="dropdown-new-project"
+                      onSelect={() => setOpenCreateProject(true)}
+                    >
+                      <Plus className="mr-2 h-3.5 w-3.5" />
+                      New Project
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
+                <DropdownMenuItem
+                  data-testid="dropdown-toggle-archived"
+                  onSelect={() => setShowArchived(!showArchived)}
+                >
+                  {showArchived ? (
+                    <EyeOff className="mr-2 h-3.5 w-3.5" />
+                  ) : (
+                    <Eye className="mr-2 h-3.5 w-3.5" />
+                  )}
+                  {showArchived ? "Hide Archived" : "Show Archived"}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            {canCreateProjects && (
+              <CreateProjectDialog
+                externalOpen={openCreateProject}
+                onExternalChange={setOpenCreateProject}
+              />
+            )}
           </div>
         </div>
 
@@ -520,8 +554,13 @@ export default function Dashboard() {
   );
 }
 
-function CreateProjectDialog() {
-  const [open, setOpen] = useState(false);
+function CreateProjectDialog({ externalOpen, onExternalChange }: { externalOpen?: boolean; onExternalChange?: (v: boolean) => void } = {}) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = externalOpen !== undefined ? externalOpen : internalOpen;
+  const setOpen = (v: boolean) => {
+    if (onExternalChange) onExternalChange(v);
+    else setInternalOpen(v);
+  };
   const { mutate, isPending } = useCreateProject();
   const { toast } = useToast();
   const { data: users } = useUsers();
@@ -631,12 +670,14 @@ function CreateProjectDialog() {
 
   return (
     <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) removeImage(); }}>
-      <DialogTrigger asChild>
-        <Button size="sm" data-testid="button-new-project">
-          <Plus className="mr-2 h-4 w-4" />
-          New Project
-        </Button>
-      </DialogTrigger>
+      {!onExternalChange && (
+        <DialogTrigger asChild>
+          <Button size="sm" data-testid="button-new-project">
+            <Plus className="mr-2 h-4 w-4" />
+            New Project
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent className="sm:max-w-[480px]">
         <DialogHeader>
           <DialogTitle className="font-serif text-2xl" data-testid="text-dialog-title">Create New Project</DialogTitle>
