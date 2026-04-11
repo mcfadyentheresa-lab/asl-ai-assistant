@@ -376,6 +376,15 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
         return !c.__isAdmin || (window.innerWidth < 640 && !c.__mobileEditMode);
       };
 
+      // Lock any newly added object immediately when view-only is active
+      canvas.on("object:added", (e) => {
+        if (isViewOnly()) {
+          e.target?.set({ selectable: false, evented: false });
+          canvas.discardActiveObject();
+          canvas.renderAll();
+        }
+      });
+
       const handleTouchStart = (e: TouchEvent) => {
         if (!isViewOnly()) return;
         e.preventDefault();
@@ -1449,40 +1458,42 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
       )}
 
       <Card className={`flex items-center gap-1 p-1.5 mb-3 flex-wrap ${(!selectedBoardId || isLoadingData) && boards.length > 0 ? "invisible" : ""} ${boards.length === 0 ? "hidden" : ""}`} data-testid="planning-board-toolbar">
-        {toolBtn("select", <MousePointer2 className="h-4 w-4" />, "Select (V)")}
-        {toolBtn("draw", <Pencil className="h-4 w-4" />, "Draw / Sketch")}
-        {toolBtn("eraser", <Eraser className="h-4 w-4" />, "Eraser")}
+        {!isViewOnly && toolBtn("select", <MousePointer2 className="h-4 w-4" />, "Select (V)")}
+        {!isViewOnly && toolBtn("draw", <Pencil className="h-4 w-4" />, "Draw / Sketch")}
+        {!isViewOnly && toolBtn("eraser", <Eraser className="h-4 w-4" />, "Eraser")}
 
-        <Separator orientation="vertical" className="h-6 mx-1" />
+        {!isViewOnly && <Separator orientation="vertical" className="h-6 mx-1" />}
 
-        {toolBtn("text", <Type className="h-4 w-4" />, "Add Text", addText, false)}
-        {toolBtn("sticky", <StickyNote className="h-4 w-4" />, "Sticky Note", addSticky, false)}
-        {toolBtn("card", <LayoutPanelLeft className="h-4 w-4" />, "Add Card / Column", openCardDialog, false)}
-        {toolBtn("rect", <Square className="h-4 w-4" />, "Rectangle", addRect, false)}
-        {toolBtn("circle", <Circle className="h-4 w-4" />, "Circle", addCircle, false)}
+        {!isViewOnly && toolBtn("text", <Type className="h-4 w-4" />, "Add Text", addText, false)}
+        {!isViewOnly && toolBtn("sticky", <StickyNote className="h-4 w-4" />, "Sticky Note", addSticky, false)}
+        {!isViewOnly && toolBtn("card", <LayoutPanelLeft className="h-4 w-4" />, "Add Card / Column", openCardDialog, false)}
+        {!isViewOnly && toolBtn("rect", <Square className="h-4 w-4" />, "Rectangle", addRect, false)}
+        {!isViewOnly && toolBtn("circle", <Circle className="h-4 w-4" />, "Circle", addCircle, false)}
 
-        <Separator orientation="vertical" className="h-6 mx-1" />
+        {!isViewOnly && <Separator orientation="vertical" className="h-6 mx-1" />}
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              size="icon"
-              variant="ghost"
-              disabled={isUploadingImage}
-              data-testid="button-add-image"
-            >
-              {isUploadingImage ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            <DropdownMenuItem onClick={() => fileInputRef.current?.click()} data-testid="menu-upload-image">
-              <ImagePlus className="h-4 w-4 mr-2" /> Upload from Device
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => { setImageUrl(""); setShowImageUrlDialog(true); }} data-testid="menu-image-from-url">
-              <Link2 className="h-4 w-4 mr-2" /> Paste Image URL
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {!isViewOnly && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                size="icon"
+                variant="ghost"
+                disabled={isUploadingImage}
+                data-testid="button-add-image"
+              >
+                {isUploadingImage ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem onClick={() => fileInputRef.current?.click()} data-testid="menu-upload-image">
+                <ImagePlus className="h-4 w-4 mr-2" /> Upload from Device
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => { setImageUrl(""); setShowImageUrlDialog(true); }} data-testid="menu-image-from-url">
+                <Link2 className="h-4 w-4 mr-2" /> Paste Image URL
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
         <input
           ref={fileInputRef}
           type="file"
@@ -1492,52 +1503,54 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
           data-testid="input-planning-board-image"
         />
 
-        <Separator orientation="vertical" className="h-6 mx-1" />
+        {!isViewOnly && <Separator orientation="vertical" className="h-6 mx-1" />}
 
-        <div className="relative">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={() => setShowColorPicker(!showColorPicker)}
-                data-testid="button-color-picker"
-              >
-                <div className="h-4 w-4 rounded-full border border-border" style={{ backgroundColor: brushColor }} />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" className="text-xs">Brush Color</TooltipContent>
-          </Tooltip>
-          {showColorPicker && (
-            <div className="absolute top-full left-0 mt-2 z-50 bg-popover border rounded-md p-2 shadow-md" data-testid="color-picker-popover">
-              <div className="grid grid-cols-5 gap-1.5">
-                {DRAW_COLORS.map((c) => (
-                  <button
-                    key={c}
-                    className="h-6 w-6 rounded-full border-2 transition-transform"
-                    style={{
-                      backgroundColor: c,
-                      borderColor: brushColor === c ? "hsl(var(--primary))" : "transparent",
-                    }}
-                    onClick={() => { setBrushColor(c); setShowColorPicker(false); }}
-                    data-testid={`button-color-${c.slice(1)}`}
+        {!isViewOnly && (
+          <div className="relative">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => setShowColorPicker(!showColorPicker)}
+                  data-testid="button-color-picker"
+                >
+                  <div className="h-4 w-4 rounded-full border border-border" style={{ backgroundColor: brushColor }} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">Brush Color</TooltipContent>
+            </Tooltip>
+            {showColorPicker && (
+              <div className="absolute top-full left-0 mt-2 z-50 bg-popover border rounded-md p-2 shadow-md" data-testid="color-picker-popover">
+                <div className="grid grid-cols-5 gap-1.5">
+                  {DRAW_COLORS.map((c) => (
+                    <button
+                      key={c}
+                      className="h-6 w-6 rounded-full border-2 transition-transform"
+                      style={{
+                        backgroundColor: c,
+                        borderColor: brushColor === c ? "hsl(var(--primary))" : "transparent",
+                      }}
+                      onClick={() => { setBrushColor(c); setShowColorPicker(false); }}
+                      data-testid={`button-color-${c.slice(1)}`}
+                    />
+                  ))}
+                </div>
+                <div className="mt-2 pt-2 border-t">
+                  <Input
+                    type="color"
+                    value={brushColor}
+                    onChange={(e) => setBrushColor(e.target.value)}
+                    className="h-7 w-full p-0 border-0"
+                    data-testid="input-custom-color"
                   />
-                ))}
+                </div>
               </div>
-              <div className="mt-2 pt-2 border-t">
-                <Input
-                  type="color"
-                  value={brushColor}
-                  onChange={(e) => setBrushColor(e.target.value)}
-                  className="h-7 w-full p-0 border-0"
-                  data-testid="input-custom-color"
-                />
-              </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
 
-        {(tool === "draw" || tool === "eraser") && (
+        {!isViewOnly && (tool === "draw" || tool === "eraser") && (
           <div className="flex items-center gap-2 ml-1" data-testid="brush-size-control">
             <span className="text-[10px] text-muted-foreground whitespace-nowrap">Size</span>
             <Slider
@@ -1555,10 +1568,10 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
 
         <div className="flex-1" />
 
-        {toolBtn("duplicate", <Copy className="h-4 w-4" />, "Duplicate (Cmd+D)", handleDuplicate, false)}
-        {toolBtn("forward", <ChevronUp className="h-4 w-4" />, "Bring Forward", bringForward, false)}
-        {toolBtn("backward", <ChevronDown className="h-4 w-4" />, "Send Backward", sendBackward, false)}
-        {toolBtn("deleteObj", <Trash2 className="h-4 w-4" />, "Delete (Del)", handleDelete, false)}
+        {!isViewOnly && toolBtn("duplicate", <Copy className="h-4 w-4" />, "Duplicate (Cmd+D)", handleDuplicate, false)}
+        {!isViewOnly && toolBtn("forward", <ChevronUp className="h-4 w-4" />, "Bring Forward", bringForward, false)}
+        {!isViewOnly && toolBtn("backward", <ChevronDown className="h-4 w-4" />, "Send Backward", sendBackward, false)}
+        {!isViewOnly && toolBtn("deleteObj", <Trash2 className="h-4 w-4" />, "Delete (Del)", handleDelete, false)}
 
         <Separator orientation="vertical" className="h-6 mx-1" />
 
