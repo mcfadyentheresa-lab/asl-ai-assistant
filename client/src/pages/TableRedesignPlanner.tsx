@@ -792,27 +792,24 @@ export default function TableRedesignPlanner() {
               <div className="space-y-6">
                 {/* Plan detail header */}
                 <Card>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <CardTitle className="uppercase tracking-wider text-base md:text-lg leading-tight" data-testid="text-plan-title">
+                  <CardHeader className="py-3 px-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <CardTitle className="uppercase tracking-wider text-sm leading-tight" data-testid="text-plan-title">
                           {selectedPlan.conceptTitle || selectedPlan.pieceName}
                         </CardTitle>
-                        <div className="flex gap-2 mt-1 flex-wrap">
-                          <Badge variant="secondary" className="capitalize">{selectedPlan.pieceType.replace("_", " ")}</Badge>
-                          <Badge variant="outline" className="capitalize">{selectedPlan.redesignScope.replace("_", " ")}</Badge>
+                        <div className="flex gap-1.5 mt-1.5 flex-wrap">
+                          <Badge variant="secondary" className="capitalize text-xs px-1.5 py-0">{selectedPlan.pieceType.replace("_", " ")}</Badge>
+                          <Badge variant="outline" className="capitalize text-xs px-1.5 py-0">{selectedPlan.redesignScope.replace("_", " ")}</Badge>
                           {selectedPlan.intendedUse && (
-                            <Badge variant="outline" className="capitalize">{selectedPlan.intendedUse.replace("_", " ")}</Badge>
-                          )}
-                          {selectedPlan.priorityConstraint && (
-                            <Badge variant="secondary" className="capitalize">Priority: {selectedPlan.priorityConstraint}</Badge>
+                            <Badge variant="outline" className="capitalize text-xs px-1.5 py-0">{selectedPlan.intendedUse.replace("_", " ")}</Badge>
                           )}
                           {selectedPlan.proposedBaseType && (
-                            <Badge variant="secondary" className="capitalize">
+                            <Badge variant="secondary" className="capitalize text-xs px-1.5 py-0">
                               Base: {selectedPlan.proposedBaseType.replace("_", " ")}
                             </Badge>
                           )}
-                          <Badge className={`capitalize ${
+                          <Badge className={`capitalize text-xs px-1.5 py-0 ${
                             selectedPlan.approvalStatus === "approved" ? "bg-green-600" :
                             selectedPlan.approvalStatus === "ready_for_client" ? "bg-blue-600" :
                             selectedPlan.approvalStatus === "revise" ? "bg-amber-600" : ""
@@ -821,15 +818,15 @@ export default function TableRedesignPlanner() {
                           </Badge>
                         </div>
                       </div>
-                      <div className="flex gap-2">
-                        <Button variant="outline" size="sm" onClick={() => setShowShareView(true)} data-testid="button-share-view">
-                          <Eye className="h-4 w-4 mr-1" /> Client View
+                      <div className="flex gap-1.5 shrink-0">
+                        <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => setShowShareView(true)} data-testid="button-share-view">
+                          <Eye className="h-3.5 w-3.5 mr-1" /> Client View
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => setShowPushDialog(true)} data-testid="button-push-to-board">
-                          <Send className="h-4 w-4 mr-1" /> Add to Board
+                        <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => setShowPushDialog(true)} data-testid="button-push-to-board">
+                          <Send className="h-3.5 w-3.5 mr-1" /> Board
                         </Button>
-                        <Button variant="destructive" size="sm" onClick={() => deletePlan.mutate(selectedPlan.id)} data-testid="button-delete-plan">
-                          <Trash2 className="h-4 w-4" />
+                        <Button variant="destructive" size="sm" className="h-7 w-7 px-0" onClick={() => deletePlan.mutate(selectedPlan.id)} data-testid="button-delete-plan">
+                          <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
                     </div>
