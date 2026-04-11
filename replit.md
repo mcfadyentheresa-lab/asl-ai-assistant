@@ -10,6 +10,27 @@ The long-term vision is to transition Aster & Spruce Connect into a SaaS offerin
 
 Preferred communication style: Simple, everyday language.
 
+## Vocabulary Standard (Canadian English)
+
+All user-facing copy must follow these conventions:
+
+| Term | Use | Avoid |
+|------|-----|-------|
+| Colour | "Colour Portfolio", "Paint Colour" | "Color" |
+| Labour | "Labour & Contractors", "Labour Cost" | "Labor" |
+| In Progress | task status label | "In-Progress", "in progress" |
+| To Do | task status label | "Todo", "TODO" |
+| Done | task status label | "Completed" (for tasks) |
+| Planning Board | the canvas feature | "Kanban Board" |
+| Timeline | the scheduling/Gantt view | "Gantt" (user-facing) |
+| Open Items | checklist items without completion | "Open Item" (singular OK) |
+| Progress | the tab formerly called Checklist | "Checklist" (tab label) |
+| Log Hours | button to open time entry | "Log Your Hours" |
+| New Time Entry | card/form title on Timesheets | "Log Your Hours" |
+| View Progress | activity log action | "View Checklist" |
+
+Internal code identifiers (component names, variable names, URL paths such as `/labor-rates`, `/colors`) may retain US English for stability.
+
 ## System Architecture
 
 ### Overall Structure

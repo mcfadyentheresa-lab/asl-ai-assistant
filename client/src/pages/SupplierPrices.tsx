@@ -747,7 +747,7 @@ function AddFromReceiptDialog({
             <Label htmlFor="receiptProduct">Product Name *</Label>
             <Input id="receiptProduct" value={formData.productName} onChange={e => setFormData(p => ({ ...p, productName: e.target.value }))} placeholder="e.g., 2x6x10 SPF Lumber" required data-testid="input-receipt-product" />
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="space-y-2">
               <Label htmlFor="receiptPrice">Price (CAD) *</Label>
               <Input id="receiptPrice" type="number" step="0.01" value={formData.unitPrice} onChange={e => setFormData(p => ({ ...p, unitPrice: e.target.value }))} required data-testid="input-receipt-price" />
