@@ -945,7 +945,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
           {isAdmin && drillLevel === "buildings" && (
             <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => setAddingBuilding(true)} data-testid="button-add-building-timeline">
               <Plus className="h-3 w-3" />
-              Add
+              Section
             </Button>
           )}
           {isAdmin && drillLevel === "tasks" && selectedBuildingId && (
