@@ -136,15 +136,7 @@ export function Navbar() {
                 Your Profile
               </DropdownMenuItem>
             </Link>
-            {effectiveRole === "client" && (
-              <Link href="/colors">
-                <DropdownMenuItem data-testid="link-colors">
-                  <Palette className="mr-2 h-4 w-4" />
-                  Colour Portfolio
-                </DropdownMenuItem>
-              </Link>
-            )}
-            {effectiveRole === "admin" && (
+            {effectiveRole !== "crew" && (
               <Link href="/colors">
                 <DropdownMenuItem data-testid="link-colors">
                   <Palette className="mr-2 h-4 w-4" />
@@ -188,7 +180,7 @@ export function Navbar() {
               <Link href="/labor-rates">
                 <DropdownMenuItem data-testid="link-labor-rates">
                   <Users className="mr-2 h-4 w-4" />
-                  Labor & Contractors
+                  Labour & Contractors
                 </DropdownMenuItem>
               </Link>
             )}

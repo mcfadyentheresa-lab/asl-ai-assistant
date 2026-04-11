@@ -179,10 +179,23 @@ export default function Dashboard() {
 
           <div className="flex items-center gap-2 flex-wrap">
             {isAdmin && (
-              <div className="flex items-center rounded-full border border-border/70 bg-muted/30 p-0.5 overflow-hidden shadow-sm" data-testid="view-mode-toggle">
-                <Button type="button" size="sm" variant={viewMode === "admin" ? "default" : "ghost"} className="h-8 rounded-full px-3 text-xs" onClick={() => setViewMode("admin")} data-testid="button-view-admin">Admin</Button>
-                <Button type="button" size="sm" variant={viewMode === "crew" ? "default" : "ghost"} className="h-8 rounded-full px-3 text-xs" onClick={() => setViewMode("crew")} data-testid="button-view-crew">Crew</Button>
-                <Button type="button" size="sm" variant={viewMode === "client" ? "default" : "ghost"} className="h-8 rounded-full px-3 text-xs" onClick={() => setViewMode("client")} data-testid="button-view-client">Client</Button>
+              <div className="inline-flex items-center border border-border/70 rounded-md overflow-hidden bg-muted/20" data-testid="view-mode-toggle">
+                {(["admin", "crew", "client"] as const).map((role) => (
+                  <button
+                    key={role}
+                    type="button"
+                    onClick={() => setViewMode(role)}
+                    data-testid={`button-view-${role}`}
+                    className={[
+                      "h-8 px-3 text-xs font-medium transition-colors",
+                      viewMode === role
+                        ? "bg-foreground text-background"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/40",
+                    ].join(" ")}
+                  >
+                    {role.charAt(0).toUpperCase() + role.slice(1)}
+                  </button>
+                ))}
               </div>
             )}
             <Button

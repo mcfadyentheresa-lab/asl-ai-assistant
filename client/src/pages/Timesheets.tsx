@@ -350,7 +350,7 @@ export default function Timesheets() {
           <CardHeader>
             <CardTitle className="font-serif text-lg flex items-center gap-2">
               <Plus className="h-5 w-5" />
-              Log Your Hours
+              New Time Entry
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">

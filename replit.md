@@ -48,7 +48,7 @@ Replit Auth provides authentication via OpenID Connect, with session management 
 *   **Crew Timesheets & Admin Payroll**: Bi-weekly timesheet system with draft/submitted/approved workflow, pay period navigation (prev/next), crew-friendly language, and admin payroll view.
 *   **Crew "My Day" Dashboard**: When in crew view mode, the dashboard shows a "Your Assignments" panel with tasks grouped by project, inline status toggling (To Do → In Progress → Done), quick links to Timesheets and Master Calendar, and a personalised subtitle with open assignment count. Backend `GET /api/my-tasks` endpoint fetches tasks assigned to the logged-in user.
 *   **Cost Estimator**: Per-project estimation tool with line items, material markup, market rate auto-fill, variance warnings, and receipt tracking. Includes an AI Scope Analyzer (OpenAI/gpt-5-mini), an "Import from Board" feature, and a toggleable management fee (default 25%) applied before HST. Accessible from the Budget Snapshot card on each project via `/project/:id/estimate`.
-*   **Labor & Contractors**: Admin page for managing crew pay/billable rates and a subcontractor directory.
+*   **Labour & Contractors**: Admin page for managing crew pay/billable rates and a subcontractor directory.
 *   **Supplier Price Book**: Admin-only material pricing database with supplier and product management, integrated with the Cost Estimator.
 *   **Gantt Chart / Progress Tab**: A nested expandable tree view of projects with buildings, rooms, and tasks, supporting drag-and-drop scheduling and progress tracking.
 *   **Overview Tab — Project Snapshot**: Condensed cards for project milestones and checklist status.

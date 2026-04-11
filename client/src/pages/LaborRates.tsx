@@ -184,7 +184,7 @@ export default function LaborRates() {
               </Button>
             </Link>
             <div>
-              <h1 className="text-2xl font-bold" data-testid="text-labor-rates-title">Labor & Contractors</h1>
+              <h1 className="text-2xl font-bold" data-testid="text-labor-rates-title">Labour & Contractors</h1>
               <p className="text-sm text-muted-foreground">Manage crew pay rates, billable rates, and subcontractor information</p>
             </div>
           </div>

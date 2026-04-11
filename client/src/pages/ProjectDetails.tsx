@@ -16,7 +16,7 @@ import { useProjectRealtime } from "@/hooks/use-project-realtime";
 import { Navbar } from "@/components/layout/Navbar";
 import SpatialCanvas from "@/components/SpatialCanvas";
 import GanttChart from "@/components/GanttChart";
-import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, ExternalLink, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, CalendarDays, ChevronLeft, Upload, Download, User, X, Paperclip, ZoomIn, Palette, Shield, Users, Phone, Check, Bell, Eye, EyeOff, Archive, ArchiveRestore, PanelRightOpen, MoreVertical, Flag, DollarSign, BarChart3, TrendingUp, TrendingDown, Minus, ArrowUpRight, Building2 } from "lucide-react";
+import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, ExternalLink, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, CalendarDays, ChevronLeft, Upload, Download, User, X, Paperclip, ZoomIn, Palette, Shield, Users, Phone, Check, Bell, Eye, EyeOff, Archive, ArchiveRestore, PanelRightOpen, MoreVertical, Flag, DollarSign, BarChart3, TrendingUp, TrendingDown, Minus, ArrowUpRight, Building2, Sparkles, Armchair } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -404,13 +404,13 @@ function SidebarCards({
   ) || [];
 
   const typeStyles: Record<string, { dot: string; tab: string | null; label: string }> = {
-    milestone_created: { dot: "bg-blue-500", tab: "checklist", label: "View Checklist" },
+    milestone_created: { dot: "bg-blue-500", tab: "checklist", label: "View Progress" },
     photo_uploaded: { dot: "bg-emerald-500", tab: "photos", label: "View Photos" },
     document_uploaded: { dot: "bg-amber-500", tab: "docs", label: "View Documents" },
     notification_sent: { dot: "bg-purple-500", tab: null, label: "" },
     message_sent: { dot: "bg-sky-500", tab: "chat", label: "View Chat" },
     calendar_event_created: { dot: "bg-rose-500", tab: "calendar", label: "View Calendar" },
-    task_created: { dot: "bg-teal-500", tab: "checklist", label: "View Checklist" },
+    task_created: { dot: "bg-teal-500", tab: "checklist", label: "View Progress" },
   };
 
   return (
@@ -1123,6 +1123,28 @@ export default function ProjectDetails() {
                     </button>
                   </div>
                 </Card>
+
+                {userRole === "admin" && (
+                  <Card data-testid="card-admin-tools">
+                    <div className="p-4 space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Admin Tools</p>
+                      <div className="flex flex-wrap gap-2">
+                        <Link href="/social-media">
+                          <Button variant="outline" size="sm" className="text-xs h-8" data-testid="button-overview-social-media">
+                            <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                            Social Media
+                          </Button>
+                        </Link>
+                        <Link href="/table-redesign">
+                          <Button variant="outline" size="sm" className="text-xs h-8" data-testid="button-overview-table-redesign">
+                            <Armchair className="h-3.5 w-3.5 mr-1.5" />
+                            Furniture Redesign
+                          </Button>
+                        </Link>
+                      </div>
+                    </div>
+                  </Card>
+                )}
 
               </div>
 
@@ -2671,6 +2693,8 @@ function PhotosTab({ projectId }: { projectId: number }) {
   const { mutate: deletePhoto } = useDeletePhoto();
   const { mutateAsync: uploadImage, isPending: isUploading } = useUploadImage();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [lightboxPhoto, setLightboxPhoto] = useState<{ url: string; caption?: string | null } | null>(null);
   const [caption, setCaption] = useState("");
@@ -2739,6 +2763,14 @@ function PhotosTab({ projectId }: { projectId: number }) {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h3 className="font-serif text-lg font-semibold" data-testid="text-photos-heading">Progress Photos</h3>
         <div className="flex items-center gap-2 flex-wrap">
+          {isAdmin && (
+            <Link href="/social-media">
+              <Button variant="outline" size="sm" data-testid="button-create-social-post">
+                <Sparkles className="mr-2 h-4 w-4" />
+                Create Social Post
+              </Button>
+            </Link>
+          )}
           <Input
             value={caption}
             onChange={(e) => setCaption(e.target.value)}

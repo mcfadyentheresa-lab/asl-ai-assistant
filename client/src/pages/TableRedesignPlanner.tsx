@@ -453,9 +453,9 @@ export default function TableRedesignPlanner() {
           </Button>
         </div>
 
-        <div className="grid grid-cols-12 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Plan list sidebar */}
-          <div className="col-span-3">
+          <div className="col-span-1 lg:col-span-3">
             <Card>
               <CardHeader className="py-3 px-4">
                 <CardTitle className="text-sm uppercase tracking-wider">Plans</CardTitle>
@@ -493,14 +493,14 @@ export default function TableRedesignPlanner() {
           </div>
 
           {/* Main content */}
-          <div className="col-span-9">
+          <div className="col-span-1 lg:col-span-9">
             {showCreateForm && (
               <Card>
                 <CardHeader>
                   <CardTitle className="uppercase tracking-wider">New Redesign Plan</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <Label>Project *</Label>
                       <Select value={selectedProjectId || ""} onValueChange={setSelectedProjectId}>
@@ -540,7 +540,7 @@ export default function TableRedesignPlanner() {
                   <Separator />
                   <h3 className="text-sm font-semibold uppercase tracking-wider">Images</h3>
 
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
                       <Label>Before Image</Label>
                       <Button variant="outline" className="w-full mt-1" onClick={() => handleUpload("beforeImageUrl")} disabled={isUploading} data-testid="button-upload-before">
@@ -567,7 +567,7 @@ export default function TableRedesignPlanner() {
                   <Separator />
                   <h3 className="text-sm font-semibold uppercase tracking-wider">Dimensions & Weight</h3>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <Label>Shape *</Label>
                       <Select value={form.tableShape} onValueChange={v => setForm(f => ({ ...f, tableShape: v }))}>
@@ -592,7 +592,7 @@ export default function TableRedesignPlanner() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-4 gap-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                     <div>
                       <Label>Length (inches)</Label>
                       <Input type="number" value={form.lengthInches} onChange={e => setForm(f => ({ ...f, lengthInches: e.target.value }))} data-testid="input-length" />
@@ -633,7 +633,7 @@ export default function TableRedesignPlanner() {
                   <Separator />
                   <h3 className="text-sm font-semibold uppercase tracking-wider">Design Direction</h3>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <Label>Intended Use *</Label>
                       <Select value={form.intendedUse} onValueChange={v => setForm(f => ({ ...f, intendedUse: v }))}>
@@ -658,7 +658,7 @@ export default function TableRedesignPlanner() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <Label>Redesign Scope *</Label>
                       <Select value={form.redesignScope} onValueChange={v => setForm(f => ({ ...f, redesignScope: v }))}>
@@ -683,7 +683,7 @@ export default function TableRedesignPlanner() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <Label>Style Direction</Label>
                       <Input
@@ -707,7 +707,7 @@ export default function TableRedesignPlanner() {
                   <Separator />
                   <h3 className="text-sm font-semibold uppercase tracking-wider">Concept Output</h3>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <Label>Concept Title</Label>
                       <Input
@@ -843,7 +843,7 @@ export default function TableRedesignPlanner() {
                     )}
 
                     {/* Images row */}
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       {[
                         { key: "beforeImageUrl" as const, label: "Before" },
                         { key: "inspirationImageUrl" as const, label: "Inspiration" },
@@ -874,7 +874,7 @@ export default function TableRedesignPlanner() {
                     </div>
 
                     {/* Dimensions summary */}
-                    <div className="grid grid-cols-4 gap-3 text-sm">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
                       <div className="bg-muted/50 rounded p-2">
                         <div className="text-xs text-muted-foreground">Shape</div>
                         <div className="font-medium capitalize">{selectedPlan.tableShape}</div>
@@ -1122,7 +1122,7 @@ function MaterialRow({ material, planId, onDelete }: { material: TableRedesignMa
     return (
       <div className="flex items-center gap-3 p-2 rounded border text-sm group" data-testid={`material-row-${material.id}`}>
         <div className="flex-1 space-y-1">
-          <div className="grid grid-cols-6 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
             <div><span className="text-xs text-muted-foreground block">Component</span>{material.component}</div>
             <div><span className="text-xs text-muted-foreground block">Material</span>{material.material || "—"}</div>
             <div><span className="text-xs text-muted-foreground block">Finish</span>{material.finish || "—"}</div>
@@ -1145,12 +1145,12 @@ function MaterialRow({ material, planId, onDelete }: { material: TableRedesignMa
 
   return (
     <div className="p-3 rounded border space-y-2" data-testid={`material-edit-${material.id}`}>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
         <Input placeholder="Component" value={form.component} onChange={e => setForm(f => ({ ...f, component: e.target.value }))} />
         <Input placeholder="Material" value={form.material} onChange={e => setForm(f => ({ ...f, material: e.target.value }))} />
         <Input placeholder="Finish" value={form.finish} onChange={e => setForm(f => ({ ...f, finish: e.target.value }))} />
       </div>
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         <Input placeholder="Dimensions" value={form.dimensions} onChange={e => setForm(f => ({ ...f, dimensions: e.target.value }))} />
         <Input placeholder="Qty" type="number" value={form.quantity} onChange={e => setForm(f => ({ ...f, quantity: e.target.value }))} />
         <Input placeholder="Supplier" value={form.supplier} onChange={e => setForm(f => ({ ...f, supplier: e.target.value }))} />
