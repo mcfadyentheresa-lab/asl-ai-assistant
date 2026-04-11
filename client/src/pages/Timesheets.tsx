@@ -23,7 +23,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Clock, Calendar, Briefcase, Send, Trash2, Plus, CheckCircle2, Loader2, User, Pencil, ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
+import { Clock, Calendar, Briefcase, Send, Trash2, Plus, CheckCircle2, Loader2, User, Pencil, ArrowLeft, ChevronLeft, ChevronRight, FolderPlus } from "lucide-react";
 import { Link } from "wouter";
 import { format } from "date-fns";
 import type { Project, Milestone, CalendarEvent, TimeEntry } from "@shared/schema";
@@ -87,6 +87,8 @@ export default function Timesheets() {
   const [description, setDescription] = useState("");
   const [selectedMilestoneId, setSelectedMilestoneId] = useState("");
   const [selectedCalendarEventId, setSelectedCalendarEventId] = useState("");
+  const [showCreateProject, setShowCreateProject] = useState(false);
+  const [newProjectName, setNewProjectName] = useState("");
 
   function calcHours(start: string, end: string): number {
     if (!start || !end) return 0;
@@ -119,6 +121,25 @@ export default function Timesheets() {
   const { data: calendarEvents } = useQuery<CalendarEvent[]>({
     queryKey: [`/api/projects/${projectIdNum}/calendar`],
     enabled: !!projectIdNum,
+  });
+
+  const createProject = useMutation({
+    mutationFn: async (name: string) => {
+      const res = await apiRequest("POST", "/api/projects", { name, status: "planning" });
+      return res.json() as Promise<Project>;
+    },
+    onSuccess: (project) => {
+      toast({ title: "Project created", description: `"${project.name}" has been added.` });
+      queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
+      setSelectedProjectId(String(project.id));
+      setSelectedMilestoneId("");
+      setSelectedCalendarEventId("");
+      setNewProjectName("");
+      setShowCreateProject(false);
+    },
+    onError: () => {
+      toast({ title: "Failed to create project", variant: "destructive" });
+    },
   });
 
   const createEntry = useMutation({
@@ -403,6 +424,15 @@ export default function Timesheets() {
                   ))}
                 </SelectContent>
               </Select>
+              <button
+                type="button"
+                onClick={() => setShowCreateProject(true)}
+                className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                data-testid="button-create-project-inline"
+              >
+                <FolderPlus className="h-3.5 w-3.5" />
+                Don't see your project? Create one
+              </button>
             </div>
 
             {projectIdNum > 0 && milestones && milestones.length > 0 && (
@@ -583,6 +613,50 @@ export default function Timesheets() {
             )}
           </div>
         )}
+        <Dialog open={showCreateProject} onOpenChange={(open) => { if (!open) { setShowCreateProject(false); setNewProjectName(""); } }}>
+          <DialogContent data-testid="dialog-create-project">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <FolderPlus className="h-5 w-5" />
+                Create New Project
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 pt-2">
+              <div>
+                <Label htmlFor="new-project-name">Project Name <span className="text-destructive">*</span></Label>
+                <Input
+                  id="new-project-name"
+                  value={newProjectName}
+                  onChange={(e) => setNewProjectName(e.target.value)}
+                  placeholder="e.g., Muskoka Lakehouse Renovation"
+                  className="mt-1.5"
+                  data-testid="input-new-project-name"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && newProjectName.trim()) {
+                      createProject.mutate(newProjectName.trim());
+                    }
+                  }}
+                  autoFocus
+                />
+                <p className="text-xs text-muted-foreground mt-1.5">You can add more details (dates, budget, etc.) from the project page later.</p>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => { setShowCreateProject(false); setNewProjectName(""); }} data-testid="button-cancel-create-project">
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => { if (newProjectName.trim()) createProject.mutate(newProjectName.trim()); }}
+                  disabled={!newProjectName.trim() || createProject.isPending}
+                  data-testid="button-confirm-create-project"
+                >
+                  {createProject.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <FolderPlus className="h-4 w-4 mr-2" />}
+                  Create Project
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
         <Dialog open={!!editingEntry} onOpenChange={(open) => { if (!open) setEditingEntry(null); }}>
           <DialogContent>
             <DialogHeader>
