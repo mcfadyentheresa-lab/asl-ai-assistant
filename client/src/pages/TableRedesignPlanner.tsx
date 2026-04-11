@@ -819,9 +819,6 @@ export default function TableRedesignPlanner() {
                         </div>
                       </div>
                       <div className="flex gap-1.5 shrink-0">
-                        <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => setShowShareView(true)} data-testid="button-share-view">
-                          <Eye className="h-3.5 w-3.5 mr-1" /> Client View
-                        </Button>
                         <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => setShowPushDialog(true)} data-testid="button-push-to-board">
                           <Send className="h-3.5 w-3.5 mr-1" /> Board
                         </Button>
