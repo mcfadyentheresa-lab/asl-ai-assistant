@@ -106,6 +106,16 @@ Replit Auth provides authentication via OpenID Connect, with session management 
 *   `TWILIO_AUTH_TOKEN`
 *   `TWILIO_PHONE_NUMBER`
 
+## Component Removals & Replacements
+
+| Component | Status | Replacement |
+|-----------|--------|-------------|
+| `client/src/components/MoodBoard.tsx` | Deleted | Superseded by the full Planning Board (`/planning-board`) which provides a richer spatial canvas (Fabric.js) with element types, drawing tools, and board templates. No remaining references to MoodBoard anywhere in the codebase. |
+
+## UI Architecture Notes
+
+- **Dashboard actions dropdown**: The "Show Archived" toggle and "New Project" button are consolidated into a single `⋯` (`MoreHorizontal`) dropdown next to the view-mode toggle. This keeps the header to one row on mobile. `CreateProjectDialog` accepts optional `externalOpen`/`onExternalChange` props for external control (used by the dropdown); when called without props it manages its own open state and renders a visible trigger button (used by the empty-state CTA).
+
 ## Manual Setup Steps
 
 ### Rename Replit Project
