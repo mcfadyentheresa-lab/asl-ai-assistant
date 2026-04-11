@@ -480,7 +480,9 @@ export default function TableRedesignPlanner() {
                       }
                     }}
                     className={`w-full text-left px-3 py-2 rounded-md text-sm hover:bg-accent transition-colors ${
-                      selectedPlanId === plan.id || (showCreateForm && draftPlanId === plan.id) ? "bg-accent" : ""
+                      selectedPlanId === plan.id || (showCreateForm && draftPlanId === plan.id)
+                        ? "bg-accent text-accent-foreground"
+                        : ""
                     }`}
                     data-testid={`button-plan-${plan.id}`}
                   >
