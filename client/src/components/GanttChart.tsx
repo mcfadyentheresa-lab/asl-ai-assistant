@@ -1254,7 +1254,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                               </DropdownMenuItem>
                               <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => handleDeleteBuilding(building.id)} data-testid={`button-delete-building-${building.id}`}>
                                 <Trash2 className="h-3.5 w-3.5 mr-2" />
-                                Delete Milestone
+                                Delete
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
