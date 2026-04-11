@@ -365,7 +365,7 @@ export default function Timesheets() {
                 className="mt-1.5"
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label>Time In <span className="text-destructive">*</span></Label>
                 <TimePicker value={startTime} onChange={setStartTime} testId="start-time" />
@@ -593,7 +593,7 @@ export default function Timesheets() {
                 <Label>Date <span className="text-destructive">*</span></Label>
                 <Input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} className="mt-1.5" data-testid="input-edit-date" />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label>Time In <span className="text-destructive">*</span></Label>
                   <TimePicker value={editStartTime} onChange={setEditStartTime} testId="edit-start" />
