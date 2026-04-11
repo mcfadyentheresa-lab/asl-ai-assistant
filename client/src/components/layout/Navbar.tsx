@@ -114,7 +114,7 @@ export function Navbar() {
                 Your Profile
               </DropdownMenuItem>
             </Link>
-            {effectiveRole !== "crew" && (
+            {(effectiveRole === "admin" || effectiveRole === "crew") && (
               <Link href="/colors">
                 <DropdownMenuItem data-testid="link-colors">
                   <Palette className="mr-2 h-4 w-4" />
