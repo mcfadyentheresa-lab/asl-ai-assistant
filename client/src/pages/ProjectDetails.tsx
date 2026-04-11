@@ -910,7 +910,6 @@ export default function ProjectDetails() {
   const [showOpenItemsDrawer, setShowOpenItemsDrawer] = useState(false);
   const [progressSubTab, setProgressSubTab] = useState<"gantt" | "calendar">("gantt");
   const { data: planningBoards } = usePlanningBoards(projectId);
-  const { data: overviewChecklistItems, isLoading: loadingChecklist } = useChecklistItems(projectId);
   const assignedClient = users?.find((u) => u.id === project?.clientId);
 
   const { viewMode } = useViewMode();
@@ -1125,117 +1124,6 @@ export default function ProjectDetails() {
                   </div>
                 </Card>
 
-                {(() => {
-                  if (loadingChecklist) {
-                    return (
-                      <Card data-testid="card-checklist-snapshot">
-                        <div className="p-4 flex items-center gap-2 text-muted-foreground">
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          <span className="text-sm">Loading checklist…</span>
-                        </div>
-                      </Card>
-                    );
-                  }
-
-                  const clItems = (overviewChecklistItems || []) as ChecklistItem[];
-                  const total = clItems.length;
-                  const done = clItems.filter((i) => i.status === "done" || i.completed).length;
-                  const inProgress = clItems.filter((i) => i.status === "in_progress").length;
-                  const nextYear = clItems.filter((i) => i.status === "next_year").length;
-                  const open = total - done;
-                  const todo = total - done - inProgress - nextYear;
-                  const highPriority = clItems.filter((i) => i.priority === "high" && i.status !== "done" && !i.completed);
-                  const recentIncomplete = clItems
-                    .filter((i) => i.status !== "done" && !i.completed && i.status !== "next_year" && i.priority !== "high")
-                    .slice(0, Math.max(0, 4 - highPriority.length));
-                  const previewItems = [...highPriority.slice(0, 4), ...recentIncomplete].slice(0, 4);
-
-                  return (
-                    <Card data-testid="card-checklist-snapshot">
-                      <div className="p-4 space-y-3">
-                            <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <CheckSquare className="h-4 w-4 text-primary" />
-                            <h3 className="font-serif text-base font-semibold text-foreground" data-testid="text-checklist-heading">
-                              Open Items
-                            </h3>
-                          </div>
-                          {total > 0 && (
-                            <div className="flex items-center gap-2">
-                              <div className="w-20 h-1.5 rounded-full bg-muted overflow-hidden">
-                                <div
-                                  className="h-full rounded-full bg-primary transition-all duration-500"
-                                  style={{ width: `${Math.round((done / total) * 100)}%` }}
-                                />
-                              </div>
-                              <span className="text-xs font-medium text-muted-foreground tabular-nums">
-                                {open} open
-                              </span>
-                            </div>
-                          )}
-                        </div>
-
-                        {total > 0 ? (
-                          <>
-                            <div className="flex flex-wrap gap-2" data-testid="checklist-status-counts">
-                              {done > 0 && (
-                                <Badge variant="outline" className="text-[10px] no-default-hover-elevate border-primary/20 text-primary bg-primary/5" data-testid="badge-done-count">
-                                  <Check className="h-3 w-3 mr-0.5" /> {done} done
-                                </Badge>
-                              )}
-                              {todo > 0 && (
-                                <Badge variant="outline" className="text-[10px] no-default-hover-elevate" data-testid="badge-todo-count">
-                                  {todo} to do
-                                </Badge>
-                              )}
-                              {inProgress > 0 && (
-                                <Badge variant="outline" className="text-[10px] no-default-hover-elevate border-blue-200 text-blue-600 bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:bg-blue-950" data-testid="badge-inprogress-count">
-                                  {inProgress} in progress
-                                </Badge>
-                              )}
-                              {nextYear > 0 && (
-                                <Badge variant="outline" className="text-[10px] no-default-hover-elevate border-amber-200 text-amber-600 bg-amber-50 dark:border-amber-800 dark:text-amber-400 dark:bg-amber-950" data-testid="badge-nextyear-count">
-                                  {nextYear} next year
-                                </Badge>
-                              )}
-                            </div>
-
-                            {previewItems.length > 0 && (
-                              <div className="space-y-1" data-testid="checklist-preview-items">
-                                {previewItems.map((item) => (
-                                  <div key={item.id} className="flex items-center gap-2 py-1 px-2 rounded-md hover:bg-muted/40 transition-colors" data-testid={`checklist-preview-${item.id}`}>
-                                    <div className="shrink-0 h-3.5 w-3.5 rounded border border-muted-foreground/25 bg-background" />
-                                    <span className="text-sm truncate text-foreground flex-1">{item.title}</span>
-                                    {item.priority === "high" && (
-                                      <Badge variant="destructive" className="text-[9px] h-4 px-1.5 no-default-hover-elevate">high</Badge>
-                                    )}
-                                    {item.notes?.includes("📌 Moved to Timeline") && (
-                                      <Badge variant="outline" className="text-[9px] h-4 px-1.5 no-default-hover-elevate bg-primary/5 text-primary border-primary/20">
-                                        <ArrowUpRight className="h-2.5 w-2.5" />
-                                      </Badge>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </>
-                        ) : (
-                          <p className="text-sm text-muted-foreground py-2" data-testid="text-no-checklist">
-                            No open items yet.
-                          </p>
-                        )}
-
-                        <button
-                          onClick={() => setShowOpenItemsDrawer(true)}
-                          className="text-xs text-primary hover:underline cursor-pointer"
-                          data-testid="link-view-checklist"
-                        >
-                          View open items →
-                        </button>
-                      </div>
-                    </Card>
-                  );
-                })()}
               </div>
 
               <div className="md:hidden mb-4">
