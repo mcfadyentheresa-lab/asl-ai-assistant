@@ -54,6 +54,7 @@ interface Task {
   milestoneId: number | null;
   sectionId: number | null;
   order: number | null;
+  assignedTo: string | null;
 }
 
 interface GanttChartProps {
