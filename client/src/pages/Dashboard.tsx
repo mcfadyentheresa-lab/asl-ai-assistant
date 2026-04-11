@@ -208,43 +208,47 @@ export default function Dashboard() {
                 ))}
               </div>
             )}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="h-8 w-8 p-0" data-testid="button-dashboard-actions">
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-44">
-                {canCreateProjects && (
-                  <>
+            {!isClient && (
+              <>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-8 w-8 p-0" data-testid="button-dashboard-actions">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-44">
+                    {canCreateProjects && (
+                      <>
+                        <DropdownMenuItem
+                          data-testid="dropdown-new-project"
+                          onSelect={() => setOpenCreateProject(true)}
+                        >
+                          <Plus className="mr-2 h-3.5 w-3.5" />
+                          New Project
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                      </>
+                    )}
                     <DropdownMenuItem
-                      data-testid="dropdown-new-project"
-                      onSelect={() => setOpenCreateProject(true)}
+                      data-testid="dropdown-toggle-archived"
+                      onSelect={() => setShowArchived(!showArchived)}
                     >
-                      <Plus className="mr-2 h-3.5 w-3.5" />
-                      New Project
+                      {showArchived ? (
+                        <EyeOff className="mr-2 h-3.5 w-3.5" />
+                      ) : (
+                        <Eye className="mr-2 h-3.5 w-3.5" />
+                      )}
+                      {showArchived ? "Hide Archived" : "Show Archived"}
                     </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                  </>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                {canCreateProjects && (
+                  <CreateProjectDialog
+                    externalOpen={openCreateProject}
+                    onExternalChange={setOpenCreateProject}
+                  />
                 )}
-                <DropdownMenuItem
-                  data-testid="dropdown-toggle-archived"
-                  onSelect={() => setShowArchived(!showArchived)}
-                >
-                  {showArchived ? (
-                    <EyeOff className="mr-2 h-3.5 w-3.5" />
-                  ) : (
-                    <Eye className="mr-2 h-3.5 w-3.5" />
-                  )}
-                  {showArchived ? "Hide Archived" : "Show Archived"}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            {canCreateProjects && (
-              <CreateProjectDialog
-                externalOpen={openCreateProject}
-                onExternalChange={setOpenCreateProject}
-              />
+              </>
             )}
           </div>
         </div>
