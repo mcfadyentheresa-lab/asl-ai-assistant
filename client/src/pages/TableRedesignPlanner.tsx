@@ -626,29 +626,16 @@ export default function TableRedesignPlanner() {
                     </Select>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <Label>Redesign Scope *</Label>
-                      <Select value={form.redesignScope} onValueChange={v => setForm(f => ({ ...f, redesignScope: v }))}>
-                        <SelectTrigger data-testid="select-scope">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {REDESIGN_SCOPES.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label>Proposed Base Type</Label>
-                      <Select value={form.proposedBaseType} onValueChange={v => setForm(f => ({ ...f, proposedBaseType: v }))}>
-                        <SelectTrigger data-testid="select-base-type">
-                          <SelectValue placeholder="Select base type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {BASE_TYPES.map(b => <SelectItem key={b.value} value={b.value}>{b.label}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                  <div>
+                    <Label>Redesign Scope *</Label>
+                    <Select value={form.redesignScope} onValueChange={v => setForm(f => ({ ...f, redesignScope: v }))}>
+                      <SelectTrigger data-testid="select-scope">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {REDESIGN_SCOPES.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -764,11 +751,6 @@ export default function TableRedesignPlanner() {
                           <Badge variant="outline" className="capitalize text-xs px-1.5 py-0">{selectedPlan.redesignScope.replace("_", " ")}</Badge>
                           {selectedPlan.intendedUse && (
                             <Badge variant="outline" className="capitalize text-xs px-1.5 py-0">{selectedPlan.intendedUse.replace("_", " ")}</Badge>
-                          )}
-                          {selectedPlan.proposedBaseType && (
-                            <Badge variant="secondary" className="capitalize text-xs px-1.5 py-0">
-                              Base: {selectedPlan.proposedBaseType.replace("_", " ")}
-                            </Badge>
                           )}
                           <Badge className={`capitalize text-xs px-1.5 py-0 ${
                             selectedPlan.approvalStatus === "approved" ? "bg-green-600" :
