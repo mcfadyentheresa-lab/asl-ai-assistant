@@ -449,7 +449,7 @@ export default function TableRedesignPlanner() {
             </Select>
           </div>
           <Button onClick={handleNewPlan} data-testid="button-new-plan">
-            <Plus className="h-4 w-4 mr-2" /> New Plan
+            <Plus className="h-4 w-4 mr-2" /> New Concept
           </Button>
         </div>
 
@@ -458,11 +458,11 @@ export default function TableRedesignPlanner() {
           <div className="col-span-1 lg:col-span-3">
             <Card>
               <CardHeader className="py-3 px-4">
-                <CardTitle className="text-sm uppercase tracking-wider">Plans</CardTitle>
+                <CardTitle className="text-sm uppercase tracking-wider">Concepts</CardTitle>
               </CardHeader>
               <CardContent className="p-2">
                 {plansLoading && <p className="text-sm text-muted-foreground px-2">Loading…</p>}
-                {plans?.length === 0 && <p className="text-sm text-muted-foreground px-2">No plans yet</p>}
+                {plans?.length === 0 && <p className="text-sm text-muted-foreground px-2">No concepts yet</p>}
                 {plans?.map(plan => (
                   <button
                     key={plan.id}
@@ -499,7 +499,7 @@ export default function TableRedesignPlanner() {
             {showCreateForm && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="uppercase tracking-wider">New Redesign Plan</CardTitle>
+                  <CardTitle className="uppercase tracking-wider">New Concept</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
