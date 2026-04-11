@@ -40,7 +40,7 @@ export function Navbar() {
     >
       <Link href="/" data-testid="link-home">
         <span className="font-serif text-xl mobile-landscape:text-base font-bold tracking-tight text-foreground">
-          Aster & Spruce
+          ASL
         </span>
       </Link>
 
