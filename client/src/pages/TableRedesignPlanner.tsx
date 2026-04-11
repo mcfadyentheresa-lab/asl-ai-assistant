@@ -614,29 +614,16 @@ export default function TableRedesignPlanner() {
                   <Separator />
                   <h3 className="text-sm font-semibold uppercase tracking-wider">Design Direction</h3>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <Label>Intended Use *</Label>
-                      <Select value={form.intendedUse} onValueChange={v => setForm(f => ({ ...f, intendedUse: v }))}>
-                        <SelectTrigger data-testid="select-intended-use">
-                          <SelectValue placeholder="Select intended use" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {INTENDED_USES.map(u => <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label>Priority Constraint *</Label>
-                      <Select value={form.priorityConstraint} onValueChange={v => setForm(f => ({ ...f, priorityConstraint: v }))}>
-                        <SelectTrigger data-testid="select-priority-constraint">
-                          <SelectValue placeholder="Select priority" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {PRIORITY_CONSTRAINTS.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                  <div>
+                    <Label>Intended Use *</Label>
+                    <Select value={form.intendedUse} onValueChange={v => setForm(f => ({ ...f, intendedUse: v }))}>
+                      <SelectTrigger data-testid="select-intended-use">
+                        <SelectValue placeholder="Select intended use" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {INTENDED_USES.map(u => <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -703,10 +690,6 @@ export default function TableRedesignPlanner() {
                       <Select value={form.approvalStatus} onValueChange={v => {
                         if (v !== "draft" && !form.intendedUse) {
                           toast({ title: "Please select an intended use before changing status", variant: "destructive" });
-                          return;
-                        }
-                        if (v !== "draft" && !form.priorityConstraint) {
-                          toast({ title: "Please select a priority constraint before changing status", variant: "destructive" });
                           return;
                         }
                         setForm(f => ({ ...f, approvalStatus: v }));
