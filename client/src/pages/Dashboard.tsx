@@ -524,16 +524,16 @@ export default function Dashboard() {
             </div>
             {canCreateProjects && !isClientView ? (
               <>
-                <h3 className="font-serif text-xl font-semibold text-foreground mb-2">No projects yet</h3>
-                <p className="text-muted-foreground mb-6">Create your first project to get started.</p>
+                <h3 className="font-serif text-xl font-semibold text-foreground mb-2 text-center">No projects yet</h3>
+                <p className="text-muted-foreground mb-6 text-center max-w-xs">Create your first project to get started.</p>
                 <CreateProjectDialog />
               </>
             ) : (
               <>
-                <h3 className="font-serif text-xl font-semibold text-foreground mb-2">
+                <h3 className="font-serif text-xl font-semibold text-foreground mb-2 text-center">
                   {isClientView ? "Your project will appear here" : "No projects yet"}
                 </h3>
-                <p className="text-muted-foreground mb-6">
+                <p className="text-muted-foreground mb-2 text-center max-w-xs">
                   {isClientView
                     ? "Once you've been invited to a project, it will show up here."
                     : isCrewView
