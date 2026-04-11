@@ -168,8 +168,9 @@ export default function Dashboard() {
       <main className="container py-8 md:py-12 px-6 md:px-10">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-0.5" data-testid="text-greeting">
-              Welcome back, <span className="font-serif">{fullName}</span>
+            <h1 className="normal-case mb-0.5" data-testid="text-greeting">
+              <span className="block text-xs tracking-widest text-muted-foreground font-sans font-normal uppercase mb-1">Welcome back</span>
+              <span className="block font-serif text-2xl md:text-3xl font-normal text-foreground">{user?.firstName || fullName}</span>
             </h1>
             <p className="text-sm text-muted-foreground" data-testid="text-subtitle">
               {isCrewView
