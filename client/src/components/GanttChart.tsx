@@ -645,8 +645,8 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
       const newSection = await res.json();
       const sectionTasks = tasks.filter(t => t.sectionId === sec.id);
       await Promise.all(
-        sectionTasks.map(t =>
-          fetch(`/api/projects/${projectId}/tasks`, {
+        sectionTasks.map(async t => {
+          const taskRes = await fetch(`/api/projects/${projectId}/tasks`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -659,11 +659,13 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
               dueDate: t.dueDate || null,
               assignedTo: t.assignedTo || null,
             }),
-          })
-        )
+          });
+          if (!taskRes.ok) throw new Error("Failed to clone task");
+        })
       );
       queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "sections"] });
       queryClient.invalidateQueries({ queryKey: ["/api/projects/:projectId/tasks", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "tasks"] });
       toast({ title: "Section duplicated" });
     } catch {
       toast({ title: "Failed to duplicate section", variant: "destructive" });
