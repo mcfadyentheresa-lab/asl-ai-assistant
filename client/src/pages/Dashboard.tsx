@@ -243,7 +243,7 @@ export default function Dashboard() {
               <Link href="/timesheets">
                 <Button variant="default" size="sm" data-testid="button-crew-timesheets">
                   <Clock className="mr-2 h-4 w-4" />
-                  Log Your Hours
+                  Log Hours
                 </Button>
               </Link>
               <Link href="/master-calendar">

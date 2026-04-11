@@ -480,7 +480,7 @@ export default function CostEstimator() {
                   <div className="text-xs text-muted-foreground">incl. ${hstAmount.toLocaleString("en-CA", { minimumFractionDigits: 2 })} HST (13%)</div>
                   {(() => {
                     const totalLabor = items.reduce((s, i) => s + (parseFloat(i.laborCost) || 0), 0);
-                    return totalLabor > 0 ? <div className="text-xs text-muted-foreground">Labor: ${totalLabor.toLocaleString("en-CA", { minimumFractionDigits: 2 })}</div> : null;
+                    return totalLabor > 0 ? <div className="text-xs text-muted-foreground">Labour: ${totalLabor.toLocaleString("en-CA", { minimumFractionDigits: 2 })}</div> : null;
                   })()}
                 </CardContent>
               </Card>
@@ -820,7 +820,7 @@ export default function CostEstimator() {
                       <div className="col-span-2 text-right">Qty</div>
                       <div className="col-span-2 text-right">Unit Cost</div>
                       <div className="col-span-1 text-right">Material</div>
-                      <div className="col-span-1 text-right">Labor</div>
+                      <div className="col-span-1 text-right">Labour</div>
                       <div className="col-span-2 text-right">Total</div>
                       <div className="col-span-1"></div>
                     </div>
@@ -1260,7 +1260,7 @@ export default function CostEstimator() {
 
             <div>
               <div className="flex items-center justify-between mb-2">
-                <Label>Labor Cost ($)</Label>
+                <Label>Labour Cost ($)</Label>
                 <div className="flex items-center gap-2">
                   <Label className="text-[10px] text-muted-foreground">Crew Count:</Label>
                   <Input 
@@ -1272,7 +1272,7 @@ export default function CostEstimator() {
                   {isAdmin && (
                     <Link href="/labor-rates">
                       <Button variant="link" size="sm" className="h-auto p-0 text-xs">
-                        Manage Labor Rates
+                        Manage Labour Rates
                       </Button>
                     </Link>
                   )}

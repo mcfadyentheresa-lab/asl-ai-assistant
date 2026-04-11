@@ -270,7 +270,7 @@ export default function MarketRates() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <Label>Low ($)</Label>
                 <Input type="number" step="0.01" value={newRate.lowRate} onChange={(e) => setNewRate(prev => ({ ...prev, lowRate: e.target.value }))} data-testid="input-rate-low" />
@@ -308,7 +308,7 @@ export default function MarketRates() {
             </DialogHeader>
             <div className="space-y-4">
               <div className="text-sm font-medium">{categories.find(c => c.id === editingRate.categoryId)?.name}</div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <Label>Low ($)</Label>
                   <Input type="number" step="0.01" defaultValue={editingRate.lowRate}

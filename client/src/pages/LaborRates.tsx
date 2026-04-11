@@ -475,7 +475,7 @@ export default function LaborRates() {
                 <Label>Address</Label>
                 <Input value={newSub.address} onChange={e => setNewSub(p => ({ ...p, address: e.target.value }))} placeholder="Bracebridge, ON" data-testid="input-sub-address" />
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <Label>Hourly Rate</Label>
                   <Input type="number" step="0.01" value={newSub.hourlyRate} onChange={e => setNewSub(p => ({ ...p, hourlyRate: e.target.value }))} placeholder="95.00" data-testid="input-sub-hourly" />
@@ -547,7 +547,7 @@ export default function LaborRates() {
                   <Label>Address</Label>
                   <Input value={editingSub.address || ""} onChange={e => setEditingSub({ ...editingSub, address: e.target.value })} data-testid="input-edit-sub-address" />
                 </div>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <Label>Hourly Rate</Label>
                     <Input type="number" step="0.01" value={editingSub.hourlyRate || ""} onChange={e => setEditingSub({ ...editingSub, hourlyRate: e.target.value || null })} data-testid="input-edit-sub-hourly" />
