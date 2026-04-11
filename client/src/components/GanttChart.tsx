@@ -1190,7 +1190,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                               </div>
                               <DropdownMenuItem onClick={() => { setAddingRoomFor(building.id); setNewRoomTitle(""); setNewRoomStart(""); setNewRoomEnd(""); }} data-testid={`button-add-room-${building.id}`}>
                                 <FolderPlus className="h-3.5 w-3.5 mr-2" />
-                                Add Room
+                                Add Folder
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => { setAddingTask({ milestoneId: building.id, sectionId: null }); setNewTaskTitle(""); setNewTaskStartDate(""); setNewTaskDueDate(""); }} data-testid={`button-add-task-building-${building.id}`}>
                                 <ListPlus className="h-3.5 w-3.5 mr-2" />
