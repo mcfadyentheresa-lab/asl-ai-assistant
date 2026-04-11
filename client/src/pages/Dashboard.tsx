@@ -568,6 +568,24 @@ function CreateProjectDialog() {
     }
 
     const clientId = selectedClient && selectedClient !== "none" ? selectedClient : null;
+
+    if (showInviteForm) {
+      const missingFields: string[] = [];
+      if (!inviteForm.firstName.trim()) missingFields.push("First Name");
+      if (!inviteForm.lastName.trim()) missingFields.push("Last Name");
+      if (!inviteForm.email.trim()) missingFields.push("Email");
+      if (!inviteForm.phone.trim()) missingFields.push("Phone");
+
+      if (missingFields.length > 0) {
+        toast({
+          title: "Incomplete invite details",
+          description: `Please fill in: ${missingFields.join(", ")}. Or collapse the invite form to skip.`,
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
     mutate({ ...data, thumbnailUrl: thumbnailUrl || null, clientId }, {
       onSuccess: async (newProject: { id: number }) => {
         if (showInviteForm && inviteForm.firstName && inviteForm.lastName && inviteForm.email && inviteForm.phone) {

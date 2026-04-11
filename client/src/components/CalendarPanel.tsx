@@ -215,7 +215,7 @@ export default function CalendarPanel({ projectId, compact = false, readOnly = f
   const selectedDateEvents = selectedDate ? getEventsForDate(selectedDate) : [];
   const selectedDateTimeline = selectedDate ? getTimelineForDate(selectedDate) : [];
 
-  const kindLabel = (k: string) => k === "milestone" ? "Building" : k === "room" ? "Room" : "Task";
+  const kindLabel = (k: string) => k === "milestone" ? "Milestone" : k === "room" ? "Room" : "Task";
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

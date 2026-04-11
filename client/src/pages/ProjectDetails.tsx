@@ -1746,7 +1746,7 @@ function ChecklistTab({ projectId, compact = false }: { projectId: number; compa
       createMilestone(
         { projectId, title: moveItem.title },
         {
-          onSuccess: () => markAsMovedAndClose(`"${moveItem.title}" created as a new building.`),
+          onSuccess: () => markAsMovedAndClose(`"${moveItem.title}" created as a new milestone.`),
           onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
         }
       );
@@ -2341,10 +2341,10 @@ function ChecklistTab({ projectId, compact = false }: { projectId: number; compa
                 >
                   <div className="flex items-center gap-2 font-medium">
                     <Building2 className="h-4 w-4" />
-                    Create as New Building
+                    Create as New Milestone
                   </div>
                   <span className="text-xs text-muted-foreground">
-                    Add a new building to the timeline with this title
+                    Add a new milestone to the timeline with this title
                   </span>
                 </Button>
                 <Button
@@ -2358,7 +2358,7 @@ function ChecklistTab({ projectId, compact = false }: { projectId: number; compa
                     Add as Task
                   </div>
                   <span className="text-xs text-muted-foreground">
-                    Add as a task inside an existing building or room
+                    Add as a task inside an existing milestone or room
                   </span>
                 </Button>
               </div>
@@ -2366,7 +2366,7 @@ function ChecklistTab({ projectId, compact = false }: { projectId: number; compa
               <div className="space-y-4">
                 <div className="rounded-lg border p-3 bg-muted/30">
                   <p className="text-sm">
-                    A new building called <span className="font-medium">"{moveItem?.title}"</span> will be created on the timeline.
+                    A new milestone called <span className="font-medium">"{moveItem?.title}"</span> will be created on the timeline.
                   </p>
                 </div>
                 <div className="flex justify-end gap-2">
@@ -2377,17 +2377,17 @@ function ChecklistTab({ projectId, compact = false }: { projectId: number; compa
                     data-testid="button-move-confirm-building"
                   >
                     {isCreatingMilestone && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Create Building
+                    Create Milestone
                   </Button>
                 </div>
               </div>
             ) : (
               <div className="space-y-4">
                 <div>
-                  <label className="text-sm font-medium mb-1 block">Building</label>
+                  <label className="text-sm font-medium mb-1 block">Milestone</label>
                   <Select value={selectedBuildingId} onValueChange={(v) => { setSelectedBuildingId(v); setSelectedRoomId(""); }}>
                     <SelectTrigger data-testid="select-move-building">
-                      <SelectValue placeholder="Select a building..." />
+                      <SelectValue placeholder="Select a milestone..." />
                     </SelectTrigger>
                     <SelectContent>
                       {(checklistMilestones || []).map((m: any) => (

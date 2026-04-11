@@ -585,10 +585,10 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
     };
     createMilestone(payload, {
       onSuccess: () => {
-        toast({ title: "Building added" });
+        toast({ title: "Milestone added" });
         setNewBuildingTitle(""); setNewBuildingStart(""); setNewBuildingEnd(""); setNewBuildingColorHex(null); setAddingBuilding(false);
       },
-      onError: () => toast({ title: "Failed to add building", variant: "destructive" }),
+      onError: () => toast({ title: "Failed to add milestone", variant: "destructive" }),
     });
   };
 
@@ -655,10 +655,10 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
   }, [updateMilestone, projectId, toast]);
 
   const handleDeleteBuilding = useCallback((buildingId: number) => {
-    if (!window.confirm("Delete this building? This will remove its rooms and tasks.")) return;
+    if (!window.confirm("Delete this milestone? This will remove its rooms and tasks.")) return;
     deleteMilestone({ id: buildingId, projectId }, {
-      onSuccess: () => toast({ title: "Building deleted" }),
-      onError: () => toast({ title: "Failed to delete building", variant: "destructive" }),
+      onSuccess: () => toast({ title: "Milestone deleted" }),
+      onError: () => toast({ title: "Failed to delete milestone", variant: "destructive" }),
     });
   }, [deleteMilestone, projectId, toast]);
 
@@ -945,7 +945,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
           {isAdmin && drillLevel === "buildings" && (
             <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => setAddingBuilding(true)} data-testid="button-add-building-timeline">
               <Plus className="h-3 w-3" />
-              Building
+              Add
             </Button>
           )}
           {isAdmin && drillLevel === "tasks" && selectedBuildingId && (
@@ -1028,7 +1028,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
 
       {addingBuilding && isAdmin && (
         <div className="flex flex-col sm:flex-row gap-2 p-3 border border-border/60 rounded-sm bg-muted/20" data-testid="form-add-building-inline">
-          <Input placeholder="Building name (e.g., Cottage, Boathouse, Bunkie)" value={newBuildingTitle} onChange={e => setNewBuildingTitle(e.target.value)} className="flex-1" autoFocus data-testid="input-building-title" onKeyDown={e => { if (e.key === "Enter") handleAddBuilding(); }} />
+          <Input placeholder="Milestone name (e.g., Cottage, Boathouse, Bunkie)" value={newBuildingTitle} onChange={e => setNewBuildingTitle(e.target.value)} className="flex-1" autoFocus data-testid="input-building-title" onKeyDown={e => { if (e.key === "Enter") handleAddBuilding(); }} />
           <DateField label="Start date" value={newBuildingStart} onChange={setNewBuildingStart} placeholder="Start date" testId="button-building-start-date" />
           <DateField label="End date" value={newBuildingEnd} onChange={setNewBuildingEnd} placeholder="End date" testId="button-building-end-date" />
           <BuildingColourPicker currentHex={newBuildingColorHex} onSelect={setNewBuildingColorHex} />
@@ -1113,7 +1113,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
       {currentRows.length === 0 && !addingBuilding && !addingRoomFor && !addingTask ? (
         <div className="py-12 text-center">
           <p className="text-sm text-muted-foreground" data-testid="text-gantt-empty">
-            {drillLevel === "buildings" && "No buildings yet. Add a building to start organising your project timeline."}
+            {drillLevel === "buildings" && "No milestones yet. Add a milestone to start organising your project timeline."}
             {drillLevel === "tasks" && "No tasks in this room yet. Add a task to get started."}
           </p>
         </div>
@@ -1198,7 +1198,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                               </DropdownMenuItem>
                               <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => handleDeleteBuilding(building.id)} data-testid={`button-delete-building-${building.id}`}>
                                 <Trash2 className="h-3.5 w-3.5 mr-2" />
-                                Delete Building
+                                Delete Milestone
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
