@@ -1921,15 +1921,9 @@ function ChecklistTab({ projectId, compact = false }: { projectId: number; compa
       {checklistMilestones && checklistMilestones.length > 0 && (
         <Card data-testid="checklist-milestones-section">
           <div className="p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <Flag className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-serif font-semibold text-foreground" data-testid="text-milestones-heading">
-                Wish List
-              </span>
-              <span className="text-xs text-muted-foreground">
-                ({checklistMilestones.length})
-              </span>
-            </div>
+            <p className="text-xs text-muted-foreground mb-3" data-testid="text-milestones-heading">
+              Items you'd like to explore adding to the project scope.
+            </p>
             <div className="border-t">
               {checklistMilestones.map((ms: any) => {
                 const isDone = !!ms.completed;
