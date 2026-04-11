@@ -13,14 +13,13 @@ import {
 import { LogOut, UserCog, Eye, EyeOff, User, Palette, ZoomIn, Clock, DollarSign, Calculator, Users, BookUser, Store, CalendarDays, Sparkles, Armchair, Sun, Moon } from "lucide-react";
 import { useTextZoom } from "@/hooks/use-text-zoom";
 import { Link } from "wouter";
-import { useOnlineUsers, useVisibilityToggle } from "@/hooks/use-presence";
+import { useVisibilityToggle } from "@/hooks/use-presence";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useViewMode } from "@/hooks/use-view-mode";
 import { useTheme } from "next-themes";
 
 export function Navbar() {
   const { user, logout } = useAuth();
-  const { data: onlineUsers } = useOnlineUsers();
   const { visible, toggleVisibility } = useVisibilityToggle();
   const { zoom, cycleZoom } = useTextZoom();
   const { viewMode, setViewMode } = useViewMode();
@@ -61,27 +60,6 @@ export function Navbar() {
             {theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
           </TooltipContent>
         </Tooltip>
-        {effectiveRole === "admin" && onlineUsers && onlineUsers.length > 0 && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div className="flex items-center gap-1.5" data-testid="indicator-online-users">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
-                </span>
-                <span className="text-xs text-muted-foreground">{onlineUsers.length} online</span>
-              </div>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" className="max-w-xs">
-              <p className="text-xs font-medium mb-1">Currently online:</p>
-              {onlineUsers.map((u) => (
-                <p key={u.userId} className="text-xs">
-                  {u.firstName || ""} {u.lastName || ""} <span className="text-muted-foreground">({u.role})</span>
-                </p>
-              ))}
-            </TooltipContent>
-          </Tooltip>
-        )}
         {isAdmin && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
