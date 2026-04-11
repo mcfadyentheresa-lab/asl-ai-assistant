@@ -1919,12 +1919,12 @@ function ChecklistTab({ projectId, compact = false }: { projectId: number; compa
       </div>
 
       {checklistMilestones && checklistMilestones.length > 0 && (
-        <Card data-testid="checklist-milestones-section">
-          <div className="p-4">
-            <p className="text-xs text-muted-foreground mb-3" data-testid="text-milestones-heading">
+        <div data-testid="checklist-milestones-section" className="rounded-lg border border-border/60 bg-transparent">
+          <div className="px-1 pt-1">
+            <p className="text-xs text-muted-foreground mb-2 px-3" data-testid="text-milestones-heading">
               Items you'd like to explore adding to the project scope.
             </p>
-            <div className="border-t">
+            <div className="border-t border-border/60">
               {checklistMilestones.map((ms: any) => {
                 const isDone = !!ms.completed;
                 const completedUser = ms.completedBy
@@ -1933,7 +1933,7 @@ function ChecklistTab({ projectId, compact = false }: { projectId: number; compa
                 return (
                   <div
                     key={ms.id}
-                    className={`flex items-start gap-3 px-4 py-3 border-b last:border-b-0 transition-opacity ${isDone ? "opacity-60" : ""}`}
+                    className={`flex items-start gap-3 px-3 py-2.5 border-b border-border/60 last:border-b-0 transition-opacity ${isDone ? "opacity-60" : ""}`}
                     data-testid={`checklist-milestone-${ms.id}`}
                   >
                     <Checkbox
@@ -1975,20 +1975,20 @@ function ChecklistTab({ projectId, compact = false }: { projectId: number; compa
               })}
             </div>
           </div>
-        </Card>
+        </div>
       )}
 
-      <form onSubmit={handleAdd} className="space-y-2 sm:space-y-0 sm:flex sm:flex-row sm:gap-3 sm:flex-wrap" data-testid="form-add-checklist">
+      <form onSubmit={handleAdd} className="space-y-2 sm:space-y-0 sm:flex sm:flex-row sm:gap-2.5 sm:flex-wrap" data-testid="form-add-checklist">
         <Input
           value={newTitle}
           onChange={(e) => setNewTitle(e.target.value)}
           placeholder="Add a checklist item..."
-          className="flex-1 min-w-[200px]"
+          className="flex-1 min-w-[200px] rounded-md"
           data-testid="input-checklist-title"
         />
-        <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-row sm:gap-3">
+        <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-row sm:gap-2.5">
           <Select value={newGroup} onValueChange={(v) => { setNewGroup(v); if (v !== "__custom__") setCustomGroup(""); }}>
-            <SelectTrigger className="w-full sm:w-[160px]" data-testid="select-checklist-group">
+            <SelectTrigger className="w-full sm:w-[160px] rounded-md" data-testid="select-checklist-group">
               <SelectValue placeholder="Group" />
             </SelectTrigger>
             <SelectContent>
@@ -1999,7 +1999,7 @@ function ChecklistTab({ projectId, compact = false }: { projectId: number; compa
             </SelectContent>
           </Select>
           <Select value={newPriority} onValueChange={setNewPriority}>
-            <SelectTrigger className="w-full sm:w-[120px]" data-testid="select-checklist-priority">
+            <SelectTrigger className="w-full sm:w-[120px] rounded-md" data-testid="select-checklist-priority">
               <SelectValue placeholder="Priority" />
             </SelectTrigger>
             <SelectContent>
@@ -2009,7 +2009,7 @@ function ChecklistTab({ projectId, compact = false }: { projectId: number; compa
             </SelectContent>
           </Select>
           <Select value={newStatus} onValueChange={setNewStatus}>
-            <SelectTrigger className="w-full sm:w-[140px]" data-testid="select-checklist-status">
+            <SelectTrigger className="w-full sm:w-[140px] rounded-md" data-testid="select-checklist-status">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
@@ -2029,7 +2029,7 @@ function ChecklistTab({ projectId, compact = false }: { projectId: number; compa
             data-testid="input-custom-group"
           />
         )}
-        <Button type="submit" className="w-full sm:w-auto" disabled={isCreating || !newTitle.trim()} data-testid="button-add-checklist">
+        <Button type="submit" variant="secondary" className="w-full sm:w-auto rounded-md shadow-none" disabled={isCreating || !newTitle.trim()} data-testid="button-add-checklist">
           {isCreating ? <Loader2 className="mr-2 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
           Add
         </Button>
