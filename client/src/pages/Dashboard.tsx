@@ -208,7 +208,7 @@ export default function Dashboard() {
                 ))}
               </div>
             )}
-            {!isClient && (
+            {effectiveRole !== "client" && (
               <>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
