@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
-import { AlertTriangle, ArrowLeft, Check, ExternalLink, Loader2, Plus, Trash2, Upload, Image, Send, Copy, Eye, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Check, ExternalLink, Loader2, Pencil, Plus, Trash2, Upload, Image, Send, Copy, Eye, X } from "lucide-react";
 import { Link } from "wouter";
 import type { TableRedesignPlan, TableRedesignMaterial } from "@shared/schema";
 
@@ -127,6 +127,7 @@ export default function TableRedesignPlanner() {
   const [showPushDialog, setShowPushDialog] = useState(false);
 
   const [draftPlanId, setDraftPlanId] = useState<number | null>(null);
+  const [isEditingExisting, setIsEditingExisting] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const draftIdRef = useRef<number | null>(null);
@@ -372,6 +373,7 @@ export default function TableRedesignPlanner() {
     draftIdRef.current = null;
     creatingRef.current = false;
     setSaveStatus("idle");
+    setIsEditingExisting(false);
     setShowCreateForm(true);
     setSelectedPlanId(null);
   };
@@ -385,7 +387,42 @@ export default function TableRedesignPlanner() {
     draftIdRef.current = null;
     creatingRef.current = false;
     setSaveStatus("idle");
+    setIsEditingExisting(false);
     setForm(initialForm);
+  };
+
+  const handleEditPlan = (plan: TableRedesignPlan) => {
+    setForm({
+      pieceType: plan.pieceType || "table",
+      pieceName: plan.pieceName || "",
+      beforeImageUrl: plan.beforeImageUrl || "",
+      inspirationImageUrl: plan.inspirationImageUrl || "",
+      conceptImageUrl: plan.conceptImageUrl || "",
+      tableShape: plan.tableShape || "rectangular",
+      lengthInches: plan.lengthInches != null ? String(plan.lengthInches) : "",
+      widthInches: plan.widthInches != null ? String(plan.widthInches) : "",
+      heightInches: plan.heightInches != null ? String(plan.heightInches) : "30",
+      thicknessInches: plan.thicknessInches != null ? String(plan.thicknessInches) : "",
+      weightClass: plan.weightClass || "unknown",
+      existingMaterial: plan.existingMaterial || "",
+      redesignScope: plan.redesignScope || "full",
+      proposedBaseType: plan.proposedBaseType || "",
+      styleDirection: plan.styleDirection || "",
+      finishDirection: plan.finishDirection || "",
+      intendedUse: plan.intendedUse || "",
+      priorityConstraint: plan.priorityConstraint || "",
+      approvalStatus: plan.approvalStatus || "draft",
+      conceptTitle: plan.conceptTitle || "",
+      conceptDescription: plan.conceptDescription || "",
+      buildNotes: plan.buildNotes || "",
+    });
+    setDraftPlanId(plan.id);
+    draftIdRef.current = plan.id;
+    creatingRef.current = false;
+    setSaveStatus("idle");
+    setIsEditingExisting(true);
+    if (plan.projectId) setSelectedProjectId(String(plan.projectId));
+    setShowCreateForm(true);
   };
 
   const handleCopyShareText = () => {
@@ -502,7 +539,7 @@ export default function TableRedesignPlanner() {
             {showCreateForm && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="uppercase tracking-wider">New Concept</CardTitle>
+                  <CardTitle className="uppercase tracking-wider">{isEditingExisting ? "Edit Concept" : "New Concept"}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div>
@@ -762,6 +799,9 @@ export default function TableRedesignPlanner() {
                         </div>
                       </div>
                       <div className="flex gap-1.5 shrink-0">
+                        <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => handleEditPlan(selectedPlan)} data-testid="button-edit-plan">
+                          <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
+                        </Button>
                         <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => setShowPushDialog(true)} data-testid="button-push-to-board">
                           <Send className="h-3.5 w-3.5 mr-1" /> Board
                         </Button>
