@@ -463,33 +463,36 @@ export default function TableRedesignPlanner() {
               <CardContent className="p-2">
                 {plansLoading && <p className="text-sm text-muted-foreground px-2">Loading…</p>}
                 {plans?.length === 0 && <p className="text-sm text-muted-foreground px-2">No concepts yet</p>}
-                {plans?.map(plan => (
-                  <button
-                    key={plan.id}
-                    onClick={() => {
-                      if (showCreateForm && draftPlanId === plan.id) {
-                        handleDoneCreate();
-                      } else {
-                        setSelectedPlanId(plan.id);
-                        setShowCreateForm(false);
-                        setDraftPlanId(null);
-                        draftIdRef.current = null;
-                        creatingRef.current = false;
-                        setSaveStatus("idle");
-                        setForm(initialForm);
-                      }
-                    }}
-                    className={`w-full text-left px-3 py-2 rounded-md text-sm hover:bg-accent transition-colors ${
-                      selectedPlanId === plan.id || (showCreateForm && draftPlanId === plan.id)
-                        ? "bg-accent text-accent-foreground"
-                        : ""
-                    }`}
-                    data-testid={`button-plan-${plan.id}`}
-                  >
-                    <div className="font-medium truncate">{plan.conceptTitle || plan.pieceName}</div>
-                    <div className="text-xs text-muted-foreground capitalize">{plan.pieceType.replace("_", " ")} · {(plan.approvalStatus || plan.status || "draft").replace("_", " ")}</div>
-                  </button>
-                ))}
+                {plans?.map(plan => {
+                  const isSelected = selectedPlanId === plan.id || (showCreateForm && draftPlanId === plan.id);
+                  return (
+                    <button
+                      key={plan.id}
+                      onClick={() => {
+                        if (showCreateForm && draftPlanId === plan.id) {
+                          handleDoneCreate();
+                        } else {
+                          setSelectedPlanId(plan.id);
+                          setShowCreateForm(false);
+                          setDraftPlanId(null);
+                          draftIdRef.current = null;
+                          creatingRef.current = false;
+                          setSaveStatus("idle");
+                          setForm(initialForm);
+                        }
+                      }}
+                      className={`w-full text-left px-3 py-2 rounded-md text-sm hover:bg-accent transition-colors ${
+                        isSelected ? "bg-accent text-accent-foreground" : ""
+                      }`}
+                      data-testid={`button-plan-${plan.id}`}
+                    >
+                      <div className="font-medium truncate">{plan.conceptTitle || plan.pieceName}</div>
+                      <div className={`text-xs capitalize ${isSelected ? "text-accent-foreground/70" : "text-muted-foreground"}`}>
+                        {plan.pieceType.replace("_", " ")} · {(plan.approvalStatus || plan.status || "draft").replace("_", " ")}
+                      </div>
+                    </button>
+                  );
+                })}
               </CardContent>
             </Card>
           </div>
