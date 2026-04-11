@@ -1142,6 +1142,7 @@ export default function ProjectDetails() {
                   const done = clItems.filter((i) => i.status === "done" || i.completed).length;
                   const inProgress = clItems.filter((i) => i.status === "in_progress").length;
                   const nextYear = clItems.filter((i) => i.status === "next_year").length;
+                  const open = total - done;
                   const todo = total - done - inProgress - nextYear;
                   const highPriority = clItems.filter((i) => i.priority === "high" && i.status !== "done" && !i.completed);
                   const recentIncomplete = clItems
@@ -1152,7 +1153,7 @@ export default function ProjectDetails() {
                   return (
                     <Card data-testid="card-checklist-snapshot">
                       <div className="p-4 space-y-3">
-                        <div className="flex items-center justify-between">
+                            <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <CheckSquare className="h-4 w-4 text-primary" />
                             <h3 className="font-serif text-base font-semibold text-foreground" data-testid="text-checklist-heading">
@@ -1168,7 +1169,7 @@ export default function ProjectDetails() {
                                 />
                               </div>
                               <span className="text-xs font-medium text-muted-foreground tabular-nums">
-                                {done}/{total}
+                                {open} open
                               </span>
                             </div>
                           )}
