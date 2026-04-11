@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { usePresenceHeartbeat } from "@/hooks/use-presence";
 import { useEffect, useRef } from "react";
 import { Loader2 } from "lucide-react";
+import { ThemeProvider } from "next-themes";
 
 import Dashboard from "@/pages/Dashboard";
 import ProjectDetails from "@/pages/ProjectDetails";
@@ -109,13 +110,15 @@ function Router() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <PresenceTracker />
-        <Toaster />
-        <Router />
-      </TooltipProvider>
-    </QueryClientProvider>
+    <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <PresenceTracker />
+          <Toaster />
+          <Router />
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ThemeProvider>
   );
 }
 

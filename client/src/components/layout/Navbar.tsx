@@ -10,12 +10,13 @@ import {
   DropdownMenuTrigger,
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
-import { LogOut, UserCog, Eye, EyeOff, User, Palette, ZoomIn, Clock, DollarSign, Calculator, Users, BookUser, Store, CalendarDays, Sparkles, Armchair } from "lucide-react";
+import { LogOut, UserCog, Eye, EyeOff, User, Palette, ZoomIn, Clock, DollarSign, Calculator, Users, BookUser, Store, CalendarDays, Sparkles, Armchair, Sun, Moon } from "lucide-react";
 import { useTextZoom } from "@/hooks/use-text-zoom";
 import { Link } from "wouter";
 import { useOnlineUsers, useVisibilityToggle } from "@/hooks/use-presence";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useViewMode } from "@/hooks/use-view-mode";
+import { useTheme } from "next-themes";
 
 export function Navbar() {
   const { user, logout } = useAuth();
@@ -23,6 +24,7 @@ export function Navbar() {
   const { visible, toggleVisibility } = useVisibilityToggle();
   const { zoom, cycleZoom } = useTextZoom();
   const { viewMode, setViewMode } = useViewMode();
+  const { theme, setTheme } = useTheme();
 
   if (!user) return null;
 
@@ -44,6 +46,21 @@ export function Navbar() {
       </Link>
 
       <div className="flex items-center gap-3">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              data-testid="button-theme-toggle"
+            >
+              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">
+            {theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+          </TooltipContent>
+        </Tooltip>
         {effectiveRole === "admin" && onlineUsers && onlineUsers.length > 0 && (
           <Tooltip>
             <TooltipTrigger asChild>
