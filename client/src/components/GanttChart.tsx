@@ -1237,15 +1237,16 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <div className="px-2 py-1.5">
+                              <div className="px-2 py-1.5 flex items-center gap-2">
                                 <BuildingColourPicker
                                   currentHex={building.colorHex}
                                   onSelect={(hex) => handleBuildingColourChange(building.id, hex)}
                                 />
+                                <span className="text-sm">Colour</span>
                               </div>
                               <DropdownMenuItem onClick={() => { setAddingRoomFor(building.id); setNewRoomTitle(""); setNewRoomStart(""); setNewRoomEnd(""); }} data-testid={`button-add-room-${building.id}`}>
                                 <FolderPlus className="h-3.5 w-3.5 mr-2" />
-                                Add Folder
+                                Add Sub-section
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => startNewTask(building.id)} data-testid={`button-add-task-building-${building.id}`}>
                                 <ListPlus className="h-3.5 w-3.5 mr-2" />
@@ -1321,7 +1322,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem onClick={() => openEditSection(roomData.id)} data-testid={`button-edit-room-${roomData.id}`}>
                               <Pencil className="h-3.5 w-3.5 mr-2" />
-                              Edit Room
+                              Edit Sub-section
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => { if (parentBuilding) startNewTask(parentBuilding.id, roomData.id); }} data-testid={`button-add-task-room-${roomData.id}`}>
                               <ListPlus className="h-3.5 w-3.5 mr-2" />
@@ -1331,9 +1332,9 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                               <Copy className="h-3.5 w-3.5 mr-2" />
                               Duplicate
                             </DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive" onClick={() => deleteSection({ id: roomData.id, projectId }, { onSuccess: () => toast({ title: "Room deleted" }), onError: () => toast({ title: "Failed to delete room", variant: "destructive" }) })} data-testid={`button-delete-room-${roomData.id}`}>
+                            <DropdownMenuItem className="text-destructive" onClick={() => deleteSection({ id: roomData.id, projectId }, { onSuccess: () => toast({ title: "Sub-section deleted" }), onError: () => toast({ title: "Failed to delete sub-section", variant: "destructive" }) })} data-testid={`button-delete-room-${roomData.id}`}>
                               <Trash2 className="h-3.5 w-3.5 mr-2" />
-                              Delete Room
+                              Delete Sub-section
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
