@@ -488,7 +488,7 @@ export default function TableRedesignPlanner() {
                     >
                       <div className="font-medium truncate">{plan.conceptTitle || plan.pieceName}</div>
                       <div className={`text-xs capitalize ${isSelected ? "text-accent-foreground/70" : "text-muted-foreground"}`}>
-                        {plan.pieceType.replace("_", " ")} · {(plan.approvalStatus || plan.status || "draft").replace("_", " ")}
+                        {(plan.approvalStatus || plan.status || "draft").replace("_", " ")}
                       </div>
                     </button>
                   );
@@ -505,31 +505,18 @@ export default function TableRedesignPlanner() {
                   <CardTitle className="uppercase tracking-wider">New Concept</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <Label>Project *</Label>
-                      <Select value={selectedProjectId || ""} onValueChange={setSelectedProjectId}>
-                        <SelectTrigger data-testid="select-project">
-                          <SelectValue placeholder="Select project" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {projects?.map((p: any) => (
-                            <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label>Piece Type *</Label>
-                      <Select value={form.pieceType} onValueChange={v => setForm(f => ({ ...f, pieceType: v }))}>
-                        <SelectTrigger data-testid="select-piece-type">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {PIECE_TYPES.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                  <div>
+                    <Label>Project *</Label>
+                    <Select value={selectedProjectId || ""} onValueChange={setSelectedProjectId}>
+                      <SelectTrigger data-testid="select-project">
+                        <SelectValue placeholder="Select project" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {projects?.map((p: any) => (
+                          <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <div>
@@ -802,7 +789,6 @@ export default function TableRedesignPlanner() {
                           {selectedPlan.conceptTitle || selectedPlan.pieceName}
                         </CardTitle>
                         <div className="flex gap-1.5 mt-1.5 flex-wrap">
-                          <Badge variant="secondary" className="capitalize text-xs px-1.5 py-0">{selectedPlan.pieceType.replace("_", " ")}</Badge>
                           <Badge variant="outline" className="capitalize text-xs px-1.5 py-0">{selectedPlan.redesignScope.replace("_", " ")}</Badge>
                           {selectedPlan.intendedUse && (
                             <Badge variant="outline" className="capitalize text-xs px-1.5 py-0">{selectedPlan.intendedUse.replace("_", " ")}</Badge>
