@@ -793,7 +793,7 @@ export default function TableRedesignPlanner() {
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <div>
-                        <CardTitle className="uppercase tracking-wider" data-testid="text-plan-title">
+                        <CardTitle className="uppercase tracking-wider text-base md:text-lg leading-tight" data-testid="text-plan-title">
                           {selectedPlan.conceptTitle || selectedPlan.pieceName}
                         </CardTitle>
                         <div className="flex gap-2 mt-1 flex-wrap">
