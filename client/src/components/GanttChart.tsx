@@ -149,7 +149,7 @@ function DateField({ label, value, onChange, placeholder, testId }: { label: str
   );
 }
 
-function BuildingColourPicker({ currentHex, onSelect }: { currentHex: string | null | undefined; onSelect: (hex: string | null) => void }) {
+function BuildingColourPicker({ currentHex, onSelect, label }: { currentHex: string | null | undefined; onSelect: (hex: string | null) => void; label?: string }) {
   const QUICK_COLOURS = [
     "#1E3A2F", "#2D5A47", "#3D7A5F", "#8B7355", "#6B8E73",
     "#4A6741", "#7A6B5D", "#556B2F", "#C4A882", "#3B5249",
@@ -160,9 +160,20 @@ function BuildingColourPicker({ currentHex, onSelect }: { currentHex: string | n
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={(e) => e.stopPropagation()} data-testid="button-building-colour-picker">
-          <Palette className="w-3.5 h-3.5 text-muted-foreground" />
-        </Button>
+        {label ? (
+          <button
+            className="relative flex w-full cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground"
+            onClick={(e) => e.stopPropagation()}
+            data-testid="button-building-colour-picker"
+          >
+            <Palette className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
+            {label}
+          </button>
+        ) : (
+          <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={(e) => e.stopPropagation()} data-testid="button-building-colour-picker">
+            <Palette className="w-3.5 h-3.5 text-muted-foreground" />
+          </Button>
+        )}
       </PopoverTrigger>
       <PopoverContent className="w-48 p-2" align="start" onClick={(e) => e.stopPropagation()}>
         <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2 font-medium">Colour</p>
@@ -1237,13 +1248,11 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <div className="px-2 py-1.5 flex items-center gap-2">
-                                <BuildingColourPicker
-                                  currentHex={building.colorHex}
-                                  onSelect={(hex) => handleBuildingColourChange(building.id, hex)}
-                                />
-                                <span className="text-sm">Colour</span>
-                              </div>
+                              <BuildingColourPicker
+                                currentHex={building.colorHex}
+                                onSelect={(hex) => handleBuildingColourChange(building.id, hex)}
+                                label="Assign Colour"
+                              />
                               <DropdownMenuItem onClick={() => { setAddingRoomFor(building.id); setNewRoomTitle(""); setNewRoomStart(""); setNewRoomEnd(""); }} data-testid={`button-add-room-${building.id}`}>
                                 <FolderPlus className="h-3.5 w-3.5 mr-2" />
                                 Add Sub-section
