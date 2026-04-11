@@ -16,7 +16,7 @@ import { useProjectRealtime } from "@/hooks/use-project-realtime";
 import { Navbar } from "@/components/layout/Navbar";
 import SpatialCanvas from "@/components/SpatialCanvas";
 import GanttChart from "@/components/GanttChart";
-import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, ExternalLink, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, CalendarDays, ChevronLeft, Upload, Download, User, X, Paperclip, ZoomIn, Palette, Shield, Users, Phone, Check, Bell, Eye, EyeOff, Archive, ArchiveRestore, PanelRightOpen, MoreVertical, Flag, DollarSign, BarChart3, TrendingUp, TrendingDown, Minus, ArrowUpRight, Building2, Sparkles, Armchair } from "lucide-react";
+import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, ExternalLink, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, CalendarDays, ChevronLeft, Upload, Download, User, X, Paperclip, ZoomIn, Palette, Shield, Users, Phone, Check, Bell, Eye, EyeOff, Archive, ArchiveRestore, PanelRightOpen, MoreVertical, Flag, DollarSign, BarChart3, TrendingUp, TrendingDown, Minus, ArrowUpRight, Building2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -1123,28 +1123,6 @@ export default function ProjectDetails() {
                     </button>
                   </div>
                 </Card>
-
-                {userRole === "admin" && (
-                  <Card data-testid="card-admin-tools">
-                    <div className="p-4 space-y-2">
-                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Admin Tools</p>
-                      <div className="flex flex-wrap gap-2">
-                        <Link href="/social-media">
-                          <Button variant="outline" size="sm" className="text-xs h-8" data-testid="button-overview-social-media">
-                            <Sparkles className="h-3.5 w-3.5 mr-1.5" />
-                            Social Media
-                          </Button>
-                        </Link>
-                        <Link href="/table-redesign">
-                          <Button variant="outline" size="sm" className="text-xs h-8" data-testid="button-overview-table-redesign">
-                            <Armchair className="h-3.5 w-3.5 mr-1.5" />
-                            Furniture Redesign
-                          </Button>
-                        </Link>
-                      </div>
-                    </div>
-                  </Card>
-                )}
 
               </div>
 
