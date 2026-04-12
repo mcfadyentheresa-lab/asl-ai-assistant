@@ -17,7 +17,7 @@ All user-facing copy must follow these conventions:
 | Term | Use | Avoid |
 |------|-----|-------|
 | Colour | "Colour Portfolio", "Paint Colour" | "Color" |
-| Labour | "Labour & Contractors", "Labour Cost" | "Labor" |
+| Labour | "Crew & Trade", "Labour Cost" | "Labor" |
 | In Progress | task status label | "In-Progress", "in progress" |
 | To Do | task status label | "Todo", "TODO" |
 | Done | task status label | "Completed" (for tasks) |
@@ -69,7 +69,7 @@ Replit Auth provides authentication via OpenID Connect, with session management 
 *   **Crew Timesheets & Admin Payroll**: Bi-weekly timesheet system with draft/submitted/approved workflow, pay period navigation (prev/next), crew-friendly language, and admin payroll view.
 *   **Crew "My Day" Dashboard**: When in crew view mode, the dashboard shows a "Your Assignments" panel with tasks grouped by project, inline status toggling (To Do → In Progress → Done), quick links to Timesheets and Master Calendar, and a personalised subtitle with open assignment count. Backend `GET /api/my-tasks` endpoint fetches tasks assigned to the logged-in user.
 *   **Cost Estimator**: Per-project estimation tool with line items, material markup, market rate auto-fill, variance warnings, and receipt tracking. Includes an AI Scope Analyzer (OpenAI/gpt-5-mini), an "Import from Board" feature, and a toggleable management fee (default 25%) applied before HST. Accessible from the Budget Snapshot card on each project via `/project/:id/estimate`.
-*   **Labour & Contractors**: Admin page for managing crew pay/billable rates and a subcontractor directory.
+*   **Crew & Trade**: Consolidated admin page (`/crew-and-trade`) combining three previously separate pages: Crew tab (pay/billable rates for internal crew), Trade Contacts tab (subcontractor directory with search, trade filters, contact cards — also accessible to crew role), and Market Benchmarks tab (low/typical/high rate benchmarks by trade category used by Cost Estimator). Old routes `/labor-rates`, `/trade-contacts`, `/market-rates` all redirect here.
 *   **Supplier Price Book**: Admin-only material pricing database with supplier and product management, integrated with the Cost Estimator.
 *   **Gantt Chart / Progress Tab**: A nested expandable tree view of projects with buildings, rooms, and tasks, supporting drag-and-drop scheduling and progress tracking.
 *   **Overview Tab — Project Snapshot**: Condensed cards for project milestones and checklist status.

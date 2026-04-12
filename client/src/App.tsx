@@ -27,9 +27,7 @@ import Profile from "@/pages/Profile";
 import ColorPortfolio from "@/pages/ColorPortfolio";
 import Timesheets from "@/pages/Timesheets";
 import Payroll from "@/pages/Payroll";
-import MarketRates from "@/pages/MarketRates";
-import LaborRates from "@/pages/LaborRates";
-import TradeContacts from "@/pages/TradeContacts";
+import CrewAndTrade from "@/pages/CrewAndTrade";
 import SupplierPrices from "@/pages/SupplierPrices";
 import MasterCalendar from "@/pages/MasterCalendar";
 import SocialMediaGenerator from "@/pages/SocialMediaGenerator";
@@ -113,14 +111,17 @@ function Router() {
         <Route path="/payroll">
           {() => <RoleGuard component={Payroll} allowedRoles={["admin"]} />}
         </Route>
-        <Route path="/market-rates">
-          {() => <RoleGuard component={MarketRates} allowedRoles={["admin"]} />}
+        <Route path="/crew-and-trade">
+          {() => <RoleGuard component={CrewAndTrade} allowedRoles={["admin", "crew"]} />}
         </Route>
         <Route path="/labor-rates">
-          {() => <RoleGuard component={LaborRates} allowedRoles={["admin"]} />}
+          {() => <RoleGuard component={CrewAndTrade} allowedRoles={["admin", "crew"]} />}
         </Route>
         <Route path="/trade-contacts">
-          {() => <RoleGuard component={TradeContacts} allowedRoles={["admin", "crew"]} />}
+          {() => <RoleGuard component={CrewAndTrade} allowedRoles={["admin", "crew"]} />}
+        </Route>
+        <Route path="/market-rates">
+          {() => <RoleGuard component={CrewAndTrade} allowedRoles={["admin", "crew"]} />}
         </Route>
         <Route path="/supplier-prices">
           {() => <RoleGuard component={SupplierPrices} allowedRoles={["admin"]} />}

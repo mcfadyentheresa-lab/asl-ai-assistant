@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
-import { LogOut, UserCog, Eye, EyeOff, User, Palette, ZoomIn, Clock, DollarSign, Calculator, Users, BookUser, Store, CalendarDays, Sparkles, Armchair, Sun, Moon } from "lucide-react";
+import { LogOut, UserCog, Eye, EyeOff, User, Palette, ZoomIn, Clock, DollarSign, Users, Store, CalendarDays, Sparkles, Armchair, Sun, Moon } from "lucide-react";
 import { useTextZoom } from "@/hooks/use-text-zoom";
 import { Link } from "wouter";
 import { useVisibilityToggle } from "@/hooks/use-presence";
@@ -146,27 +146,11 @@ export function Navbar() {
                 </DropdownMenuItem>
               </Link>
             )}
-            {effectiveRole === "admin" && (
-              <Link href="/market-rates">
-                <DropdownMenuItem data-testid="link-market-rates">
-                  <Calculator className="mr-2 h-4 w-4" />
-                  Market Rates
-                </DropdownMenuItem>
-              </Link>
-            )}
-            {effectiveRole === "admin" && (
-              <Link href="/labor-rates">
-                <DropdownMenuItem data-testid="link-labor-rates">
-                  <Users className="mr-2 h-4 w-4" />
-                  Labour & Contractors
-                </DropdownMenuItem>
-              </Link>
-            )}
             {(effectiveRole === "admin" || effectiveRole === "crew") && (
-              <Link href="/trade-contacts">
-                <DropdownMenuItem data-testid="link-trade-contacts">
-                  <BookUser className="mr-2 h-4 w-4" />
-                  Trade Contacts
+              <Link href="/crew-and-trade">
+                <DropdownMenuItem data-testid="link-crew-and-trade">
+                  <Users className="mr-2 h-4 w-4" />
+                  Crew & Trade
                 </DropdownMenuItem>
               </Link>
             )}
