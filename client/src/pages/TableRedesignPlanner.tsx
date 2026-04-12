@@ -113,12 +113,16 @@ function calculateBaseRange(
   return { min, max, notes, isHeavy };
 }
 
-export default function TableRedesignPlanner() {
-  const { user } = useAuth();
+// Core planner component — shared by both embedded and standalone modes.
+// When fixedProjectId is provided, the project is locked (no selector shown).
+function FurniturePlannerCore({ fixedProjectId }: { fixedProjectId?: number }) {
+  const embedded = fixedProjectId !== undefined;
   const { toast } = useToast();
   const { uploadFile, isUploading } = useUpload();
 
-  const [selectedProjectId, setSelectedProjectId] = useState<string>("");
+  const [selectedProjectId, setSelectedProjectId] = useState<string>(
+    fixedProjectId ? String(fixedProjectId) : ""
+  );
   const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showShareView, setShowShareView] = useState(false);
@@ -165,7 +169,9 @@ export default function TableRedesignPlanner() {
   const { data: plans, isLoading: plansLoading } = useQuery<TableRedesignPlan[]>({
     queryKey: ["/api/redesign-plans", selectedProjectId],
     queryFn: async () => {
-      const url = selectedProjectId ? `/api/redesign-plans?projectId=${selectedProjectId}` : "/api/redesign-plans";
+      const url = selectedProjectId && selectedProjectId !== "all"
+        ? `/api/redesign-plans?projectId=${selectedProjectId}`
+        : "/api/redesign-plans";
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch plans");
       return res.json();
@@ -248,6 +254,7 @@ export default function TableRedesignPlanner() {
   });
 
   const buildPayload = () => {
+    const projectIdNum = fixedProjectId ?? parseInt(selectedProjectId);
     const base = calculateBaseRange(
       form.tableShape,
       form.lengthInches ? parseInt(form.lengthInches, 10) || null : null,
@@ -256,7 +263,7 @@ export default function TableRedesignPlanner() {
       form.existingMaterial
     );
     return {
-      projectId: parseInt(selectedProjectId),
+      projectId: projectIdNum,
       pieceType: form.pieceType,
       pieceName: form.pieceName,
       beforeImageUrl: form.beforeImageUrl || null,
@@ -285,9 +292,11 @@ export default function TableRedesignPlanner() {
     };
   };
 
+  const effectiveProjectId = fixedProjectId ? String(fixedProjectId) : selectedProjectId;
+
   useEffect(() => {
     if (!showCreateForm) return;
-    if (!selectedProjectId || selectedProjectId === "all" || !form.pieceName.trim()) return;
+    if (!effectiveProjectId || effectiveProjectId === "all" || !form.pieceName.trim()) return;
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
@@ -326,7 +335,7 @@ export default function TableRedesignPlanner() {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [form, selectedProjectId, showCreateForm]);
+  }, [form, effectiveProjectId, showCreateForm]);
 
   const handleUpload = async (field: "beforeImageUrl" | "inspirationImageUrl" | "conceptImageUrl") => {
     const input = document.createElement("input");
@@ -421,7 +430,7 @@ export default function TableRedesignPlanner() {
     creatingRef.current = false;
     setSaveStatus("idle");
     setIsEditingExisting(true);
-    if (plan.projectId) setSelectedProjectId(String(plan.projectId));
+    if (!embedded && plan.projectId) setSelectedProjectId(String(plan.projectId));
     setShowCreateForm(true);
   };
 
@@ -441,35 +450,10 @@ export default function TableRedesignPlanner() {
     toast({ title: "Copied to clipboard" });
   };
 
-  if (!user || user.role !== "admin") {
-    return (
-      <div className="min-h-screen bg-background">
-        <Navbar />
-        <div className="p-8 text-center">
-          <p className="text-muted-foreground">Admin access required.</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-background">
-      <Navbar />
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        <div className="flex items-center gap-3 mb-6">
-          <Link href="/">
-            <Button variant="ghost" size="icon" data-testid="button-back">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-          </Link>
-          <div>
-            <h1 className="text-2xl font-bold uppercase tracking-wide" data-testid="text-page-title">
-              FURNITURE PLANNER
-            </h1>
-            <p className="text-sm text-muted-foreground">Create and manage furniture redesign concepts</p>
-          </div>
-        </div>
-
+    <>
+      {/* Standalone mode: filter bar with project selector + New Concept button */}
+      {!embedded && (
         <div className="flex gap-4 mb-6 items-end">
           <div className="w-64">
             <Label>Filter by Project</Label>
@@ -489,59 +473,67 @@ export default function TableRedesignPlanner() {
             <Plus className="h-4 w-4 mr-2" /> New Concept
           </Button>
         </div>
+      )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Plan list sidebar */}
-          <div className="col-span-1 lg:col-span-3">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Plan list sidebar */}
+        <div className="col-span-1 lg:col-span-3">
+          <Card>
+            <CardHeader className="py-3 px-4 flex-row items-center justify-between space-y-0">
+              <CardTitle className="text-sm uppercase tracking-wider">Concepts</CardTitle>
+              {embedded && (
+                <Button size="sm" variant="outline" onClick={handleNewPlan} data-testid="button-new-plan" className="h-7 px-2 text-xs">
+                  <Plus className="h-3 w-3 mr-1" /> New
+                </Button>
+              )}
+            </CardHeader>
+            <CardContent className="p-2">
+              {plansLoading && <p className="text-sm text-muted-foreground px-2">Loading…</p>}
+              {plans?.length === 0 && <p className="text-sm text-muted-foreground px-2">No concepts yet</p>}
+              {plans?.map(plan => {
+                const isSelected = selectedPlanId === plan.id || (showCreateForm && draftPlanId === plan.id);
+                return (
+                  <button
+                    key={plan.id}
+                    onClick={() => {
+                      if (showCreateForm && draftPlanId === plan.id) {
+                        handleDoneCreate();
+                      } else {
+                        setSelectedPlanId(plan.id);
+                        setShowCreateForm(false);
+                        setDraftPlanId(null);
+                        draftIdRef.current = null;
+                        creatingRef.current = false;
+                        setSaveStatus("idle");
+                        setForm(initialForm);
+                      }
+                    }}
+                    className={`w-full text-left px-3 py-2 rounded-md text-sm hover:bg-accent transition-colors ${
+                      isSelected ? "bg-accent text-accent-foreground" : ""
+                    }`}
+                    data-testid={`button-plan-${plan.id}`}
+                  >
+                    <div className="font-medium truncate">{plan.conceptTitle || plan.pieceName}</div>
+                    <div className={`text-xs capitalize ${isSelected ? "text-accent-foreground/70" : "text-muted-foreground"}`}>
+                      {(plan.approvalStatus || plan.status || "draft").replace("_", " ")}
+                    </div>
+                  </button>
+                );
+              })}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Main content */}
+        <div className="col-span-1 lg:col-span-9">
+          {showCreateForm && (
             <Card>
-              <CardHeader className="py-3 px-4">
-                <CardTitle className="text-sm uppercase tracking-wider">Concepts</CardTitle>
+              <CardHeader>
+                <CardTitle className="uppercase tracking-wider">{isEditingExisting ? "Edit Concept" : "New Concept"}</CardTitle>
               </CardHeader>
-              <CardContent className="p-2">
-                {plansLoading && <p className="text-sm text-muted-foreground px-2">Loading…</p>}
-                {plans?.length === 0 && <p className="text-sm text-muted-foreground px-2">No concepts yet</p>}
-                {plans?.map(plan => {
-                  const isSelected = selectedPlanId === plan.id || (showCreateForm && draftPlanId === plan.id);
-                  return (
-                    <button
-                      key={plan.id}
-                      onClick={() => {
-                        if (showCreateForm && draftPlanId === plan.id) {
-                          handleDoneCreate();
-                        } else {
-                          setSelectedPlanId(plan.id);
-                          setShowCreateForm(false);
-                          setDraftPlanId(null);
-                          draftIdRef.current = null;
-                          creatingRef.current = false;
-                          setSaveStatus("idle");
-                          setForm(initialForm);
-                        }
-                      }}
-                      className={`w-full text-left px-3 py-2 rounded-md text-sm hover:bg-accent transition-colors ${
-                        isSelected ? "bg-accent text-accent-foreground" : ""
-                      }`}
-                      data-testid={`button-plan-${plan.id}`}
-                    >
-                      <div className="font-medium truncate">{plan.conceptTitle || plan.pieceName}</div>
-                      <div className={`text-xs capitalize ${isSelected ? "text-accent-foreground/70" : "text-muted-foreground"}`}>
-                        {(plan.approvalStatus || plan.status || "draft").replace("_", " ")}
-                      </div>
-                    </button>
-                  );
-                })}
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Main content */}
-          <div className="col-span-1 lg:col-span-9">
-            {showCreateForm && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="uppercase tracking-wider">{isEditingExisting ? "Edit Concept" : "New Concept"}</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
+              <CardContent className="space-y-6">
+                {/* Project selector: only shown in standalone mode */}
+                {!embedded && (
                   <div>
                     <Label>Project *</Label>
                     <Select value={selectedProjectId || ""} onValueChange={setSelectedProjectId}>
@@ -555,423 +547,471 @@ export default function TableRedesignPlanner() {
                       </SelectContent>
                     </Select>
                   </div>
+                )}
 
+                <div>
+                  <Label>Piece Name *</Label>
+                  <Input
+                    value={form.pieceName}
+                    onChange={e => setForm(f => ({ ...f, pieceName: e.target.value }))}
+                    placeholder="e.g. Client's Dining Table"
+                    data-testid="input-piece-name"
+                  />
+                </div>
+
+                <Separator />
+                <h3 className="text-sm font-semibold uppercase tracking-wider">Images</h3>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
-                    <Label>Piece Name *</Label>
+                    <Label>Before Image</Label>
+                    <Button variant="outline" className="w-full mt-1" onClick={() => handleUpload("beforeImageUrl")} disabled={isUploading} data-testid="button-upload-before">
+                      <Upload className="h-4 w-4 mr-2" /> {form.beforeImageUrl ? "Replace" : "Upload"}
+                    </Button>
+                    {form.beforeImageUrl && <img src={form.beforeImageUrl} className="mt-2 rounded h-20 object-cover w-full" alt="Before" />}
+                  </div>
+                  <div>
+                    <Label>Inspiration Image</Label>
+                    <Button variant="outline" className="w-full mt-1" onClick={() => handleUpload("inspirationImageUrl")} disabled={isUploading} data-testid="button-upload-inspiration">
+                      <Image className="h-4 w-4 mr-2" /> {form.inspirationImageUrl ? "Replace" : "Upload"}
+                    </Button>
+                    {form.inspirationImageUrl && <img src={form.inspirationImageUrl} className="mt-2 rounded h-20 object-cover w-full" alt="Inspiration" />}
+                  </div>
+                  <div>
+                    <Label>Concept Image (Optional)</Label>
+                    <Button variant="outline" className="w-full mt-1" onClick={() => handleUpload("conceptImageUrl")} disabled={isUploading} data-testid="button-upload-concept">
+                      <Image className="h-4 w-4 mr-2" /> {form.conceptImageUrl ? "Replace" : "Upload"}
+                    </Button>
+                    {form.conceptImageUrl && <img src={form.conceptImageUrl} className="mt-2 rounded h-20 object-cover w-full" alt="Concept" />}
+                  </div>
+                </div>
+
+                <Separator />
+                <h3 className="text-sm font-semibold uppercase tracking-wider">Dimensions & Weight</h3>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <Label>Weight Class *</Label>
+                    <Select value={form.weightClass} onValueChange={v => setForm(f => ({ ...f, weightClass: v }))}>
+                      <SelectTrigger data-testid="select-weight">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {WEIGHT_CLASSES.map(w => <SelectItem key={w.value} value={w.value}>{w.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  <div>
+                    <Label>Length (inches)</Label>
+                    <Input type="number" value={form.lengthInches} onChange={e => setForm(f => ({ ...f, lengthInches: e.target.value }))} data-testid="input-length" />
+                  </div>
+                  <div>
+                    <Label>Width (inches)</Label>
+                    <Input type="number" value={form.widthInches} onChange={e => setForm(f => ({ ...f, widthInches: e.target.value }))} data-testid="input-width" />
+                  </div>
+                  <div>
+                    <Label>Height (inches)</Label>
+                    <Input type="number" value={form.heightInches} onChange={e => setForm(f => ({ ...f, heightInches: e.target.value }))} data-testid="input-height" />
+                  </div>
+                  <div>
+                    <Label>Thickness (inches)</Label>
+                    <Input type="number" value={form.thicknessInches} onChange={e => setForm(f => ({ ...f, thicknessInches: e.target.value }))} data-testid="input-thickness" />
+                  </div>
+                </div>
+
+                <div>
+                  <Label>Existing Material</Label>
+                  <Input
+                    value={form.existingMaterial}
+                    onChange={e => setForm(f => ({ ...f, existingMaterial: e.target.value }))}
+                    placeholder="e.g. oak, marble, glass"
+                    data-testid="input-existing-material"
+                  />
+                </div>
+
+                {(form.weightClass === "heavy" || HEAVY_MATERIALS.some(m => form.existingMaterial.toLowerCase().includes(m))) && (
+                  <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md" data-testid="warning-heavy-top">
+                    <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0" />
+                    <p className="text-sm text-amber-800 dark:text-amber-200">
+                      <strong>Heavy top detected.</strong> Stone, glass, or concrete tops require structural review. Base range will be widened for stability.
+                    </p>
+                  </div>
+                )}
+
+                <Separator />
+                <h3 className="text-sm font-semibold uppercase tracking-wider">Design Direction</h3>
+
+                <div>
+                  <Label>Intended Use *</Label>
+                  <Select value={form.intendedUse} onValueChange={v => setForm(f => ({ ...f, intendedUse: v }))}>
+                    <SelectTrigger data-testid="select-intended-use">
+                      <SelectValue placeholder="Select intended use" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {INTENDED_USES.map(u => <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label>Redesign Scope *</Label>
+                  <Select value={form.redesignScope} onValueChange={v => setForm(f => ({ ...f, redesignScope: v }))}>
+                    <SelectTrigger data-testid="select-scope">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {REDESIGN_SCOPES.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <Label>Style Direction</Label>
                     <Input
-                      value={form.pieceName}
-                      onChange={e => setForm(f => ({ ...f, pieceName: e.target.value }))}
-                      placeholder="e.g. Client's Dining Table"
-                      data-testid="input-piece-name"
+                      value={form.styleDirection}
+                      onChange={e => setForm(f => ({ ...f, styleDirection: e.target.value }))}
+                      placeholder="e.g. modern farmhouse, mid-century"
+                      data-testid="input-style"
                     />
                   </div>
-
-                  <Separator />
-                  <h3 className="text-sm font-semibold uppercase tracking-wider">Images</h3>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div>
-                      <Label>Before Image</Label>
-                      <Button variant="outline" className="w-full mt-1" onClick={() => handleUpload("beforeImageUrl")} disabled={isUploading} data-testid="button-upload-before">
-                        <Upload className="h-4 w-4 mr-2" /> {form.beforeImageUrl ? "Replace" : "Upload"}
-                      </Button>
-                      {form.beforeImageUrl && <img src={form.beforeImageUrl} className="mt-2 rounded h-20 object-cover w-full" alt="Before" />}
-                    </div>
-                    <div>
-                      <Label>Inspiration Image</Label>
-                      <Button variant="outline" className="w-full mt-1" onClick={() => handleUpload("inspirationImageUrl")} disabled={isUploading} data-testid="button-upload-inspiration">
-                        <Image className="h-4 w-4 mr-2" /> {form.inspirationImageUrl ? "Replace" : "Upload"}
-                      </Button>
-                      {form.inspirationImageUrl && <img src={form.inspirationImageUrl} className="mt-2 rounded h-20 object-cover w-full" alt="Inspiration" />}
-                    </div>
-                    <div>
-                      <Label>Concept Image (Optional)</Label>
-                      <Button variant="outline" className="w-full mt-1" onClick={() => handleUpload("conceptImageUrl")} disabled={isUploading} data-testid="button-upload-concept">
-                        <Image className="h-4 w-4 mr-2" /> {form.conceptImageUrl ? "Replace" : "Upload"}
-                      </Button>
-                      {form.conceptImageUrl && <img src={form.conceptImageUrl} className="mt-2 rounded h-20 object-cover w-full" alt="Concept" />}
-                    </div>
-                  </div>
-
-                  <Separator />
-                  <h3 className="text-sm font-semibold uppercase tracking-wider">Dimensions & Weight</h3>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <Label>Weight Class *</Label>
-                      <Select value={form.weightClass} onValueChange={v => setForm(f => ({ ...f, weightClass: v }))}>
-                        <SelectTrigger data-testid="select-weight">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {WEIGHT_CLASSES.map(w => <SelectItem key={w.value} value={w.value}>{w.label}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                    <div>
-                      <Label>Length (inches)</Label>
-                      <Input type="number" value={form.lengthInches} onChange={e => setForm(f => ({ ...f, lengthInches: e.target.value }))} data-testid="input-length" />
-                    </div>
-                    <div>
-                      <Label>Width (inches)</Label>
-                      <Input type="number" value={form.widthInches} onChange={e => setForm(f => ({ ...f, widthInches: e.target.value }))} data-testid="input-width" />
-                    </div>
-                    <div>
-                      <Label>Height (inches)</Label>
-                      <Input type="number" value={form.heightInches} onChange={e => setForm(f => ({ ...f, heightInches: e.target.value }))} data-testid="input-height" />
-                    </div>
-                    <div>
-                      <Label>Thickness (inches)</Label>
-                      <Input type="number" value={form.thicknessInches} onChange={e => setForm(f => ({ ...f, thicknessInches: e.target.value }))} data-testid="input-thickness" />
-                    </div>
-                  </div>
-
                   <div>
-                    <Label>Existing Material</Label>
+                    <Label>Finish Direction</Label>
                     <Input
-                      value={form.existingMaterial}
-                      onChange={e => setForm(f => ({ ...f, existingMaterial: e.target.value }))}
-                      placeholder="e.g. oak, marble, glass"
-                      data-testid="input-existing-material"
+                      value={form.finishDirection}
+                      onChange={e => setForm(f => ({ ...f, finishDirection: e.target.value }))}
+                      placeholder="e.g. matte black, natural oak"
+                      data-testid="input-finish"
                     />
                   </div>
+                </div>
 
-                  {(form.weightClass === "heavy" || HEAVY_MATERIALS.some(m => form.existingMaterial.toLowerCase().includes(m))) && (
-                    <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md" data-testid="warning-heavy-top">
+                <Separator />
+                <h3 className="text-sm font-semibold uppercase tracking-wider">Concept Output</h3>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <Label>Concept Title</Label>
+                    <Input
+                      value={form.conceptTitle}
+                      onChange={e => setForm(f => ({ ...f, conceptTitle: e.target.value }))}
+                      placeholder={form.pieceName || "Auto-fills from piece name if empty"}
+                      data-testid="input-concept-title"
+                    />
+                  </div>
+                  <div>
+                    <Label>Approval Status</Label>
+                    <Select value={form.approvalStatus} onValueChange={v => {
+                      if (v !== "draft" && !form.intendedUse) {
+                        toast({ title: "Please select an intended use before changing status", variant: "destructive" });
+                        return;
+                      }
+                      setForm(f => ({ ...f, approvalStatus: v }));
+                    }}>
+                      <SelectTrigger data-testid="select-approval-status">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {APPROVAL_STATUSES.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div>
+                  <Label>Concept Description</Label>
+                  <Textarea
+                    value={form.conceptDescription}
+                    onChange={e => setForm(f => ({ ...f, conceptDescription: e.target.value }))}
+                    placeholder="Short description of the redesign concept"
+                    rows={2}
+                    data-testid="input-concept-description"
+                  />
+                </div>
+
+                <div>
+                  <Label>Scope Notes</Label>
+                  <Textarea
+                    value={form.buildNotes}
+                    onChange={e => setForm(f => ({ ...f, buildNotes: e.target.value }))}
+                    rows={2}
+                    placeholder="Construction notes, special considerations"
+                    data-testid="input-scope-notes"
+                  />
+                </div>
+
+                <div className="flex items-center gap-3">
+                  {saveStatus === "saving" && (
+                    <span className="flex items-center gap-1 text-sm text-muted-foreground" data-testid="text-save-status">
+                      <Loader2 className="h-3 w-3 animate-spin" /> Saving…
+                    </span>
+                  )}
+                  {saveStatus === "saved" && (
+                    <span className="flex items-center gap-1 text-sm text-green-600" data-testid="text-save-status">
+                      <Check className="h-3 w-3" /> Saved
+                    </span>
+                  )}
+                  {saveStatus === "idle" && !draftPlanId && (
+                    <span className="text-sm text-muted-foreground" data-testid="text-save-status">
+                      {embedded ? "Enter a piece name to start" : "Select a project and enter a piece name to start"}
+                    </span>
+                  )}
+                  <Button variant="outline" onClick={handleDoneCreate} data-testid="button-done-create">
+                    {draftPlanId ? "Done" : "Cancel"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {selectedPlan && !showCreateForm && (
+            <div className="space-y-6">
+              {/* Plan detail header */}
+              <Card>
+                <CardHeader className="py-3 px-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <CardTitle className="uppercase tracking-wider text-sm leading-tight" data-testid="text-plan-title">
+                        {selectedPlan.conceptTitle || selectedPlan.pieceName}
+                      </CardTitle>
+                      <div className="flex gap-1.5 mt-1.5 flex-wrap">
+                        <Badge variant="outline" className="capitalize text-xs px-1.5 py-0">{selectedPlan.redesignScope.replace("_", " ")}</Badge>
+                        {selectedPlan.intendedUse && (
+                          <Badge variant="outline" className="capitalize text-xs px-1.5 py-0">{selectedPlan.intendedUse.replace("_", " ")}</Badge>
+                        )}
+                        <Badge className={`capitalize text-xs px-1.5 py-0 ${
+                          selectedPlan.approvalStatus === "approved" ? "bg-green-600" :
+                          selectedPlan.approvalStatus === "ready_for_client" ? "bg-blue-600" :
+                          selectedPlan.approvalStatus === "revise" ? "bg-amber-600" : ""
+                        }`}>
+                          {(selectedPlan.approvalStatus || "draft").replace("_", " ")}
+                        </Badge>
+                      </div>
+                    </div>
+                    <div className="flex gap-1.5 shrink-0">
+                      <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => handleEditPlan(selectedPlan)} data-testid="button-edit-plan">
+                        <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
+                      </Button>
+                      <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => setShowPushDialog(true)} data-testid="button-push-to-board">
+                        <Send className="h-3.5 w-3.5 mr-1" /> Board
+                      </Button>
+                      <Button variant="destructive" size="sm" className="h-7 w-7 px-0" onClick={() => deletePlan.mutate(selectedPlan.id)} data-testid="button-delete-plan">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {isHeavyTop && (
+                    <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md" data-testid="warning-heavy-top-detail">
                       <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0" />
                       <p className="text-sm text-amber-800 dark:text-amber-200">
-                        <strong>Heavy top detected.</strong> Stone, glass, or concrete tops require structural review. Base range will be widened for stability.
+                        <strong>Heavy top detected.</strong> Stone, glass, or concrete tops require structural review before final build.
                       </p>
                     </div>
                   )}
 
-                  <Separator />
-                  <h3 className="text-sm font-semibold uppercase tracking-wider">Design Direction</h3>
-
-                  <div>
-                    <Label>Intended Use *</Label>
-                    <Select value={form.intendedUse} onValueChange={v => setForm(f => ({ ...f, intendedUse: v }))}>
-                      <SelectTrigger data-testid="select-intended-use">
-                        <SelectValue placeholder="Select intended use" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {INTENDED_USES.map(u => <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                  {/* Images row */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    {[
+                      { key: "beforeImageUrl" as const, label: "Before" },
+                      { key: "inspirationImageUrl" as const, label: "Inspiration" },
+                      { key: "conceptImageUrl" as const, label: "Concept" },
+                    ].map(({ key, label }) => (
+                      <div key={key} className="space-y-1">
+                        <Label className="text-xs">{label}</Label>
+                        {selectedPlan[key] ? (
+                          <div className="relative group">
+                            <img src={selectedPlan[key]!} className="rounded border h-32 w-full object-cover" alt={label} />
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="absolute bottom-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity h-7 text-xs"
+                              onClick={() => handleUpload(key)}
+                              disabled={isUploading}
+                            >
+                              Replace
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button variant="outline" className="w-full h-32 border-dashed" onClick={() => handleUpload(key)} disabled={isUploading} data-testid={`button-upload-${key}`}>
+                            <Upload className="h-4 w-4 mr-2" /> Upload {label}
+                          </Button>
+                        )}
+                      </div>
+                    ))}
                   </div>
 
-                  <div>
-                    <Label>Redesign Scope *</Label>
-                    <Select value={form.redesignScope} onValueChange={v => setForm(f => ({ ...f, redesignScope: v }))}>
-                      <SelectTrigger data-testid="select-scope">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {REDESIGN_SCOPES.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <Label>Style Direction</Label>
-                      <Input
-                        value={form.styleDirection}
-                        onChange={e => setForm(f => ({ ...f, styleDirection: e.target.value }))}
-                        placeholder="e.g. modern farmhouse, mid-century"
-                        data-testid="input-style"
-                      />
+                  {/* Dimensions summary */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
+                    <div className="bg-muted/50 rounded p-2">
+                      <div className="text-xs text-muted-foreground">Dimensions</div>
+                      <div className="font-medium">
+                        {selectedPlan.lengthInches || "—"}" × {selectedPlan.widthInches || "—"}" × {selectedPlan.heightInches || "—"}"
+                      </div>
                     </div>
-                    <div>
-                      <Label>Finish Direction</Label>
-                      <Input
-                        value={form.finishDirection}
-                        onChange={e => setForm(f => ({ ...f, finishDirection: e.target.value }))}
-                        placeholder="e.g. matte black, natural oak"
-                        data-testid="input-finish"
-                      />
+                    <div className="bg-muted/50 rounded p-2">
+                      <div className="text-xs text-muted-foreground">Weight</div>
+                      <div className="font-medium capitalize">{selectedPlan.weightClass}</div>
                     </div>
-                  </div>
-
-                  <Separator />
-                  <h3 className="text-sm font-semibold uppercase tracking-wider">Concept Output</h3>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <Label>Concept Title</Label>
-                      <Input
-                        value={form.conceptTitle}
-                        onChange={e => setForm(f => ({ ...f, conceptTitle: e.target.value }))}
-                        placeholder={form.pieceName || "Auto-fills from piece name if empty"}
-                        data-testid="input-concept-title"
-                      />
-                    </div>
-                    <div>
-                      <Label>Approval Status</Label>
-                      <Select value={form.approvalStatus} onValueChange={v => {
-                        if (v !== "draft" && !form.intendedUse) {
-                          toast({ title: "Please select an intended use before changing status", variant: "destructive" });
-                          return;
-                        }
-                        setForm(f => ({ ...f, approvalStatus: v }));
-                      }}>
-                        <SelectTrigger data-testid="select-approval-status">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {APPROVAL_STATUSES.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
+                    <div className="bg-muted/50 rounded p-2">
+                      <div className="text-xs text-muted-foreground">Material</div>
+                      <div className="font-medium">{selectedPlan.existingMaterial || "—"}</div>
                     </div>
                   </div>
 
-                  <div>
-                    <Label>Concept Description</Label>
-                    <Textarea
-                      value={form.conceptDescription}
-                      onChange={e => setForm(f => ({ ...f, conceptDescription: e.target.value }))}
-                      placeholder="Short description of the redesign concept"
-                      rows={2}
-                      data-testid="input-concept-description"
-                    />
-                  </div>
+                  {selectedPlan.conceptDescription && (
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Description</Label>
+                      <p className="text-sm mt-1">{selectedPlan.conceptDescription}</p>
+                    </div>
+                  )}
 
-                  <div>
-                    <Label>Scope Notes</Label>
-                    <Textarea
-                      value={form.buildNotes}
-                      onChange={e => setForm(f => ({ ...f, buildNotes: e.target.value }))}
-                      rows={2}
-                      placeholder="Construction notes, special considerations"
-                      data-testid="input-scope-notes"
-                    />
-                  </div>
+                  {/* Base size range */}
+                  {baseRange && (
+                    <Card className="border-primary/20">
+                      <CardContent className="py-3 px-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h4 className="text-sm font-semibold uppercase tracking-wider">Recommended Base Size Range</h4>
+                              <Badge variant="outline" className="text-xs">Planning Guidance Only</Badge>
+                            </div>
+                            <p className="text-2xl font-bold mt-1" data-testid="text-base-range">
+                              {selectedPlan.baseSizeMinInches || baseRange.min}" – {selectedPlan.baseSizeMaxInches || baseRange.max}"
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">{selectedPlan.baseSizeNotes || baseRange.notes}</p>
+                          </div>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-2 italic">
+                          These values are editable planning estimates, not engineering specifications. Always verify with structural assessment for heavy tops.
+                        </p>
+                      </CardContent>
+                    </Card>
+                  )}
 
-                  <div className="flex items-center gap-3">
-                    {saveStatus === "saving" && (
-                      <span className="flex items-center gap-1 text-sm text-muted-foreground" data-testid="text-save-status">
-                        <Loader2 className="h-3 w-3 animate-spin" /> Saving…
-                      </span>
-                    )}
-                    {saveStatus === "saved" && (
-                      <span className="flex items-center gap-1 text-sm text-green-600" data-testid="text-save-status">
-                        <Check className="h-3 w-3" /> Saved
-                      </span>
-                    )}
-                    {saveStatus === "idle" && !draftPlanId && (
-                      <span className="text-sm text-muted-foreground" data-testid="text-save-status">
-                        Select a project and enter a piece name to start
-                      </span>
-                    )}
-                    <Button variant="outline" onClick={handleDoneCreate} data-testid="button-done-create">
-                      {draftPlanId ? "Done" : "Cancel"}
+                  {selectedPlan.buildNotes && (
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Scope Notes</Label>
+                      <p className="text-sm mt-1">{selectedPlan.buildNotes}</p>
+                    </div>
+                  )}
+
+                  <div className="text-xs text-muted-foreground italic border-t pt-3" data-testid="text-disclaimer">
+                    Concept and planning preview only. Final result may vary based on material availability, structural requirements, and on-site conditions.
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Materials panel */}
+              <Card>
+                <CardHeader className="py-3 px-4">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm uppercase tracking-wider">Materials / Spec List</CardTitle>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => addMaterial.mutate({ component: "New Component" })}
+                      disabled={addMaterial.isPending}
+                      data-testid="button-add-material"
+                    >
+                      <Plus className="h-3 w-3 mr-1" /> Add
                     </Button>
                   </div>
+                </CardHeader>
+                <CardContent>
+                  {(!materials || materials.length === 0) && (
+                    <p className="text-sm text-muted-foreground">No materials added yet.</p>
+                  )}
+                  <div className="space-y-3">
+                    {materials?.map(mat => (
+                      <MaterialRow
+                        key={mat.id}
+                        material={mat}
+                        planId={selectedPlanId!}
+                        onDelete={() => deleteMaterial.mutate(mat.id)}
+                      />
+                    ))}
+                  </div>
                 </CardContent>
               </Card>
-            )}
 
-            {selectedPlan && !showCreateForm && (
-              <div className="space-y-6">
-                {/* Plan detail header */}
-                <Card>
-                  <CardHeader className="py-3 px-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <CardTitle className="uppercase tracking-wider text-sm leading-tight" data-testid="text-plan-title">
-                          {selectedPlan.conceptTitle || selectedPlan.pieceName}
-                        </CardTitle>
-                        <div className="flex gap-1.5 mt-1.5 flex-wrap">
-                          <Badge variant="outline" className="capitalize text-xs px-1.5 py-0">{selectedPlan.redesignScope.replace("_", " ")}</Badge>
-                          {selectedPlan.intendedUse && (
-                            <Badge variant="outline" className="capitalize text-xs px-1.5 py-0">{selectedPlan.intendedUse.replace("_", " ")}</Badge>
-                          )}
-                          <Badge className={`capitalize text-xs px-1.5 py-0 ${
-                            selectedPlan.approvalStatus === "approved" ? "bg-green-600" :
-                            selectedPlan.approvalStatus === "ready_for_client" ? "bg-blue-600" :
-                            selectedPlan.approvalStatus === "revise" ? "bg-amber-600" : ""
-                          }`}>
-                            {(selectedPlan.approvalStatus || "draft").replace("_", " ")}
-                          </Badge>
-                        </div>
-                      </div>
-                      <div className="flex gap-1.5 shrink-0">
-                        <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => handleEditPlan(selectedPlan)} data-testid="button-edit-plan">
-                          <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
-                        </Button>
-                        <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => setShowPushDialog(true)} data-testid="button-push-to-board">
-                          <Send className="h-3.5 w-3.5 mr-1" /> Board
-                        </Button>
-                        <Button variant="destructive" size="sm" className="h-7 w-7 px-0" onClick={() => deletePlan.mutate(selectedPlan.id)} data-testid="button-delete-plan">
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {isHeavyTop && (
-                      <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md" data-testid="warning-heavy-top-detail">
-                        <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0" />
-                        <p className="text-sm text-amber-800 dark:text-amber-200">
-                          <strong>Heavy top detected.</strong> Stone, glass, or concrete tops require structural review before final build.
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Images row */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      {[
-                        { key: "beforeImageUrl" as const, label: "Before" },
-                        { key: "inspirationImageUrl" as const, label: "Inspiration" },
-                        { key: "conceptImageUrl" as const, label: "Concept" },
-                      ].map(({ key, label }) => (
-                        <div key={key} className="space-y-1">
-                          <Label className="text-xs">{label}</Label>
-                          {selectedPlan[key] ? (
-                            <div className="relative group">
-                              <img src={selectedPlan[key]!} className="rounded border h-32 w-full object-cover" alt={label} />
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="absolute bottom-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity h-7 text-xs"
-                                onClick={() => handleUpload(key)}
-                                disabled={isUploading}
-                              >
-                                Replace
-                              </Button>
-                            </div>
-                          ) : (
-                            <Button variant="outline" className="w-full h-32 border-dashed" onClick={() => handleUpload(key)} disabled={isUploading} data-testid={`button-upload-${key}`}>
-                              <Upload className="h-4 w-4 mr-2" /> Upload {label}
-                            </Button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Dimensions summary */}
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
-                      <div className="bg-muted/50 rounded p-2">
-                        <div className="text-xs text-muted-foreground">Dimensions</div>
-                        <div className="font-medium">
-                          {selectedPlan.lengthInches || "—"}" × {selectedPlan.widthInches || "—"}" × {selectedPlan.heightInches || "—"}"
-                        </div>
-                      </div>
-                      <div className="bg-muted/50 rounded p-2">
-                        <div className="text-xs text-muted-foreground">Weight</div>
-                        <div className="font-medium capitalize">{selectedPlan.weightClass}</div>
-                      </div>
-                      <div className="bg-muted/50 rounded p-2">
-                        <div className="text-xs text-muted-foreground">Material</div>
-                        <div className="font-medium">{selectedPlan.existingMaterial || "—"}</div>
-                      </div>
-                    </div>
-
-                    {selectedPlan.conceptDescription && (
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Description</Label>
-                        <p className="text-sm mt-1">{selectedPlan.conceptDescription}</p>
-                      </div>
-                    )}
-
-                    {/* Base size range */}
-                    {baseRange && (
-                      <Card className="border-primary/20">
-                        <CardContent className="py-3 px-4">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <h4 className="text-sm font-semibold uppercase tracking-wider">Recommended Base Size Range</h4>
-                                <Badge variant="outline" className="text-xs">Planning Guidance Only</Badge>
-                              </div>
-                              <p className="text-2xl font-bold mt-1" data-testid="text-base-range">
-                                {selectedPlan.baseSizeMinInches || baseRange.min}" – {selectedPlan.baseSizeMaxInches || baseRange.max}"
-                              </p>
-                              <p className="text-xs text-muted-foreground mt-1">{selectedPlan.baseSizeNotes || baseRange.notes}</p>
-                            </div>
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-2 italic">
-                            These values are editable planning estimates, not engineering specifications. Always verify with structural assessment for heavy tops.
-                          </p>
-                        </CardContent>
-                      </Card>
-                    )}
-
-                    {selectedPlan.buildNotes && (
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Scope Notes</Label>
-                        <p className="text-sm mt-1">{selectedPlan.buildNotes}</p>
-                      </div>
-                    )}
-
-                    <div className="text-xs text-muted-foreground italic border-t pt-3" data-testid="text-disclaimer">
-                      Concept and planning preview only. Final result may vary based on material availability, structural requirements, and on-site conditions.
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Materials panel */}
-                <Card>
-                  <CardHeader className="py-3 px-4">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-sm uppercase tracking-wider">Materials / Spec List</CardTitle>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => addMaterial.mutate({ component: "New Component" })}
-                        disabled={addMaterial.isPending}
-                        data-testid="button-add-material"
-                      >
-                        <Plus className="h-3 w-3 mr-1" /> Add
+              {/* Share / export */}
+              <Card>
+                <CardHeader className="py-3 px-4">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm uppercase tracking-wider">Share</CardTitle>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" onClick={handleCopyShareText} data-testid="button-copy-share">
+                        <Copy className="h-3.5 w-3.5 mr-1" /> Copy Text
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setShowShareView(!showShareView)} data-testid="button-toggle-share">
+                        <Eye className="h-3.5 w-3.5 mr-1" /> {showShareView ? "Hide" : "Preview"}
                       </Button>
                     </div>
-                  </CardHeader>
+                  </div>
+                </CardHeader>
+                {showShareView && (
                   <CardContent>
-                    {(!materials || materials.length === 0) && (
-                      <p className="text-sm text-muted-foreground">No materials added yet.</p>
-                    )}
-                    <div className="space-y-3">
-                      {materials?.map(mat => (
-                        <MaterialRow
-                          key={mat.id}
-                          material={mat}
-                          planId={selectedPlanId!}
-                          onDelete={() => deleteMaterial.mutate(mat.id)}
-                        />
-                      ))}
+                    <div className="border rounded-lg p-4 space-y-3 bg-muted/30">
+                      <h2 className="font-semibold text-lg">{selectedPlan.conceptTitle || selectedPlan.pieceName}</h2>
+                      {selectedPlan.conceptDescription && <p className="text-sm">{selectedPlan.conceptDescription}</p>}
+                      {materials && materials.length > 0 && (
+                        <div>
+                          <h3 className="text-sm font-semibold mb-1">Materials</h3>
+                          <ul className="space-y-1">
+                            {materials.map(m => (
+                              <li key={m.id} className="text-sm flex items-start gap-1">
+                                <span className="text-muted-foreground">•</span>
+                                <span>
+                                  <strong>{m.component}</strong>
+                                  {m.material && ` — ${m.material}`}
+                                  {m.finish && ` (${m.finish})`}
+                                  {m.webLink && (
+                                    <a href={m.webLink} target="_blank" rel="noopener noreferrer" className="ml-1 text-primary inline-flex items-center gap-0.5">
+                                      <ExternalLink className="h-3 w-3" />
+                                    </a>
+                                  )}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      <p className="text-xs text-muted-foreground italic">
+                        Concept and planning preview only. Final result may vary based on material availability, structural requirements, and on-site conditions.
+                      </p>
                     </div>
                   </CardContent>
-                </Card>
-              </div>
-            )}
-
-            {!selectedPlan && !showCreateForm && (
-              <Card>
-                <CardContent className="py-12 text-center">
-                  <p className="text-muted-foreground">Select a plan from the list or create a new one.</p>
-                </CardContent>
+                )}
               </Card>
-            )}
-          </div>
+            </div>
+          )}
+
+          {!selectedPlan && !showCreateForm && (
+            <div className="flex items-center justify-center h-64 text-muted-foreground">
+              <p className="text-sm">Select a concept from the list or create a new one</p>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Push to Board Dialog */}
+      {/* Push to Board dialog */}
       <Dialog open={showPushDialog} onOpenChange={setShowPushDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add to Planning Board</DialogTitle>
-            <DialogDescription>Choose a board to add a clean concept card.</DialogDescription>
+            <DialogTitle>Push to Planning Board</DialogTitle>
+            <DialogDescription>Add this concept as a card on a planning board.</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="space-y-4 pt-2">
             <div>
-              <Label>Select Board</Label>
+              <Label>Planning Board</Label>
               <Select value={pushBoardId} onValueChange={setPushBoardId}>
-                <SelectTrigger data-testid="select-board">
-                  <SelectValue placeholder="Choose a board" />
+                <SelectTrigger data-testid="select-push-board">
+                  <SelectValue placeholder="Select board" />
                 </SelectTrigger>
                 <SelectContent>
                   {boards?.map((b: any) => (
@@ -985,100 +1025,49 @@ export default function TableRedesignPlanner() {
               <Input
                 value={pushBoardTag}
                 onChange={e => setPushBoardTag(e.target.value)}
-                placeholder="e.g. Option A"
+                placeholder="e.g. Concept, For Review"
                 data-testid="input-push-tag"
               />
-            </div>
-            <div className="bg-muted/50 rounded p-3 text-sm">
-              <p className="font-medium mb-1">Card will contain:</p>
-              <ul className="text-muted-foreground text-xs space-y-1">
-                <li>• Image (concept or before photo)</li>
-                <li>• Title: {selectedPlan?.conceptTitle || selectedPlan?.pieceName}</li>
-                <li>• Description (1–2 lines)</li>
-                {pushBoardTag && <li>• Tag: {pushBoardTag}</li>}
-              </ul>
             </div>
             <div className="flex gap-2 justify-end">
               <Button variant="outline" onClick={() => setShowPushDialog(false)}>Cancel</Button>
               <Button
-                onClick={() => pushToBoard.mutate({ planId: selectedPlan!.id, boardId: parseInt(pushBoardId), tag: pushBoardTag || undefined })}
                 disabled={!pushBoardId || pushToBoard.isPending}
+                onClick={() => {
+                  if (!selectedPlan) return;
+                  pushToBoard.mutate({ planId: selectedPlan.id, boardId: parseInt(pushBoardId), tag: pushBoardTag || undefined });
+                }}
                 data-testid="button-confirm-push"
               >
-                {pushToBoard.isPending ? "Adding…" : "Add Card"}
+                {pushToBoard.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Push to Board"}
               </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
-
-      {/* Client Share View Dialog */}
-      <Dialog open={showShareView} onOpenChange={setShowShareView}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Client Share View</DialogTitle>
-            <DialogDescription>Preview of the presentation-ready summary.</DialogDescription>
-          </DialogHeader>
-          {selectedPlan && (
-            <div className="space-y-4">
-              {selectedPlan.beforeImageUrl && (
-                <div>
-                  <Label className="text-xs text-muted-foreground">Before</Label>
-                  <img src={selectedPlan.beforeImageUrl} className="rounded border w-full h-40 object-cover mt-1" alt="Before" />
-                </div>
-              )}
-              {selectedPlan.conceptImageUrl && (
-                <div>
-                  <Label className="text-xs text-muted-foreground">Concept</Label>
-                  <img src={selectedPlan.conceptImageUrl} className="rounded border w-full h-40 object-cover mt-1" alt="Concept" />
-                </div>
-              )}
-              <div>
-                <h3 className="font-bold text-lg">{selectedPlan.conceptTitle || selectedPlan.pieceName}</h3>
-                <p className="text-sm text-muted-foreground mt-1">{selectedPlan.conceptDescription}</p>
-              </div>
-              {materials && materials.length > 0 && (
-                <div>
-                  <h4 className="text-sm font-semibold uppercase tracking-wider mb-2">Selected Materials</h4>
-                  {materials.map(m => (
-                    <div key={m.id} className="text-sm">
-                      <span className="font-medium">{m.component}</span>
-                      {m.material && <span className="text-muted-foreground"> — {m.material}</span>}
-                      {m.finish && <span className="text-muted-foreground"> ({m.finish})</span>}
-                    </div>
-                  ))}
-                </div>
-              )}
-              {selectedPlan.buildNotes && (
-                <div>
-                  <h4 className="text-sm font-semibold uppercase tracking-wider mb-1">Scope Notes</h4>
-                  <p className="text-sm text-muted-foreground">{selectedPlan.buildNotes}</p>
-                </div>
-              )}
-              <p className="text-xs text-muted-foreground italic">
-                Concept and planning preview only. Final result may vary based on material availability, structural requirements, and on-site conditions.
-              </p>
-              <Button onClick={handleCopyShareText} variant="outline" className="w-full" data-testid="button-copy-share">
-                <Copy className="h-4 w-4 mr-2" /> Copy to Clipboard
-              </Button>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-    </div>
+    </>
   );
 }
 
-function MaterialRow({ material, planId, onDelete }: { material: TableRedesignMaterial; planId: number; onDelete: () => void }) {
+// Inline editable material row component
+function MaterialRow({
+  material,
+  planId,
+  onDelete,
+}: {
+  material: TableRedesignMaterial;
+  planId: number;
+  onDelete: () => void;
+}) {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({
-    component: material.component,
+    component: material.component || "",
     material: material.material || "",
     finish: material.finish || "",
     dimensions: material.dimensions || "",
-    quantity: String(material.quantity || 1),
-    notes: material.notes || "",
+    quantity: String(material.quantity ?? 1),
     supplier: material.supplier || "",
+    notes: material.notes || "",
     webLink: material.webLink || "",
   });
 
@@ -1131,12 +1120,53 @@ function MaterialRow({ material, planId, onDelete }: { material: TableRedesignMa
         <Input placeholder="Supplier" value={form.supplier} onChange={e => setForm(f => ({ ...f, supplier: e.target.value }))} />
         <Input placeholder="Notes" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
       </div>
-      <div>
-        <Input placeholder="Web link (e.g. supplier URL or cost estimator link)" value={form.webLink} onChange={e => setForm(f => ({ ...f, webLink: e.target.value }))} data-testid="input-material-weblink" />
-      </div>
+      <Input placeholder="Web link (e.g. supplier URL or cost estimator link)" value={form.webLink} onChange={e => setForm(f => ({ ...f, webLink: e.target.value }))} data-testid="input-material-weblink" />
       <div className="flex gap-2">
         <Button size="sm" onClick={() => updateMaterial.mutate({ ...form, quantity: parseInt(form.quantity) || 1 })} disabled={updateMaterial.isPending}>Save</Button>
         <Button size="sm" variant="outline" onClick={() => setEditing(false)}>Cancel</Button>
+      </div>
+    </div>
+  );
+}
+
+// Named export: embed the planner inside a project page tab (no Navbar, no project selector)
+export function FurniturePlannerPanel({ projectId }: { projectId: number }) {
+  return <FurniturePlannerCore fixedProjectId={projectId} />;
+}
+
+// Default export: standalone page at /table-redesign (kept for backward compat)
+export default function TableRedesignPlanner() {
+  const { user } = useAuth();
+
+  if (!user || user.role !== "admin") {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <div className="p-8 text-center">
+          <p className="text-muted-foreground">Admin access required.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      <Navbar />
+      <div className="max-w-7xl mx-auto px-4 py-6">
+        <div className="flex items-center gap-3 mb-6">
+          <Link href="/">
+            <Button variant="ghost" size="icon" data-testid="button-back">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          </Link>
+          <div>
+            <h1 className="text-2xl font-bold uppercase tracking-wide normal-case" data-testid="text-page-title">
+              Furniture Planner
+            </h1>
+            <p className="text-sm text-muted-foreground">Create and manage furniture redesign concepts</p>
+          </div>
+        </div>
+        <FurniturePlannerCore />
       </div>
     </div>
   );

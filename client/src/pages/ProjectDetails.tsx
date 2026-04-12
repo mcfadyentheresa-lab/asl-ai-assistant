@@ -15,8 +15,9 @@ import { useViewMode } from "@/hooks/use-view-mode";
 import { useProjectRealtime } from "@/hooks/use-project-realtime";
 import { Navbar } from "@/components/layout/Navbar";
 import SpatialCanvas from "@/components/SpatialCanvas";
+import { FurniturePlannerPanel } from "@/pages/TableRedesignPlanner";
 import GanttChart from "@/components/GanttChart";
-import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, ExternalLink, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, CalendarDays, ChevronLeft, Upload, Download, User, X, Paperclip, ZoomIn, Palette, Shield, Users, Phone, Check, Bell, Eye, EyeOff, Archive, ArchiveRestore, PanelRightOpen, MoreVertical, Flag, DollarSign, BarChart3, TrendingUp, TrendingDown, Minus, ArrowUpRight, Building2, Sparkles } from "lucide-react";
+import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, ExternalLink, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, CalendarDays, ChevronLeft, Upload, Download, User, X, Paperclip, ZoomIn, Palette, Shield, Users, Phone, Check, Bell, Eye, EyeOff, Archive, ArchiveRestore, PanelRightOpen, MoreVertical, Flag, DollarSign, BarChart3, TrendingUp, TrendingDown, Minus, ArrowUpRight, Building2, Sparkles, Armchair } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -954,6 +955,7 @@ export default function ProjectDetails() {
     { id: "overview", label: "Overview", icon: Clock, roles: ["admin", "crew", "client"] },
     { id: "checklist", label: "Progress", icon: BarChart3, roles: ["admin", "crew", "client"] },
     { id: "board", label: "Planning Board", icon: Palette, roles: ["admin", "crew", "client"], clientRequiresInvite: true },
+    { id: "furniture", label: "Furniture", icon: Armchair, roles: ["admin"] },
     { id: "photos", label: "Photos", icon: ImageIcon, roles: ["admin", "crew", "client"] },
     { id: "docs", label: "Documents", icon: FileText, roles: ["admin", "client"] },
     { id: "chat", label: "Messages", icon: MessageSquare, roles: ["admin", "crew", "client"] },
@@ -1232,6 +1234,12 @@ export default function ProjectDetails() {
 
           <TabsContent value="board" className="flex-1 min-h-0">
             <SpatialCanvas projectId={projectId} />
+          </TabsContent>
+
+          <TabsContent value="furniture">
+            <div className="p-4">
+              <FurniturePlannerPanel projectId={projectId} />
+            </div>
           </TabsContent>
 
           <TabsContent value="chat">
