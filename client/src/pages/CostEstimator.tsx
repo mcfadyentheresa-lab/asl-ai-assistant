@@ -1008,12 +1008,12 @@ export default function CostEstimator() {
             </Card>
 
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-3">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <ReceiptIcon className="h-5 w-5" /> Receipts & Actual Spend
+              <CardHeader className="flex flex-row items-center justify-between gap-3 pb-3 flex-wrap">
+                <CardTitle className="text-base flex items-center gap-2 shrink-0">
+                  <ReceiptIcon className="h-4 w-4" /> Receipts & Actual Spend
                 </CardTitle>
                 {canEdit && (
-                  <Button size="sm" onClick={() => setShowAddReceipt(true)} data-testid="button-add-receipt">
+                  <Button size="sm" className="h-8 shrink-0" onClick={() => setShowAddReceipt(true)} data-testid="button-add-receipt">
                     <Plus className="h-4 w-4 mr-1" /> Add Receipt
                   </Button>
                 )}
