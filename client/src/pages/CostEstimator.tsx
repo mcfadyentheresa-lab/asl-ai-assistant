@@ -367,14 +367,17 @@ export default function CostEstimator() {
     setScanning(true);
     try {
       const formData = new FormData();
-      formData.append("image", file);
+      formData.append("file", file);
       
-      const uploadRes = await fetch("/api/upload", {
+      const uploadRes = await fetch("/api/receipts/upload", {
         method: "POST",
         body: formData,
       });
       
-      if (!uploadRes.ok) throw new Error("Upload failed");
+      if (!uploadRes.ok) {
+        const errData = await uploadRes.json().catch(() => ({}));
+        throw new Error(errData.message || "Upload failed");
+      }
       const { url } = await uploadRes.json();
 
       const scanRes = await apiRequest("POST", `/api/projects/${projectId}/receipts/scan`, { imageUrl: url });
@@ -1388,7 +1391,7 @@ export default function CostEstimator() {
             <div className="p-4 border-2 border-dashed rounded-lg text-center bg-muted/30">
               <Input
                 type="file"
-                accept="image/*"
+                accept="image/*,application/pdf"
                 className="hidden"
                 id="receipt-upload"
                 onChange={handleFileUpload}
@@ -1407,7 +1410,7 @@ export default function CostEstimator() {
                   {scanning ? "Analyzing Receipt..." : "Click to Scan Receipt Image"}
                 </span>
                 <span className="text-xs text-muted-foreground">
-                  AI extracts vendor, date, amount & every line item
+                  Accepts images or PDF · AI extracts vendor, date, amount & line items
                 </span>
               </Label>
             </div>

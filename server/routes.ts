@@ -11,6 +11,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { randomUUID } from "crypto";
+import { execFile } from "child_process";
 import {
   notifyNewMessage,
   notifyTaskAssigned,
@@ -119,6 +120,21 @@ export async function registerRoutes(
       if (!req.file) {
         return res.status(400).json({ message: "No image file provided" });
       }
+      const url = `/uploads/${req.file.filename}`;
+      res.json({ url });
+    });
+  });
+
+  // Receipt upload — accepts images and PDFs
+  app.post("/api/receipts/upload", isAuthenticated, (req: any, res) => {
+    docUpload.single("file")(req, res, (err: any) => {
+      if (err) {
+        const message = err instanceof multer.MulterError
+          ? (err.code === "LIMIT_FILE_SIZE" ? "File too large (max 25MB)" : err.message)
+          : err.message || "Upload failed";
+        return res.status(400).json({ message });
+      }
+      if (!req.file) return res.status(400).json({ message: "No file provided" });
       const url = `/uploads/${req.file.filename}`;
       res.json({ url });
     });
@@ -3744,22 +3760,12 @@ Respond with valid JSON only:
 
   // Receipt Scanning with OpenAI Vision
   app.post("/api/projects/:id/receipts/scan", isAuthenticated, async (req: any, res) => {
+    let tempImagePath: string | null = null;
     try {
       const { imageUrl } = req.body;
       if (!imageUrl) return res.status(400).json({ message: "Image URL is required" });
 
-      const OpenAI = (await import("openai")).default;
-      const openai = new OpenAI({
-        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-      });
-
-      const response = await openai.chat.completions.create({
-        model: "gpt-5.2",
-        messages: [
-          {
-            role: "system",
-            content: `You are a receipt parsing assistant. Extract all information from the receipt image and respond with valid JSON only using this exact shape:
+      const systemPrompt = `You are a receipt parsing assistant. Extract all information from the receipt image and respond with valid JSON only using this exact shape:
 {
   "vendor": "string",
   "amount": number,
@@ -3774,13 +3780,48 @@ Rules:
 - If unit price cannot be determined but subtotal is present, set unitPrice = subtotal / qty.
 - amount is the receipt grand total (including tax if shown).
 - date format must be YYYY-MM-DD. If not visible, use today's date.
-- All numbers must be plain numbers (no currency symbols).`
-          },
+- All numbers must be plain numbers (no currency symbols).`;
+
+      // Resolve the actual image URL to send to OpenAI
+      let scanUrl = imageUrl;
+      const isPdf = imageUrl.toLowerCase().endsWith(".pdf");
+      if (isPdf) {
+        // Convert first PDF page to JPEG using pdftoppm
+        const filePath = path.join(process.cwd(), imageUrl.replace(/^\//, ""));
+        const tempBase = path.join("/tmp", `receipt_${randomUUID()}`);
+        await new Promise<void>((resolve, reject) => {
+          execFile("pdftoppm", ["-jpeg", "-r", "200", "-f", "1", "-l", "1", filePath, tempBase], (err) => {
+            if (err) reject(err); else resolve();
+          });
+        });
+        // pdftoppm outputs tempBase-N.jpg where N has as many digits as needed for page count
+        const tmpDir = path.dirname(tempBase);
+        const tmpPrefix = path.basename(tempBase);
+        const allFiles = fs.readdirSync(tmpDir)
+          .filter(f => f.startsWith(tmpPrefix) && f.endsWith(".jpg"))
+          .map(f => path.join(tmpDir, f));
+        const found = allFiles[0] ?? null;
+        if (!found) throw new Error("PDF conversion produced no output");
+        tempImagePath = found;
+        const imgBuffer = fs.readFileSync(found);
+        scanUrl = `data:image/jpeg;base64,${imgBuffer.toString("base64")}`;
+      }
+
+      const OpenAI = (await import("openai")).default;
+      const openai = new OpenAI({
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+      });
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-5.2",
+        messages: [
+          { role: "system", content: systemPrompt },
           {
             role: "user",
             content: [
               { type: "text", text: "Parse this receipt and extract every line item:" },
-              { type: "image_url", image_url: { url: imageUrl } }
+              { type: "image_url", image_url: { url: scanUrl } }
             ]
           }
         ],
@@ -3793,6 +3834,10 @@ Rules:
     } catch (error) {
       console.error("Receipt scan error:", error);
       res.status(500).json({ message: "Failed to scan receipt" });
+    } finally {
+      if (tempImagePath && fs.existsSync(tempImagePath)) {
+        fs.unlinkSync(tempImagePath);
+      }
     }
   });
 
