@@ -10,17 +10,15 @@ import {
   DropdownMenuTrigger,
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
-import { LogOut, UserCog, Eye, EyeOff, User, Palette, ZoomIn, Clock, DollarSign, Users, Store, CalendarDays, Sparkles, Armchair, Sun, Moon } from "lucide-react";
+import { LogOut, UserCog, User, Palette, ZoomIn, Clock, DollarSign, Users, Store, CalendarDays, Sparkles, Armchair, Sun, Moon } from "lucide-react";
 import { useTextZoom } from "@/hooks/use-text-zoom";
 import { Link } from "wouter";
-import { useVisibilityToggle } from "@/hooks/use-presence";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useViewMode } from "@/hooks/use-view-mode";
 import { useTheme } from "next-themes";
 
 export function Navbar() {
   const { user, logout } = useAuth();
-  const { visible, toggleVisibility } = useVisibilityToggle();
   const { zoom, cycleZoom } = useTextZoom();
   const { viewMode, setViewMode } = useViewMode();
   const { theme, setTheme } = useTheme();
@@ -188,12 +186,6 @@ export function Navbar() {
               <ZoomIn className="mr-2 h-4 w-4" />
               Text Size: {zoom}%
             </DropdownMenuItem>
-            {effectiveRole === "admin" && (
-              <DropdownMenuItem onClick={toggleVisibility} data-testid="button-toggle-visibility">
-                {visible ? <Eye className="mr-2 h-4 w-4" /> : <EyeOff className="mr-2 h-4 w-4" />}
-                {visible ? "Appear Offline" : "Go Online"}
-              </DropdownMenuItem>
-            )}
             <DropdownMenuItem onClick={() => logout()} data-testid="button-logout">
               <LogOut className="mr-2" />
               Sign Out
