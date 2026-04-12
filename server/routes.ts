@@ -3978,6 +3978,77 @@ Rules:
     res.json({ message: "Supplier price deleted" });
   }));
 
+  // Bulk-create supplier prices (used when importing receipt line items)
+  app.post("/api/supplier-prices/bulk", isAuthenticated, asyncHandler(async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const user = await authStorage.getUser(userId);
+    if (!user || user.role !== "admin") return res.status(403).json({ message: "Admin access required" });
+    const { items } = req.body;
+    if (!Array.isArray(items) || items.length === 0) return res.status(400).json({ message: "No items provided" });
+    const created = [];
+    for (const item of items) {
+      const parsed = insertSupplierPriceSchema.safeParse({ ...item, createdBy: userId });
+      if (!parsed.success) continue;
+      const price = await storage.createSupplierPrice(parsed.data);
+      created.push(price);
+    }
+    res.status(201).json(created);
+  }));
+
+  // Fetch live price from a product URL using AI
+  app.post("/api/supplier-prices/:id/fetch-price", isAuthenticated, asyncHandler(async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const user = await authStorage.getUser(userId);
+    if (!user || user.role !== "admin") return res.status(403).json({ message: "Admin access required" });
+    const priceId = parseInt(req.params.id);
+    const allPrices = await storage.getSupplierPrices();
+    const priceEntry = allPrices.find(p => p.id === priceId);
+    if (!priceEntry) return res.status(404).json({ message: "Price not found" });
+    if (!priceEntry.productUrl) return res.status(400).json({ message: "No product URL set for this entry" });
+    let pageText = "";
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
+      const pageRes = await fetch(priceEntry.productUrl, {
+        signal: controller.signal,
+        headers: { "User-Agent": "Mozilla/5.0 (compatible; PriceBot/1.0)" },
+      });
+      clearTimeout(timeout);
+      const html = await pageRes.text();
+      pageText = html
+        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 6000);
+    } catch {
+      return res.status(400).json({ message: "Failed to fetch product page — check the URL" });
+    }
+    const OpenAI = (await import("openai")).default;
+    const openai = new OpenAI({
+      apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+      baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+    });
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: `You are a price extraction assistant. Given product page text, extract the current selling price. Return JSON: { "price": number | null, "currency": "CAD" | "USD" | null, "confidence": "high" | "medium" | "low" }. If a sale price exists return it. All values must be plain numbers (no symbols).`,
+        },
+        { role: "user", content: `Product: ${priceEntry.productName}\nURL: ${priceEntry.productUrl}\n\nPage text:\n${pageText}` },
+      ],
+      response_format: { type: "json_object" },
+    });
+    const content = response.choices[0]?.message?.content;
+    if (!content) return res.status(500).json({ message: "No AI response" });
+    const extracted = JSON.parse(content);
+    if (!extracted.price) return res.status(422).json({ message: "Could not detect a price on that page", confidence: extracted.confidence });
+    const updated = await storage.updateSupplierPrice(priceId, { unitPrice: String(extracted.price) });
+    res.json({ ...updated, fetchedPrice: extracted.price, currency: extracted.currency, confidence: extracted.confidence });
+  }));
+
   // ==================== TABLE REDESIGN PLANNER ====================
 
   app.get("/api/redesign-plans", isAuthenticated, asyncHandler(async (req: any, res) => {

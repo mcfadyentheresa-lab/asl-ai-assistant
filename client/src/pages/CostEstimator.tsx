@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useParams, Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { Navbar } from "@/components/layout/Navbar";
@@ -72,6 +72,13 @@ export default function CostEstimator() {
     vendor: "", description: "", date: new Date().toISOString().split("T")[0], amount: "", estimateItemId: "", lineItems: [],
   });
   const [expandedReceipts, setExpandedReceipts] = useState<Set<number>>(new Set());
+  const [priceBookImport, setPriceBookImport] = useState<{
+    enabled: boolean;
+    supplierId: string;
+    items: Array<{ checked: boolean; productName: string; categoryId: string; unitPrice: string }>;
+  }>({ enabled: false, supplierId: "", items: [] });
+  const priceBookImportRef = useRef(priceBookImport);
+  priceBookImportRef.current = priceBookImport;
 
   const { data: project } = useQuery<Project>({ queryKey: ["/api/projects", projectId] });
   const { data: categories = [] } = useQuery<CostCategory[]>({ queryKey: ["/api/cost-categories"] });
@@ -143,11 +150,31 @@ export default function CostEstimator() {
       const res = await apiRequest("POST", `/api/projects/${projectId}/receipts`, data);
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: async (receipt) => {
+      const pb = priceBookImportRef.current;
+      let importedCount = 0;
+      if (pb.enabled && pb.supplierId) {
+        const checkedItems = pb.items.filter(i => i.checked && i.productName.trim() && i.unitPrice);
+        if (checkedItems.length > 0) {
+          await apiRequest("POST", "/api/supplier-prices/bulk", {
+            items: checkedItems.map(i => ({
+              supplierId: parseInt(pb.supplierId),
+              productName: i.productName.trim(),
+              unitPrice: i.unitPrice,
+              unitType: "unit",
+              categoryId: i.categoryId ? parseInt(i.categoryId) : null,
+              sourceReceiptId: receipt.id,
+            })),
+          });
+          queryClient.invalidateQueries({ queryKey: ["/api/supplier-prices"] });
+          importedCount = checkedItems.length;
+        }
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "receipts"] });
       setShowAddReceipt(false);
       setNewReceipt({ vendor: "", description: "", date: new Date().toISOString().split("T")[0], amount: "", estimateItemId: "", lineItems: [] });
-      toast({ title: "Receipt added" });
+      setPriceBookImport({ enabled: false, supplierId: "", items: [] });
+      toast({ title: importedCount > 0 ? `Receipt added · ${importedCount} item(s) sent to Price Book` : "Receipt added" });
     },
   });
 
@@ -383,14 +410,28 @@ export default function CostEstimator() {
       const scanRes = await apiRequest("POST", `/api/projects/${projectId}/receipts/scan`, { imageUrl: url });
       const data = await scanRes.json();
 
+      const lineItems = Array.isArray(data.lineItems) ? data.lineItems : [];
       setNewReceipt(prev => ({
         ...prev,
         vendor: data.vendor || "",
         amount: data.amount?.toString() || "",
         date: data.date || prev.date,
-        lineItems: Array.isArray(data.lineItems) ? data.lineItems : [],
+        lineItems,
       }));
-      toast({ title: `Receipt scanned — ${Array.isArray(data.lineItems) ? data.lineItems.length : 0} line item(s) extracted` });
+      if (lineItems.length > 0) {
+        const firstSupplier = priceBookSuppliers[0];
+        setPriceBookImport({
+          enabled: false,
+          supplierId: firstSupplier ? String(firstSupplier.id) : "",
+          items: lineItems.map((item: { description: string; unitPrice: number }) => ({
+            checked: true,
+            productName: item.description,
+            categoryId: "",
+            unitPrice: String(item.unitPrice),
+          })),
+        });
+      }
+      toast({ title: `Receipt scanned — ${lineItems.length} line item(s) extracted` });
     } catch (error) {
       toast({ title: "Failed to scan receipt", variant: "destructive" });
     } finally {
@@ -1382,8 +1423,8 @@ export default function CostEstimator() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showAddReceipt} onOpenChange={setShowAddReceipt}>
-        <DialogContent className="max-w-md">
+      <Dialog open={showAddReceipt} onOpenChange={(open) => { setShowAddReceipt(open); if (!open) { setNewReceipt({ vendor: "", description: "", date: new Date().toISOString().split("T")[0], amount: "", estimateItemId: "", lineItems: [] }); setPriceBookImport({ enabled: false, supplierId: "", items: [] }); } }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add Receipt</DialogTitle>
           </DialogHeader>
@@ -1415,15 +1456,88 @@ export default function CostEstimator() {
               </Label>
             </div>
             {newReceipt.lineItems.length > 0 && (
-              <div className="rounded-md border bg-muted/30 p-3 space-y-1.5">
-                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-2">Extracted Line Items</p>
-                {newReceipt.lineItems.map((item, idx) => (
-                  <div key={idx} className="flex items-center justify-between text-xs gap-2">
-                    <span className="flex-1 truncate">{item.description}</span>
-                    <span className="text-muted-foreground shrink-0">{item.qty} × ${item.unitPrice.toFixed(2)}</span>
-                    <span className="font-medium shrink-0 w-16 text-right">${item.subtotal.toFixed(2)}</span>
-                  </div>
-                ))}
+              <div className="space-y-2">
+                <div className="rounded-md border bg-muted/30 p-3 space-y-1.5">
+                  <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-2">Extracted Line Items</p>
+                  {newReceipt.lineItems.map((item, idx) => (
+                    <div key={idx} className="flex items-center justify-between text-xs gap-2">
+                      <span className="flex-1 truncate">{item.description}</span>
+                      <span className="text-muted-foreground shrink-0">{item.qty} × ${item.unitPrice.toFixed(2)}</span>
+                      <span className="font-medium shrink-0 w-16 text-right">${item.subtotal.toFixed(2)}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="rounded-md border p-3 space-y-3">
+                  <button
+                    type="button"
+                    className="flex items-center justify-between w-full text-left"
+                    onClick={() => setPriceBookImport(p => ({ ...p, enabled: !p.enabled }))}
+                    data-testid="button-toggle-price-book-import"
+                  >
+                    <span className="text-xs font-medium flex items-center gap-1.5">
+                      <Store className="h-3.5 w-3.5 text-muted-foreground" />
+                      Also send to Price Book
+                    </span>
+                    {priceBookImport.enabled ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
+                  </button>
+                  {priceBookImport.enabled && (
+                    <div className="space-y-3 pt-1 border-t">
+                      <div>
+                        <Label className="text-xs">Supplier</Label>
+                        <Select value={priceBookImport.supplierId} onValueChange={v => setPriceBookImport(p => ({ ...p, supplierId: v }))}>
+                          <SelectTrigger className="h-8 text-sm mt-1" data-testid="select-pb-supplier">
+                            <SelectValue placeholder="Select supplier" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {priceBookSuppliers.map(s => <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-xs text-muted-foreground">Tick items to import:</p>
+                        {priceBookImport.items.map((item, idx) => (
+                          <div key={idx} className="flex items-center gap-2 text-xs">
+                            <input
+                              type="checkbox"
+                              checked={item.checked}
+                              onChange={e => setPriceBookImport(p => ({
+                                ...p,
+                                items: p.items.map((it, j) => j === idx ? { ...it, checked: e.target.checked } : it),
+                              }))}
+                              className="h-3.5 w-3.5 rounded shrink-0"
+                              data-testid={`checkbox-pb-item-${idx}`}
+                            />
+                            <Input
+                              value={item.productName}
+                              onChange={e => setPriceBookImport(p => ({
+                                ...p,
+                                items: p.items.map((it, j) => j === idx ? { ...it, productName: e.target.value } : it),
+                              }))}
+                              className="h-7 text-xs flex-1 min-w-0"
+                              data-testid={`input-pb-name-${idx}`}
+                            />
+                            <Select
+                              value={item.categoryId || "none"}
+                              onValueChange={v => setPriceBookImport(p => ({
+                                ...p,
+                                items: p.items.map((it, j) => j === idx ? { ...it, categoryId: v === "none" ? "" : v } : it),
+                              }))}
+                            >
+                              <SelectTrigger className="h-7 text-xs w-32 shrink-0" data-testid={`select-pb-cat-${idx}`}>
+                                <SelectValue placeholder="Category" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">No category</SelectItem>
+                                {categories.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                            <span className="text-muted-foreground shrink-0 w-14 text-right">${parseFloat(item.unitPrice || "0").toFixed(2)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
             <div>

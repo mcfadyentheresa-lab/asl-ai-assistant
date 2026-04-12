@@ -20,7 +20,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Package, Plus, Trash2, Pencil, Search, Store, ExternalLink, Loader2, Star, Phone, Mail, MapPin, Globe, Receipt, ArrowLeft } from "lucide-react";
+import { Package, Plus, Trash2, Pencil, Search, Store, ExternalLink, Loader2, Star, Phone, Mail, MapPin, Globe, Receipt, ArrowLeft, RefreshCw } from "lucide-react";
 import { Link } from "wouter";
 import type { Supplier, SupplierPrice, CostCategory } from "@shared/schema";
 
@@ -52,6 +52,7 @@ export default function SupplierPrices() {
   });
 
   const isAdmin = user?.role === "admin";
+  const [fetchingPriceId, setFetchingPriceId] = useState<number | null>(null);
 
   const activeSupplier = suppliersList.find(s => s.id === selectedSupplierId) || null;
 
@@ -85,6 +86,26 @@ export default function SupplierPrices() {
       toast({ title: "Failed to delete price", description: error.message, variant: "destructive" });
     },
   });
+
+  async function fetchLivePrice(price: SupplierPrice) {
+    if (!price.productUrl) return;
+    setFetchingPriceId(price.id);
+    try {
+      const res = await apiRequest("POST", `/api/supplier-prices/${price.id}/fetch-price`, {});
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast({ title: err.message || "Could not fetch price", variant: "destructive" });
+        return;
+      }
+      const data = await res.json();
+      queryClient.invalidateQueries({ queryKey: [priceQueryPath] });
+      toast({ title: `Price updated to $${parseFloat(data.fetchedPrice).toFixed(2)}${data.currency ? ` ${data.currency}` : ""}` });
+    } catch {
+      toast({ title: "Failed to reach product page", variant: "destructive" });
+    } finally {
+      setFetchingPriceId(null);
+    }
+  }
 
   if (!user || user.role !== "admin") {
     return (
@@ -297,7 +318,22 @@ export default function SupplierPrices() {
                     <div className="text-xs text-muted-foreground mt-1 md:mt-0" data-testid={`text-updated-${price.id}`}>
                       {price.lastUpdated ? new Date(price.lastUpdated).toLocaleDateString() : "—"}
                     </div>
-                    <div className="flex items-center gap-0.5 mt-2 md:mt-0" style={{ visibility: "visible" }}>
+                    <div className="flex items-center gap-0.5 mt-2 md:mt-0">
+                      {price.productUrl && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="text-muted-foreground hover:text-primary"
+                          onClick={() => fetchLivePrice(price)}
+                          disabled={fetchingPriceId === price.id}
+                          title="Fetch live price from website"
+                          data-testid={`button-fetch-price-${price.id}`}
+                        >
+                          {fetchingPriceId === price.id
+                            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            : <RefreshCw className="h-3.5 w-3.5" />}
+                        </Button>
+                      )}
                       <Button size="icon" variant="ghost" onClick={() => setEditingPrice(price)} data-testid={`button-edit-price-${price.id}`}>
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
