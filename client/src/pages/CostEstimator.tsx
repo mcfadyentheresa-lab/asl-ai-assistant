@@ -65,9 +65,13 @@ export default function CostEstimator() {
     length: "", width: "", crewCount: "1", room: "", productUrl: "",
   });
 
-  const [newReceipt, setNewReceipt] = useState({
-    vendor: "", description: "", date: new Date().toISOString().split("T")[0], amount: "", estimateItemId: "",
+  const [newReceipt, setNewReceipt] = useState<{
+    vendor: string; description: string; date: string; amount: string; estimateItemId: string;
+    lineItems: Array<{ description: string; qty: number; unitPrice: number; subtotal: number }>;
+  }>({
+    vendor: "", description: "", date: new Date().toISOString().split("T")[0], amount: "", estimateItemId: "", lineItems: [],
   });
+  const [expandedReceipts, setExpandedReceipts] = useState<Set<number>>(new Set());
 
   const { data: project } = useQuery<Project>({ queryKey: ["/api/projects", projectId] });
   const { data: categories = [] } = useQuery<CostCategory[]>({ queryKey: ["/api/cost-categories"] });
@@ -142,7 +146,7 @@ export default function CostEstimator() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "receipts"] });
       setShowAddReceipt(false);
-      setNewReceipt({ vendor: "", description: "", date: new Date().toISOString().split("T")[0], amount: "", estimateItemId: "" });
+      setNewReceipt({ vendor: "", description: "", date: new Date().toISOString().split("T")[0], amount: "", estimateItemId: "", lineItems: [] });
       toast({ title: "Receipt added" });
     },
   });
@@ -350,6 +354,7 @@ export default function CostEstimator() {
       date: newReceipt.date,
       amount: newReceipt.amount,
       estimateItemId: newReceipt.estimateItemId && newReceipt.estimateItemId !== "none" ? parseInt(newReceipt.estimateItemId) : null,
+      lineItems: newReceipt.lineItems.length > 0 ? newReceipt.lineItems : null,
     });
   }
 
@@ -380,8 +385,9 @@ export default function CostEstimator() {
         vendor: data.vendor || "",
         amount: data.amount?.toString() || "",
         date: data.date || prev.date,
+        lineItems: Array.isArray(data.lineItems) ? data.lineItems : [],
       }));
-      toast({ title: "Receipt scanned successfully" });
+      toast({ title: `Receipt scanned — ${Array.isArray(data.lineItems) ? data.lineItems.length : 0} line item(s) extracted` });
     } catch (error) {
       toast({ title: "Failed to scan receipt", variant: "destructive" });
     } finally {
@@ -1016,21 +1022,54 @@ export default function CostEstimator() {
                   <div className="space-y-2">
                     {receipts.map(r => {
                       const linkedItem = r.estimateItemId ? itemTotals.find(i => i.id === r.estimateItemId) : null;
+                      const lineItems = (r as any).lineItems as Array<{ description: string; qty: number; unitPrice: number; subtotal: number }> | null;
+                      const isExpanded = expandedReceipts.has(r.id);
                       return (
-                        <div key={r.id} className="flex items-center gap-3 p-3 rounded-md border" data-testid={`receipt-${r.id}`}>
-                          <DollarSign className="h-4 w-4 text-muted-foreground shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm font-medium">{r.vendor}</div>
-                            <div className="text-xs text-muted-foreground">
-                              {r.date} {r.description && `· ${r.description}`}
-                              {linkedItem && ` · Linked: ${linkedItem.categoryName}`}
+                        <div key={r.id} className="rounded-md border" data-testid={`receipt-${r.id}`}>
+                          <div className="flex items-center gap-3 p-3">
+                            {lineItems && lineItems.length > 0 ? (
+                              <button
+                                className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                                onClick={() => setExpandedReceipts(prev => { const s = new Set(prev); isExpanded ? s.delete(r.id) : s.add(r.id); return s; })}
+                                data-testid={`button-expand-receipt-${r.id}`}
+                              >
+                                {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                              </button>
+                            ) : (
+                              <DollarSign className="h-4 w-4 text-muted-foreground shrink-0" />
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-medium">{r.vendor}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {r.date} {r.description && `· ${r.description}`}
+                                {linkedItem && ` · Linked: ${linkedItem.categoryName}`}
+                                {lineItems && lineItems.length > 0 && ` · ${lineItems.length} items`}
+                              </div>
                             </div>
+                            <div className="text-sm font-semibold">${parseFloat(r.amount).toLocaleString("en-CA", { minimumFractionDigits: 2 })}</div>
+                            {canEdit && (
+                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => deleteReceiptMutation.mutate(r.id)} data-testid={`button-delete-receipt-${r.id}`}>
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            )}
                           </div>
-                          <div className="text-sm font-semibold">${parseFloat(r.amount).toLocaleString("en-CA", { minimumFractionDigits: 2 })}</div>
-                          {canEdit && (
-                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => deleteReceiptMutation.mutate(r.id)} data-testid={`button-delete-receipt-${r.id}`}>
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
+                          {isExpanded && lineItems && lineItems.length > 0 && (
+                            <div className="border-t bg-muted/20 px-3 py-2 space-y-1">
+                              <div className="grid grid-cols-12 text-[10px] uppercase tracking-wider text-muted-foreground font-medium pb-1 border-b border-border/40">
+                                <span className="col-span-5">Item</span>
+                                <span className="col-span-2 text-right">Qty</span>
+                                <span className="col-span-3 text-right">Unit Price</span>
+                                <span className="col-span-2 text-right">Total</span>
+                              </div>
+                              {lineItems.map((item, idx) => (
+                                <div key={idx} className="grid grid-cols-12 text-xs py-0.5">
+                                  <span className="col-span-5 truncate pr-1">{item.description}</span>
+                                  <span className="col-span-2 text-right text-muted-foreground">{item.qty}</span>
+                                  <span className="col-span-3 text-right text-muted-foreground">${item.unitPrice.toFixed(2)}</span>
+                                  <span className="col-span-2 text-right font-medium">${item.subtotal.toFixed(2)}</span>
+                                </div>
+                              ))}
+                            </div>
                           )}
                         </div>
                       );
@@ -1368,10 +1407,22 @@ export default function CostEstimator() {
                   {scanning ? "Analyzing Receipt..." : "Click to Scan Receipt Image"}
                 </span>
                 <span className="text-xs text-muted-foreground">
-                  AI will automatically extract vendor, date, and amount
+                  AI extracts vendor, date, amount & every line item
                 </span>
               </Label>
             </div>
+            {newReceipt.lineItems.length > 0 && (
+              <div className="rounded-md border bg-muted/30 p-3 space-y-1.5">
+                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-2">Extracted Line Items</p>
+                {newReceipt.lineItems.map((item, idx) => (
+                  <div key={idx} className="flex items-center justify-between text-xs gap-2">
+                    <span className="flex-1 truncate">{item.description}</span>
+                    <span className="text-muted-foreground shrink-0">{item.qty} × ${item.unitPrice.toFixed(2)}</span>
+                    <span className="font-medium shrink-0 w-16 text-right">${item.subtotal.toFixed(2)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
             <div>
               <Label>Vendor</Label>
               <Input value={newReceipt.vendor} onChange={(e) => setNewReceipt(prev => ({ ...prev, vendor: e.target.value }))} placeholder="e.g., Home Hardware" data-testid="input-receipt-vendor" />

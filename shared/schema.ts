@@ -475,6 +475,7 @@ export const receipts = pgTable("receipts", {
   date: date("date").notNull(),
   amount: text("amount").notNull(),
   fileUrl: text("file_url"),
+  lineItems: jsonb("line_items").$type<Array<{ description: string; qty: number; unitPrice: number; subtotal: number }>>(),
   createdBy: text("created_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
 });
