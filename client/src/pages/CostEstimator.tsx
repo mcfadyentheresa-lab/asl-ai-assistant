@@ -367,7 +367,7 @@ export default function CostEstimator() {
     setScanning(true);
     try {
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("image", file);
       
       const uploadRes = await fetch("/api/upload", {
         method: "POST",
