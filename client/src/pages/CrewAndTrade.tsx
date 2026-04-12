@@ -337,7 +337,7 @@ export default function CrewAndTrade() {
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2">
                               <div>
                                 <div className="text-xs text-muted-foreground">Pay Rate</div>
-                                <div className="font-medium text-red-600" data-testid={`text-crew-pay-${crew.id}`}>
+                                <div className="font-medium" data-testid={`text-crew-pay-${crew.id}`}>
                                   ${parseFloat(crew.payRate).toFixed(2)}/hr
                                 </div>
                               </div>
