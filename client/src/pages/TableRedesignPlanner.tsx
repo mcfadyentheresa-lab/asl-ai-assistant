@@ -292,6 +292,12 @@ function FurniturePlannerCore({ fixedProjectId }: { fixedProjectId?: number }) {
     };
   };
 
+  useEffect(() => {
+    if (fixedProjectId !== undefined) {
+      setSelectedProjectId(String(fixedProjectId));
+    }
+  }, [fixedProjectId]);
+
   const effectiveProjectId = fixedProjectId ? String(fixedProjectId) : selectedProjectId;
 
   useEffect(() => {
