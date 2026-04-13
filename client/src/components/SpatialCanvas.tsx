@@ -197,6 +197,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const panStartRef = useRef<{ x: number; y: number; px: number; py: number } | null>(null);
+  const pinchStartRef = useRef<{ dist: number; zoom: number; pan: { x: number; y: number }; cx: number; cy: number } | null>(null);
   const spaceRef = useRef(false);
 
   const [showRenameDialog, setShowRenameDialog] = useState(false);
@@ -740,9 +741,21 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     }
   };
 
-  // Touch-based canvas handlers for drag & pan on mobile
+  // Touch-based canvas handlers for drag, pan & pinch-to-zoom on mobile
   const handleCanvasTouchStart = (e: React.TouchEvent) => {
     if (drawingMode) return;
+    if (e.touches.length === 2) {
+      // Begin pinch-to-zoom — cancel any active pan
+      const t1 = e.touches[0];
+      const t2 = e.touches[1];
+      const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+      const cx = (t1.clientX + t2.clientX) / 2;
+      const cy = (t1.clientY + t2.clientY) / 2;
+      pinchStartRef.current = { dist, zoom, pan: { x: pan.x, y: pan.y }, cx, cy };
+      setIsPanning(false);
+      panStartRef.current = null;
+      return;
+    }
     if (e.touches.length === 1) {
       const touch = e.touches[0];
       setIsPanning(true);
@@ -752,6 +765,26 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
 
   const handleCanvasTouchMove = (e: React.TouchEvent) => {
     if (drawingMode) return;
+    // Pinch-to-zoom with two fingers
+    if (e.touches.length === 2 && pinchStartRef.current) {
+      e.preventDefault();
+      const t1 = e.touches[0];
+      const t2 = e.touches[1];
+      const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+      const scale = dist / pinchStartRef.current.dist;
+      const newZoom = Math.max(0.15, Math.min(4, pinchStartRef.current.zoom * scale));
+      // Keep the pinch midpoint fixed in canvas space
+      if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        const px = pinchStartRef.current.cx - rect.left;
+        const py = pinchStartRef.current.cy - rect.top;
+        const wx = (px - pinchStartRef.current.pan.x) / pinchStartRef.current.zoom;
+        const wy = (py - pinchStartRef.current.pan.y) / pinchStartRef.current.zoom;
+        setPan({ x: px - wx * newZoom, y: py - wy * newZoom });
+      }
+      setZoom(newZoom);
+      return;
+    }
     const touch = e.touches[0];
     if (!touch) return;
     if (longPressTimerRef.current) {
@@ -790,6 +823,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   };
 
   const handleCanvasTouchEnd = () => {
+    pinchStartRef.current = null;
     if (isPanning) {
       setIsPanning(false);
       panStartRef.current = null;
@@ -2822,8 +2856,8 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
 
       {boards.length > 0 && selectedBoardId && (
         <div className="flex flex-1 gap-0 min-h-0">
-          {/* Left sidebar — modern toolbar */}
-          <div className="w-[52px] shrink-0 border-r border-border/25 flex flex-col items-center py-3 bg-background overflow-y-auto" data-testid="canvas-sidebar">
+          {/* Left sidebar — desktop only */}
+          <div className="hidden md:flex w-[52px] shrink-0 border-r border-border/25 flex-col items-center py-3 bg-background overflow-y-auto" data-testid="canvas-sidebar">
             {sidebarToolGroups.map((group, gi) => (
               <div key={group.label} className="w-full flex flex-col items-center">
                 {gi > 0 && <div className="w-6 h-px bg-border/30 my-2" />}
@@ -3032,6 +3066,82 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                 );
               })}
             </div>
+
+            {/* Mobile floating bottom toolbar */}
+            {!drawingMode && (
+              <div
+                className="md:hidden absolute bottom-3 left-1/2 -translate-x-1/2 z-30 flex items-center gap-0.5 px-2 py-1 rounded-full bg-background/95 border border-border/60 shadow-lg backdrop-blur-sm overflow-x-auto max-w-[92vw]"
+                onTouchStart={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+                data-testid="mobile-canvas-toolbar"
+              >
+                {sidebarToolGroups.flatMap((g) => g.tools).map((t) => (
+                  <button
+                    key={t.type}
+                    className="h-11 w-11 flex items-center justify-center rounded-full text-foreground/60 active:bg-foreground/10 shrink-0"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (t.type === "image") {
+                        setShowImagePopup(true);
+                      } else if (t.type === "draw") {
+                        setDrawingMode(true);
+                        setDrawTool("pen");
+                        setDrawingPaths([]);
+                        drawPathsRef.current = [];
+                        setDrawUndoStack([]);
+                        setEditingId(null);
+                      } else {
+                        createElement(t.type);
+                      }
+                    }}
+                    data-testid={`mobile-tool-${t.type}`}
+                  >
+                    <t.icon className="h-[18px] w-[18px]" strokeWidth={1.5} />
+                  </button>
+                ))}
+                <div className="h-5 w-px bg-border/40 mx-1 shrink-0" />
+                <button
+                  className="h-11 w-11 flex items-center justify-center rounded-full text-foreground/60 active:bg-foreground/10 shrink-0"
+                  onClick={(e) => { e.stopPropagation(); setZoom((z) => Math.max(0.15, z - 0.15)); }}
+                  data-testid="mobile-zoom-out"
+                >
+                  <ZoomOut className="h-[18px] w-[18px]" strokeWidth={1.5} />
+                </button>
+                <button
+                  className="text-xs text-muted-foreground px-1.5 shrink-0 min-w-[2.5rem] text-center"
+                  onClick={(e) => { e.stopPropagation(); fitToScreen(); }}
+                  data-testid="mobile-zoom-level"
+                >
+                  {Math.round(zoom * 100)}%
+                </button>
+                <button
+                  className="h-11 w-11 flex items-center justify-center rounded-full text-foreground/60 active:bg-foreground/10 shrink-0"
+                  onClick={(e) => { e.stopPropagation(); setZoom((z) => Math.min(4, z + 0.15)); }}
+                  data-testid="mobile-zoom-in"
+                >
+                  <ZoomIn className="h-[18px] w-[18px]" strokeWidth={1.5} />
+                </button>
+                <button
+                  className="h-11 w-11 flex items-center justify-center rounded-full text-foreground/60 active:bg-foreground/10 shrink-0"
+                  onClick={(e) => { e.stopPropagation(); fitToScreen(); }}
+                  data-testid="mobile-fit-screen"
+                >
+                  <Maximize className="h-[18px] w-[18px]" strokeWidth={1.5} />
+                </button>
+                {editingId && (
+                  <>
+                    <div className="h-5 w-px bg-border/40 mx-1 shrink-0" />
+                    <button
+                      className="h-11 w-11 flex items-center justify-center rounded-full text-destructive/70 active:bg-destructive/10 shrink-0"
+                      onClick={(e) => { e.stopPropagation(); handleDeleteElement(editingId); }}
+                      data-testid="mobile-delete-element"
+                    >
+                      <Trash2 className="h-[18px] w-[18px]" strokeWidth={1.5} />
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
 
             {/* Full-board drawing overlay */}
             {drawingMode && (
