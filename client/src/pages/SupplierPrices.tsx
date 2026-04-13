@@ -157,7 +157,7 @@ export default function SupplierPrices() {
               <p className="text-sm text-muted-foreground mt-1">Track material prices from your suppliers</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
             <Button variant="outline" onClick={() => setShowAddFromReceipt(true)} data-testid="button-add-from-receipt">
               <Receipt className="h-4 w-4 mr-2" />
               Add from Receipt

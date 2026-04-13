@@ -1243,7 +1243,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                         <div className="flex items-center gap-0.5 pr-1.5 shrink-0">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
-                              <Button size="icon" variant="ghost" className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity" data-testid={`button-building-menu-${building.id}`}>
+                              <Button size="icon" variant="ghost" className="h-11 w-11 md:h-5 md:w-5 md:opacity-0 md:group-hover:opacity-100 transition-opacity" data-testid={`button-building-menu-${building.id}`}>
                                 <MoreVertical className="h-3 w-3" />
                               </Button>
                             </DropdownMenuTrigger>
@@ -1324,7 +1324,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                       {isAdmin && !isGeneralTasks && (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
-                            <Button size="icon" variant="ghost" className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity mr-1.5" data-testid={`button-room-menu-${roomData.id}`}>
+                            <Button size="icon" variant="ghost" className="h-11 w-11 md:h-5 md:w-5 md:opacity-0 md:group-hover:opacity-100 transition-opacity mr-1.5" data-testid={`button-room-menu-${roomData.id}`}>
                               <MoreVertical className="h-3 w-3" />
                             </Button>
                           </DropdownMenuTrigger>
@@ -1401,7 +1401,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
                     {isAdmin && selectedBuildingId && (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button size="icon" variant="ghost" className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity mr-1.5 shrink-0" data-testid={`button-task-menu-${task.id}`}>
+                          <Button size="icon" variant="ghost" className="h-11 w-11 md:h-5 md:w-5 md:opacity-0 md:group-hover:opacity-100 transition-opacity mr-1.5 shrink-0" data-testid={`button-task-menu-${task.id}`}>
                             <MoreVertical className="h-3 w-3" />
                           </Button>
                         </DropdownMenuTrigger>
