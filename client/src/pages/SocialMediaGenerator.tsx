@@ -344,22 +344,24 @@ export default function SocialMediaGenerator() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="mb-4">
-            <TabsTrigger value="generate" data-testid="tab-generate">
-              <Sparkles className="mr-2 h-4 w-4" /> Generate
-            </TabsTrigger>
-            <TabsTrigger value="library" data-testid="tab-library">
-              <Library className="mr-2 h-4 w-4" /> Library
-              {libraryPosts.length > 0 && (
-                <Badge variant="secondary" className="ml-2 text-xs">{libraryPosts.length}</Badge>
-              )}
-              {unseenMilestoneCount > 0 && (
-                <Badge variant="destructive" className="ml-1 text-xs" data-testid="badge-new-drafts">
-                  {unseenMilestoneCount} new
-                </Badge>
-              )}
-            </TabsTrigger>
-          </TabsList>
+          <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 mb-4">
+            <TabsList className="w-max md:w-auto">
+              <TabsTrigger value="generate" data-testid="tab-generate">
+                <Sparkles className="mr-2 h-4 w-4" /> Generate
+              </TabsTrigger>
+              <TabsTrigger value="library" data-testid="tab-library">
+                <Library className="mr-2 h-4 w-4" /> Library
+                {libraryPosts.length > 0 && (
+                  <Badge variant="secondary" className="ml-2 text-xs">{libraryPosts.length}</Badge>
+                )}
+                {unseenMilestoneCount > 0 && (
+                  <Badge variant="destructive" className="ml-1 text-xs" data-testid="badge-new-drafts">
+                    {unseenMilestoneCount} new
+                  </Badge>
+                )}
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           {/* =================== GENERATE TAB =================== */}
           <TabsContent value="generate" className="space-y-6">

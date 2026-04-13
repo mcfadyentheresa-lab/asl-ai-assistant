@@ -258,7 +258,7 @@ export default function MasterCalendar() {
           </h1>
         </div>
 
-        <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="flex items-center gap-3">
             <Button
               size="icon"
@@ -268,7 +268,7 @@ export default function MasterCalendar() {
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <h3 className="font-serif text-xl font-bold text-foreground min-w-[180px] text-center" data-testid="text-master-current-month">
+            <h3 className="font-serif text-xl font-bold text-foreground min-w-[160px] text-center" data-testid="text-master-current-month">
               {format(currentMonth, "MMMM yyyy")}
             </h3>
             <Button
@@ -280,9 +280,9 @@ export default function MasterCalendar() {
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
-          <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
             <Select value={projectFilter} onValueChange={setProjectFilter}>
-              <SelectTrigger className="w-[200px]" data-testid="select-project-filter">
+              <SelectTrigger className="w-full sm:w-[190px]" data-testid="select-project-filter">
                 <SelectValue placeholder="All Projects" />
               </SelectTrigger>
               <SelectContent>
@@ -292,22 +292,24 @@ export default function MasterCalendar() {
                 ))}
               </SelectContent>
             </Select>
-            <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer" data-testid="toggle-master-timeline">
-              <Switch checked={showTimeline} onCheckedChange={setShowTimeline} className="scale-75" />
-              Timeline
-            </label>
-            <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer" data-testid="toggle-master-events">
-              <Switch checked={showEvents} onCheckedChange={setShowEvents} className="scale-75" />
-              Events
-            </label>
-            <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer" data-testid="toggle-master-team">
-              <Switch checked={showTeam} onCheckedChange={setShowTeam} className="scale-75" />
-              Team
-            </label>
-            <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer" data-testid="toggle-master-personal">
-              <Switch checked={showPersonal} onCheckedChange={setShowPersonal} className="scale-75" />
-              Personal
-            </label>
+            <div className="flex items-center gap-3 flex-wrap">
+              <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer" data-testid="toggle-master-timeline">
+                <Switch checked={showTimeline} onCheckedChange={setShowTimeline} className="scale-75" />
+                Timeline
+              </label>
+              <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer" data-testid="toggle-master-events">
+                <Switch checked={showEvents} onCheckedChange={setShowEvents} className="scale-75" />
+                Events
+              </label>
+              <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer" data-testid="toggle-master-team">
+                <Switch checked={showTeam} onCheckedChange={setShowTeam} className="scale-75" />
+                Team
+              </label>
+              <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer" data-testid="toggle-master-personal">
+                <Switch checked={showPersonal} onCheckedChange={setShowPersonal} className="scale-75" />
+                Personal
+              </label>
+            </div>
           </div>
         </div>
 

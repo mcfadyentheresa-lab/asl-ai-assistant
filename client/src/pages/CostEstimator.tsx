@@ -877,92 +877,165 @@ export default function CostEstimator() {
                         const isEditing = editingItemId === item.id;
 
                         if (isEditing && canEdit) {
+                          const saveEdit = () => {
+                            updateItemMutation.mutate({
+                              id: item.id,
+                              quantity: editItemForm.quantity,
+                              unitCost: editItemForm.unitCost,
+                              materialCost: editItemForm.materialCost || "0",
+                              laborCost: editItemForm.laborCost || "0",
+                            });
+                            setEditingItemId(null);
+                          };
                           return (
-                            <div key={item.id} className="grid grid-cols-2 md:grid-cols-12 gap-2 items-center p-2 rounded-md border border-primary/40 bg-primary/5" data-testid={`estimate-item-${item.id}`}>
-                              <div className="col-span-2 md:col-span-2 text-sm font-medium flex items-center gap-1 flex-wrap">
-                                <span className="truncate">{item.categoryName}</span>
-                              </div>
-                              <div className="hidden md:block md:col-span-1">
-                                <Badge variant="outline" className="text-[10px]">
-                                  {item.unitType === "sq_ft" ? "sq ft" : item.unitType === "hour" ? "hr" : "unit"}
-                                </Badge>
-                              </div>
-                              <div className="md:col-span-2">
-                                <Input type="number" className="h-7 text-sm text-right" value={editItemForm.quantity} onChange={(e) => setEditItemForm(f => ({ ...f, quantity: e.target.value }))} data-testid={`input-edit-qty-${item.id}`} />
-                              </div>
-                              <div className="md:col-span-2">
-                                <Input type="number" step="0.01" className="h-7 text-sm text-right" value={editItemForm.unitCost} onChange={(e) => setEditItemForm(f => ({ ...f, unitCost: e.target.value }))} data-testid={`input-edit-unit-cost-${item.id}`} />
-                              </div>
-                              <div className="md:col-span-1">
-                                <Input type="number" step="0.01" className="h-7 text-sm text-right" value={editItemForm.materialCost} onChange={(e) => setEditItemForm(f => ({ ...f, materialCost: e.target.value }))} data-testid={`input-edit-material-${item.id}`} />
-                              </div>
-                              <div className="md:col-span-1">
-                                <Input type="number" step="1" className="h-7 text-sm text-right" value={editItemForm.laborCost} onChange={(e) => setEditItemForm(f => ({ ...f, laborCost: e.target.value }))} data-testid={`input-edit-labor-${item.id}`} />
-                              </div>
-                              <div className="md:col-span-2 text-right">
-                                <div className="flex items-center justify-end gap-1">
-                                  <Button size="sm" className="h-7 px-2 text-xs" onClick={() => {
-                                    updateItemMutation.mutate({
-                                      id: item.id,
-                                      quantity: editItemForm.quantity,
-                                      unitCost: editItemForm.unitCost,
-                                      materialCost: editItemForm.materialCost || "0",
-                                      laborCost: editItemForm.laborCost || "0",
-                                    });
-                                    setEditingItemId(null);
-                                  }} data-testid={`button-save-edit-${item.id}`}>Save</Button>
-                                  <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setEditingItemId(null)} data-testid={`button-cancel-edit-${item.id}`}>Cancel</Button>
+                            <div key={item.id} data-testid={`estimate-item-${item.id}`}>
+                              {/* Mobile edit layout */}
+                              <div className="md:hidden space-y-2 p-3 rounded-md border border-primary/40 bg-primary/5">
+                                <div className="text-sm font-medium flex items-center gap-1 flex-wrap">
+                                  <span>{item.categoryName}</span>
+                                  <Badge variant="outline" className="text-[10px]">
+                                    {item.unitType === "sq_ft" ? "sq ft" : item.unitType === "hour" ? "hr" : "unit"}
+                                  </Badge>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div>
+                                    <Label className="text-xs text-muted-foreground">Qty</Label>
+                                    <Input type="number" className="h-8 text-sm" value={editItemForm.quantity} onChange={(e) => setEditItemForm(f => ({ ...f, quantity: e.target.value }))} data-testid={`input-edit-qty-${item.id}`} />
+                                  </div>
+                                  <div>
+                                    <Label className="text-xs text-muted-foreground">Unit Cost</Label>
+                                    <Input type="number" step="0.01" className="h-8 text-sm" value={editItemForm.unitCost} onChange={(e) => setEditItemForm(f => ({ ...f, unitCost: e.target.value }))} data-testid={`input-edit-unit-cost-${item.id}`} />
+                                  </div>
+                                  <div>
+                                    <Label className="text-xs text-muted-foreground">Material Cost</Label>
+                                    <Input type="number" step="0.01" className="h-8 text-sm" value={editItemForm.materialCost} onChange={(e) => setEditItemForm(f => ({ ...f, materialCost: e.target.value }))} data-testid={`input-edit-material-${item.id}`} />
+                                  </div>
+                                  <div>
+                                    <Label className="text-xs text-muted-foreground">Labour Cost</Label>
+                                    <Input type="number" step="1" className="h-8 text-sm" value={editItemForm.laborCost} onChange={(e) => setEditItemForm(f => ({ ...f, laborCost: e.target.value }))} data-testid={`input-edit-labor-${item.id}`} />
+                                  </div>
+                                </div>
+                                <div className="flex gap-2 pt-1">
+                                  <Button size="sm" className="flex-1 h-8" onClick={saveEdit} data-testid={`button-save-edit-${item.id}`}>Save</Button>
+                                  <Button variant="ghost" size="sm" className="flex-1 h-8" onClick={() => setEditingItemId(null)} data-testid={`button-cancel-edit-${item.id}`}>Cancel</Button>
                                 </div>
                               </div>
-                              <div className="md:col-span-1"></div>
+                              {/* Desktop edit layout */}
+                              <div className="hidden md:grid grid-cols-12 gap-2 items-center p-2 rounded-md border border-primary/40 bg-primary/5">
+                                <div className="col-span-2 text-sm font-medium flex items-center gap-1 flex-wrap">
+                                  <span className="truncate">{item.categoryName}</span>
+                                </div>
+                                <div className="col-span-1">
+                                  <Badge variant="outline" className="text-[10px]">
+                                    {item.unitType === "sq_ft" ? "sq ft" : item.unitType === "hour" ? "hr" : "unit"}
+                                  </Badge>
+                                </div>
+                                <div className="col-span-2">
+                                  <Input type="number" className="h-7 text-sm text-right" value={editItemForm.quantity} onChange={(e) => setEditItemForm(f => ({ ...f, quantity: e.target.value }))} data-testid={`input-edit-qty-${item.id}`} />
+                                </div>
+                                <div className="col-span-2">
+                                  <Input type="number" step="0.01" className="h-7 text-sm text-right" value={editItemForm.unitCost} onChange={(e) => setEditItemForm(f => ({ ...f, unitCost: e.target.value }))} data-testid={`input-edit-unit-cost-${item.id}`} />
+                                </div>
+                                <div className="col-span-1">
+                                  <Input type="number" step="0.01" className="h-7 text-sm text-right" value={editItemForm.materialCost} onChange={(e) => setEditItemForm(f => ({ ...f, materialCost: e.target.value }))} data-testid={`input-edit-material-${item.id}`} />
+                                </div>
+                                <div className="col-span-1">
+                                  <Input type="number" step="1" className="h-7 text-sm text-right" value={editItemForm.laborCost} onChange={(e) => setEditItemForm(f => ({ ...f, laborCost: e.target.value }))} data-testid={`input-edit-labor-${item.id}`} />
+                                </div>
+                                <div className="col-span-2 text-right">
+                                  <div className="flex items-center justify-end gap-1">
+                                    <Button size="sm" className="h-7 px-2 text-xs" onClick={saveEdit} data-testid={`button-save-edit-${item.id}`}>Save</Button>
+                                    <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setEditingItemId(null)} data-testid={`button-cancel-edit-${item.id}`}>Cancel</Button>
+                                  </div>
+                                </div>
+                                <div className="col-span-1"></div>
+                              </div>
                             </div>
                           );
                         }
 
+                        const borderClass = itemWarnings.length > 0
+                          ? 'border-amber-300 bg-amber-50/50 dark:border-amber-700 dark:bg-amber-950/30'
+                          : 'border-border';
+                        const editActions = canEdit ? (
+                          <div className="flex items-center gap-0.5 shrink-0">
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => {
+                              setEditingItemId(item.id);
+                              setEditItemForm({
+                                quantity: item.quantity,
+                                unitCost: item.unitCost,
+                                materialCost: item.materialCost,
+                                laborCost: item.laborCost,
+                              });
+                            }} data-testid={`button-edit-item-${item.id}`}>
+                              <Pencil className="h-3 w-3 text-muted-foreground" />
+                            </Button>
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => deleteItemMutation.mutate(item.id)} data-testid={`button-delete-item-${item.id}`}>
+                              <Trash2 className="h-3 w-3 text-muted-foreground" />
+                            </Button>
+                          </div>
+                        ) : null;
                         return (
-                          <div key={item.id} className={`grid grid-cols-2 md:grid-cols-12 gap-2 items-center p-2 rounded-md border ${itemWarnings.length > 0 ? 'border-amber-300 bg-amber-50/50 dark:border-amber-700 dark:bg-amber-950/30' : 'border-border'}`} data-testid={`estimate-item-${item.id}`}>
-                            <div className="col-span-2 md:col-span-2 text-sm font-medium flex items-center gap-1 flex-wrap">
-                              {itemWarnings.length > 0 && <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" />}
-                              <span className="truncate">{item.categoryName}</span>
-                              {item.isCustomRate && <Badge variant="outline" className="text-[10px] ml-1">Custom</Badge>}
-                              {item.room && <Badge variant="outline" className="text-[10px] ml-1" data-testid={`badge-room-${item.id}`}><Home className="h-2.5 w-2.5 mr-0.5" />{item.room}</Badge>}
-                              {item.productUrl && (
-                                <a href={item.productUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} data-testid={`link-product-${item.id}`}>
-                                  <ExternalLink className="h-3 w-3 text-muted-foreground" />
-                                </a>
-                              )}
+                          <div key={item.id} data-testid={`estimate-item-${item.id}`}>
+                            {/* Mobile card layout */}
+                            <div className={`md:hidden p-2.5 rounded-md border ${borderClass}`}>
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex items-center gap-1 flex-wrap min-w-0">
+                                  {itemWarnings.length > 0 && <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" />}
+                                  <span className="font-medium text-sm">{item.categoryName}</span>
+                                  {item.isCustomRate && <Badge variant="outline" className="text-[10px]">Custom</Badge>}
+                                  {item.room && <Badge variant="outline" className="text-[10px]" data-testid={`badge-room-${item.id}`}><Home className="h-2.5 w-2.5 mr-0.5" />{item.room}</Badge>}
+                                  {item.productUrl && (
+                                    <a href={item.productUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} data-testid={`link-product-${item.id}`}>
+                                      <ExternalLink className="h-3 w-3 text-muted-foreground" />
+                                    </a>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <span className="font-semibold text-sm">
+                                    ${item.totalWithMarkup.toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </span>
+                                  {editActions}
+                                </div>
+                              </div>
+                              <div className="flex gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
+                                <span>{parseFloat(item.quantity).toLocaleString()} × ${parseFloat(item.unitCost).toFixed(2)}</span>
+                                {parseFloat(item.laborCost) > 0 && <span>Labour ${parseFloat(item.laborCost).toFixed(0)}</span>}
+                                <span className="ml-auto">
+                                  <Badge variant="outline" className="text-[10px]">
+                                    {item.unitType === "sq_ft" ? "sq ft" : item.unitType === "hour" ? "hr" : "unit"}
+                                  </Badge>
+                                </span>
+                              </div>
                             </div>
-                            <div className="hidden md:block md:col-span-1">
-                              <Badge variant="outline" className="text-[10px]">
-                                {item.unitType === "sq_ft" ? "sq ft" : item.unitType === "hour" ? "hr" : "unit"}
-                              </Badge>
-                            </div>
-                            <div className="text-right text-sm md:col-span-2">{parseFloat(item.quantity).toLocaleString()}</div>
-                            <div className="text-right text-sm md:col-span-2">${parseFloat(item.unitCost).toFixed(2)}</div>
-                            <div className="text-right text-sm md:col-span-1">${parseFloat(item.materialCost).toFixed(2)}</div>
-                            <div className="text-right text-sm md:col-span-1">{parseFloat(item.laborCost) > 0 ? `$${parseFloat(item.laborCost).toFixed(0)}` : '—'}</div>
-                            <div className="text-right text-sm font-medium md:col-span-2">
-                              ${item.totalWithMarkup.toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </div>
-                            <div className="text-right md:col-span-1 flex items-center justify-end gap-0.5">
-                              {canEdit && (
-                                <>
-                                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => {
-                                    setEditingItemId(item.id);
-                                    setEditItemForm({
-                                      quantity: item.quantity,
-                                      unitCost: item.unitCost,
-                                      materialCost: item.materialCost,
-                                      laborCost: item.laborCost,
-                                    });
-                                  }} data-testid={`button-edit-item-${item.id}`}>
-                                    <Pencil className="h-3 w-3 text-muted-foreground" />
-                                  </Button>
-                                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => deleteItemMutation.mutate(item.id)} data-testid={`button-delete-item-${item.id}`}>
-                                    <Trash2 className="h-3 w-3 text-muted-foreground" />
-                                  </Button>
-                                </>
-                              )}
+                            {/* Desktop grid layout */}
+                            <div className={`hidden md:grid grid-cols-12 gap-2 items-center p-2 rounded-md border ${borderClass}`}>
+                              <div className="col-span-2 text-sm font-medium flex items-center gap-1 flex-wrap">
+                                {itemWarnings.length > 0 && <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" />}
+                                <span className="truncate">{item.categoryName}</span>
+                                {item.isCustomRate && <Badge variant="outline" className="text-[10px] ml-1">Custom</Badge>}
+                                {item.room && <Badge variant="outline" className="text-[10px] ml-1" data-testid={`badge-room-${item.id}`}><Home className="h-2.5 w-2.5 mr-0.5" />{item.room}</Badge>}
+                                {item.productUrl && (
+                                  <a href={item.productUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} data-testid={`link-product-${item.id}`}>
+                                    <ExternalLink className="h-3 w-3 text-muted-foreground" />
+                                  </a>
+                                )}
+                              </div>
+                              <div className="col-span-1">
+                                <Badge variant="outline" className="text-[10px]">
+                                  {item.unitType === "sq_ft" ? "sq ft" : item.unitType === "hour" ? "hr" : "unit"}
+                                </Badge>
+                              </div>
+                              <div className="text-right text-sm col-span-2">{parseFloat(item.quantity).toLocaleString()}</div>
+                              <div className="text-right text-sm col-span-2">${parseFloat(item.unitCost).toFixed(2)}</div>
+                              <div className="text-right text-sm col-span-1">${parseFloat(item.materialCost).toFixed(2)}</div>
+                              <div className="text-right text-sm col-span-1">{parseFloat(item.laborCost) > 0 ? `$${parseFloat(item.laborCost).toFixed(0)}` : '—'}</div>
+                              <div className="text-right text-sm font-medium col-span-2">
+                                ${item.totalWithMarkup.toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                              <div className="text-right col-span-1 flex items-center justify-end">
+                                {editActions}
+                              </div>
                             </div>
                           </div>
                         );

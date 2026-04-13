@@ -331,33 +331,35 @@ export default function Payroll() {
           </Card>
         ) : (
           <Card>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-10"></TableHead>
-                  <TableHead>Crew Member</TableHead>
-                  <TableHead className="text-right">Hours</TableHead>
-                  <TableHead className="text-right">Entries</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {crewSummaries.map((crew) => {
-                  const isExpanded = expandedUsers.has(crew.userId);
-                  return (
-                    <CrewSection
-                      key={crew.userId}
-                      crew={crew}
-                      isExpanded={isExpanded}
-                      onToggle={() => toggleExpand(crew.userId)}
-                      projectMap={projectMap}
-                      selectedEntryIds={selectedEntryIds}
-                      onToggleEntry={toggleEntrySelection}
-                    />
-                  );
-                })}
-              </TableBody>
-            </Table>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-10"></TableHead>
+                    <TableHead>Crew Member</TableHead>
+                    <TableHead className="text-right">Hours</TableHead>
+                    <TableHead className="text-right">Entries</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {crewSummaries.map((crew) => {
+                    const isExpanded = expandedUsers.has(crew.userId);
+                    return (
+                      <CrewSection
+                        key={crew.userId}
+                        crew={crew}
+                        isExpanded={isExpanded}
+                        onToggle={() => toggleExpand(crew.userId)}
+                        projectMap={projectMap}
+                        selectedEntryIds={selectedEntryIds}
+                        onToggleEntry={toggleEntrySelection}
+                      />
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
           </Card>
         )}
 
@@ -368,37 +370,39 @@ export default function Payroll() {
               Payroll Export Summary
             </h2>
             <Card>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead className="text-right">Total Hours</TableHead>
-                    <TableHead className="text-right">Submitted</TableHead>
-                    <TableHead className="text-right">Approved</TableHead>
-                    <TableHead className="text-right">Draft</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {crewSummaries.map((crew) => (
-                    <TableRow key={crew.userId}>
-                      <TableCell className="font-medium">{crew.name}</TableCell>
-                      <TableCell className="text-right">{crew.totalHours.toFixed(1)}</TableCell>
-                      <TableCell className="text-right">{crew.submitted}</TableCell>
-                      <TableCell className="text-right">{crew.approved}</TableCell>
-                      <TableCell className="text-right">{crew.draft}</TableCell>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead className="text-right">Total Hours</TableHead>
+                      <TableHead className="text-right">Submitted</TableHead>
+                      <TableHead className="text-right">Approved</TableHead>
+                      <TableHead className="text-right">Draft</TableHead>
                     </TableRow>
-                  ))}
-                  <TableRow className="font-bold border-t-2">
-                    <TableCell>Total</TableCell>
-                    <TableCell className="text-right">{totalHours.toFixed(1)}</TableCell>
-                    <TableCell className="text-right">{pendingCount}</TableCell>
-                    <TableCell className="text-right">{approvedCount}</TableCell>
-                    <TableCell className="text-right">
-                      {entries?.filter((e) => e.status === "draft").length || 0}
-                    </TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {crewSummaries.map((crew) => (
+                      <TableRow key={crew.userId}>
+                        <TableCell className="font-medium">{crew.name}</TableCell>
+                        <TableCell className="text-right">{crew.totalHours.toFixed(1)}</TableCell>
+                        <TableCell className="text-right">{crew.submitted}</TableCell>
+                        <TableCell className="text-right">{crew.approved}</TableCell>
+                        <TableCell className="text-right">{crew.draft}</TableCell>
+                      </TableRow>
+                    ))}
+                    <TableRow className="font-bold border-t-2">
+                      <TableCell>Total</TableCell>
+                      <TableCell className="text-right">{totalHours.toFixed(1)}</TableCell>
+                      <TableCell className="text-right">{pendingCount}</TableCell>
+                      <TableCell className="text-right">{approvedCount}</TableCell>
+                      <TableCell className="text-right">
+                        {entries?.filter((e) => e.status === "draft").length || 0}
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </div>
             </Card>
           </div>
         )}

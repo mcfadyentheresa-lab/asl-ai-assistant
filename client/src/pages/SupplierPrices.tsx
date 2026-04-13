@@ -283,7 +283,64 @@ export default function SupplierPrices() {
             {filteredPrices.map(price => (
               <Card key={price.id} data-testid={`card-price-${price.id}`}>
                 <CardContent className="py-3 px-4">
-                  <div className="md:grid md:grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr_auto] md:gap-3 md:items-center">
+                  {/* Mobile layout */}
+                  <div className="md:hidden">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-medium text-foreground" data-testid={`text-product-name-${price.id}`}>
+                            {price.productName}
+                          </span>
+                          {price.productUrl && (
+                            <a href={price.productUrl} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary shrink-0" data-testid={`link-product-url-${price.id}`}>
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </a>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                          <span className="font-semibold text-foreground" data-testid={`text-price-${price.id}`}>
+                            ${parseFloat(price.unitPrice).toFixed(2)}
+                          </span>
+                          <span className="text-xs text-muted-foreground" data-testid={`text-unit-type-${price.id}`}>
+                            {formatUnitType(price.unitType)}
+                          </span>
+                          {getCategoryName(price.categoryId) && (
+                            <Badge variant="secondary" className="text-xs" data-testid={`badge-category-${price.id}`}>
+                              {getCategoryName(price.categoryId)}
+                            </Badge>
+                          )}
+                        </div>
+                        {price.notes && (
+                          <p className="text-xs text-muted-foreground mt-0.5 italic">{price.notes}</p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-0.5 shrink-0">
+                        {price.productUrl && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 text-muted-foreground hover:text-primary"
+                            onClick={() => fetchLivePrice(price)}
+                            disabled={fetchingPriceId === price.id}
+                            title="Fetch live price"
+                            data-testid={`button-fetch-price-${price.id}`}
+                          >
+                            {fetchingPriceId === price.id
+                              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              : <RefreshCw className="h-3.5 w-3.5" />}
+                          </Button>
+                        )}
+                        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setEditingPrice(price)} data-testid={`button-edit-price-${price.id}`}>
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setDeletePrice(price)} data-testid={`button-delete-price-${price.id}`}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                  {/* Desktop layout */}
+                  <div className="hidden md:grid grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr_auto] gap-3 items-center">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="font-medium text-foreground truncate" data-testid={`text-product-name-${price.id}`}>
@@ -295,30 +352,27 @@ export default function SupplierPrices() {
                           </a>
                         )}
                       </div>
-                      {price.notes && (
-                        <p className="text-xs text-muted-foreground truncate mt-0.5 md:hidden">{price.notes}</p>
-                      )}
                     </div>
-                    <div className="text-sm text-muted-foreground mt-1 md:mt-0">
+                    <div>
                       {getCategoryName(price.categoryId) && (
                         <Badge variant="secondary" className="text-xs" data-testid={`badge-category-${price.id}`}>
                           {getCategoryName(price.categoryId)}
                         </Badge>
                       )}
                     </div>
-                    <div className="font-semibold text-foreground mt-1 md:mt-0" data-testid={`text-price-${price.id}`}>
+                    <div className="font-semibold text-foreground" data-testid={`text-price-${price.id}`}>
                       ${parseFloat(price.unitPrice).toFixed(2)}
                     </div>
-                    <div className="text-sm text-muted-foreground mt-1 md:mt-0" data-testid={`text-unit-type-${price.id}`}>
+                    <div className="text-sm text-muted-foreground" data-testid={`text-unit-type-${price.id}`}>
                       {formatUnitType(price.unitType)}
                     </div>
-                    <div className="text-sm text-muted-foreground mt-1 md:mt-0" data-testid={`text-code-${price.id}`}>
+                    <div className="text-sm text-muted-foreground" data-testid={`text-code-${price.id}`}>
                       {price.productCode || "—"}
                     </div>
-                    <div className="text-xs text-muted-foreground mt-1 md:mt-0" data-testid={`text-updated-${price.id}`}>
+                    <div className="text-xs text-muted-foreground" data-testid={`text-updated-${price.id}`}>
                       {price.lastUpdated ? new Date(price.lastUpdated).toLocaleDateString() : "—"}
                     </div>
-                    <div className="flex items-center gap-0.5 mt-2 md:mt-0">
+                    <div className="flex items-center gap-0.5">
                       {price.productUrl && (
                         <Button
                           size="icon"

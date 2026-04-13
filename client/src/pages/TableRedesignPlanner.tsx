@@ -460,8 +460,8 @@ function FurniturePlannerCore({ fixedProjectId }: { fixedProjectId?: number }) {
     <>
       {/* Standalone mode: filter bar with project selector + New Concept button */}
       {!embedded && (
-        <div className="flex gap-4 mb-6 items-end">
-          <div className="w-64">
+        <div className="flex flex-wrap gap-3 mb-6 items-end">
+          <div className="w-full sm:w-64">
             <Label>Filter by Project</Label>
             <Select value={selectedProjectId} onValueChange={(v) => { setSelectedProjectId(v); setSelectedPlanId(null); }}>
               <SelectTrigger data-testid="select-project-filter">
@@ -835,7 +835,7 @@ function FurniturePlannerCore({ fixedProjectId }: { fixedProjectId?: number }) {
                             <Button
                               variant="outline"
                               size="sm"
-                              className="absolute bottom-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity h-7 text-xs"
+                              className="absolute bottom-1 right-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity h-7 text-xs"
                               onClick={() => handleUpload(key)}
                               disabled={isUploading}
                             >
@@ -1107,8 +1107,8 @@ function MaterialRow({
             </div>
           )}
         </div>
-        <Button variant="ghost" size="sm" onClick={() => setEditing(true)} className="opacity-0 group-hover:opacity-100 h-7 text-xs">Edit</Button>
-        <Button variant="ghost" size="sm" onClick={onDelete} className="opacity-0 group-hover:opacity-100 h-7 text-xs text-destructive"><Trash2 className="h-3 w-3" /></Button>
+        <Button variant="ghost" size="sm" onClick={() => setEditing(true)} className="md:opacity-0 md:group-hover:opacity-100 h-7 text-xs">Edit</Button>
+        <Button variant="ghost" size="sm" onClick={onDelete} className="md:opacity-0 md:group-hover:opacity-100 h-7 text-xs text-destructive"><Trash2 className="h-3 w-3" /></Button>
       </div>
     );
   }

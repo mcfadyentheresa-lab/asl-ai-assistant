@@ -98,7 +98,7 @@ export function ProjectCard({ project, onArchive, onDelete, clientName }: Projec
               <Button
                 size="icon"
                 variant="secondary"
-                className="opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 transition-opacity"
+                className="md:opacity-0 md:group-focus-within:opacity-100 md:group-hover:opacity-100 transition-opacity"
                 onClick={(e) => e.preventDefault()}
                 data-testid={`button-project-menu-${project.id}`}
               >

@@ -295,21 +295,23 @@ export default function CrewAndTrade() {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="mb-4">
-            {isAdmin && (
-              <TabsTrigger value="crew" data-testid="tab-crew">
-                <Users className="h-4 w-4 mr-2" /> Crew
+          <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 mb-4">
+            <TabsList className="w-max md:w-auto">
+              {isAdmin && (
+                <TabsTrigger value="crew" data-testid="tab-crew">
+                  <Users className="h-4 w-4 mr-2" /> Crew
+                </TabsTrigger>
+              )}
+              <TabsTrigger value="trade" data-testid="tab-trade">
+                <Building2 className="h-4 w-4 mr-2" /> Trade Contacts
               </TabsTrigger>
-            )}
-            <TabsTrigger value="trade" data-testid="tab-trade">
-              <Building2 className="h-4 w-4 mr-2" /> Trade Contacts
-            </TabsTrigger>
-            {isAdmin && (
-              <TabsTrigger value="benchmarks" data-testid="tab-benchmarks">
-                <TrendingUp className="h-4 w-4 mr-2" /> Market Benchmarks
-              </TabsTrigger>
-            )}
-          </TabsList>
+              {isAdmin && (
+                <TabsTrigger value="benchmarks" data-testid="tab-benchmarks">
+                  <TrendingUp className="h-4 w-4 mr-2" /> Market Benchmarks
+                </TabsTrigger>
+              )}
+            </TabsList>
+          </div>
 
           {/* ── CREW TAB ─────────────────────────────────────── */}
           {isAdmin && (
