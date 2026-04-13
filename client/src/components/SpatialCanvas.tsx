@@ -27,7 +27,7 @@ import {
   Bold, Italic, Strikethrough, Underline, List, ListOrdered, Code, Link as LinkIcon,
   Eraser, Undo2, Redo2, Save, PenTool, Sparkles, TypeIcon, Shapes,
   CalendarDays, Milestone, ListChecks, Bell, BellOff,
-  ChefHat, Bath, Home, FileText, LayoutPanelLeft,
+  ChefHat, Bath, Home, FileText, LayoutPanelLeft, Move,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { usePlanningBoards, useCreatePlanningBoard, useDeletePlanningBoard, useUpdatePlanningBoard, useUploadImage, useUsers, useProjects, useMilestones, useChecklistItems, useCalendarEvents, useUpdateCalendarEvent, useDeleteCalendarEvent, useCreateCalendarEvent, useCreateMilestone, useCreateChecklistItem, useBoardSnapshots, useCreateBoardSnapshot, useRestoreBoardSnapshot, useDeleteBoardSnapshot } from "@/hooks/use-projects";
@@ -198,6 +198,8 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   const [isPanning, setIsPanning] = useState(false);
   const panStartRef = useRef<{ x: number; y: number; px: number; py: number } | null>(null);
   const pinchStartRef = useRef<{ dist: number; zoom: number; pan: { x: number; y: number }; cx: number; cy: number } | null>(null);
+  const doubleTapRef = useRef<{ id: number | null; time: number }>({ id: null, time: 0 });
+  const [mobileUnlockedId, setMobileUnlockedId] = useState<number | null>(null);
   const spaceRef = useRef(false);
 
   const [showRenameDialog, setShowRenameDialog] = useState(false);
@@ -721,17 +723,40 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     const el = elements[elementId];
     if (!el) return;
     e.stopPropagation();
-    const newZ = maxZ;
-    setMaxZ((z) => z + 1);
-    updateElement(elementId, { zIndex: newZ });
-    setDraggingId(elementId);
-    setEditingId(elementId);
-    dragStartRef.current = { x: touch.clientX, y: touch.clientY, elX: el.x, elY: el.y };
-    longPressTimerRef.current = setTimeout(() => {
-      setDraggingId(null);
-      dragStartRef.current = null;
-      openContextMenu(e, elementId);
-    }, 500);
+
+    const now = Date.now();
+    const lastTap = doubleTapRef.current;
+    const isDoubleTap = lastTap.id === elementId && now - lastTap.time < 350;
+    // Reset after double-tap so triple-tap doesn't re-trigger
+    doubleTapRef.current = isDoubleTap ? { id: null, time: 0 } : { id: elementId, time: now };
+
+    if (isDoubleTap) {
+      // Double-tap: unlock this element for moving/editing
+      setMobileUnlockedId(elementId);
+      setEditingId(elementId);
+      const newZ = maxZ;
+      setMaxZ((z) => z + 1);
+      updateElement(elementId, { zIndex: newZ });
+      setDraggingId(elementId);
+      dragStartRef.current = { x: touch.clientX, y: touch.clientY, elX: el.x, elY: el.y };
+    } else if (mobileUnlockedId === elementId) {
+      // Already unlocked: touch immediately starts a drag
+      const newZ = maxZ;
+      setMaxZ((z) => z + 1);
+      updateElement(elementId, { zIndex: newZ });
+      setDraggingId(elementId);
+      setEditingId(elementId);
+      dragStartRef.current = { x: touch.clientX, y: touch.clientY, elX: el.x, elY: el.y };
+      longPressTimerRef.current = setTimeout(() => {
+        setDraggingId(null);
+        dragStartRef.current = null;
+        openContextMenu(e, elementId);
+      }, 500);
+    } else {
+      // Single tap on locked element: select/open editor only — no drag
+      setEditingId(elementId);
+      setMobileUnlockedId(null);
+    }
   };
 
   const handleLongPressEnd = () => {
@@ -744,6 +769,9 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   // Touch-based canvas handlers for drag, pan & pinch-to-zoom on mobile
   const handleCanvasTouchStart = (e: React.TouchEvent) => {
     if (drawingMode) return;
+    // Tapping the canvas background re-locks any unlocked element
+    setMobileUnlockedId(null);
+    doubleTapRef.current = { id: null, time: 0 };
     if (e.touches.length === 2) {
       // Begin pinch-to-zoom — cancel any active pan
       const t1 = e.touches[0];
@@ -1621,13 +1649,14 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   const renderElement = (el: CanvasElement) => {
     const isSelected = editingId === el.id;
     const isDragging = draggingId === el.id;
+    const isUnlocked = mobileUnlockedId === el.id;
     const c = (el.content || {}) as any;
     const activeEdit = activeEdits[el.id];
 
     const parentCol = el.parentColumnId ? elements[el.parentColumnId] : null;
     const effectiveZ = parentCol ? Math.max(el.zIndex, (parentCol.zIndex || 0) + 1) : el.zIndex;
     const isDropping = droppingIds.has(el.id);
-    const cardBase = `absolute rounded select-none ${isSelected && !activeEdit ? "ring-2 ring-primary/50 shadow-lg" : "shadow-sm"} ${isDragging ? "opacity-80 cursor-grabbing" : ""} ${isDropping && !isDragging ? "transition-[left,top,width,height] duration-300 ease-out" : "transition-shadow"}`;
+    const cardBase = `absolute rounded select-none ${isUnlocked ? "ring-2 ring-amber-400/70 shadow-lg" : isSelected && !activeEdit ? "ring-2 ring-primary/50 shadow-lg" : "shadow-sm"} ${isDragging ? "opacity-80 cursor-grabbing" : ""} ${isDropping && !isDragging ? "transition-[left,top,width,height] duration-300 ease-out" : "transition-shadow"}`;
 
     const handleClick = (e: React.MouseEvent) => {
       e.stopPropagation();
@@ -2996,6 +3025,25 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
               data-testid="spatial-canvas-transform"
             >
               {elementsList.map(renderElement)}
+
+              {/* Mobile unlock badge — shown above the double-tapped element */}
+              {mobileUnlockedId !== null && (() => {
+                const unlockedEl = elements[mobileUnlockedId];
+                if (!unlockedEl) return null;
+                return (
+                  <div
+                    key="mobile-unlock-badge"
+                    className="md:hidden absolute pointer-events-none flex items-center gap-1"
+                    style={{ left: unlockedEl.x, top: unlockedEl.y - 28, zIndex: 9999 }}
+                    data-testid="mobile-unlock-badge"
+                  >
+                    <div className="flex items-center gap-1 bg-amber-400 text-white rounded-full px-2 py-0.5 shadow-md" style={{ fontSize: 10, fontWeight: 500, whiteSpace: "nowrap" }}>
+                      <Move style={{ width: 11, height: 11 }} />
+                      <span>drag to move · tap elsewhere to lock</span>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Active edit indicators — colored rings showing who is editing each element */}
               {Object.values(activeEdits).map((edit) => {
