@@ -126,6 +126,8 @@ export default function Dashboard() {
   });
 
   const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(" ") || "there";
+  const hour = new Date().getHours();
+  const timeGreeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
   const isAdminView = effectiveRole === "admin";
   const isClientView = effectiveRole === "client";
 
@@ -169,20 +171,20 @@ export default function Dashboard() {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
           <div>
             <h1 className="normal-case mb-0.5" data-testid="text-greeting">
-              <span className="block text-xs tracking-widest text-muted-foreground font-sans font-normal uppercase mb-1">Welcome back</span>
+              <span className="block text-xs tracking-widest text-muted-foreground font-sans font-normal uppercase mb-1">{timeGreeting}</span>
               <span className="block font-serif text-2xl md:text-3xl font-normal text-foreground">{user?.firstName || fullName}</span>
             </h1>
             <p className="text-sm text-muted-foreground" data-testid="text-subtitle">
               {isCrewView
-                ? `Here's your day at a glance. ${todayTasks.length} ${todayTasks.length === 1 ? "task" : "tasks"} for today${overdueTasks.length > 0 ? `, ${overdueTasks.length} overdue` : ""}.`
+                ? `${todayTasks.length > 0 ? `${todayTasks.length} ${todayTasks.length === 1 ? "task" : "tasks"} due today` : "No tasks due today"}${overdueTasks.length > 0 ? ` · ${overdueTasks.length} overdue` : ""}.`
                 : isClientView && clientSingleProject
-                  ? `Your project is ${statusLabel[clientSingleProject.status]?.toLowerCase() || "active"}.`
+                  ? `Your ${clientSingleProject.name}`
                   : isClientView && !isClient
                     ? "Client view — this is what clients see once they've been invited to a project."
                   : isClientView
-                    ? `You have ${activeProjects.length} active ${activeProjects.length === 1 ? "project" : "projects"}.`
+                    ? `${activeProjects.length} active ${activeProjects.length === 1 ? "project" : "projects"}.`
                     : isAdminView
-                      ? `${activeProjects.length} active ${activeProjects.length === 1 ? "project" : "projects"}${completedProjects.length > 0 ? ` · ${completedProjects.length} completed` : ""}${onlineCrew.length > 0 ? ` · ${onlineCrew.length} team online` : ""}`
+                      ? `${activeProjects.length} active ${activeProjects.length === 1 ? "project" : "projects"}${completedProjects.length > 0 ? ` · ${completedProjects.length} completed` : ""}${onlineCrew.length > 0 ? ` · ${onlineCrew.length} online` : ""}`
                       : "Here is an overview of your active projects."
               }
             </p>
