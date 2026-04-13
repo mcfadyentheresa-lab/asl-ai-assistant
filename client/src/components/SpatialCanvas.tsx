@@ -198,7 +198,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   const [isPanning, setIsPanning] = useState(false);
   const panStartRef = useRef<{ x: number; y: number; px: number; py: number } | null>(null);
   const pinchStartRef = useRef<{ dist: number; zoom: number; pan: { x: number; y: number }; cx: number; cy: number } | null>(null);
-  const doubleTapRef = useRef<{ id: number | null; time: number }>({ id: null, time: 0 });
+  const pendingDragRef = useRef<{ id: number; x: number; y: number; elX: number; elY: number } | null>(null);
   const [mobileUnlockedId, setMobileUnlockedId] = useState<number | null>(null);
   const spaceRef = useRef(false);
 
@@ -724,38 +724,18 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     if (!el) return;
     e.stopPropagation();
 
-    const now = Date.now();
-    const lastTap = doubleTapRef.current;
-    const isDoubleTap = lastTap.id === elementId && now - lastTap.time < 350;
-    // Reset after double-tap so triple-tap doesn't re-trigger
-    doubleTapRef.current = isDoubleTap ? { id: null, time: 0 } : { id: elementId, time: now };
-
-    if (isDoubleTap) {
-      // Double-tap: unlock this element for moving/editing
+    if (editingId === elementId) {
+      // Second tap on already-selected element: arm threshold drag
       setMobileUnlockedId(elementId);
-      setEditingId(elementId);
+      pendingDragRef.current = { id: elementId, x: touch.clientX, y: touch.clientY, elX: el.x, elY: el.y };
       const newZ = maxZ;
       setMaxZ((z) => z + 1);
       updateElement(elementId, { zIndex: newZ });
-      setDraggingId(elementId);
-      dragStartRef.current = { x: touch.clientX, y: touch.clientY, elX: el.x, elY: el.y };
-    } else if (mobileUnlockedId === elementId) {
-      // Already unlocked: touch immediately starts a drag
-      const newZ = maxZ;
-      setMaxZ((z) => z + 1);
-      updateElement(elementId, { zIndex: newZ });
-      setDraggingId(elementId);
-      setEditingId(elementId);
-      dragStartRef.current = { x: touch.clientX, y: touch.clientY, elX: el.x, elY: el.y };
-      longPressTimerRef.current = setTimeout(() => {
-        setDraggingId(null);
-        dragStartRef.current = null;
-        openContextMenu(e, elementId);
-      }, 500);
     } else {
-      // Single tap on locked element: select/open editor only — no drag
+      // First tap: just select — no drag started yet
       setEditingId(elementId);
       setMobileUnlockedId(null);
+      pendingDragRef.current = null;
     }
   };
 
@@ -769,9 +749,10 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   // Touch-based canvas handlers for drag, pan & pinch-to-zoom on mobile
   const handleCanvasTouchStart = (e: React.TouchEvent) => {
     if (drawingMode) return;
-    // Tapping the canvas background re-locks any unlocked element
+    // Tapping the canvas background deselects and re-locks any element
+    setEditingId(null);
     setMobileUnlockedId(null);
-    doubleTapRef.current = { id: null, time: 0 };
+    pendingDragRef.current = null;
     if (e.touches.length === 2) {
       // Begin pinch-to-zoom — cancel any active pan
       const t1 = e.touches[0];
@@ -819,6 +800,18 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
     }
+    // Threshold-based drag: activate once finger moves > 8px from pending-drag start
+    if (pendingDragRef.current && draggingId === null && e.touches.length === 1) {
+      const pdx = touch.clientX - pendingDragRef.current.x;
+      const pdy = touch.clientY - pendingDragRef.current.y;
+      if (Math.hypot(pdx, pdy) > 8) {
+        const pd = pendingDragRef.current;
+        dragStartRef.current = { x: pd.x, y: pd.y, elX: pd.elX, elY: pd.elY };
+        setDraggingId(pd.id);
+        pendingDragRef.current = null;
+      }
+      return;
+    }
     if (draggingId !== null && dragStartRef.current) {
       e.preventDefault();
       const dx = (touch.clientX - dragStartRef.current.x) / zoom;
@@ -852,6 +845,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
 
   const handleCanvasTouchEnd = () => {
     pinchStartRef.current = null;
+    pendingDragRef.current = null;
     if (isPanning) {
       setIsPanning(false);
       panStartRef.current = null;
@@ -1315,6 +1309,13 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   };
 
   const resetView = () => { setPan({ x: 0, y: 0 }); setZoom(1); };
+
+  // Auto fit-to-screen when a board is first opened on a touch device
+  useEffect(() => {
+    if (!selectedBoardId || !("ontouchstart" in window)) return;
+    const timer = setTimeout(() => fitToScreen(), 150);
+    return () => clearTimeout(timer);
+  }, [selectedBoardId]);
 
   const startResize = (id: number, handle: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -2727,7 +2728,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           </>
         )}
         {(selectedBoard?.linkedUserIds?.length ?? 0) > 0 && (
-          <div className="flex items-center gap-1 mobile-landscape:hidden" data-testid="badges-linked-people">
+          <div className="hidden md:flex items-center gap-1" data-testid="badges-linked-people">
             <div className="flex -space-x-1.5">
               {selectedBoard!.linkedUserIds!.slice(0, 4).map((uid: string) => {
                 const user = allUsers.find((u: any) => u.id === uid);
@@ -2747,7 +2748,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           </div>
         )}
         {(selectedBoard?.linkedProjectIds?.length ?? 0) > 0 && (
-          <div className="flex items-center gap-1 flex-wrap mobile-landscape:hidden" data-testid="badges-linked-projects">
+          <div className="hidden md:flex items-center gap-1 flex-wrap" data-testid="badges-linked-projects">
             {selectedBoard!.linkedProjectIds!.map((pid: number) => {
               const proj = allProjects.find((p: any) => p.id === pid);
               return proj ? (
@@ -2758,7 +2759,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             })}
           </div>
         )}
-        <div className="flex items-center gap-1.5 mobile-landscape:hidden">
+        <div className="hidden md:flex items-center gap-1.5">
         {selectedBoard?.linkedCalendarEventId && (() => {
           const ev = calendarEvents.find((e: any) => e.id === selectedBoard.linkedCalendarEventId);
           return ev ? (
@@ -2812,6 +2813,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             </TooltipTrigger>
             <TooltipContent side="bottom" className="text-xs">Undo (Ctrl+Z)</TooltipContent>
           </Tooltip>
+          <div className="hidden md:flex items-center gap-1">
           <Separator orientation="vertical" className="h-4 mx-1" />
           <Tooltip>
             <TooltipTrigger asChild>
@@ -2871,6 +2873,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
               <span className="text-xs text-muted-foreground">{collaborators.length} live</span>
             </div>
           )}
+          </div>
         </div>
       </div>
 
@@ -3039,7 +3042,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                   >
                     <div className="flex items-center gap-1 bg-amber-400 text-white rounded-full px-2 py-0.5 shadow-md" style={{ fontSize: 10, fontWeight: 500, whiteSpace: "nowrap" }}>
                       <Move style={{ width: 11, height: 11 }} />
-                      <span>drag to move · tap elsewhere to lock</span>
+                      <span>drag to move</span>
                     </div>
                   </div>
                 );
