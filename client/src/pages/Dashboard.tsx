@@ -255,25 +255,25 @@ export default function Dashboard() {
         </div>
 
         {isAdmin && !isClientView && (
-          <div className="grid grid-cols-3 gap-2 mb-5" data-testid="admin-stats-strip">
-            <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-muted/40 border border-border/40">
-              <FolderOpen className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-xs font-medium text-foreground whitespace-nowrap">{activeProjects.length} Active</span>
+          <div className="grid grid-cols-3 gap-1.5 sm:gap-2 mb-5" data-testid="admin-stats-strip">
+            <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-2.5 py-1.5 rounded-md bg-muted/40 border border-border/40 min-w-0">
+              <FolderOpen className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              <span className="text-[11px] sm:text-xs font-medium text-foreground truncate">{activeProjects.length} Active</span>
             </div>
-            <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-muted/40 border border-border/40">
-              <Briefcase className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-xs font-medium text-foreground whitespace-nowrap">{completedProjects.length} Completed</span>
+            <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-2.5 py-1.5 rounded-md bg-muted/40 border border-border/40 min-w-0">
+              <Briefcase className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              <span className="text-[11px] sm:text-xs font-medium text-foreground truncate">{completedProjects.length} Done</span>
             </div>
-            <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-muted/40 border border-border/40">
+            <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-2.5 py-1.5 rounded-md bg-muted/40 border border-border/40 min-w-0">
               {onlineCrew.length > 0 ? (
-                <div className="relative flex h-2 w-2">
+                <div className="relative flex h-2 w-2 shrink-0">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75" />
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
                 </div>
               ) : (
-                <div className="h-2 w-2 rounded-full bg-muted-foreground/30" />
+                <div className="h-2 w-2 rounded-full bg-muted-foreground/30 shrink-0" />
               )}
-              <span className="text-xs font-medium text-foreground whitespace-nowrap">{onlineCrew.length} Online</span>
+              <span className="text-[11px] sm:text-xs font-medium text-foreground truncate">{onlineCrew.length} Online</span>
             </div>
           </div>
         )}

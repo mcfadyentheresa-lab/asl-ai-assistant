@@ -598,7 +598,7 @@ export default function CrewAndTrade() {
 
       {/* ═══════════════ CREW DIALOGS ══════════════════════════ */}
       <Dialog open={showAddCrew} onOpenChange={setShowAddCrew}>
-        <DialogContent>
+        <DialogContent className="w-[95vw] max-w-lg">
           <DialogHeader><DialogTitle>Add Crew Rate</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
@@ -639,7 +639,7 @@ export default function CrewAndTrade() {
       </Dialog>
 
       <Dialog open={!!editingCrew} onOpenChange={() => setEditingCrew(null)}>
-        <DialogContent>
+        <DialogContent className="w-[95vw] max-w-lg">
           <DialogHeader><DialogTitle>Edit Crew Rate</DialogTitle></DialogHeader>
           {editingCrew && (
             <div className="space-y-4">
@@ -717,7 +717,7 @@ export default function CrewAndTrade() {
 
       {/* ═══════════════ MARKET BENCHMARK DIALOGS ════════════ */}
       <Dialog open={showAddRate} onOpenChange={setShowAddRate}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="w-[95vw] max-w-md">
           <DialogHeader><DialogTitle>Add Market Rate</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div>
@@ -774,7 +774,7 @@ export default function CrewAndTrade() {
 
       {editingRate && (
         <Dialog open={!!editingRate} onOpenChange={() => setEditingRate(null)}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="w-[95vw] max-w-md">
             <DialogHeader><DialogTitle>Edit Market Rate</DialogTitle></DialogHeader>
             <div className="space-y-4">
               <div className="text-sm font-medium">{categories.find(c => c.id === editingRate.categoryId)?.name}</div>
@@ -815,7 +815,7 @@ export default function CrewAndTrade() {
       )}
 
       <Dialog open={showAddCategory} onOpenChange={setShowAddCategory}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="w-[95vw] max-w-md">
           <DialogHeader><DialogTitle>Add Cost Category</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div>
@@ -1024,7 +1024,7 @@ function EditContactDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle data-testid="text-dialog-title">{isNew ? "Add Contact" : "Edit Contact"}</DialogTitle>
           <DialogDescription>

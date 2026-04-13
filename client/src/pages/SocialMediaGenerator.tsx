@@ -764,7 +764,7 @@ export default function SocialMediaGenerator() {
 
       {/* Edit dialog */}
       <Dialog open={!!editingPost} onOpenChange={(open) => !open && setEditingPost(null)}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="w-[95vw] max-w-lg">
           <DialogHeader>
             <DialogTitle className="uppercase tracking-normal text-base">Edit Post</DialogTitle>
           </DialogHeader>

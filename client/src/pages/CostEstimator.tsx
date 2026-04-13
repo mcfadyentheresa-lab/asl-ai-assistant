@@ -897,7 +897,7 @@ export default function CostEstimator() {
                                     {item.unitType === "sq_ft" ? "sq ft" : item.unitType === "hour" ? "hr" : "unit"}
                                   </Badge>
                                 </div>
-                                <div className="grid grid-cols-2 gap-2">
+                                <div className="grid grid-cols-1 gap-2">
                                   <div>
                                     <Label className="text-xs text-muted-foreground">Qty</Label>
                                     <Input type="number" className="h-11 text-sm" value={editItemForm.quantity} onChange={(e) => setEditItemForm(f => ({ ...f, quantity: e.target.value }))} data-testid={`input-edit-qty-${item.id}`} />
@@ -1204,7 +1204,7 @@ export default function CostEstimator() {
       </div>
 
       <Dialog open={showAddItem} onOpenChange={setShowAddItem}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="w-[95vw] max-w-md">
           <DialogHeader>
             <DialogTitle>Add Estimate Line Item</DialogTitle>
           </DialogHeader>
@@ -1497,7 +1497,7 @@ export default function CostEstimator() {
       </Dialog>
 
       <Dialog open={showAddReceipt} onOpenChange={(open) => { setShowAddReceipt(open); if (!open) { setNewReceipt({ vendor: "", description: "", date: new Date().toISOString().split("T")[0], amount: "", estimateItemId: "", lineItems: [] }); setPriceBookImport({ enabled: false, supplierId: "", items: [] }); } }}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add Receipt</DialogTitle>
           </DialogHeader>
@@ -1650,7 +1650,7 @@ export default function CostEstimator() {
       </Dialog>
 
       <Dialog open={showBoardImport} onOpenChange={(open) => { setShowBoardImport(open); if (!open) setExpandedBoards(new Set()); }}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="w-[95vw] max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Shapes className="h-5 w-5" /> Import from Planning Board
@@ -1751,7 +1751,7 @@ export default function CostEstimator() {
       </Dialog>
 
       <Dialog open={showAlternatives} onOpenChange={(open) => { setShowAlternatives(open); if (!open) setAlternativesResults(null); }}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="w-[95vw] max-w-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Lightbulb className="h-5 w-5" /> Cost-Saving Alternatives
@@ -1849,7 +1849,7 @@ export default function CostEstimator() {
       </Dialog>
 
       <Dialog open={showAiAnalyzer} onOpenChange={setShowAiAnalyzer}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="w-[95vw] max-w-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Sparkles className="h-5 w-5" /> AI Scope Analyzer
