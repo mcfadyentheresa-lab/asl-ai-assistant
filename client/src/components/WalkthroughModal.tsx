@@ -182,7 +182,7 @@ export function WalkthroughModal({ open, onClose, role, firstName }: Walkthrough
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) handleClose(); }}>
       <DialogContent
-        className="max-w-sm p-0 gap-0 overflow-hidden"
+        className="w-[95vw] max-w-sm p-0 gap-0 overflow-hidden"
         onInteractOutside={(e) => e.preventDefault()}
         data-testid="walkthrough-modal"
       >

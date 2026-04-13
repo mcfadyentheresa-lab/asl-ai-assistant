@@ -900,24 +900,24 @@ export default function CostEstimator() {
                                 <div className="grid grid-cols-2 gap-2">
                                   <div>
                                     <Label className="text-xs text-muted-foreground">Qty</Label>
-                                    <Input type="number" className="h-8 text-sm" value={editItemForm.quantity} onChange={(e) => setEditItemForm(f => ({ ...f, quantity: e.target.value }))} data-testid={`input-edit-qty-${item.id}`} />
+                                    <Input type="number" className="h-11 text-sm" value={editItemForm.quantity} onChange={(e) => setEditItemForm(f => ({ ...f, quantity: e.target.value }))} data-testid={`input-edit-qty-${item.id}`} />
                                   </div>
                                   <div>
                                     <Label className="text-xs text-muted-foreground">Unit Cost</Label>
-                                    <Input type="number" step="0.01" className="h-8 text-sm" value={editItemForm.unitCost} onChange={(e) => setEditItemForm(f => ({ ...f, unitCost: e.target.value }))} data-testid={`input-edit-unit-cost-${item.id}`} />
+                                    <Input type="number" step="0.01" className="h-11 text-sm" value={editItemForm.unitCost} onChange={(e) => setEditItemForm(f => ({ ...f, unitCost: e.target.value }))} data-testid={`input-edit-unit-cost-${item.id}`} />
                                   </div>
                                   <div>
                                     <Label className="text-xs text-muted-foreground">Material Cost</Label>
-                                    <Input type="number" step="0.01" className="h-8 text-sm" value={editItemForm.materialCost} onChange={(e) => setEditItemForm(f => ({ ...f, materialCost: e.target.value }))} data-testid={`input-edit-material-${item.id}`} />
+                                    <Input type="number" step="0.01" className="h-11 text-sm" value={editItemForm.materialCost} onChange={(e) => setEditItemForm(f => ({ ...f, materialCost: e.target.value }))} data-testid={`input-edit-material-${item.id}`} />
                                   </div>
                                   <div>
                                     <Label className="text-xs text-muted-foreground">Labour Cost</Label>
-                                    <Input type="number" step="1" className="h-8 text-sm" value={editItemForm.laborCost} onChange={(e) => setEditItemForm(f => ({ ...f, laborCost: e.target.value }))} data-testid={`input-edit-labor-${item.id}`} />
+                                    <Input type="number" step="1" className="h-11 text-sm" value={editItemForm.laborCost} onChange={(e) => setEditItemForm(f => ({ ...f, laborCost: e.target.value }))} data-testid={`input-edit-labor-${item.id}`} />
                                   </div>
                                 </div>
                                 <div className="flex gap-2 pt-1">
-                                  <Button size="sm" className="flex-1 h-8" onClick={saveEdit} data-testid={`button-save-edit-${item.id}`}>Save</Button>
-                                  <Button variant="ghost" size="sm" className="flex-1 h-8" onClick={() => setEditingItemId(null)} data-testid={`button-cancel-edit-${item.id}`}>Cancel</Button>
+                                  <Button size="sm" className="flex-1 h-11" onClick={saveEdit} data-testid={`button-save-edit-${item.id}`}>Save</Button>
+                                  <Button variant="ghost" size="sm" className="flex-1 h-11" onClick={() => setEditingItemId(null)} data-testid={`button-cancel-edit-${item.id}`}>Cancel</Button>
                                 </div>
                               </div>
                               {/* Desktop edit layout */}
@@ -959,7 +959,7 @@ export default function CostEstimator() {
                           : 'border-border';
                         const editActions = canEdit ? (
                           <div className="flex items-center gap-0.5 shrink-0">
-                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => {
+                            <Button variant="ghost" size="sm" className="h-11 w-11 md:h-7 md:w-7 p-0" onClick={() => {
                               setEditingItemId(item.id);
                               setEditItemForm({
                                 quantity: item.quantity,
@@ -970,7 +970,7 @@ export default function CostEstimator() {
                             }} data-testid={`button-edit-item-${item.id}`}>
                               <Pencil className="h-3 w-3 text-muted-foreground" />
                             </Button>
-                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => deleteItemMutation.mutate(item.id)} data-testid={`button-delete-item-${item.id}`}>
+                            <Button variant="ghost" size="sm" className="h-11 w-11 md:h-7 md:w-7 p-0" onClick={() => deleteItemMutation.mutate(item.id)} data-testid={`button-delete-item-${item.id}`}>
                               <Trash2 className="h-3 w-3 text-muted-foreground" />
                             </Button>
                           </div>
@@ -1165,7 +1165,7 @@ export default function CostEstimator() {
                             </div>
                             <div className="text-sm font-semibold">${parseFloat(r.amount).toLocaleString("en-CA", { minimumFractionDigits: 2 })}</div>
                             {canEdit && (
-                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => deleteReceiptMutation.mutate(r.id)} data-testid={`button-delete-receipt-${r.id}`}>
+                              <Button variant="ghost" size="sm" className="h-11 w-11 md:h-7 md:w-7 p-0" onClick={() => deleteReceiptMutation.mutate(r.id)} data-testid={`button-delete-receipt-${r.id}`}>
                                 <Trash2 className="h-3 w-3" />
                               </Button>
                             )}

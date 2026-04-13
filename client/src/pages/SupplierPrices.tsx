@@ -319,7 +319,7 @@ export default function SupplierPrices() {
                           <Button
                             size="icon"
                             variant="ghost"
-                            className="h-8 w-8 text-muted-foreground hover:text-primary"
+                            className="h-11 w-11 text-muted-foreground hover:text-primary"
                             onClick={() => fetchLivePrice(price)}
                             disabled={fetchingPriceId === price.id}
                             title="Fetch live price"
@@ -330,10 +330,10 @@ export default function SupplierPrices() {
                               : <RefreshCw className="h-3.5 w-3.5" />}
                           </Button>
                         )}
-                        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setEditingPrice(price)} data-testid={`button-edit-price-${price.id}`}>
+                        <Button size="icon" variant="ghost" className="h-11 w-11" onClick={() => setEditingPrice(price)} data-testid={`button-edit-price-${price.id}`}>
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
-                        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setDeletePrice(price)} data-testid={`button-delete-price-${price.id}`}>
+                        <Button size="icon" variant="ghost" className="h-11 w-11" onClick={() => setDeletePrice(price)} data-testid={`button-delete-price-${price.id}`}>
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
@@ -487,7 +487,7 @@ function AddSupplierDialog({ open, onClose }: { open: boolean; onClose: () => vo
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="w-[95vw] max-w-lg">
         <DialogHeader>
           <DialogTitle data-testid="text-add-supplier-title">Add Supplier</DialogTitle>
           <DialogDescription>Add a new material supplier to your price book.</DialogDescription>
@@ -579,7 +579,7 @@ function EditSupplierDialog({ supplier, open, onClose }: { supplier: Supplier | 
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="w-[95vw] max-w-lg">
         <DialogHeader>
           <DialogTitle data-testid="text-edit-supplier-title">Edit Supplier</DialogTitle>
           <DialogDescription>Update supplier details.</DialogDescription>
@@ -695,7 +695,7 @@ function PriceFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="w-[95vw] max-w-lg">
         <DialogHeader>
           <DialogTitle data-testid="text-price-dialog-title">{isNew ? "Add Price" : "Edit Price"}</DialogTitle>
           <DialogDescription>{isNew ? "Add a new product price to this supplier." : "Update product price details."}</DialogDescription>
@@ -818,7 +818,7 @@ function AddFromReceiptDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="w-[95vw] max-w-lg">
         <DialogHeader>
           <DialogTitle data-testid="text-receipt-dialog-title">Add Price from Receipt</DialogTitle>
           <DialogDescription>Quickly add a product price from a receipt or invoice.</DialogDescription>
