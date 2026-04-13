@@ -163,7 +163,7 @@ export function Navbar() {
                   </DropdownMenuItem>
                 </Link>
               )}
-              {(effectiveRole === "admin" || effectiveRole === "crew") && (
+              {effectiveRole === "admin" && (
                 <Link href="/crew-and-trade">
                   <DropdownMenuItem data-testid="link-crew-and-trade">
                     <Users className="mr-2 h-4 w-4" />
