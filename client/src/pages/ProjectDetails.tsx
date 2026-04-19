@@ -7,7 +7,7 @@ import {
   useCreateCalendarEvent,
   useDocuments, useUploadDocument, useDeleteDocument,
   usePhotos, useCreatePhoto, useDeletePhoto, useUploadImage,
-  useUsers, useUpdateProject, usePlanningBoards, useUpdateUserPhone, useSendTestSms, useNotifyTeam,
+  useUsers, useUpdateProject, usePlanningBoards, useUpdateUserPhone, useNotifyTeam,
   useActivityLog, useUpdateMilestone, useSections, useCreateMilestone, useCreateTask,
 } from "@/hooks/use-projects";
 import { useOnlineUsers, isUserOnline } from "@/hooks/use-presence";
@@ -87,7 +87,6 @@ export default function ProjectDetails() {
   const { mutate: updateProject } = useUpdateProject();
   const { mutate: updateMilestone } = useUpdateMilestone();
   const { mutate: updatePhone } = useUpdateUserPhone();
-  const { mutate: sendTestSms, isPending: sendingTestSms } = useSendTestSms();
   const { mutate: notifyTeam, isPending: sendingNotification } = useNotifyTeam();
   const { data: onlineUsers } = useOnlineUsers();
   const { viewers } = useProjectRealtime(projectId, user);
@@ -301,8 +300,6 @@ export default function ProjectDetails() {
                     seenLocally={seenLocally}
                     toast={toast}
                     updateProject={updateProject}
-                    sendTestSms={sendTestSms}
-                    sendingTestSms={sendingTestSms}
                     notifyTeam={notifyTeam}
                     sendingNotification={sendingNotification}
                     showNotifyForm={showNotifyForm}
@@ -373,8 +370,6 @@ export default function ProjectDetails() {
                           seenLocally={seenLocally}
                           toast={toast}
                           updateProject={updateProject}
-                          sendTestSms={sendTestSms}
-                          sendingTestSms={sendingTestSms}
                           notifyTeam={notifyTeam}
                           sendingNotification={sendingNotification}
                           showNotifyForm={showNotifyForm}
@@ -409,8 +404,6 @@ export default function ProjectDetails() {
                     seenLocally={seenLocally}
                     toast={toast}
                     updateProject={updateProject}
-                    sendTestSms={sendTestSms}
-                    sendingTestSms={sendingTestSms}
                     notifyTeam={notifyTeam}
                     sendingNotification={sendingNotification}
                     showNotifyForm={showNotifyForm}

@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  UserPlus, Mail, Phone, Pencil, Plus, Send, Check, ChevronRight, Shield, Loader2, ChevronDown,
+  UserPlus, Mail, Pencil, Plus, Check, ChevronRight, Shield, Loader2, ChevronDown,
 } from "lucide-react";
 import { apiRequest, queryClient as qc } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -20,7 +20,7 @@ import { formatDistanceToNow } from "date-fns";
 
 export function ProjectSidebarCards({
   project, user, users, userRole, onlineUsers, planningBoards, assignedClient,
-  activityLog, seenLocally, toast, updateProject, sendTestSms, sendingTestSms,
+  activityLog, seenLocally, toast, updateProject,
   notifyTeam, sendingNotification, showNotifyForm, setShowNotifyForm,
   notifyMessage, setNotifyMessage, selectedRecipients, setSelectedRecipients,
   setEditingUser, setProfileForm, setShowAddPerson, setAddPersonForm, setActiveTab, projectId,
@@ -115,12 +115,12 @@ export function ProjectSidebarCards({
             {u.archivedAt && <Badge variant="outline" className="ml-1 text-[9px] no-default-hover-elevate no-default-active-elevate">Archived</Badge>}
           </span>
           <div className="flex items-center gap-1">
-            {u.phone ? (
-              <span className="text-xs text-muted-foreground flex items-center gap-1" data-testid={`text-phone-${u.id}`}>
-                <Phone className="h-3 w-3" />{u.phone}
+            {u.email ? (
+              <span className="text-xs text-muted-foreground flex items-center gap-1" data-testid={`text-email-${u.id}`}>
+                <Mail className="h-3 w-3" />{u.email}
               </span>
             ) : (
-              <span className="text-xs text-muted-foreground/50 italic">No phone</span>
+              <span className="text-xs text-muted-foreground/50 italic">No email</span>
             )}
             {userRole === "admin" && (
               <Button
@@ -381,7 +381,7 @@ export function ProjectSidebarCards({
             )}
             {userRole === "admin" && (
               <div className="pt-2 border-t space-y-2">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">SMS Notifications</p>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Email Notifications</p>
                 <div className="flex items-center gap-2 flex-wrap">
                   <Button
                     variant="outline"
@@ -389,32 +389,9 @@ export function ProjectSidebarCards({
                     data-testid="button-notify-team"
                     onClick={() => setShowNotifyForm(!showNotifyForm)}
                   >
-                    <Send className="h-3 w-3 mr-1" />
-                    Notify Team
+                    <Mail className="h-3 w-3 mr-1" />
+                    Email Team
                   </Button>
-                  {userRole === "admin" && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={sendingTestSms}
-                      data-testid="button-send-test-sms"
-                      onClick={() => {
-                        const adminUser = users?.find((u: any) => u.id === user?.id);
-                        const phone = adminUser?.phone;
-                        if (!phone) {
-                          toast({ title: "No phone number", description: "Add your phone number first to receive a test SMS", variant: "destructive" });
-                          return;
-                        }
-                        sendTestSms(phone, {
-                          onSuccess: () => toast({ title: "Test SMS sent", description: `Sent to ${phone}` }),
-                          onError: (err: any) => toast({ title: "SMS failed", description: err.message, variant: "destructive" }),
-                        });
-                      }}
-                    >
-                      {sendingTestSms ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Phone className="h-3 w-3 mr-1" />}
-                      Test SMS
-                    </Button>
-                  )}
                 </div>
                 {showNotifyForm && (() => {
                   const eligibleRecipients = (users || []).filter(
@@ -445,13 +422,13 @@ export function ProjectSidebarCards({
                           {eligibleRecipients.map((u: any) => {
                             const selected = selectedRecipients.includes(u.id);
                             const name = `${u.firstName || ""} ${u.lastName || ""}`.trim() || u.email;
-                            const hasPhone = !!u.phone;
+                            const hasEmail = !!u.email;
                             return (
                               <Button
                                 key={u.id}
                                 variant={selected ? "default" : "outline"}
                                 size="sm"
-                                disabled={!hasPhone}
+                                disabled={!hasEmail}
                                 className={`text-xs toggle-elevate ${selected ? "toggle-elevated" : ""}`}
                                 onClick={() => toggleRecipient(u.id)}
                                 data-testid={`recipient-toggle-${u.id}`}
@@ -459,7 +436,7 @@ export function ProjectSidebarCards({
                                 {selected && <Check className="h-3 w-3 mr-1" />}
                                 {name}
                                 <span className="ml-1 opacity-60">({u.role})</span>
-                                {!hasPhone && <span className="ml-1 opacity-60">- no phone</span>}
+                                {!hasEmail && <span className="ml-1 opacity-60">- no email</span>}
                               </Button>
                             );
                           })}
@@ -467,13 +444,13 @@ export function ProjectSidebarCards({
                       </div>
                       <Textarea
                         value={notifyMessage}
-                        onChange={(e) => setNotifyMessage(e.target.value.slice(0, 300))}
-                        placeholder="Type a message to send via SMS..."
+                        onChange={(e) => setNotifyMessage(e.target.value.slice(0, 1000))}
+                        placeholder="Type a message to send by email..."
                         className="text-sm min-h-[60px]"
                         data-testid="input-notify-message"
                       />
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-xs text-muted-foreground">{notifyMessage.length}/300</span>
+                        <span className="text-xs text-muted-foreground">{notifyMessage.length}/1000</span>
                         <div className="flex items-center gap-2">
                           <Button
                             variant="ghost"
@@ -502,8 +479,8 @@ export function ProjectSidebarCards({
                               );
                             }}
                           >
-                            {sendingNotification ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Send className="h-3 w-3 mr-1" />}
-                            Send ({selectedRecipients.length})
+                            {sendingNotification ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Mail className="h-3 w-3 mr-1" />}
+                            Send Email ({selectedRecipients.length})
                           </Button>
                         </div>
                       </div>

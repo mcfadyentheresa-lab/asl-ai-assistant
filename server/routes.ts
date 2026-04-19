@@ -22,10 +22,9 @@ import {
   notifyDocumentUploaded,
   notifyCalendarEventCreated,
   notifyCalendarEventChanged,
-  notifyTeamCustom,
-  sendTestSms,
   notifyBoardLinked,
 } from "./sms";
+import { notifyTeamEmail } from "./email";
 import { heartbeat, getOnlineUsers, setVisibility, getVisibility } from "./presence";
 import { broadcastProjectChange } from "./websocket";
 import { getTemplateCatalogue, getTemplateCanvasData } from "./board-templates";
@@ -2202,29 +2201,6 @@ function templateCanvasToElements(canvasData: any, boardId: number, createdBy: s
     res.json({ visible: getVisibility(userId) });
   });
 
-  app.post("/api/sms/test", isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const requester = await authStorage.getUser(userId);
-      if (requester?.role !== "admin") {
-        return res.status(403).json({ message: "Only admins can send test SMS" });
-      }
-      const { phone } = req.body;
-      if (!phone) {
-        return res.status(400).json({ message: "Phone number required" });
-      }
-      const success = await sendTestSms(phone);
-      if (success) {
-        res.json({ message: "Test SMS sent successfully" });
-      } else {
-        res.status(500).json({ message: "Failed to send test SMS. Check Twilio configuration." });
-      }
-    } catch (error: any) {
-      console.error("Test SMS error:", error);
-      res.status(500).json({ message: error.message || "Failed to send test SMS" });
-    }
-  });
-
   app.post("/api/projects/:projectId/notify", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -2236,13 +2212,13 @@ function templateCanvasToElements(canvasData: any, boardId: number, createdBy: s
       if (!message || typeof message !== "string" || message.trim().length === 0) {
         return res.status(400).json({ message: "Message is required" });
       }
-      if (message.length > 300) {
-        return res.status(400).json({ message: "Message must be 300 characters or less" });
+      if (message.length > 1000) {
+        return res.status(400).json({ message: "Message must be 1000 characters or less" });
       }
       const project = await storage.getProject(Number(req.params.projectId));
       if (!project) return res.status(404).json({ message: "Project not found" });
 
-      const result = await notifyTeamCustom(
+      const result = await notifyTeamEmail(
         project.name,
         message.trim(),
         project.clientId,
@@ -2258,7 +2234,7 @@ function templateCanvasToElements(canvasData: any, boardId: number, createdBy: s
         description: message.trim(),
       });
 
-      res.json({ message: `Notification sent to ${result.sent} team member(s)`, ...result });
+      res.json({ message: `Email sent to ${result.sent} team member(s)`, ...result });
     } catch (error: any) {
       console.error("Notify team error:", error);
       res.status(500).json({ message: error.message || "Failed to send notification" });

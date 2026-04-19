@@ -28,6 +28,51 @@ function getTransporter(): nodemailer.Transporter | null {
   return transporter;
 }
 
+export async function notifyTeamEmail(
+  projectName: string,
+  message: string,
+  projectClientId: string | null,
+  sentByUserId: string,
+  recipientIds?: string[]
+): Promise<{ sent: number; failed: number; recipientNames: string[] }> {
+  const { authStorage } = await import("./replit_integrations/auth/storage");
+  const all = await authStorage.getUsers();
+  let recipients = all.filter((u) => {
+    if (!u.email) return false;
+    if (u.id === sentByUserId) return false;
+    if (u.role === "admin" || u.role === "crew") return true;
+    if (u.role === "client" && u.id === projectClientId) return true;
+    return false;
+  });
+  if (recipientIds && recipientIds.length > 0) {
+    recipients = recipients.filter((u) => recipientIds.includes(u.id));
+  }
+
+  const transport = getTransporter();
+  let sent = 0;
+  let failed = 0;
+  const recipientNames: string[] = [];
+
+  for (const u of recipients) {
+    const name = `${u.firstName || ""} ${u.lastName || ""}`.trim() || u.email!;
+    recipientNames.push(name);
+    if (!transport) { failed++; continue; }
+    try {
+      await transport.sendMail({
+        from: `"Aster & Spruce Living" <${gmailUser}>`,
+        to: u.email!,
+        subject: `Update on "${projectName}" — Aster & Spruce`,
+        html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f4f4f0;font-family:Inter,Helvetica,Arial,sans-serif;"><div style="max-width:600px;margin:0 auto;padding:40px 20px;"><div style="background:#1a3a2a;color:#fff;padding:24px 40px;text-align:center;"><div style="font-size:20px;font-weight:700;letter-spacing:1px;text-transform:uppercase;">Aster &amp; Spruce</div><div style="font-size:11px;color:#a8c5b0;letter-spacing:2px;text-transform:uppercase;margin-top:4px;">Living</div></div><div style="background:#fff;padding:32px 40px;"><p style="margin:0 0 8px;color:#666;font-size:13px;text-transform:uppercase;letter-spacing:.5px;">${projectName}</p><p style="margin:0 0 24px;color:#1a3a2a;font-size:15px;line-height:1.7;">${message}</p><p style="margin:0;font-size:12px;color:#999;">You received this because you are a team member on this project.</p></div></div></body></html>`,
+        text: `${projectName}\n\n${message}\n\n— Aster & Spruce Living`,
+      });
+      sent++;
+    } catch {
+      failed++;
+    }
+  }
+  return { sent, failed, recipientNames };
+}
+
 export async function sendClientInviteEmail(
   toEmail: string,
   clientFirstName: string,
