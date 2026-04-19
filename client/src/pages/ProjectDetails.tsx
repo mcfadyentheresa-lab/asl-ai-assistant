@@ -17,7 +17,7 @@ import { Navbar } from "@/components/layout/Navbar";
 import SpatialCanvas from "@/components/SpatialCanvas";
 import { FurniturePlannerPanel } from "@/pages/TableRedesignPlanner";
 import GanttChart from "@/components/GanttChart";
-import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, ExternalLink, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, CalendarDays, ChevronLeft, Upload, Download, User, X, Paperclip, ZoomIn, Palette, Shield, Users, Phone, Check, Bell, Eye, EyeOff, Archive, ArchiveRestore, PanelRightOpen, MoreVertical, Flag, DollarSign, BarChart3, TrendingUp, TrendingDown, Minus, ArrowUpRight, Building2, Sparkles, Armchair } from "lucide-react";
+import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, ExternalLink, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, CalendarDays, ChevronLeft, Upload, Download, User, X, Paperclip, ZoomIn, Palette, Shield, Users, Phone, Check, Bell, Archive, ArchiveRestore, PanelRightOpen, MoreVertical, Flag, BarChart3, ArrowUpRight, Building2, Sparkles, Armchair } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -69,8 +69,7 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { useRecentProjects } from "@/hooks/use-recent-projects";
-import { format, formatDistanceToNow } from "date-fns";
-import CalendarPanel from "@/components/CalendarPanel";
+import { format } from "date-fns";
 import { ProjectProgressSummary } from "@/components/project/ProjectProgressSummary";
 import { BudgetSnapshot } from "@/components/project/BudgetSnapshot";
 import { ProjectSidebarCards } from "@/components/project/ProjectSidebarCards";
@@ -2288,14 +2287,6 @@ function ChatTab({ projectId }: { projectId: number }) {
       </CardContent>
     </Card>
   );
-}
-
-function CalendarTab({ projectId }: { projectId: number }) {
-  const { user } = useAuth();
-  const { viewMode } = useViewMode();
-  const actualRole = user?.role || "client";
-  const effectiveRole = actualRole === "admin" ? viewMode : actualRole;
-  return <CalendarPanel projectId={projectId} effectiveRole={effectiveRole} />;
 }
 
 const docTypeLabels: Record<string, string> = {
