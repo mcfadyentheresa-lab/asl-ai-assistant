@@ -68,10 +68,15 @@ export function NavbarShell({ onMenuToggle }: NavbarShellProps) {
               <Menu className="h-5 w-5" />
             </Button>
           )}
-          <Link href="/" data-testid="link-home">
-            <span className="font-serif text-xl font-bold tracking-tight text-foreground">
-              ASL
-            </span>
+          <Link href="/" data-testid="link-home" className="lg:hidden">
+            <div className="flex flex-col">
+              <span className="font-serif text-lg font-bold tracking-tight text-foreground leading-none select-none">
+                Aster &amp; Spruce
+              </span>
+              <span className="text-[9px] font-semibold tracking-[0.18em] uppercase text-muted-foreground mt-0.5 select-none">
+                Living
+              </span>
+            </div>
           </Link>
         </div>
 
