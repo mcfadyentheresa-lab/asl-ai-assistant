@@ -2,6 +2,7 @@ import { useState } from "react";
 import { AppShellContext } from "@/contexts/app-shell-context";
 import { NavbarShell } from "@/components/layout/Navbar";
 import { DesktopSidebar, SidebarNav } from "@/components/layout/Sidebar";
+import { Link } from "wouter";
 import {
   Sheet,
   SheetContent,
@@ -31,10 +32,19 @@ export function AppShell({ children }: AppShellProps) {
       </div>
 
       <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
-        <SheetContent side="left" className="w-64 p-0">
-          <SheetHeader className="px-4 pt-4 pb-2 border-b border-border/60">
-            <SheetTitle className="font-serif text-lg font-bold tracking-tight text-foreground text-left">
-              ASL
+        <SheetContent side="left" className="w-64 p-0 bg-sidebar border-sidebar-border">
+          <SheetHeader className="px-5 py-4 border-b border-sidebar-border/50">
+            <SheetTitle asChild>
+              <div>
+                <Link href="/" onClick={() => setDrawerOpen(false)} data-testid="link-mobile-sidebar-logo">
+                  <span className="font-serif text-lg font-bold tracking-tight text-sidebar-primary leading-none block select-none">
+                    Aster & Spruce
+                  </span>
+                </Link>
+                <span className="text-[9px] font-semibold tracking-[0.18em] uppercase text-sidebar-foreground/35 mt-0.5 block select-none">
+                  Living
+                </span>
+              </div>
             </SheetTitle>
           </SheetHeader>
           <SidebarNav onNavigate={() => setDrawerOpen(false)} />

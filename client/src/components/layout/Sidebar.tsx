@@ -69,11 +69,11 @@ export function SidebarNav({ onNavigate, compact = false }: SidebarNavProps) {
       <Link href={path} onClick={onNavigate} data-testid={testId}>
         <div
           className={cn(
-            "flex items-center gap-3 rounded-lg text-sm transition-colors cursor-pointer",
+            "flex items-center gap-3 rounded-sm text-sm transition-colors cursor-pointer",
             compact ? "px-2 py-2 justify-center" : "px-3 py-2",
             active
-              ? "bg-primary/10 text-primary font-medium"
-              : "text-muted-foreground hover:bg-accent hover:text-foreground"
+              ? "bg-sidebar-accent text-sidebar-primary font-semibold"
+              : "text-sidebar-foreground/65 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
           )}
         >
           <Icon className="h-4 w-4 shrink-0" />
@@ -108,7 +108,7 @@ export function SidebarNav({ onNavigate, compact = false }: SidebarNavProps) {
       <button
         onClick={onClick}
         className={cn(
-          "flex items-center gap-3 rounded-lg text-sm text-muted-foreground hover:bg-accent hover:text-foreground transition-colors cursor-pointer w-full text-left",
+          "flex items-center gap-3 rounded-sm text-sm text-sidebar-foreground/50 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground transition-colors cursor-pointer w-full text-left",
           compact ? "px-2 py-2 justify-center" : "px-3 py-2"
         )}
         data-testid={testId}
@@ -136,12 +136,12 @@ export function SidebarNav({ onNavigate, compact = false }: SidebarNavProps) {
           {Object.entries(grouped).map(([group, groupItems]) => (
             <div key={group} className="mb-4">
               {group !== "Projects" && !compact && (
-                <p className="px-3 mb-1 text-[10px] font-semibold tracking-widest uppercase text-muted-foreground/60">
+                <p className="px-3 mb-1.5 text-[9px] font-semibold tracking-[0.14em] uppercase text-sidebar-foreground/35 select-none">
                   {group}
                 </p>
               )}
               {group !== "Projects" && compact && (
-                <div className="h-px bg-border/40 mx-1 mb-2" />
+                <div className="h-px bg-sidebar-border/50 mx-1 mb-2" />
               )}
               <div className="flex flex-col gap-0.5">
                 {groupItems.map((item) => (
@@ -169,7 +169,7 @@ export function SidebarNav({ onNavigate, compact = false }: SidebarNavProps) {
           ))}
         </div>
 
-        <div className={cn("border-t border-border/40 py-3 flex flex-col gap-0.5", compact ? "px-1" : "px-3")}>
+        <div className={cn("border-t border-sidebar-border/50 py-3 flex flex-col gap-0.5", compact ? "px-1" : "px-3")}>
           <FooterButton
             icon={BookOpen}
             label="Take the Tour"
@@ -194,16 +194,33 @@ export function DesktopSidebar() {
   return (
     <>
       <aside
-        className="hidden md:flex lg:hidden flex-col w-14 shrink-0 border-r border-border/60 bg-background overflow-y-auto"
+        className="hidden md:flex lg:hidden flex-col w-14 shrink-0 border-r border-sidebar-border bg-sidebar overflow-y-auto"
         data-testid="sidebar-tablet"
       >
+        <div className="flex items-center justify-center h-14 shrink-0 border-b border-sidebar-border/50">
+          <Link href="/" data-testid="link-sidebar-logo-compact">
+            <span className="font-serif text-sm font-bold tracking-tight text-sidebar-primary select-none">
+              A
+            </span>
+          </Link>
+        </div>
         <SidebarNav compact={true} />
       </aside>
 
       <aside
-        className="hidden lg:flex flex-col w-56 shrink-0 border-r border-border/60 bg-background overflow-y-auto"
+        className="hidden lg:flex flex-col w-56 shrink-0 border-r border-sidebar-border bg-sidebar overflow-y-auto"
         data-testid="sidebar-desktop"
       >
+        <div className="flex flex-col px-5 py-4 shrink-0 border-b border-sidebar-border/50">
+          <Link href="/" data-testid="link-sidebar-logo">
+            <span className="font-serif text-lg font-bold tracking-tight text-sidebar-primary leading-none select-none">
+              Aster & Spruce
+            </span>
+          </Link>
+          <span className="text-[9px] font-semibold tracking-[0.18em] uppercase text-sidebar-foreground/35 mt-0.5 select-none">
+            Living
+          </span>
+        </div>
         <SidebarNav compact={false} />
       </aside>
     </>
