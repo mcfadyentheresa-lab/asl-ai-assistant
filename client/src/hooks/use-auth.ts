@@ -7,14 +7,20 @@ async function fetchUser(): Promise<User | null> {
   });
 
   if (response.status === 401) {
+    localStorage.removeItem("userRole");
     return null;
   }
 
   if (!response.ok) {
+    localStorage.removeItem("userRole");
     throw new Error(`${response.status}: ${response.statusText}`);
   }
 
-  return response.json();
+  const user: User = await response.json();
+  if (user?.role) {
+    localStorage.setItem("userRole", user.role);
+  }
+  return user;
 }
 
 async function logout(): Promise<void> {

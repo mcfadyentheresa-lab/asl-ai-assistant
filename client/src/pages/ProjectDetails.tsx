@@ -110,6 +110,8 @@ export default function ProjectDetails() {
     if (tab === "checklist") return "checklist";
     if (tab === "photos") return "photos";
     if (tab === "documents") return "documents";
+    const cachedRole = localStorage.getItem("userRole");
+    if (cachedRole === "admin" || cachedRole === "crew") return "checklist";
     return "overview";
   });
   const [editingPhoneUserId, setEditingPhoneUserId] = useState<string | null>(null);
@@ -132,17 +134,6 @@ export default function ProjectDetails() {
   const { viewMode } = useViewMode();
   const actualRole = user?.role || "client";
   const userRole = actualRole === "admin" ? viewMode : actualRole;
-
-  const [tabDefaulted, setTabDefaulted] = useState(false);
-  useEffect(() => {
-    if (tabDefaulted || !user) return;
-    const params = new URLSearchParams(window.location.search);
-    const actualUserRole = user.role as string;
-    if (!params.has("tab") && activeTab === "overview" && (actualUserRole === "admin" || actualUserRole === "crew")) {
-      setActiveTab("checklist");
-    }
-    setTabDefaulted(true);
-  }, [user, tabDefaulted, activeTab]);
 
   const [seenLocally, setSeenLocally] = useState<Set<number>>(new Set());
 
