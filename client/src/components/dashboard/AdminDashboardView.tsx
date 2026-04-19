@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 import { ProjectCard } from "@/components/project/ProjectCard";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, History, ArrowRight } from "lucide-react";
+import { Plus, History, ArrowRight, Image } from "lucide-react";
 import { FolderOpen, Briefcase } from "lucide-react";
 import { Link } from "wouter";
 import type { Project } from "@shared/schema";
@@ -97,22 +97,39 @@ export function AdminDashboardView({
               >
                 <Link href={`/project/${project.id}`} data-testid={`link-recent-project-${project.id}`}>
                   <div
-                    className="group flex flex-col gap-2 p-3.5 rounded-xl border border-border/60 bg-card hover:bg-muted/30 hover:border-border transition-colors cursor-pointer"
+                    className="group flex flex-col rounded-xl border border-border/60 bg-card hover:bg-muted/30 hover:border-border transition-colors cursor-pointer overflow-hidden"
                     data-testid={`card-recent-project-${project.id}`}
                   >
-                    <div className="flex items-start justify-between gap-2">
-                      <span className="text-sm font-medium text-foreground leading-snug line-clamp-2" data-testid={`text-recent-project-name-${project.id}`}>
-                        {project.name}
-                      </span>
-                      <ArrowRight className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    {project.thumbnailUrl ? (
+                      <img
+                        src={project.thumbnailUrl}
+                        alt={project.name}
+                        className="w-full h-24 object-cover"
+                        data-testid={`img-recent-thumbnail-${project.id}`}
+                      />
+                    ) : (
+                      <div
+                        className="w-full h-24 bg-muted/40 flex items-center justify-center"
+                        data-testid={`placeholder-recent-thumbnail-${project.id}`}
+                      >
+                        <Image className="h-6 w-6 text-muted-foreground/30" />
+                      </div>
+                    )}
+                    <div className="flex flex-col gap-2 p-3.5">
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="text-sm font-medium text-foreground leading-snug line-clamp-2" data-testid={`text-recent-project-name-${project.id}`}>
+                          {project.name}
+                        </span>
+                        <ArrowRight className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                      <Badge
+                        variant={statusVariant[project.status] ?? "secondary"}
+                        className="w-fit text-[10px] px-1.5 py-0 h-5 no-default-hover-elevate"
+                        data-testid={`badge-recent-status-${project.id}`}
+                      >
+                        {statusLabel[project.status] || project.status}
+                      </Badge>
                     </div>
-                    <Badge
-                      variant={statusVariant[project.status] ?? "secondary"}
-                      className="w-fit text-[10px] px-1.5 py-0 h-5 no-default-hover-elevate"
-                      data-testid={`badge-recent-status-${project.id}`}
-                    >
-                      {statusLabel[project.status] || project.status}
-                    </Badge>
                   </div>
                 </Link>
               </motion.div>
