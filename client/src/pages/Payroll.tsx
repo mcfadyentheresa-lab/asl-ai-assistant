@@ -217,6 +217,10 @@ export default function Payroll() {
       <Navbar />
 
       <main className="container py-10 md:py-14 px-6 md:px-10 max-w-5xl mx-auto">
+        <div className="md:hidden flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/60 border border-border/50 text-xs text-muted-foreground mb-4" data-testid="banner-desktop-best">
+          <span>💻</span>
+          <span>Payroll is best viewed on a larger screen for full detail.</span>
+        </div>
         <div className="flex items-center gap-3 mb-6">
           <Link href="/">
             <Button variant="ghost" size="icon" className="h-8 w-8" data-testid="button-back">

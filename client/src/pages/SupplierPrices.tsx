@@ -143,6 +143,10 @@ export default function SupplierPrices() {
     <div className="min-h-screen bg-background">
       <Navbar />
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        <div className="md:hidden flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/60 border border-border/50 text-xs text-muted-foreground mb-4" data-testid="banner-desktop-best">
+          <span>💻</span>
+          <span>Supplier Price Book is best viewed on a larger screen.</span>
+        </div>
         <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
           <div className="flex items-center gap-3">
             <Link href="/">

@@ -2,24 +2,27 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
-import { LogOut, UserCog, User, Palette, ZoomIn, Clock, DollarSign, Users, Store, CalendarDays, Sparkles, Sun, Moon, BookOpen } from "lucide-react";
+import { LogOut, UserCog, User, ZoomIn, Sun, Moon, BookOpen, Menu } from "lucide-react";
 import { useTextZoom } from "@/hooks/use-text-zoom";
 import { Link } from "wouter";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useViewMode } from "@/hooks/use-view-mode";
 import { useTheme } from "next-themes";
 import { WalkthroughModal } from "@/components/WalkthroughModal";
+import { useAppShell } from "@/contexts/app-shell-context";
 
-export function Navbar() {
+interface NavbarShellProps {
+  onMenuToggle?: () => void;
+}
+
+export function NavbarShell({ onMenuToggle }: NavbarShellProps) {
   const { user, logout } = useAuth();
   const { zoom, cycleZoom } = useTextZoom();
   const { viewMode, setViewMode } = useViewMode();
@@ -44,7 +47,6 @@ export function Navbar() {
   if (!user) return null;
 
   const isAdmin = user.role === "admin";
-  const effectiveRole = isAdmin ? viewMode : user.role;
 
   const initials =
     `${(user.firstName || "")[0] || ""}${(user.lastName || "")[0] || ""}`.toUpperCase() || "U";
@@ -52,16 +54,30 @@ export function Navbar() {
   return (
     <>
       <nav
-        className="sticky top-0 z-50 flex items-center justify-between gap-4 px-6 md:px-10 h-16 mobile-landscape:h-10 shrink-0 border-b border-border/60 bg-background/80 backdrop-blur-md"
+        className="sticky top-0 z-50 flex items-center justify-between gap-4 px-4 md:px-6 h-14 shrink-0 border-b border-border/60 bg-background/95 backdrop-blur-md"
         data-testid="navbar"
       >
-        <Link href="/" data-testid="link-home">
-          <span className="font-serif text-xl mobile-landscape:text-base font-bold tracking-tight text-foreground">
-            ASL
-          </span>
-        </Link>
-
         <div className="flex items-center gap-3">
+          {onMenuToggle && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="md:hidden"
+              onClick={onMenuToggle}
+              data-testid="button-mobile-menu"
+              aria-label="Open navigation menu"
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
+          )}
+          <Link href="/" data-testid="link-home">
+            <span className="font-serif text-xl font-bold tracking-tight text-foreground">
+              ASL
+            </span>
+          </Link>
+        </div>
+
+        <div className="flex items-center gap-2">
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -77,18 +93,19 @@ export function Navbar() {
               {theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
             </TooltipContent>
           </Tooltip>
+
           {isAdmin && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" data-testid="button-role-switch">
                   <UserCog className="mr-2 h-4 w-4" />
-                  {viewMode === "admin" ? "Admin" : viewMode === "crew" ? "Crew" : "Client"}
+                  <span className="hidden sm:inline">
+                    {viewMode === "admin" ? "Admin" : viewMode === "crew" ? "Crew" : "Client"}
+                  </span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-40">
-                <DropdownMenuLabel className="text-xs text-muted-foreground">
-                  Switch View
-                </DropdownMenuLabel>
+                <p className="px-2 py-1.5 text-xs text-muted-foreground font-medium">Switch View</p>
                 {(["admin", "crew", "client"] as const).map((role) => (
                   <DropdownMenuItem
                     key={role}
@@ -131,62 +148,6 @@ export function Navbar() {
                   Your Profile
                 </DropdownMenuItem>
               </Link>
-              {effectiveRole === "admin" && (
-                <Link href="/colors">
-                  <DropdownMenuItem data-testid="link-colors">
-                    <Palette className="mr-2 h-4 w-4" />
-                    Colour Portfolio
-                  </DropdownMenuItem>
-                </Link>
-              )}
-              {(effectiveRole === "crew" || effectiveRole === "admin") && (
-                <Link href="/master-calendar">
-                  <DropdownMenuItem data-testid="link-master-calendar">
-                    <CalendarDays className="mr-2 h-4 w-4" />
-                    Master Calendar
-                  </DropdownMenuItem>
-                </Link>
-              )}
-              {(effectiveRole === "crew" || effectiveRole === "admin") && (
-                <Link href="/timesheets">
-                  <DropdownMenuItem data-testid="link-timesheets">
-                    <Clock className="mr-2 h-4 w-4" />
-                    Timesheets
-                  </DropdownMenuItem>
-                </Link>
-              )}
-              {effectiveRole === "admin" && (
-                <Link href="/payroll">
-                  <DropdownMenuItem data-testid="link-payroll">
-                    <DollarSign className="mr-2 h-4 w-4" />
-                    Payroll
-                  </DropdownMenuItem>
-                </Link>
-              )}
-              {effectiveRole === "admin" && (
-                <Link href="/crew-and-trade">
-                  <DropdownMenuItem data-testid="link-crew-and-trade">
-                    <Users className="mr-2 h-4 w-4" />
-                    Crew & Trade
-                  </DropdownMenuItem>
-                </Link>
-              )}
-              {effectiveRole === "admin" && (
-                <Link href="/supplier-prices">
-                  <DropdownMenuItem data-testid="link-supplier-prices">
-                    <Store className="mr-2 h-4 w-4" />
-                    Supplier Prices
-                  </DropdownMenuItem>
-                </Link>
-              )}
-              {effectiveRole === "admin" && (
-                <Link href="/social-media">
-                  <DropdownMenuItem data-testid="link-social-media">
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    Social Media
-                  </DropdownMenuItem>
-                </Link>
-              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={() => setTourOpen(true)}
@@ -205,8 +166,9 @@ export function Navbar() {
                 <ZoomIn className="mr-2 h-4 w-4" />
                 Text Size: {zoom}%
               </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => logout()} data-testid="button-logout">
-                <LogOut className="mr-2" />
+                <LogOut className="mr-2 h-4 w-4" />
                 Sign Out
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -222,4 +184,10 @@ export function Navbar() {
       />
     </>
   );
+}
+
+export function Navbar() {
+  const inShell = useAppShell();
+  if (inShell) return null;
+  return <NavbarShell />;
 }

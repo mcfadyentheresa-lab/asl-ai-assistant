@@ -356,7 +356,11 @@ export default function Dashboard() {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground">No tasks due today. You're all caught up!</p>
+                  <div className="flex flex-col items-center py-6 text-center" data-testid="empty-state-tasks">
+                    <CheckCircle2 className="h-8 w-8 text-muted-foreground/40 mb-2" />
+                    <p className="text-sm font-medium text-foreground">All clear for today</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">No tasks due — check your full assignments below or log your hours.</p>
+                  </div>
                 )}
               </CardContent>
             </Card>

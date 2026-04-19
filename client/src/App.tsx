@@ -8,6 +8,7 @@ import { usePresenceHeartbeat } from "@/hooks/use-presence";
 import { useEffect, useRef } from "react";
 import { Loader2 } from "lucide-react";
 import { ThemeProvider } from "next-themes";
+import { AppShell } from "@/components/layout/AppShell";
 
 function RoleGuard({ component: Component, allowedRoles }: { component: React.ComponentType; allowedRoles: string[] }) {
   const { user } = useAuth();
@@ -96,46 +97,54 @@ function Router() {
     <>
       <OnboardingGuard />
       <Switch>
-        <Route path="/" component={Dashboard} />
         <Route path="/welcome" component={Welcome} />
         <Route path="/invite/:token" component={InviteAccept} />
-        <Route path="/profile" component={Profile} />
-        <Route path="/project/:id" component={ProjectDetails} />
-        <Route path="/project/:id/estimate" component={CostEstimator} />
-        <Route path="/colors">
-          {() => <RoleGuard component={ColorPortfolio} allowedRoles={["admin", "crew"]} />}
+        <Route>
+          {() => (
+            <AppShell>
+              <Switch>
+                <Route path="/" component={Dashboard} />
+                <Route path="/profile" component={Profile} />
+                <Route path="/project/:id" component={ProjectDetails} />
+                <Route path="/project/:id/estimate" component={CostEstimator} />
+                <Route path="/colors">
+                  {() => <RoleGuard component={ColorPortfolio} allowedRoles={["admin", "crew"]} />}
+                </Route>
+                <Route path="/timesheets">
+                  {() => <RoleGuard component={Timesheets} allowedRoles={["admin", "crew"]} />}
+                </Route>
+                <Route path="/payroll">
+                  {() => <RoleGuard component={Payroll} allowedRoles={["admin"]} />}
+                </Route>
+                <Route path="/crew-and-trade">
+                  {() => <RoleGuard component={CrewAndTrade} allowedRoles={["admin", "crew"]} />}
+                </Route>
+                <Route path="/labor-rates">
+                  {() => <RoleGuard component={CrewAndTrade} allowedRoles={["admin", "crew"]} />}
+                </Route>
+                <Route path="/trade-contacts">
+                  {() => <RoleGuard component={CrewAndTrade} allowedRoles={["admin", "crew"]} />}
+                </Route>
+                <Route path="/market-rates">
+                  {() => <RoleGuard component={CrewAndTrade} allowedRoles={["admin", "crew"]} />}
+                </Route>
+                <Route path="/supplier-prices">
+                  {() => <RoleGuard component={SupplierPrices} allowedRoles={["admin"]} />}
+                </Route>
+                <Route path="/master-calendar">
+                  {() => <RoleGuard component={MasterCalendar} allowedRoles={["admin", "crew"]} />}
+                </Route>
+                <Route path="/social-media">
+                  {() => <RoleGuard component={SocialMediaGenerator} allowedRoles={["admin"]} />}
+                </Route>
+                <Route path="/table-redesign">
+                  {() => <RoleGuard component={TableRedesignPlanner} allowedRoles={["admin"]} />}
+                </Route>
+                <Route component={NotFound} />
+              </Switch>
+            </AppShell>
+          )}
         </Route>
-        <Route path="/timesheets">
-          {() => <RoleGuard component={Timesheets} allowedRoles={["admin", "crew"]} />}
-        </Route>
-        <Route path="/payroll">
-          {() => <RoleGuard component={Payroll} allowedRoles={["admin"]} />}
-        </Route>
-        <Route path="/crew-and-trade">
-          {() => <RoleGuard component={CrewAndTrade} allowedRoles={["admin", "crew"]} />}
-        </Route>
-        <Route path="/labor-rates">
-          {() => <RoleGuard component={CrewAndTrade} allowedRoles={["admin", "crew"]} />}
-        </Route>
-        <Route path="/trade-contacts">
-          {() => <RoleGuard component={CrewAndTrade} allowedRoles={["admin", "crew"]} />}
-        </Route>
-        <Route path="/market-rates">
-          {() => <RoleGuard component={CrewAndTrade} allowedRoles={["admin", "crew"]} />}
-        </Route>
-        <Route path="/supplier-prices">
-          {() => <RoleGuard component={SupplierPrices} allowedRoles={["admin"]} />}
-        </Route>
-        <Route path="/master-calendar">
-          {() => <RoleGuard component={MasterCalendar} allowedRoles={["admin", "crew"]} />}
-        </Route>
-        <Route path="/social-media">
-          {() => <RoleGuard component={SocialMediaGenerator} allowedRoles={["admin"]} />}
-        </Route>
-        <Route path="/table-redesign">
-          {() => <RoleGuard component={TableRedesignPlanner} allowedRoles={["admin"]} />}
-        </Route>
-        <Route component={NotFound} />
       </Switch>
     </>
   );

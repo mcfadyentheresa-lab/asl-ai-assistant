@@ -470,6 +470,10 @@ export default function CostEstimator() {
     <div className="min-h-screen bg-background">
       <Navbar />
       <div className="max-w-6xl mx-auto px-4 py-6 space-y-6">
+        <div className="md:hidden flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/60 border border-border/50 text-xs text-muted-foreground" data-testid="banner-desktop-best">
+          <span>💻</span>
+          <span>This tool is best experienced on a larger screen.</span>
+        </div>
         <div className="flex items-center gap-3">
           <Link href={`/project/${projectId}`}>
             <Button variant="ghost" size="sm" data-testid="button-back-to-project">
