@@ -1464,7 +1464,7 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
         </div>
       )}
 
-      <Card className={`flex items-center gap-1 p-1.5 mb-3 flex-wrap ${(!selectedBoardId || isLoadingData) && boards.length > 0 ? "invisible" : ""} ${boards.length === 0 ? "hidden" : ""}`} data-testid="planning-board-toolbar">
+      <Card className={`hidden sm:flex items-center gap-1 p-1.5 mb-3 flex-wrap ${(!selectedBoardId || isLoadingData) && boards.length > 0 ? "invisible" : ""} ${boards.length === 0 ? "!hidden" : ""}`} data-testid="planning-board-toolbar">
         {!isViewOnly && toolBtn("select", <MousePointer2 className="h-4 w-4" />, "Select (V)")}
         {!isViewOnly && toolBtn("draw", <Pencil className="h-4 w-4" />, "Draw / Sketch")}
         {!isViewOnly && toolBtn("eraser", <Eraser className="h-4 w-4" />, "Eraser")}
