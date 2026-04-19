@@ -70,6 +70,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { format, formatDistanceToNow } from "date-fns";
 import CalendarPanel from "@/components/CalendarPanel";
+import { ProjectProgressSummary } from "@/components/project/ProjectProgressSummary";
 import type { ChecklistItem, BoardItem, Task } from "@shared/schema";
 
 function formatCurrency(amount: number): string {
@@ -954,11 +955,11 @@ export default function ProjectDetails() {
   const tabConfig: TabConfig[] = [
     { id: "overview", label: "Overview", icon: Clock, roles: ["admin", "crew", "client"] },
     { id: "checklist", label: "Progress", icon: BarChart3, roles: ["admin", "crew", "client"] },
-    { id: "board", label: "Planning Board", icon: Palette, roles: ["admin", "crew", "client"], clientRequiresInvite: true },
-    { id: "furniture", label: "Furniture", icon: Armchair, roles: ["admin"] },
     { id: "photos", label: "Photos", icon: ImageIcon, roles: ["admin", "crew", "client"] },
     { id: "docs", label: "Documents", icon: FileText, roles: ["admin", "client"] },
     { id: "chat", label: "Messages", icon: MessageSquare, roles: ["admin", "crew", "client"] },
+    { id: "board", label: "Planning Board", icon: Palette, roles: ["admin", "crew", "client"], clientRequiresInvite: true },
+    { id: "furniture", label: "Furniture", icon: Armchair, roles: ["admin"] },
   ];
 
   const canViewTab = (tab: TabConfig) => {
@@ -1058,6 +1059,12 @@ export default function ProjectDetails() {
           <TabsContent value="overview" className="space-y-8">
             <div className="grid md:grid-cols-3 gap-8">
               <div className="md:col-span-2 space-y-5">
+                <ProjectProgressSummary
+                  projectId={projectId}
+                  milestones={milestones}
+                  userRole={userRole}
+                  onNavigateToTimeline={() => setActiveTab("checklist")}
+                />
                 <Card data-testid="card-project-overview">
                   <div className="p-4 space-y-3">
                     <div className="flex items-center justify-between">
