@@ -190,6 +190,31 @@ export function SidebarNav({ onNavigate, compact = false }: SidebarNavProps) {
   );
 }
 
+function AslMonogram({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className={className}
+      aria-label="Aster & Spruce Living"
+    >
+      {/* Central stem */}
+      <path d="M12 22V6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+      {/* Top bud */}
+      <circle cx="12" cy="4" r="2" fill="currentColor" />
+      {/* Lower left leaf */}
+      <path d="M12 17C12 17 5 14 6 8.5C9.5 10 12 13.5 12 17Z" fill="currentColor" />
+      {/* Lower right leaf */}
+      <path d="M12 17C12 17 19 14 18 8.5C14.5 10 12 13.5 12 17Z" fill="currentColor" />
+      {/* Upper left leaf */}
+      <path d="M12 11.5C12 11.5 6.5 9 7.5 4.5C10.5 6 12 9 12 11.5Z" fill="currentColor" />
+      {/* Upper right leaf */}
+      <path d="M12 11.5C12 11.5 17.5 9 16.5 4.5C13.5 6 12 9 12 11.5Z" fill="currentColor" />
+    </svg>
+  );
+}
+
 export function DesktopSidebar() {
   return (
     <>
@@ -199,9 +224,7 @@ export function DesktopSidebar() {
       >
         <div className="flex items-center justify-center h-14 shrink-0 border-b border-sidebar-border/50">
           <Link href="/" data-testid="link-sidebar-logo-compact">
-            <span className="font-serif text-sm font-bold tracking-tight text-sidebar-primary select-none">
-              A
-            </span>
+            <AslMonogram className="h-7 w-7 text-sidebar-primary" />
           </Link>
         </div>
         <SidebarNav compact={true} />
