@@ -72,802 +72,10 @@ import { useRecentProjects } from "@/hooks/use-recent-projects";
 import { format, formatDistanceToNow } from "date-fns";
 import CalendarPanel from "@/components/CalendarPanel";
 import { ProjectProgressSummary } from "@/components/project/ProjectProgressSummary";
+import { BudgetSnapshot } from "@/components/project/BudgetSnapshot";
+import { ProjectSidebarCards } from "@/components/project/ProjectSidebarCards";
+import { ProgressTab } from "@/components/project/ProgressTab";
 import type { ChecklistItem, BoardItem, Task } from "@shared/schema";
-
-function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat("en-CA", { style: "currency", currency: "CAD", minimumFractionDigits: 2 }).format(amount);
-}
-
-interface BudgetSummaryResponse {
-  hidden: boolean;
-  budget?: number;
-  totalSpent?: number;
-  status?: "no_budget" | "on_track" | "under_budget" | "over_budget";
-  variancePercent?: number;
-  budgetVisibleToClient?: boolean;
-}
-
-function BudgetSnapshot({ projectId, userRole }: { projectId: number; userRole: string }) {
-  const { toast } = useToast();
-  const { data, isLoading } = useQuery<BudgetSummaryResponse>({
-    queryKey: ["/api/projects", projectId, "budget-summary"],
-    queryFn: async () => {
-      const res = await fetch(`/api/projects/${projectId}/budget-summary`, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch budget summary");
-      return res.json();
-    },
-  });
-
-  const toggleVisibility = useMutation({
-    mutationFn: async (visible: boolean) => {
-      const res = await apiRequest("PATCH", `/api/projects/${projectId}/budget-visibility`, { visible });
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "budget-summary"] });
-      toast({ title: data?.budgetVisibleToClient ? "Budget hidden from client" : "Budget visible to client" });
-    },
-    onError: () => toast({ title: "Failed to toggle visibility", variant: "destructive" }),
-  });
-
-  if (isLoading) {
-    return (
-      <Card>
-        <CardContent className="py-6 flex justify-center">
-          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" data-testid="loader-budget" />
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (!data) return null;
-
-  if (userRole === "crew") return null;
-
-  const budgetVisibleToClient = data.budgetVisibleToClient ?? false;
-  if (userRole === "client" && !budgetVisibleToClient) return null;
-
-  const budget = data.budget ?? 0;
-  const totalSpent = data.totalSpent ?? 0;
-  const status = data.status ?? "no_budget";
-  const variancePercent = data.variancePercent ?? 0;
-
-  if (budget === 0 && status === "no_budget") {
-    return (
-      <Card data-testid="card-budget-snapshot-empty">
-        <CardHeader className="pb-2">
-          <CardTitle className="font-serif text-lg flex items-center gap-2" data-testid="text-budget-heading">
-            <DollarSign className="h-4 w-4" /> Budget Snapshot
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm text-muted-foreground">No budget set yet.</p>
-          {userRole === "admin" && (
-            <Link href={`/project/${projectId}/estimate`}>
-              <Button variant="link" size="sm" className="px-0 mt-1" data-testid="link-setup-budget">
-                Set up in Cost Estimator
-              </Button>
-            </Link>
-          )}
-          {userRole === "admin" && (
-            <div className="flex items-center justify-between pt-2 border-t border-border/60">
-              <label htmlFor="budget-visibility-toggle-empty" className="text-xs text-muted-foreground flex items-center gap-1.5">
-                {budgetVisibleToClient ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
-                Visible to client
-              </label>
-              <Switch
-                id="budget-visibility-toggle-empty"
-                checked={budgetVisibleToClient}
-                onCheckedChange={(checked) => toggleVisibility.mutate(checked)}
-                disabled={toggleVisibility.isPending}
-                data-testid="switch-budget-visibility-empty"
-              />
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    );
-  }
-
-  const usedPercent = budget > 0 ? Math.min((totalSpent / budget) * 100, 100) : 0;
-
-  const statusConfig: Record<string, { label: string; color: string; icon: typeof Check; barColor: string }> = {
-    on_track: { label: "On Track", color: "text-green-600", icon: Check, barColor: "bg-green-500" },
-    under_budget: { label: "Under Budget", color: "text-green-600", icon: TrendingDown, barColor: "bg-green-500" },
-    over_budget: { label: "Over Budget", color: "text-red-600", icon: TrendingUp, barColor: "bg-red-500" },
-    no_budget: { label: "No Budget Set", color: "text-muted-foreground", icon: Minus, barColor: "bg-muted-foreground" },
-  };
-  const sc = statusConfig[status] || statusConfig.no_budget;
-  const StatusIcon = sc.icon;
-
-  return (
-    <Card data-testid="card-budget-snapshot">
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <CardTitle className="font-serif text-lg flex items-center gap-2" data-testid="text-budget-heading">
-            <DollarSign className="h-4 w-4" /> Budget Snapshot
-          </CardTitle>
-          <div className={`flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full border ${budgetVisibleToClient ? "bg-sky-500/15 text-sky-700 border-sky-500/30" : sc.color}`} data-testid="badge-budget-status">
-            <StatusIcon className="h-3.5 w-3.5" />
-            {sc.label}
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Budget</p>
-            <p className="text-lg font-semibold tabular-nums" data-testid="text-budget-total">{formatCurrency(budget)}</p>
-          </div>
-          <div>
-            <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Spent</p>
-            <p className="text-lg font-semibold tabular-nums" data-testid="text-budget-spent">{formatCurrency(totalSpent)}</p>
-          </div>
-        </div>
-
-        {budget > 0 && (
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>Budget usage</span>
-              <span className="tabular-nums">{usedPercent.toFixed(0)}%</span>
-            </div>
-            <div className="w-full h-2 rounded-full bg-muted overflow-hidden" data-testid="progress-budget">
-              <div
-                className={`h-full rounded-full transition-all duration-500 ${sc.barColor}`}
-                style={{ width: `${Math.min(usedPercent, 100)}%` }}
-              />
-            </div>
-            {status === "over_budget" && (
-              <p className="text-xs text-red-600 font-medium" data-testid="text-over-budget-warning">
-                {Math.abs(variancePercent).toFixed(1)}% over budget ({formatCurrency(totalSpent - budget)} over)
-              </p>
-            )}
-            {status === "under_budget" && (
-              <p className="text-xs text-green-600" data-testid="text-under-budget-info">
-                {formatCurrency(budget - totalSpent)} remaining
-              </p>
-            )}
-          </div>
-        )}
-
-        {userRole === "admin" && (
-          <div className="flex items-center justify-between pt-2 border-t border-border/60">
-            <label htmlFor="budget-visibility-toggle" className="text-xs text-muted-foreground flex items-center gap-1.5">
-              {budgetVisibleToClient ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
-              Visible to client
-            </label>
-            <Switch
-              id="budget-visibility-toggle"
-              checked={budgetVisibleToClient}
-              onCheckedChange={(checked) => toggleVisibility.mutate(checked)}
-              disabled={toggleVisibility.isPending}
-              data-testid="switch-budget-visibility"
-            />
-          </div>
-        )}
-
-        {userRole === "admin" && (
-          <Link href={`/project/${projectId}/estimate`}>
-            <Button variant="outline" size="sm" className="w-full gap-1.5" data-testid="link-view-cost-estimator">
-              <ExternalLink className="h-3.5 w-3.5" />
-              View in Cost Estimator
-            </Button>
-          </Link>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function SidebarCards({
-  project, user, users, userRole, onlineUsers, planningBoards, assignedClient,
-  activityLog, seenLocally, toast, updateProject, sendTestSms, sendingTestSms,
-  notifyTeam, sendingNotification, showNotifyForm, setShowNotifyForm,
-  notifyMessage, setNotifyMessage, selectedRecipients, setSelectedRecipients,
-  setEditingUser, setProfileForm, setShowAddPerson, setAddPersonForm, setActiveTab, projectId,
-}: any) {
-  const admins = users?.filter((u: any) => u.role === "admin") || [];
-  const crewMembers = users?.filter((u: any) => u.role === "crew") || [];
-  const clients = users?.filter((u: any) => u.role === "client" && u.id === project.clientId) || [];
-  const boardInvitedClients = Array.isArray(planningBoards) ? users?.filter((u: any) =>
-    u.role === "client" && u.id !== project.clientId &&
-    planningBoards.some((b: any) => (b.linkedUserIds || []).includes(u.id))
-  ) || [] : [];
-  const allClients = [...clients, ...boardInvitedClients];
-
-  const [showInviteDialog, setShowInviteDialog] = useState(false);
-  const [inviteForm, setInviteForm] = useState({ firstName: "", lastName: "", email: "", phone: "" });
-
-  const { data: projectInvites } = useQuery({
-    queryKey: ["/api/projects", projectId, "invites"],
-    queryFn: async () => {
-      const res = await fetch(`/api/projects/${projectId}/invites`, { credentials: "include" });
-      if (!res.ok) return [];
-      return res.json();
-    },
-    enabled: userRole === "admin",
-  });
-
-  const inviteClientMutation = useMutation({
-    mutationFn: async (data: typeof inviteForm) => {
-      const res = await apiRequest("POST", `/api/projects/${projectId}/invite-client`, data);
-      return res.json();
-    },
-    onSuccess: () => {
-      toast({ title: "Invite sent", description: "The client will receive an email with their portal link." });
-      setShowInviteDialog(false);
-      setInviteForm({ firstName: "", lastName: "", email: "", phone: "" });
-      qc.invalidateQueries({ queryKey: ["/api/projects", projectId, "invites"] });
-      qc.invalidateQueries({ queryKey: ["/api/users"] });
-    },
-    onError: (err: any) => {
-      toast({ title: "Failed to send invite", description: err.message, variant: "destructive" });
-    },
-  });
-
-  const resendInviteMutation = useMutation({
-    mutationFn: async (inviteId: number) => {
-      const res = await apiRequest("POST", `/api/projects/${projectId}/invites/${inviteId}/resend`);
-      return res.json();
-    },
-    onSuccess: (data: any) => {
-      toast({
-        title: "Invite resent",
-        description: data?.emailSent
-          ? "The client will receive another email with their portal link."
-          : data?.smsSent
-            ? "The client will receive another text message with their portal link."
-            : "Invite resent.",
-      });
-      qc.invalidateQueries({ queryKey: ["/api/projects", projectId, "invites"] });
-    },
-    onError: (err: any) => {
-      toast({ title: "Failed to resend invite", description: err.message, variant: "destructive" });
-    },
-  });
-
-  const deleteInviteMutation = useMutation({
-    mutationFn: async (inviteId: number) => {
-      const res = await apiRequest("DELETE", `/api/projects/${projectId}/invites/${inviteId}`);
-      return res.json();
-    },
-    onSuccess: () => {
-      toast({ title: "Invite deleted", description: "The invite has been removed." });
-      qc.invalidateQueries({ queryKey: ["/api/projects", projectId, "invites"] });
-    },
-    onError: (err: any) => {
-      toast({ title: "Failed to delete invite", description: err.message, variant: "destructive" });
-    },
-  });
-
-  const renderUserRow = (u: any, badge?: string) => (
-    <div key={u.id} className={`space-y-1 ${u.archivedAt ? "opacity-50" : ""}`} data-testid={`access-user-${u.id}`}>
-      <div className="flex items-center gap-2">
-        <div className="relative flex-shrink-0">
-          <Avatar className="h-6 w-6">
-            <AvatarFallback className="text-[10px]">
-              {(u.firstName?.[0] || "").toUpperCase()}{(u.lastName?.[0] || "").toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
-        </div>
-        <div className="min-w-0 flex-1">
-          <span className="text-sm truncate block">
-            {u.firstName} {u.lastName}
-            {u.archivedAt && <Badge variant="outline" className="ml-1 text-[9px] no-default-hover-elevate no-default-active-elevate">Archived</Badge>}
-          </span>
-          <div className="flex items-center gap-1">
-            {u.phone ? (
-              <span className="text-xs text-muted-foreground flex items-center gap-1" data-testid={`text-phone-${u.id}`}>
-                <Phone className="h-3 w-3" />{u.phone}
-              </span>
-            ) : (
-              <span className="text-xs text-muted-foreground/50 italic">No phone</span>
-            )}
-            {userRole === "admin" && (
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-5 w-5 ml-1"
-                data-testid={`button-edit-user-${u.id}`}
-                onClick={() => {
-                  setEditingUser(u);
-                  setProfileForm({
-                    firstName: u.firstName || "",
-                    lastName: u.lastName || "",
-                    email: u.email || "",
-                    phone: u.phone || "",
-                    role: u.role || "client",
-                  });
-                }}
-              >
-                <Pencil className="h-3 w-3" />
-              </Button>
-            )}
-          </div>
-        </div>
-        {badge && <Badge variant="outline" className="ml-auto text-[10px] flex-shrink-0">{badge}</Badge>}
-      </div>
-    </div>
-  );
-
-  const copyInviteLink = async (token: string) => {
-    const link = `${window.location.origin}/invite/${token}`;
-    await navigator.clipboard.writeText(link);
-    toast({ title: "Copied", description: "Invite link copied to clipboard." });
-  };
-
-  const [activityExpanded, setActivityExpanded] = useState(false);
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
-
-  const missedEntries = activityLog?.filter((e: any) =>
-    e.userId !== user?.id && !e.views?.some((v: any) => v.userId === user?.id) && !seenLocally.has(e.id)
-  ) || [];
-  const seenEntries = activityLog?.filter((e: any) =>
-    e.userId === user?.id || e.views?.some((v: any) => v.userId === user?.id) || seenLocally.has(e.id)
-  ) || [];
-
-  const typeStyles: Record<string, { dot: string; tab: string | null; label: string }> = {
-    milestone_created: { dot: "bg-blue-500", tab: "checklist", label: "View Progress" },
-    photo_uploaded: { dot: "bg-emerald-500", tab: "photos", label: "View Photos" },
-    document_uploaded: { dot: "bg-amber-500", tab: "docs", label: "View Documents" },
-    notification_sent: { dot: "bg-purple-500", tab: null, label: "" },
-    message_sent: { dot: "bg-sky-500", tab: "chat", label: "View Chat" },
-    calendar_event_created: { dot: "bg-rose-500", tab: "calendar", label: "View Calendar" },
-    task_created: { dot: "bg-teal-500", tab: "checklist", label: "View Progress" },
-  };
-
-  return (
-    <>
-      {userRole === "admin" && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="font-serif text-base" data-testid="text-client-heading">
-              Assigned Client
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0 space-y-3">
-            {!assignedClient && (
-              <p className="text-muted-foreground text-sm" data-testid="text-no-client">No client assigned</p>
-            )}
-
-            <div className="space-y-2">
-              <Dialog open={showInviteDialog} onOpenChange={setShowInviteDialog}>
-                <DialogTrigger asChild>
-                  <Button variant="outline" size="sm" className="w-full justify-start gap-2 rounded-xl border-border/70 bg-background/70 px-4 py-3.5" data-testid="button-invite-client">
-                    <UserPlus className="h-4 w-4" />
-                    Invite New Client
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-md">
-                  <DialogHeader>
-                    <DialogTitle className="font-serif">Invite Client</DialogTitle>
-                    <DialogDescription>
-                      The client will receive an email with a link to access their project portal. SMS can be used as a backup.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-3 pt-1">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <Label htmlFor="invite-first">First Name</Label>
-                        <Input id="invite-first" value={inviteForm.firstName} onChange={(e) => setInviteForm(f => ({ ...f, firstName: e.target.value }))} placeholder="Theresa" data-testid="input-invite-first" />
-                      </div>
-                      <div className="space-y-1">
-                        <Label htmlFor="invite-last">Last Name</Label>
-                        <Input id="invite-last" value={inviteForm.lastName} onChange={(e) => setInviteForm(f => ({ ...f, lastName: e.target.value }))} placeholder="McFadyen" data-testid="input-invite-last" />
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="invite-email">Email</Label>
-                      <Input id="invite-email" type="email" value={inviteForm.email} onChange={(e) => setInviteForm(f => ({ ...f, email: e.target.value }))} placeholder="client@example.com" data-testid="input-invite-email" />
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="invite-phone">Phone Number (optional)</Label>
-                      <Input id="invite-phone" value={inviteForm.phone} onChange={(e) => setInviteForm(f => ({ ...f, phone: e.target.value }))} placeholder="(705) 555-0123" data-testid="input-invite-phone" />
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        className="flex-1"
-                        onClick={() => inviteClientMutation.mutate(inviteForm)}
-                        disabled={inviteClientMutation.isPending || !inviteForm.firstName.trim() || !inviteForm.lastName.trim() || !inviteForm.email.trim()}
-                        data-testid="button-send-invite"
-                      >
-                        {inviteClientMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
-                        Send Invite
-                      </Button>
-                    </div>
-                  </div>
-                </DialogContent>
-              </Dialog>
-
-              {Array.isArray(projectInvites) && projectInvites.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-[0.18em]">Invites</p>
-                  {projectInvites.map((inv: any) => (
-                    <div key={inv.id} className="rounded-xl border border-border/60 bg-background/60 p-2.5 space-y-1.5" data-testid={`invite-row-${inv.id}`}>
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <div className="truncate font-semibold text-sm text-foreground">{inv.firstName} {inv.lastName}</div>
-                          <div className="mt-0.5 text-xs text-muted-foreground truncate">{inv.email}{inv.phone ? ` • ${inv.phone}` : ""}</div>
-                        </div>
-                      </div>
-                      <div className="flex flex-wrap gap-1.5">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 px-2.5 text-xs"
-                          onClick={() => copyInviteLink(inv.token)}
-                          data-testid={`button-copy-invite-link-${inv.id}`}
-                        >
-                          Copy link
-                        </Button>
-                        {inv.status !== "accepted" && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 px-2.5 text-xs"
-                            onClick={() => resendInviteMutation.mutate(inv.id)}
-                            disabled={resendInviteMutation.isPending}
-                            data-testid={`button-resend-invite-${inv.id}`}
-                          >
-                            Resend
-                          </Button>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 px-2.5 text-xs text-destructive hover:text-destructive"
-                          onClick={() => deleteInviteMutation.mutate(inv.id)}
-                          disabled={deleteInviteMutation.isPending}
-                          data-testid={`button-delete-invite-${inv.id}`}
-                        >
-                          Delete
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {userRole === "admin" && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="font-serif text-lg flex items-center gap-2" data-testid="text-access-heading">
-              <Shield className="h-4 w-4 text-muted-foreground" />
-              Project Access
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div data-testid="access-group-admin">
-              <button
-                className="flex items-center gap-1.5 w-full text-left cursor-pointer select-none"
-                onClick={() => setExpandedGroups(prev => {
-                  const next = new Set(prev);
-                  next.has("admin") ? next.delete("admin") : next.add("admin");
-                  return next;
-                })}
-                data-testid="button-toggle-admins"
-              >
-                <ChevronRight className={`h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 ${expandedGroups.has("admin") ? "rotate-90" : ""}`} />
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Admins ({admins.length})</span>
-              </button>
-              {expandedGroups.has("admin") && (
-                <div className="space-y-3 mt-2 ml-5">
-                  {admins.map((u: any) => renderUserRow(u, "Full access"))}
-                </div>
-              )}
-            </div>
-            <div data-testid="access-group-crew">
-              <button
-                className="flex items-center gap-1.5 w-full text-left cursor-pointer select-none"
-                onClick={() => setExpandedGroups(prev => {
-                  const next = new Set(prev);
-                  next.has("crew") ? next.delete("crew") : next.add("crew");
-                  return next;
-                })}
-                data-testid="button-toggle-crew"
-              >
-                <ChevronRight className={`h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 ${expandedGroups.has("crew") ? "rotate-90" : ""}`} />
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Crew ({crewMembers.length})</span>
-              </button>
-              {expandedGroups.has("crew") && (
-                <div className="space-y-3 mt-2 ml-5">
-                  {crewMembers.length > 0 ? crewMembers.map((u: any) => renderUserRow(u)) : (
-                    <p className="text-xs text-muted-foreground italic">No crew assigned</p>
-                  )}
-                </div>
-              )}
-            </div>
-            <div data-testid="access-group-client">
-              <button
-                className="flex items-center gap-1.5 w-full text-left cursor-pointer select-none"
-                onClick={() => setExpandedGroups(prev => {
-                  const next = new Set(prev);
-                  next.has("client") ? next.delete("client") : next.add("client");
-                  return next;
-                })}
-                data-testid="button-toggle-clients"
-              >
-                <ChevronRight className={`h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 ${expandedGroups.has("client") ? "rotate-90" : ""}`} />
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Clients ({allClients.length})</span>
-              </button>
-              {expandedGroups.has("client") && (
-                <div className="space-y-3 mt-2 ml-5">
-                  {allClients.length > 0 ? allClients.map((u: any) =>
-                    renderUserRow(u, u.id === project.clientId ? "Project owner" : "Board invited")
-                  ) : (
-                    <p className="text-xs text-muted-foreground italic">No client assigned</p>
-                  )}
-                </div>
-              )}
-            </div>
-            {userRole === "admin" && (
-              <div className="pt-2 border-t">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  data-testid="button-add-person"
-                  onClick={() => {
-                    setShowAddPerson(true);
-                    setAddPersonForm({ firstName: "", lastName: "", email: "", phone: "", role: "crew" });
-                  }}
-                >
-                  <Plus className="h-3 w-3 mr-1" />
-                  Add Person
-                </Button>
-              </div>
-            )}
-            {userRole === "admin" && (
-              <div className="pt-2 border-t space-y-2">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">SMS Notifications</p>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    data-testid="button-notify-team"
-                    onClick={() => setShowNotifyForm(!showNotifyForm)}
-                  >
-                    <Send className="h-3 w-3 mr-1" />
-                    Notify Team
-                  </Button>
-                  {userRole === "admin" && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={sendingTestSms}
-                      data-testid="button-send-test-sms"
-                      onClick={() => {
-                        const adminUser = users?.find((u: any) => u.id === user?.id);
-                        const phone = adminUser?.phone;
-                        if (!phone) {
-                          toast({ title: "No phone number", description: "Add your phone number first to receive a test SMS", variant: "destructive" });
-                          return;
-                        }
-                        sendTestSms(phone, {
-                          onSuccess: () => toast({ title: "Test SMS sent", description: `Sent to ${phone}` }),
-                          onError: (err: any) => toast({ title: "SMS failed", description: err.message, variant: "destructive" }),
-                        });
-                      }}
-                    >
-                      {sendingTestSms ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Phone className="h-3 w-3 mr-1" />}
-                      Test SMS
-                    </Button>
-                  )}
-                </div>
-                {showNotifyForm && (() => {
-                  const eligibleRecipients = (users || []).filter(
-                    (u: any) => u.id !== user?.id && (u.role === "admin" || u.role === "crew" || (u.role === "client" && u.id === project?.clientId))
-                  );
-                  const toggleRecipient = (id: string) => {
-                    setSelectedRecipients((prev: string[]) =>
-                      prev.includes(id) ? prev.filter((r: string) => r !== id) : [...prev, id]
-                    );
-                  };
-                  const selectAll = () => {
-                    if (selectedRecipients.length === eligibleRecipients.length) {
-                      setSelectedRecipients([]);
-                    } else {
-                      setSelectedRecipients(eligibleRecipients.map((u: any) => u.id));
-                    }
-                  };
-                  return (
-                    <div className="space-y-3" data-testid="notify-team-form">
-                      <div>
-                        <div className="flex items-center justify-between mb-1.5">
-                          <span className="text-xs font-medium text-muted-foreground">Send to:</span>
-                          <Button variant="ghost" size="sm" className="h-6 text-xs px-2" onClick={selectAll} data-testid="button-select-all-recipients">
-                            {selectedRecipients.length === eligibleRecipients.length ? "Deselect All" : "Select All"}
-                          </Button>
-                        </div>
-                        <div className="flex flex-wrap gap-1.5" data-testid="recipient-list">
-                          {eligibleRecipients.map((u: any) => {
-                            const selected = selectedRecipients.includes(u.id);
-                            const name = `${u.firstName || ""} ${u.lastName || ""}`.trim() || u.email;
-                            const hasPhone = !!u.phone;
-                            return (
-                              <Button
-                                key={u.id}
-                                variant={selected ? "default" : "outline"}
-                                size="sm"
-                                disabled={!hasPhone}
-                                className={`text-xs toggle-elevate ${selected ? "toggle-elevated" : ""}`}
-                                onClick={() => toggleRecipient(u.id)}
-                                data-testid={`recipient-toggle-${u.id}`}
-                              >
-                                {selected && <Check className="h-3 w-3 mr-1" />}
-                                {name}
-                                <span className="ml-1 opacity-60">({u.role})</span>
-                                {!hasPhone && <span className="ml-1 opacity-60">- no phone</span>}
-                              </Button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                      <Textarea
-                        value={notifyMessage}
-                        onChange={(e) => setNotifyMessage(e.target.value.slice(0, 300))}
-                        placeholder="Type a message to send via SMS..."
-                        className="text-sm min-h-[60px]"
-                        data-testid="input-notify-message"
-                      />
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-xs text-muted-foreground">{notifyMessage.length}/300</span>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => { setShowNotifyForm(false); setNotifyMessage(""); setSelectedRecipients([]); }}
-                            data-testid="button-cancel-notify"
-                          >
-                            Cancel
-                          </Button>
-                          <Button
-                            size="sm"
-                            disabled={sendingNotification || !notifyMessage.trim() || selectedRecipients.length === 0}
-                            data-testid="button-send-notify"
-                            onClick={() => {
-                              notifyTeam(
-                                { projectId, message: notifyMessage.trim(), recipientIds: selectedRecipients },
-                                {
-                                  onSuccess: (data: any) => {
-                                    toast({ title: "Notification sent", description: data.message });
-                                    setNotifyMessage("");
-                                    setSelectedRecipients([]);
-                                    setShowNotifyForm(false);
-                                  },
-                                  onError: (err: any) => toast({ title: "Failed to notify", description: err.message, variant: "destructive" }),
-                                }
-                              );
-                            }}
-                          >
-                            {sendingNotification ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Send className="h-3 w-3 mr-1" />}
-                            Send ({selectedRecipients.length})
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })()}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      <Card
-        data-testid="card-recent-activity"
-      >
-        <CardHeader
-          className="cursor-pointer select-none"
-          onClick={() => setActivityExpanded(prev => !prev)}
-        >
-          <CardTitle className="font-serif text-lg flex items-center gap-2 flex-wrap" data-testid="text-activity-heading">
-            Recent Activity
-            {missedEntries.length > 0 && (
-              <Badge variant="destructive" className="text-[10px]" data-testid="badge-missed-count">
-                {missedEntries.length} new
-              </Badge>
-            )}
-            <ChevronDown className={`h-4 w-4 ml-auto text-muted-foreground transition-transform duration-200 ${activityExpanded ? 'rotate-0' : '-rotate-90'}`} />
-          </CardTitle>
-        </CardHeader>
-        {activityExpanded && (
-        <CardContent onClick={(e) => e.stopPropagation()}>
-          <div className="space-y-4">
-            {missedEntries.length > 0 && (
-              <>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider" data-testid="text-missed-label">Missed while you were away</p>
-                {missedEntries.slice(0, 10).map((entry: any) => {
-                  const style = typeStyles[entry.type] || { dot: "bg-muted-foreground", tab: null, label: "" };
-                  const timeAgo = entry.createdAt ? formatDistanceToNow(new Date(entry.createdAt), { addSuffix: true }) : "";
-                  const isClickable = !!style.tab;
-                  return (
-                    <div
-                      key={entry.id}
-                      className={`flex items-start gap-3 text-sm pb-3 border-b last:border-0 last:pb-0 rounded-sm bg-primary/5 p-2 -mx-2 ${isClickable ? "cursor-pointer hover-elevate" : ""}`}
-                      data-testid={`activity-missed-${entry.id}`}
-                      onClick={isClickable ? () => setActiveTab(style.tab!) : undefined}
-                      role={isClickable ? "button" : undefined}
-                      tabIndex={isClickable ? 0 : undefined}
-                    >
-                      <div className="relative mt-1 flex-shrink-0">
-                        <div className={`h-2 w-2 rounded-full ${style.dot}`} />
-                        <span className="absolute -top-1 -right-1 h-1.5 w-1.5 rounded-full bg-destructive" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className="font-medium text-foreground">{entry.title}</p>
-                          <Badge variant="outline" className="text-[9px] py-0 px-1 border-destructive/40 text-destructive" data-testid={`badge-new-${entry.id}`}>NEW</Badge>
-                        </div>
-                        {entry.description && (
-                          <p className="text-muted-foreground text-xs truncate">{entry.description}</p>
-                        )}
-                        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                          <span className="text-muted-foreground text-xs">{timeAgo}</span>
-                          {isClickable && (
-                            <span className="text-xs text-primary/70">{style.label}</span>
-                          )}
-                        </div>
-                      </div>
-                      {isClickable && <ChevronRight className="h-3.5 w-3.5 mt-1 text-muted-foreground flex-shrink-0" />}
-                    </div>
-                  );
-                })}
-                {seenEntries.length > 0 && (
-                  <Separator className="my-2" />
-                )}
-              </>
-            )}
-            {seenEntries.length > 0 && (
-              <>
-                {missedEntries.length > 0 && (
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider" data-testid="text-earlier-label">Earlier</p>
-                )}
-                {seenEntries.slice(0, 8).map((entry: any) => {
-                  const style = typeStyles[entry.type] || { dot: "bg-muted-foreground", tab: null, label: "" };
-                  const timeAgo = entry.createdAt ? formatDistanceToNow(new Date(entry.createdAt), { addSuffix: true }) : "";
-                  const isClickable = !!style.tab;
-                  return (
-                    <div
-                      key={entry.id}
-                      className={`flex items-start gap-3 text-sm pb-3 border-b last:border-0 last:pb-0 ${isClickable ? "cursor-pointer hover-elevate rounded-sm p-1 -mx-1" : ""}`}
-                      data-testid={`activity-seen-${entry.id}`}
-                      onClick={isClickable ? () => setActiveTab(style.tab!) : undefined}
-                      role={isClickable ? "button" : undefined}
-                      tabIndex={isClickable ? 0 : undefined}
-                    >
-                      <div className={`h-2 w-2 mt-1.5 rounded-full ${style.dot} flex-shrink-0`} />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-foreground">{entry.title}</p>
-                        {entry.description && (
-                          <p className="text-muted-foreground text-xs truncate">{entry.description}</p>
-                        )}
-                        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                          <span className="text-muted-foreground text-xs">{timeAgo}</span>
-                          {isClickable && (
-                            <span className="text-xs text-primary/70">{style.label}</span>
-                          )}
-                        </div>
-                      </div>
-                      {isClickable && <ChevronRight className="h-3.5 w-3.5 mt-1 text-muted-foreground flex-shrink-0" />}
-                    </div>
-                  );
-                })}
-              </>
-            )}
-            {missedEntries.length === 0 && seenEntries.length === 0 && (
-              <p className="text-muted-foreground text-sm" data-testid="text-no-activity">No recent activity</p>
-            )}
-          </div>
-        </CardContent>
-        )}
-      </Card>
-    </>
-  );
-}
 
 export default function ProjectDetails() {
   const { id } = useParams();
@@ -905,6 +113,15 @@ export default function ProjectDetails() {
     if (tab === "documents") return "documents";
     return "overview";
   });
+  const [tabDefaulted, setTabDefaulted] = useState(false);
+  useEffect(() => {
+    if (tabDefaulted || !user) return;
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has("tab") && activeTab === "overview" && userRole !== "client") {
+      setActiveTab("checklist");
+    }
+    setTabDefaulted(true);
+  }, [user, userRole]);
   const [editingPhoneUserId, setEditingPhoneUserId] = useState<string | null>(null);
   const [phoneInput, setPhoneInput] = useState("");
   const [showNotifyForm, setShowNotifyForm] = useState(false);
@@ -1065,174 +282,149 @@ export default function ProjectDetails() {
           </div>
 
           <TabsContent value="overview" className="space-y-8">
-            <div className="grid md:grid-cols-3 gap-8">
-              <div className="md:col-span-2 space-y-5">
+            {userRole === "client" ? (
+              <div className="space-y-5">
                 <ProjectProgressSummary
                   projectId={projectId}
                   milestones={milestones}
                   userRole={userRole}
                   onNavigateToTimeline={() => setActiveTab("checklist")}
                 />
-                <Card data-testid="card-project-overview">
-                  <div className="p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Flag className="h-4 w-4 text-primary" />
-                        <h3 className="font-serif text-base font-semibold text-foreground" data-testid="text-project-overview-heading">
-                          Project Overview
-                        </h3>
+                <div className="space-y-6">
+                  <BudgetSnapshot projectId={projectId} userRole={userRole} />
+                  <ProjectSidebarCards
+                    project={project}
+                    user={user}
+                    users={users}
+                    userRole={userRole}
+                    onlineUsers={onlineUsers}
+                    planningBoards={planningBoards}
+                    assignedClient={assignedClient}
+                    activityLog={activityLog}
+                    seenLocally={seenLocally}
+                    toast={toast}
+                    updateProject={updateProject}
+                    sendTestSms={sendTestSms}
+                    sendingTestSms={sendingTestSms}
+                    notifyTeam={notifyTeam}
+                    sendingNotification={sendingNotification}
+                    showNotifyForm={showNotifyForm}
+                    setShowNotifyForm={setShowNotifyForm}
+                    notifyMessage={notifyMessage}
+                    setNotifyMessage={setNotifyMessage}
+                    selectedRecipients={selectedRecipients}
+                    setSelectedRecipients={setSelectedRecipients}
+                    setEditingUser={setEditingUser}
+                    setProfileForm={setProfileForm}
+                    setShowAddPerson={setShowAddPerson}
+                    setAddPersonForm={setAddPersonForm}
+                    setActiveTab={setActiveTab}
+                    projectId={projectId}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="grid md:grid-cols-3 gap-8">
+                <div className="md:col-span-2 space-y-5">
+                  <ProjectProgressSummary
+                    projectId={projectId}
+                    milestones={milestones}
+                    userRole={userRole}
+                    onNavigateToTimeline={() => setActiveTab("checklist")}
+                  />
+                </div>
+
+                <div className="md:hidden mb-4">
+                  <Sheet>
+                    <SheetTrigger asChild>
+                      <Button variant="outline" size="sm" className="w-full" data-testid="button-open-sidebar-drawer">
+                        <PanelRightOpen className="h-4 w-4 mr-2" />
+                        Project Details
+                        {(() => {
+                          const missedCount = activityLog?.filter((e: any) =>
+                            e.userId !== user?.id && !e.views?.some((v: any) => v.userId === user?.id) && !seenLocally.has(e.id)
+                          ).length || 0;
+                          return missedCount > 0 ? (
+                            <Badge variant="destructive" className="ml-2 text-[10px]" data-testid="badge-drawer-missed">{missedCount} new</Badge>
+                          ) : null;
+                        })()}
+                      </Button>
+                    </SheetTrigger>
+                    <SheetContent side="right" className="w-[90vw] sm:max-w-md overflow-y-auto">
+                      <SheetHeader>
+                        <SheetTitle className="font-serif">Project Details</SheetTitle>
+                        <SheetDescription className="sr-only">Project sidebar with client, access, and activity information</SheetDescription>
+                      </SheetHeader>
+                      <div className="space-y-6 mt-4">
+                        <BudgetSnapshot projectId={projectId} userRole={userRole} />
+                        <ProjectSidebarCards
+                          project={project}
+                          user={user}
+                          users={users}
+                          userRole={userRole}
+                          onlineUsers={onlineUsers}
+                          planningBoards={planningBoards}
+                          assignedClient={assignedClient}
+                          activityLog={activityLog}
+                          seenLocally={seenLocally}
+                          toast={toast}
+                          updateProject={updateProject}
+                          sendTestSms={sendTestSms}
+                          sendingTestSms={sendingTestSms}
+                          notifyTeam={notifyTeam}
+                          sendingNotification={sendingNotification}
+                          showNotifyForm={showNotifyForm}
+                          setShowNotifyForm={setShowNotifyForm}
+                          notifyMessage={notifyMessage}
+                          setNotifyMessage={setNotifyMessage}
+                          selectedRecipients={selectedRecipients}
+                          setSelectedRecipients={setSelectedRecipients}
+                          setEditingUser={setEditingUser}
+                          setProfileForm={setProfileForm}
+                          setShowAddPerson={setShowAddPerson}
+                          setAddPersonForm={setAddPersonForm}
+                          setActiveTab={setActiveTab}
+                          projectId={projectId}
+                        />
                       </div>
-                      {milestones && milestones.length > 0 && (
-                        <div className="flex items-center gap-2" data-testid="progress-indicator">
-                          <div className="w-20 h-1.5 rounded-full bg-muted overflow-hidden">
-                            <div
-                              className="h-full rounded-full bg-primary transition-all duration-500"
-                              style={{ width: `${Math.round((milestones.filter((m) => m.completed).length / milestones.length) * 100)}%` }}
-                            />
-                          </div>
-                          <span className="text-xs font-medium text-muted-foreground tabular-nums">
-                            {milestones.filter((m) => m.completed).length}/{milestones.length}
-                          </span>
-                        </div>
-                      )}
-                    </div>
+                    </SheetContent>
+                  </Sheet>
+                </div>
 
-                    {milestones && milestones.length > 0 ? (
-                      <div className="grid gap-2 sm:grid-cols-2" data-testid="project-overview-list">
-                        {milestones.slice(0, 4).map((milestone) => (
-                          <div
-                            key={milestone.id}
-                            className="flex items-start gap-2 rounded-lg border border-border/50 bg-background/70 px-2.5 py-2"
-                            data-testid={`project-overview-item-${milestone.id}`}
-                          >
-                            <div
-                              className={`mt-0.5 shrink-0 h-4 w-4 rounded-full border-[1.5px] flex items-center justify-center ${
-                                milestone.completed
-                                  ? "border-primary bg-primary"
-                                  : "border-muted-foreground/25 bg-background"
-                              }`}
-                            >
-                              {milestone.completed && <Check className="h-2.5 w-2.5 text-primary-foreground" />}
-                            </div>
-                            <div className="min-w-0">
-                              <p className={`text-sm font-medium truncate ${milestone.completed ? "text-muted-foreground line-through" : "text-foreground"}`} data-testid={`text-project-overview-title-${milestone.id}`}>
-                                {milestone.title}
-                              </p>
-                              <p className="text-[11px] text-muted-foreground">
-                                {milestone.completed ? "Completed" : "In progress"}
-                              </p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground py-2" data-testid="text-no-overview">
-                        No project overview items yet.
-                      </p>
-                    )}
-
-                    <button
-                      onClick={() => setShowOpenItemsDrawer(true)}
-                      className="text-xs text-primary hover:underline cursor-pointer"
-                      data-testid="link-view-open-items"
-                    >
-                      View open items →
-                    </button>
-                  </div>
-                </Card>
-
+                <div className="space-y-6 hidden md:block">
+                  <BudgetSnapshot projectId={projectId} userRole={userRole} />
+                  <ProjectSidebarCards
+                    project={project}
+                    user={user}
+                    users={users}
+                    userRole={userRole}
+                    onlineUsers={onlineUsers}
+                    planningBoards={planningBoards}
+                    assignedClient={assignedClient}
+                    activityLog={activityLog}
+                    seenLocally={seenLocally}
+                    toast={toast}
+                    updateProject={updateProject}
+                    sendTestSms={sendTestSms}
+                    sendingTestSms={sendingTestSms}
+                    notifyTeam={notifyTeam}
+                    sendingNotification={sendingNotification}
+                    showNotifyForm={showNotifyForm}
+                    setShowNotifyForm={setShowNotifyForm}
+                    notifyMessage={notifyMessage}
+                    setNotifyMessage={setNotifyMessage}
+                    selectedRecipients={selectedRecipients}
+                    setSelectedRecipients={setSelectedRecipients}
+                    setEditingUser={setEditingUser}
+                    setProfileForm={setProfileForm}
+                    setShowAddPerson={setShowAddPerson}
+                    setAddPersonForm={setAddPersonForm}
+                    setActiveTab={setActiveTab}
+                    projectId={projectId}
+                  />
+                </div>
               </div>
-
-              <div className="md:hidden mb-4">
-                <Sheet>
-                  <SheetTrigger asChild>
-                    <Button variant="outline" size="sm" className="w-full" data-testid="button-open-sidebar-drawer">
-                      <PanelRightOpen className="h-4 w-4 mr-2" />
-                      Project Details
-                      {(() => {
-                        const missedCount = activityLog?.filter((e: any) =>
-                          e.userId !== user?.id && !e.views?.some((v: any) => v.userId === user?.id) && !seenLocally.has(e.id)
-                        ).length || 0;
-                        return missedCount > 0 ? (
-                          <Badge variant="destructive" className="ml-2 text-[10px]" data-testid="badge-drawer-missed">{missedCount} new</Badge>
-                        ) : null;
-                      })()}
-                    </Button>
-                  </SheetTrigger>
-                  <SheetContent side="right" className="w-[90vw] sm:max-w-md overflow-y-auto">
-                    <SheetHeader>
-                      <SheetTitle className="font-serif">Project Details</SheetTitle>
-                      <SheetDescription className="sr-only">Project sidebar with client, access, and activity information</SheetDescription>
-                    </SheetHeader>
-                    <div className="space-y-6 mt-4">
-                      <BudgetSnapshot projectId={projectId} userRole={userRole} />
-                      <SidebarCards
-                        project={project}
-                        user={user}
-                        users={users}
-                        userRole={userRole}
-                        onlineUsers={onlineUsers}
-                        planningBoards={planningBoards}
-                        assignedClient={assignedClient}
-                        activityLog={activityLog}
-                        seenLocally={seenLocally}
-                        toast={toast}
-                        updateProject={updateProject}
-                        sendTestSms={sendTestSms}
-                        sendingTestSms={sendingTestSms}
-                        notifyTeam={notifyTeam}
-                        sendingNotification={sendingNotification}
-                        showNotifyForm={showNotifyForm}
-                        setShowNotifyForm={setShowNotifyForm}
-                        notifyMessage={notifyMessage}
-                        setNotifyMessage={setNotifyMessage}
-                        selectedRecipients={selectedRecipients}
-                        setSelectedRecipients={setSelectedRecipients}
-                        setEditingUser={setEditingUser}
-                        setProfileForm={setProfileForm}
-                        setShowAddPerson={setShowAddPerson}
-                        setAddPersonForm={setAddPersonForm}
-                        setActiveTab={setActiveTab}
-                        projectId={projectId}
-                      />
-                    </div>
-                  </SheetContent>
-                </Sheet>
-              </div>
-
-              <div className="space-y-6 hidden md:block">
-                <BudgetSnapshot projectId={projectId} userRole={userRole} />
-                <SidebarCards
-                  project={project}
-                  user={user}
-                  users={users}
-                  userRole={userRole}
-                  onlineUsers={onlineUsers}
-                  planningBoards={planningBoards}
-                  assignedClient={assignedClient}
-                  activityLog={activityLog}
-                  seenLocally={seenLocally}
-                  toast={toast}
-                  updateProject={updateProject}
-                  sendTestSms={sendTestSms}
-                  sendingTestSms={sendingTestSms}
-                  notifyTeam={notifyTeam}
-                  sendingNotification={sendingNotification}
-                  showNotifyForm={showNotifyForm}
-                  setShowNotifyForm={setShowNotifyForm}
-                  notifyMessage={notifyMessage}
-                  setNotifyMessage={setNotifyMessage}
-                  selectedRecipients={selectedRecipients}
-                  setSelectedRecipients={setSelectedRecipients}
-                  setEditingUser={setEditingUser}
-                  setProfileForm={setProfileForm}
-                  setShowAddPerson={setShowAddPerson}
-                  setAddPersonForm={setAddPersonForm}
-                  setActiveTab={setActiveTab}
-                  projectId={projectId}
-                />
-              </div>
-            </div>
+            )}
           </TabsContent>
 
           <TabsContent value="checklist" className="space-y-8">
@@ -1549,39 +741,6 @@ export default function ProjectDetails() {
 }
 
 const EDITED_TEXT_COLOR = "#b45309";
-
-function ProgressTab({ projectId, milestones, sections, tasks, userRole, subTab, onSubTabChange }: { projectId: number; milestones: any[]; sections: any[]; tasks: any[]; userRole: string; subTab: "gantt" | "calendar"; onSubTabChange: (v: "gantt" | "calendar") => void }) {
-
-  return (
-    <div className="space-y-4" data-testid="progress-tab">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="space-y-0.5">
-          <h2 className="font-serif text-lg font-semibold uppercase tracking-wide text-foreground" data-testid="text-progress-heading">
-            Progress
-          </h2>
-        </div>
-        <div>
-          <Select value={subTab} onValueChange={(value) => onSubTabChange(value as "gantt" | "calendar")}>
-            <SelectTrigger className="h-8 w-full sm:w-32" data-testid="select-progress-view">
-              <SelectValue placeholder="Select view" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="gantt">Timeline</SelectItem>
-              <SelectItem value="calendar">Calendar</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      {subTab === "gantt" && (
-        <GanttChart projectId={projectId} milestones={milestones} sections={sections || []} tasks={tasks} userRole={userRole} />
-      )}
-      {subTab === "calendar" && (
-        <CalendarTab projectId={projectId} />
-      )}
-    </div>
-  );
-}
 
 function ChecklistTab({ projectId, compact = false }: { projectId: number; compact?: boolean }) {
   const { user } = useAuth();
