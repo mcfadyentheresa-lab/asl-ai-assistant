@@ -1439,21 +1439,10 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
         )}
       </div>
 
-      {isMobileView && !mobileEditMode && (
+      {isMobileView && (
         <div className="sm:hidden flex items-start gap-3 px-3 py-2.5 mb-2 rounded-lg bg-muted/60 border border-border/50 text-sm" data-testid="banner-mobile-planning-board">
           <Lock className="h-4 w-4 mt-0.5 shrink-0 text-muted-foreground" />
-          <div className="flex-1 min-w-0">
-            <span className="text-muted-foreground">Full editing is available on desktop. You can pan and zoom to explore the board here.</span>
-            {isAdmin && (
-              <button
-                className="ml-2 text-primary underline-offset-2 hover:underline text-xs font-medium"
-                onClick={() => setMobileEditMode(true)}
-                data-testid="button-enable-mobile-edit"
-              >
-                Enable editing
-              </button>
-            )}
-          </div>
+          <span className="text-muted-foreground">Full editing is available on desktop. You can pan and zoom to explore the board here.</span>
         </div>
       )}
 
@@ -1611,24 +1600,6 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
         {toolBtn("fitScreen", <Maximize className="h-4 w-4" />, "Fit to Screen", fitToScreen, false)}
 
         <Separator orientation="vertical" className="h-6 mx-1" />
-
-        {isMobileView && isAdmin && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                size="icon"
-                variant={mobileEditMode ? "default" : "ghost"}
-                onClick={() => setMobileEditMode((m) => !m)}
-                data-testid="button-mobile-edit-toggle"
-              >
-                {mobileEditMode ? <Lock className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" className="text-xs">
-              {mobileEditMode ? "Lock (view only)" : "Unlock editing"}
-            </TooltipContent>
-          </Tooltip>
-        )}
 
         <Tooltip>
           <TooltipTrigger asChild>

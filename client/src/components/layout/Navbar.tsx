@@ -9,8 +9,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { LogOut, UserCog, User, ZoomIn, Sun, Moon, BookOpen, Menu } from "lucide-react";
-import { useTextZoom } from "@/hooks/use-text-zoom";
+import { LogOut, UserCog, User, Sun, Moon, Menu } from "lucide-react";
 import { Link } from "wouter";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useViewMode } from "@/hooks/use-view-mode";
@@ -24,7 +23,6 @@ interface NavbarShellProps {
 
 export function NavbarShell({ onMenuToggle }: NavbarShellProps) {
   const { user, logout } = useAuth();
-  const { zoom, cycleZoom } = useTextZoom();
   const { viewMode, setViewMode } = useViewMode();
   const { theme, setTheme } = useTheme();
   const [tourOpen, setTourOpen] = useState(false);
@@ -148,24 +146,6 @@ export function NavbarShell({ onMenuToggle }: NavbarShellProps) {
                   Your Profile
                 </DropdownMenuItem>
               </Link>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => setTourOpen(true)}
-                data-testid="button-take-tour"
-              >
-                <BookOpen className="mr-2 h-4 w-4" />
-                Take the Tour
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={(e) => {
-                  e.preventDefault();
-                  cycleZoom();
-                }}
-                data-testid="button-text-zoom"
-              >
-                <ZoomIn className="mr-2 h-4 w-4" />
-                Text Size: {zoom}%
-              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => logout()} data-testid="button-logout">
                 <LogOut className="mr-2 h-4 w-4" />
