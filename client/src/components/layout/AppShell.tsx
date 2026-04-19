@@ -3,6 +3,7 @@ import { AppShellContext } from "@/contexts/app-shell-context";
 import { NavbarShell } from "@/components/layout/Navbar";
 import { DesktopSidebar, SidebarNav } from "@/components/layout/Sidebar";
 import { Link } from "wouter";
+import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import {
   Sheet,
   SheetContent,
@@ -25,10 +26,12 @@ export function AppShell({ children }: AppShellProps) {
         <div className="flex flex-1 overflow-hidden">
           <DesktopSidebar />
 
-          <main className="flex-1 overflow-y-auto" data-testid="app-main-content">
+          <main className="flex-1 overflow-y-auto pb-16 md:pb-0" data-testid="app-main-content">
             {children}
           </main>
         </div>
+
+        <MobileBottomNav />
       </div>
 
       <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
