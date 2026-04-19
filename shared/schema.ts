@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, date, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, date, jsonb, uniqueIndex } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -742,3 +742,15 @@ export type TableRedesignPlan = typeof tableRedesignPlans.$inferSelect;
 export type InsertTableRedesignPlan = z.infer<typeof insertTableRedesignPlanSchema>;
 export type TableRedesignMaterial = typeof tableRedesignMaterials.$inferSelect;
 export type InsertTableRedesignMaterial = z.infer<typeof insertTableRedesignMaterialSchema>;
+
+// Recent Project Views (server-side per-user history)
+export const recentProjectViews = pgTable("recent_project_views", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  projectId: integer("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  viewedAt: timestamp("viewed_at").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("recent_project_views_user_project_idx").on(table.userId, table.projectId),
+]);
+
+export type RecentProjectView = typeof recentProjectViews.$inferSelect;

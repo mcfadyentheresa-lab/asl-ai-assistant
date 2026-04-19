@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 const STORAGE_KEY = "asl_recent_projects";
 const CHANGE_EVENT = "asl_recent_projects_changed";
@@ -19,25 +21,52 @@ function loadRecent(): RecentProject[] {
   }
 }
 
-function saveRecent(projects: RecentProject[]) {
+function saveRecent(projects: RecentProject[], broadcast = true) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
-  window.dispatchEvent(new CustomEvent(CHANGE_EVENT));
+  if (broadcast) {
+    window.dispatchEvent(new CustomEvent(CHANGE_EVENT));
+  }
 }
 
 export function useRecentProjects() {
-  const [recentProjects, setRecentProjects] = useState<RecentProject[]>(loadRecent);
+  const [localProjects, setLocalProjects] = useState<RecentProject[]>(loadRecent);
 
-  const trackProject = useCallback((project: RecentProject) => {
-    setRecentProjects((prev) => {
-      const filtered = prev.filter((p) => p.id !== project.id);
-      const next = [project, ...filtered].slice(0, MAX_RECENT);
-      saveRecent(next);
-      return next;
-    });
-  }, []);
+  const { data: serverProjects, isSuccess } = useQuery<RecentProject[]>({
+    queryKey: ["/api/recent-projects"],
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  });
 
   useEffect(() => {
-    const handleChange = () => setRecentProjects(loadRecent());
+    if (isSuccess && serverProjects) {
+      saveRecent(serverProjects, false);
+      setLocalProjects(serverProjects);
+    }
+  }, [isSuccess, serverProjects]);
+
+  const mutation = useMutation({
+    mutationFn: (projectId: number) =>
+      apiRequest("POST", "/api/recent-projects", { projectId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/recent-projects"] });
+    },
+  });
+
+  const trackProject = useCallback(
+    (project: RecentProject) => {
+      setLocalProjects((prev) => {
+        const filtered = prev.filter((p) => p.id !== project.id);
+        const next = [project, ...filtered].slice(0, MAX_RECENT);
+        saveRecent(next);
+        return next;
+      });
+      mutation.mutate(project.id);
+    },
+    [mutation],
+  );
+
+  useEffect(() => {
+    const handleChange = () => setLocalProjects(loadRecent());
     window.addEventListener(CHANGE_EVENT, handleChange);
     window.addEventListener("storage", handleChange);
     return () => {
@@ -46,5 +75,5 @@ export function useRecentProjects() {
     };
   }, []);
 
-  return { recentProjects, trackProject };
+  return { recentProjects: localProjects, trackProject };
 }

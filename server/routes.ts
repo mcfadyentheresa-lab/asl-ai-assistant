@@ -421,6 +421,34 @@ export async function registerRoutes(
     broadcastProjectChange(Number(req.params.id), ["project"], "deleted", undefined, req.user.claims.sub);
   }));
 
+  // Recent Project Views
+  app.get("/api/recent-projects", isAuthenticated, asyncHandler(async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const recent = await storage.getRecentProjectViews(userId);
+    const dbUser = await authStorage.getUser(userId);
+    if (dbUser?.role === "client") {
+      const clientProjects = await storage.getProjectsByClient(userId);
+      const accessibleIds = new Set(clientProjects.map((p) => p.id));
+      return res.json(recent.filter((r) => accessibleIds.has(r.id)));
+    }
+    res.json(recent);
+  }));
+
+  app.post("/api/recent-projects", isAuthenticated, asyncHandler(async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const parseResult = z.object({ projectId: z.number().int().positive() }).safeParse(req.body);
+    if (!parseResult.success) return res.status(400).json({ message: "Invalid request body", errors: parseResult.error.errors });
+    const { projectId } = parseResult.data;
+    const project = await storage.getProject(projectId);
+    if (!project) return res.status(404).json({ message: "Project not found" });
+    const dbUser = await authStorage.getUser(userId);
+    if (dbUser?.role === "client" && project.clientId !== userId) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    await storage.trackRecentProjectView(userId, projectId);
+    res.json({ success: true });
+  }));
+
   // Client Invites
   const inviteClientSchema = z.object({
     firstName: z.string().min(1).max(100),

@@ -1,6 +1,6 @@
 import { db } from "./db";
 import { 
-  users, projects, milestones, subMilestones, sections, tasks, photos, documents, timeEntries, messages, checklistItems, boardItems, calendarEvents, planningBoards, canvasElements, activityLog, activityViews, paintColors, boardSnapshots, costCategories, marketRates, projectEstimates, estimateItems, receipts, estimateWarnings, crewRates, subcontractors, suppliers, supplierPrices, clientInvites, socialPosts, tableRedesignPlans, tableRedesignMaterials,
+  users, projects, milestones, subMilestones, sections, tasks, photos, documents, timeEntries, messages, checklistItems, boardItems, calendarEvents, planningBoards, canvasElements, activityLog, activityViews, paintColors, boardSnapshots, costCategories, marketRates, projectEstimates, estimateItems, receipts, estimateWarnings, crewRates, subcontractors, suppliers, supplierPrices, clientInvites, socialPosts, tableRedesignPlans, tableRedesignMaterials, recentProjectViews,
   type Project, type Milestone, type SubMilestone, type Section, type Task, type Photo, type Document, type TimeEntry, type Message,
   type ChecklistItem, type BoardItem, type CalendarEvent, type PlanningBoard, type CanvasElement, type ActivityLog, type PaintColor, type BoardSnapshot, type CostCategory, type MarketRate, type ProjectEstimate, type EstimateItem, type Receipt, type EstimateWarning, type CrewRate, type Subcontractor,
   type InsertProject, type InsertMilestone, type InsertSubMilestone, type InsertSection, type InsertTask, type InsertPhoto, type InsertDocument, 
@@ -235,6 +235,10 @@ export interface IStorage {
   getAllMilestonesWithProject(): Promise<(Milestone & { projectName: string; projectColor: string | null })[]>;
   getAllSectionsWithProject(): Promise<(Section & { projectName: string; projectColor: string | null })[]>;
   getAllTasksWithProject(): Promise<(Task & { projectName: string; projectColor: string | null })[]>;
+
+  // Recent Project Views
+  getRecentProjectViews(userId: string): Promise<{ id: number; name: string }[]>;
+  trackRecentProjectView(userId: string, projectId: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1049,6 +1053,40 @@ export class DatabaseStorage implements IStorage {
   }
   async deleteRedesignMaterial(id: number): Promise<void> {
     await db.delete(tableRedesignMaterials).where(eq(tableRedesignMaterials.id, id));
+  }
+
+  // Recent Project Views
+  async getRecentProjectViews(userId: string): Promise<{ id: number; name: string }[]> {
+    const rows = await db
+      .select({ id: projects.id, name: projects.name })
+      .from(recentProjectViews)
+      .innerJoin(projects, eq(recentProjectViews.projectId, projects.id))
+      .where(eq(recentProjectViews.userId, userId))
+      .orderBy(desc(recentProjectViews.viewedAt))
+      .limit(3);
+    return rows;
+  }
+
+  async trackRecentProjectView(userId: string, projectId: number): Promise<void> {
+    await db
+      .insert(recentProjectViews)
+      .values({ userId, projectId, viewedAt: new Date() })
+      .onConflictDoUpdate({
+        target: [recentProjectViews.userId, recentProjectViews.projectId],
+        set: { viewedAt: new Date() },
+      });
+
+    // Prune to keep only the 3 most recent per user
+    const all = await db
+      .select({ id: recentProjectViews.id })
+      .from(recentProjectViews)
+      .where(eq(recentProjectViews.userId, userId))
+      .orderBy(desc(recentProjectViews.viewedAt));
+
+    const toDelete = all.slice(3).map((r) => r.id);
+    if (toDelete.length > 0) {
+      await db.delete(recentProjectViews).where(inArray(recentProjectViews.id, toDelete));
+    }
   }
 }
 
