@@ -292,6 +292,13 @@ export default function ProjectDetails() {
                   userRole={userRole}
                   onNavigateToTimeline={() => setActiveTab("checklist")}
                 />
+                <button
+                  onClick={() => setShowOpenItemsDrawer(true)}
+                  className="text-xs text-primary hover:underline cursor-pointer -mt-1 block"
+                  data-testid="link-view-open-items"
+                >
+                  View open items →
+                </button>
                 <div className="space-y-6">
                   <BudgetSnapshot projectId={projectId} userRole={userRole} />
                   <ProjectSidebarCards
@@ -334,6 +341,13 @@ export default function ProjectDetails() {
                     userRole={userRole}
                     onNavigateToTimeline={() => setActiveTab("checklist")}
                   />
+                  <button
+                    onClick={() => setShowOpenItemsDrawer(true)}
+                    className="text-xs text-primary hover:underline cursor-pointer -mt-1 block"
+                    data-testid="link-view-open-items"
+                  >
+                    View open items →
+                  </button>
                 </div>
 
                 <div className="md:hidden mb-4">
