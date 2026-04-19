@@ -1,9 +1,12 @@
 import { motion } from "framer-motion";
 import { ProjectCard } from "@/components/project/ProjectCard";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Plus, History, ArrowRight } from "lucide-react";
 import { FolderOpen, Briefcase } from "lucide-react";
+import { Link } from "wouter";
 import type { Project } from "@shared/schema";
+import { useRecentProjects } from "@/hooks/use-recent-projects";
 
 interface AdminDashboardViewProps {
   projects: Project[] | undefined;
@@ -19,7 +22,22 @@ interface AdminDashboardViewProps {
   showArchived: boolean;
 }
 
+const statusLabel: Record<string, string> = {
+  planning: "Planning",
+  in_progress: "In Progress",
+  completed: "Completed",
+  archived: "Archived",
+};
+
+const statusVariant: Record<string, "secondary" | "outline" | "default"> = {
+  planning: "secondary",
+  in_progress: "default",
+  completed: "secondary",
+  archived: "outline",
+};
+
 export function AdminDashboardView({
+  projects,
   filteredProjects,
   activeProjects,
   completedProjects,
@@ -31,6 +49,13 @@ export function AdminDashboardView({
   canCreateProjects,
   showArchived,
 }: AdminDashboardViewProps) {
+  const { recentProjects } = useRecentProjects();
+
+  const recentWithData = recentProjects
+    .map((r) => projects?.find((p) => p.id === r.id))
+    .filter((p): p is Project => p !== undefined)
+    .slice(0, 3);
+
   return (
     <div data-testid="admin-dashboard-view">
       <div className="grid grid-cols-3 gap-1.5 sm:gap-2 mb-5" data-testid="admin-stats-strip">
@@ -54,6 +79,47 @@ export function AdminDashboardView({
           <span className="text-[11px] sm:text-xs font-medium text-foreground truncate">{onlineCrew.length} Online</span>
         </div>
       </div>
+
+      {recentWithData.length > 0 && (
+        <div className="mb-8" data-testid="jump-back-in-section">
+          <div className="flex items-center gap-2 mb-3">
+            <History className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="text-xs font-medium tracking-widest uppercase text-muted-foreground">Jump back in</span>
+          </div>
+          <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1">
+            {recentWithData.map((project, idx) => (
+              <motion.div
+                key={project.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.06 }}
+                className="flex-shrink-0 w-56"
+              >
+                <Link href={`/project/${project.id}`} data-testid={`link-recent-project-${project.id}`}>
+                  <div
+                    className="group flex flex-col gap-2 p-3.5 rounded-xl border border-border/60 bg-card hover:bg-muted/30 hover:border-border transition-colors cursor-pointer"
+                    data-testid={`card-recent-project-${project.id}`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="text-sm font-medium text-foreground leading-snug line-clamp-2" data-testid={`text-recent-project-name-${project.id}`}>
+                        {project.name}
+                      </span>
+                      <ArrowRight className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                    <Badge
+                      variant={statusVariant[project.status] ?? "secondary"}
+                      className="w-fit text-[10px] px-1.5 py-0 h-5 no-default-hover-elevate"
+                      data-testid={`badge-recent-status-${project.id}`}
+                    >
+                      {statusLabel[project.status] || project.status}
+                    </Badge>
+                  </div>
+                </Link>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {filteredProjects && filteredProjects.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
