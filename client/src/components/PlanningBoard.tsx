@@ -1464,7 +1464,8 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
         </div>
       )}
 
-      <Card className={`hidden sm:flex items-center gap-1 p-1.5 mb-3 flex-wrap ${(!selectedBoardId || isLoadingData) && boards.length > 0 ? "invisible" : ""} ${boards.length === 0 ? "!hidden" : ""}`} data-testid="planning-board-toolbar">
+      {boards.length > 0 && (
+      <Card className={`hidden sm:flex items-center gap-1 p-1.5 mb-3 flex-wrap ${(!selectedBoardId || isLoadingData) ? "invisible" : ""}`} data-testid="planning-board-toolbar">
         {!isViewOnly && toolBtn("select", <MousePointer2 className="h-4 w-4" />, "Select (V)")}
         {!isViewOnly && toolBtn("draw", <Pencil className="h-4 w-4" />, "Draw / Sketch")}
         {!isViewOnly && toolBtn("eraser", <Eraser className="h-4 w-4" />, "Eraser")}
@@ -1618,6 +1619,7 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
           </TooltipContent>
         </Tooltip>
       </Card>
+      )}
 
       {tool === "sticky" && boards.length > 0 && (
         <div className="flex items-center gap-2 mb-2 px-1" data-testid="sticky-color-bar">
