@@ -17,7 +17,7 @@ import { Navbar } from "@/components/layout/Navbar";
 import SpatialCanvas from "@/components/SpatialCanvas";
 import { FurniturePlannerPanel } from "@/pages/TableRedesignPlanner";
 import GanttChart from "@/components/GanttChart";
-import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, ExternalLink, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, CalendarDays, ChevronLeft, Upload, Download, User, X, Paperclip, ZoomIn, Palette, Shield, Users, Phone, Check, Bell, Archive, ArchiveRestore, PanelRightOpen, MoreVertical, Flag, BarChart3, ArrowUpRight, Building2, Sparkles, Armchair } from "lucide-react";
+import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, ExternalLink, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, ChevronLeft, Upload, Download, X, Paperclip, ZoomIn, Palette, Check, Archive, ArchiveRestore, PanelRightOpen, MoreVertical, Flag, BarChart3, ArrowUpRight, Building2, Sparkles, Armchair } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -63,8 +63,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient as qc } from "@/lib/queryClient";
-import { UserPlus, Mail } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
