@@ -6,15 +6,15 @@ import { useViewMode } from "@/hooks/use-view-mode";
 
 interface ProgressTabProps {
   projectId: number;
-  milestones: any[];
-  sections: any[];
-  tasks: any[];
+  milestones?: any[];
+  sections?: any[];
+  tasks?: any[];
   userRole: string;
   subTab: "gantt" | "calendar";
   onSubTabChange: (v: "gantt" | "calendar") => void;
 }
 
-export function ProgressTab({ projectId, milestones, sections, tasks, userRole, subTab, onSubTabChange }: ProgressTabProps) {
+export function ProgressTab({ projectId, milestones = [], sections = [], tasks = [], userRole, subTab, onSubTabChange }: ProgressTabProps) {
   const { user } = useAuth();
   const { viewMode } = useViewMode();
   const actualRole = user?.role || "client";
