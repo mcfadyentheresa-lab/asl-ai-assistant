@@ -1,0 +1,111 @@
+Implement Phase 1 only for the Aster & Spruce Connect app.
+
+Phase 1 goal:
+Improve navigation and information architecture without changing core business logic, data models, or existing workflows.
+
+Critical rules:
+- Preserve all existing populated data.
+- Do not wipe, reset, or overwrite the database.
+- Do not remove or rename existing schema fields.
+- Do not change existing API endpoints unless absolutely required for UI wiring.
+- Do not introduce destructive migrations.
+- Keep all current functionality working.
+- This phase is UI/navigation focused only.
+- Make changes incrementally and verify behavior after each major change.
+
+What to build in Phase 1:
+1. Add visible navigation for authenticated users
+2. Keep role-aware navigation by user role
+3. Reduce reliance on the avatar dropdown for primary navigation
+4. Improve dashboard wayfinding and empty states
+5. Keep the current visual tone minimal and premium
+
+Primary UX problem to solve:
+Right now, primary navigation is hidden inside the avatar dropdown. That makes the app harder to learn and harder to navigate, especially because the app has many major destinations and role-specific views. Visible navigation is better for discoverability and information architecture in multi-section products. [web:972][web:974][web:979]
+
+Implementation requirements:
+
+A. Navigation structure
+Create a new visible authenticated navigation pattern.
+
+Desktop:
+- Add a left sidebar for primary app navigation
+- Keep the existing top navbar for:
+  - logo / home
+  - theme toggle
+  - notifications if present
+  - role switcher if admin
+  - account/profile dropdown
+
+Mobile:
+- Use a compact collapsible nav or drawer
+- Do not force the full desktop sidebar pattern if it becomes cramped
+- Make sure navigation is still easy to find and use
+
+B. Role-aware nav groups
+Show only relevant items for the current effective role.
+
+Recommended grouping:
+
+Projects
+- Dashboard
+- Master Calendar
+
+Operations
+- Timesheets
+- Payroll
+
+Resources
+- Crew & Trade
+- Supplier Prices
+- Colour Portfolio
+
+Growth
+- Social Media
+
+Personal
+- Profile
+
+Rules:
+- Admin sees all relevant admin routes
+- Crew sees only the routes they are allowed to access
+- Client sees a very simplified navigation, likely:
+  - Dashboard
+  - Project
+  - Profile
+- Preserve all role guards already in place
+- Do not weaken access control
+
+C. Navbar cleanup
+Update Navbar.tsx so that:
+- primary navigation no longer lives only in the avatar dropdown
+- avatar dropdown is reduced to account actions such as:
+  - Profile
+  - Log out
+  - maybe role switcher if that fits better
+- brand/logo still links home
+- preserve dark/light mode toggle
+- preserve existing auth/session behavior
+
+D. Shared nav config
+Create a shared nav configuration if helpful, such as:
+- nav items in one typed array/config object
+- labels, icons, route paths, role visibility, and nav group all defined centrally
+
+This should make navigation easier to maintain and reduce duplication.
+
+E. Empty states and wayfinding
+Improve empty-state UX for key cases:
+- client with no assigned project
+- admin with no projects yet
+- crew with no tasks or no active projects
+
+Each empty state should:
+- explain what is happening
+- explain what to do next
+- feel calm and polished
+- match the Aster & Spruce brand tone
+
+F. Dashboard wayfinding
+Without fully refactoring Dashboard yet, make small Phase 1 improvements to wayfinding:
+- ensure the page clearly shows what role view 

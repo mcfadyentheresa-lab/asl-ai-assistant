@@ -1,0 +1,107 @@
+Implement task #52 only: Visible Navigation + Adaptive Layout
+
+Context:
+This is a live Aster & Spruce Connect app with existing populated data and working role-based behavior.
+This task is a UI and layout improvement only.
+Do not treat this as a rewrite.
+Make safe, incremental, non-destructive changes.
+
+Primary goal:
+Fix the app’s wayfinding and device usability by adding visible role-aware navigation and adaptive desktop/tablet/phone layouts.
+
+Core problems to solve:
+1. Primary navigation is hidden inside the avatar dropdown, which makes the app harder to learn and navigate.
+2. The app currently behaves too much like a squished desktop on phone.
+3. The Planning Board is not helpful on phone and should not try to support full editing there.
+
+Success criteria:
+- Desktop has a persistent left sidebar with grouped, role-aware navigation.
+- Tablet has a compact or collapsible version of the sidebar.
+- Phone has a clear mobile drawer or bottom navigation for core destinations.
+- Navbar becomes account-focused instead of carrying the primary app navigation.
+- Dashboard has polished role-specific empty states.
+- ProjectDetails is more usable on phone through layout adjustments only.
+- Planning Board is view-only or limited on phone, with a clear message that full editing is for desktop/tablet.
+- Dense tools show a “best experienced on desktop” banner on phone instead of feeling broken.
+- All current routes, role guards, auth flows, and data remain intact.
+
+Critical rules:
+- Preserve all existing data.
+- Do not wipe, reset, overwrite, or migrate data destructively.
+- Do not change database schema or API contracts for this task.
+- Do not refactor business logic in a risky way.
+- Do not remove existing routes.
+- Do not weaken access control or role guards.
+- Do not change branding, colors, typography, or tone unless required for layout clarity.
+- Prefer additive changes over destructive ones. [web:1046][web:1001]
+
+Out of scope:
+- Changing API endpoints or data models
+- Full business-logic refactors of Dashboard, ProjectDetails, or SpatialCanvas
+- New features or workflows
+- Full Planning Board editing on mobile
+- Major visual rebrand
+
+Implementation plan:
+
+1. Shared nav config
+Create a typed shared navigation config as the single source of truth for app nav.
+Each nav item should include:
+- label
+- icon
+- path
+- allowed roles
+- nav group
+- visibility rules if needed
+
+Groups:
+- Projects
+- Operations
+- Resources
+- Growth
+- Personal
+
+Role visibility:
+- Admin sees all appropriate groups
+- Crew sees Projects + Operations + Personal and only allowed routes
+- Client sees a simplified set: Dashboard, their project link if applicable, and Profile
+- Preserve all existing role guard behavior in App.tsx
+
+2. AppShell layout
+Create a reusable AppShell layout wrapper for authenticated routes.
+It should render:
+- desktop: persistent left sidebar
+- tablet: compact or collapsible sidebar / icon rail
+- phone: mobile drawer or bottom navigation
+- top navbar in slimmer form
+
+Use this AppShell in App.tsx for authenticated routes only.
+Do not break unauthenticated routes, invite acceptance flow, onboarding flow, or role switching.
+
+3. Navbar cleanup
+Update Navbar.tsx so it no longer carries primary app navigation.
+Navbar should focus on:
+- logo / home
+- theme toggle
+- role switcher (admin)
+- account dropdown
+
+Account dropdown should be reduced to:
+- Profile
+- Sign Out
+
+Preserve auth/session behavior exactly.
+
+4. Sidebar and mobile nav
+Implement role-aware rendering using the shared nav config and effectiveRole.
+Desktop:
+- visible grouped sidebar
+Tablet:
+- compact/collapsible sidebar
+Phone:
+- mobile drawer or bottom tab bar with the most essential nav items
+
+Design guidance:
+- main navigation should be easy to discover
+- mobile should not feel crowded
+- use a left-side drawer for primary mobile navigation if 
