@@ -68,6 +68,7 @@ import { UserPlus, Mail } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
+import { useRecentProjects } from "@/hooks/use-recent-projects";
 import { format, formatDistanceToNow } from "date-fns";
 import CalendarPanel from "@/components/CalendarPanel";
 import { ProjectProgressSummary } from "@/components/project/ProjectProgressSummary";
@@ -886,6 +887,13 @@ export default function ProjectDetails() {
   const { data: onlineUsers } = useOnlineUsers();
   const { viewers } = useProjectRealtime(projectId, user);
   const { toast } = useToast();
+  const { trackProject } = useRecentProjects();
+
+  useEffect(() => {
+    if (project && user?.role !== "client") {
+      trackProject({ id: project.id, name: project.name });
+    }
+  }, [project?.id, project?.name, user?.role]);
 
   const [activeTab, setActiveTab] = useState(() => {
     const params = new URLSearchParams(window.location.search);

@@ -8,7 +8,8 @@ import { useTextZoom } from "@/hooks/use-text-zoom";
 import { useQuery } from "@tanstack/react-query";
 import { getNavItemsForRole, groupNavItems, type NavRole } from "@/lib/nav-config";
 import { WalkthroughModal } from "@/components/WalkthroughModal";
-import { BookOpen, ZoomIn, Home } from "lucide-react";
+import { BookOpen, ZoomIn, Home, Clock } from "lucide-react";
+import { useRecentProjects } from "@/hooks/use-recent-projects";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface SidebarNavProps {
@@ -30,6 +31,8 @@ export function SidebarNav({ onNavigate, compact = false }: SidebarNavProps) {
     queryKey: ["/api/projects"],
     enabled: effectiveRole === "client",
   });
+
+  const { recentProjects } = useRecentProjects();
 
   const clientProject = effectiveRole === "client" && projects && projects.length > 0
     ? projects[0]
@@ -168,6 +171,29 @@ export function SidebarNav({ onNavigate, compact = false }: SidebarNavProps) {
             </div>
           ))}
         </div>
+
+        {effectiveRole !== "client" && recentProjects.length > 0 && (
+          <div className={cn("border-t border-sidebar-border/50 pt-3 pb-1 flex flex-col gap-0.5", compact ? "px-1" : "px-3")}>
+            {!compact && (
+              <p className="px-3 mb-1.5 text-[9px] font-semibold tracking-[0.14em] uppercase text-sidebar-foreground/35 select-none">
+                Recent
+              </p>
+            )}
+            {compact && <div className="h-px bg-sidebar-border/50 mx-1 mb-2" />}
+            <div className="flex flex-col gap-0.5">
+              {recentProjects.map((p) => (
+                <NavLink
+                  key={p.id}
+                  path={`/project/${p.id}`}
+                  icon={Clock}
+                  label={p.name}
+                  active={location.startsWith(`/project/${p.id}`)}
+                  testId={`sidebar-recent-project-${p.id}`}
+                />
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className={cn("border-t border-sidebar-border/50 py-3 flex flex-col gap-0.5", compact ? "px-1" : "px-3")}>
           <FooterButton
