@@ -1,9 +1,11 @@
+import { motion } from "framer-motion";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Clock, CalendarDays, CheckCircle2, Circle, PlayCircle, Calendar } from "lucide-react";
-import type { Task, CalendarEvent } from "@shared/schema";
+import { Clock, CalendarDays, CheckCircle2, Circle, PlayCircle, Calendar, History, ArrowRight, Image } from "lucide-react";
+import type { Task, CalendarEvent, Project } from "@shared/schema";
+import { useRecentProjects } from "@/hooks/use-recent-projects";
 
 type TaskWithProject = Task & { projectName: string };
 type EventWithProject = CalendarEvent & { projectName: string };
@@ -13,14 +15,37 @@ interface CrewDashboardViewProps {
   upcomingEvents: EventWithProject[] | undefined;
   onToggleTaskStatus: (id: number, currentStatus: string) => void;
   isPending: boolean;
+  projects: Project[] | undefined;
 }
+
+const statusLabel: Record<string, string> = {
+  planning: "Planning",
+  in_progress: "In Progress",
+  completed: "Completed",
+  archived: "Archived",
+};
+
+const statusVariant: Record<string, "secondary" | "outline" | "default"> = {
+  planning: "secondary",
+  in_progress: "default",
+  completed: "secondary",
+  archived: "outline",
+};
 
 export function CrewDashboardView({
   myTasks,
   upcomingEvents,
   onToggleTaskStatus,
   isPending,
+  projects,
 }: CrewDashboardViewProps) {
+  const { recentProjects } = useRecentProjects();
+
+  const recentWithData = recentProjects
+    .map((r) => projects?.find((p) => p.id === r.id))
+    .filter((p): p is Project => p !== undefined)
+    .slice(0, 3);
+
   const todayStr = new Date().toISOString().split("T")[0];
   const todayTasks = myTasks?.filter(
     (t) => t.status !== "done" && (t.dueDate === todayStr || (!t.dueDate && t.status === "in_progress"))
@@ -42,6 +67,64 @@ export function CrewDashboardView({
 
   return (
     <div className="space-y-4 mb-8" data-testid="crew-my-day">
+      {recentWithData.length > 0 && (
+        <div className="mb-2" data-testid="crew-jump-back-in-section">
+          <div className="flex items-center gap-2 mb-3">
+            <History className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="text-xs font-medium tracking-widest uppercase text-muted-foreground">Jump back in</span>
+          </div>
+          <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1">
+            {recentWithData.map((project, idx) => (
+              <motion.div
+                key={project.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.06 }}
+                className="flex-shrink-0 w-56"
+              >
+                <Link href={`/project/${project.id}`} data-testid={`link-crew-recent-project-${project.id}`}>
+                  <div
+                    className="group flex flex-col rounded-xl border border-border/60 bg-card hover:bg-muted/30 hover:border-border transition-colors cursor-pointer overflow-hidden"
+                    data-testid={`card-crew-recent-project-${project.id}`}
+                  >
+                    {project.thumbnailUrl ? (
+                      <img
+                        src={project.thumbnailUrl}
+                        alt={project.name}
+                        className="w-full h-24 object-cover"
+                        data-testid={`img-crew-recent-thumbnail-${project.id}`}
+                      />
+                    ) : (
+                      <div
+                        className="w-full h-24 bg-muted/40 flex items-center justify-center"
+                        data-testid={`placeholder-crew-recent-thumbnail-${project.id}`}
+                      >
+                        <Image className="h-6 w-6 text-muted-foreground/30" />
+                      </div>
+                    )}
+                    <div className="flex flex-col gap-2 p-3.5">
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="text-sm font-medium text-foreground leading-snug line-clamp-2" data-testid={`text-crew-recent-project-name-${project.id}`}>
+                          {project.name}
+                        </span>
+                        <ArrowRight className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                      <Badge
+                        variant={statusVariant[project.status] ?? "secondary"}
+                        className="w-fit text-[10px] px-1.5 py-0 h-5 no-default-hover-elevate"
+                        data-testid={`badge-crew-recent-status-${project.id}`}
+                      >
+                        {statusLabel[project.status] || project.status}
+                      </Badge>
+                    </div>
+                  </div>
+                </Link>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center gap-3 flex-wrap">
         <Link href="/timesheets">
           <Button variant="default" size="sm" data-testid="button-crew-timesheets">

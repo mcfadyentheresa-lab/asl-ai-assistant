@@ -265,6 +265,7 @@ export default function Dashboard() {
             upcomingEvents={upcomingEvents}
             onToggleTaskStatus={handleToggleTaskStatus}
             isPending={updateTaskStatus.isPending}
+            projects={projects}
           />
         )}
 
