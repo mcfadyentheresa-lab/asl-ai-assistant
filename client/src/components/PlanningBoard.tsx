@@ -67,8 +67,6 @@ import {
   X,
   Palette,
   Maximize,
-  Hand,
-  Move,
   ChefHat,
   Bath,
   Home,
@@ -157,7 +155,7 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
   const lastPanPoint = useRef<{ x: number; y: number } | null>(null);
   const spaceHeld = useRef(false);
   const [isMobileView, setIsMobileView] = useState(() => window.innerWidth < 640);
-  const [mobileEditMode, setMobileEditMode] = useState(false);
+  const [mobileEditMode, _setMobileEditMode] = useState(false);
   const [showCardDialog, setShowCardDialog] = useState(false);
   const [cardTitle, setCardTitle] = useState("New Column");
   const [cardItems, setCardItems] = useState<CardContentItem[]>([]);
@@ -1026,7 +1024,7 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
         shadow: new fabric.Shadow({ color: "rgba(0,0,0,0.1)", blur: 12, offsetX: 2, offsetY: 4 }),
       });
 
-      const titleBlockHeight = CARD_PAD + titleText.calcTextHeight() + 4 + countText.calcTextHeight() + 20;
+      const _titleBlockHeight = CARD_PAD + titleText.calcTextHeight() + 4 + countText.calcTextHeight() + 20;
       const allObjects = [bg, titleText, countText, ...contentObjects];
 
       const vpt = canvas.viewportTransform!;

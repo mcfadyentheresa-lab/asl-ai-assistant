@@ -51,7 +51,7 @@ export default function SupplierPrices() {
     queryKey: ["/api/cost-categories"],
   });
 
-  const isAdmin = user?.role === "admin";
+  const _isAdmin = user?.role === "admin";
   const [fetchingPriceId, setFetchingPriceId] = useState<number | null>(null);
 
   const activeSupplier = suppliersList.find(s => s.id === selectedSupplierId) || null;

@@ -227,7 +227,7 @@ export function useBoardRealtime(
             break;
           }
         }
-      } catch (_err) {
+      } catch {
         // ignore parse errors
       }
     };

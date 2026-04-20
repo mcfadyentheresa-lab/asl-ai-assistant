@@ -70,7 +70,7 @@ export default function Dashboard() {
   const { data: onlineUsers } = useOnlineUsers();
 
   const isAdmin = user?.role === "admin";
-  const isClient = user?.role === "client";
+  const _isClient = user?.role === "client";
   const effectiveRole = isAdmin ? viewMode : (user?.role || "client");
   const isCrewView = effectiveRole === "crew";
   const isClientView = effectiveRole === "client";

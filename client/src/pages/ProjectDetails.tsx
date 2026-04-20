@@ -10,26 +10,23 @@ import {
   useUsers, useUpdateProject, usePlanningBoards, useUpdateUserPhone, useNotifyTeam,
   useActivityLog, useUpdateMilestone, useSections, useCreateMilestone, useCreateTask,
 } from "@/hooks/use-projects";
-import { useOnlineUsers, isUserOnline } from "@/hooks/use-presence";
+import { useOnlineUsers } from "@/hooks/use-presence";
 import { useViewMode } from "@/hooks/use-view-mode";
 import { useProjectRealtime } from "@/hooks/use-project-realtime";
 import { Navbar } from "@/components/layout/Navbar";
 import SpatialCanvas from "@/components/SpatialCanvas";
 import { FurniturePlannerPanel } from "@/pages/TableRedesignPlanner";
-import GanttChart from "@/components/GanttChart";
-import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, ExternalLink, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, ChevronLeft, Upload, Download, X, Paperclip, ZoomIn, Palette, Check, Archive, ArchiveRestore, PanelRightOpen, MoreVertical, Flag, BarChart3, ArrowUpRight, Building2, Sparkles, Armchair } from "lucide-react";
+import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, Upload, Download, X, Paperclip, ZoomIn, Palette, Check, Archive, ArchiveRestore, PanelRightOpen, MoreVertical, Flag, BarChart3, ArrowUpRight, Building2, Sparkles, Armchair } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Separator } from "@/components/ui/separator";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -61,9 +58,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { useState, useRef, useEffect, useCallback } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { Label } from "@/components/ui/label";
+import { useState, useRef, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { useRecentProjects } from "@/hooks/use-recent-projects";
@@ -72,7 +67,7 @@ import { ProjectProgressSummary } from "@/components/project/ProjectProgressSumm
 import { BudgetSnapshot } from "@/components/project/BudgetSnapshot";
 import { ProjectSidebarCards } from "@/components/project/ProjectSidebarCards";
 import { ProgressTab } from "@/components/project/ProgressTab";
-import type { ChecklistItem, BoardItem, Task } from "@shared/schema";
+import type { ChecklistItem, BoardItem } from "@shared/schema";
 
 export default function ProjectDetails() {
   const { id } = useParams();
@@ -85,8 +80,8 @@ export default function ProjectDetails() {
   const { user } = useAuth();
   const { data: users } = useUsers();
   const { mutate: updateProject } = useUpdateProject();
-  const { mutate: updateMilestone } = useUpdateMilestone();
-  const { mutate: updatePhone } = useUpdateUserPhone();
+  const { mutate: _updateMilestone } = useUpdateMilestone();
+  const { mutate: _updatePhone } = useUpdateUserPhone();
   const { mutate: notifyTeam, isPending: sendingNotification } = useNotifyTeam();
   const { data: onlineUsers } = useOnlineUsers();
   const { viewers } = useProjectRealtime(projectId, user);
@@ -111,8 +106,8 @@ export default function ProjectDetails() {
     if (cachedRole === "admin" || cachedRole === "crew") return "checklist";
     return "overview";
   });
-  const [editingPhoneUserId, setEditingPhoneUserId] = useState<string | null>(null);
-  const [phoneInput, setPhoneInput] = useState("");
+  const [_editingPhoneUserId, _setEditingPhoneUserId] = useState<string | null>(null);
+  const [_phoneInput, _setPhoneInput] = useState("");
   const [showNotifyForm, setShowNotifyForm] = useState(false);
   const [notifyMessage, setNotifyMessage] = useState("");
   const [selectedRecipients, setSelectedRecipients] = useState<string[]>([]);
@@ -773,7 +768,7 @@ function ChecklistTab({ projectId, compact = false }: { projectId: number; compa
   const [selectedRoomId, setSelectedRoomId] = useState<string>("");
 
   const isAdmin = effectiveRole === "admin";
-  const isCrew = effectiveRole === "crew" || effectiveRole === "admin";
+  const _isCrew = effectiveRole === "crew" || effectiveRole === "admin";
 
   const roomsForBuilding = selectedBuildingId
     ? (sectionsForMove || []).filter((s: any) => s.milestoneId === parseInt(selectedBuildingId))
@@ -883,11 +878,11 @@ function ChecklistTab({ projectId, compact = false }: { projectId: number; compa
     );
   };
 
-  const handleNotesChange = (item: ChecklistItem, notes: string) => {
+  const _handleNotesChange = (item: ChecklistItem, notes: string) => {
     updateItem({ id: item.id, notes });
   };
 
-  const handlePriceChange = (item: ChecklistItem, value: string) => {
+  const _handlePriceChange = (item: ChecklistItem, value: string) => {
     const priceEstimate = value ? parseInt(value, 10) : null;
     updateItem({ id: item.id, priceEstimate });
   };
@@ -1511,7 +1506,7 @@ function OpenItemsDrawer({ projectId, open, onOpenChange }: { projectId: number;
   );
 }
 
-function BoardTab({ projectId }: { projectId: number }) {
+function _BoardTab({ projectId }: { projectId: number }) {
   const { toast } = useToast();
   const { data: items, isLoading } = useBoardItems(projectId);
   const { mutate: createItem, isPending: isCreating } = useCreateBoardItem();

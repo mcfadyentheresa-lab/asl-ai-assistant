@@ -15,7 +15,6 @@ import {
   MessageSquare,
   ImageIcon,
   BarChart3,
-  Armchair,
   ChevronLeft,
   ChevronRight,
   X,

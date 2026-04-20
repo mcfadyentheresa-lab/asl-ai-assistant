@@ -12,25 +12,11 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
-import { AlertTriangle, ArrowLeft, Check, ExternalLink, Loader2, Pencil, Plus, Trash2, Upload, Image, Send, Copy, Eye, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Check, ExternalLink, Loader2, Pencil, Plus, Trash2, Upload, Image, Send, Copy, Eye } from "lucide-react";
 import { Link } from "wouter";
 import type { TableRedesignPlan, TableRedesignMaterial } from "@shared/schema";
-
-const PIECE_TYPES = [
-  { value: "table", label: "Table" },
-  { value: "desk", label: "Desk" },
-  { value: "console", label: "Console" },
-  { value: "coffee_table", label: "Coffee Table" },
-];
-
-const TABLE_SHAPES = [
-  { value: "rectangular", label: "Rectangular" },
-  { value: "round", label: "Round" },
-  { value: "oval", label: "Oval" },
-  { value: "square", label: "Square" },
-];
 
 const WEIGHT_CLASSES = [
   { value: "light", label: "Light" },
@@ -45,27 +31,12 @@ const REDESIGN_SCOPES = [
   { value: "full", label: "Full Redesign" },
 ];
 
-const BASE_TYPES = [
-  { value: "pedestal", label: "Pedestal" },
-  { value: "trestle", label: "Trestle" },
-  { value: "four_leg", label: "Four-Leg" },
-  { value: "plinth", label: "Plinth" },
-  { value: "custom", label: "Custom" },
-];
-
 const INTENDED_USES = [
   { value: "dining", label: "Dining" },
   { value: "occasional", label: "Occasional" },
   { value: "display", label: "Display" },
   { value: "high_use", label: "High-Use" },
   { value: "decorative", label: "Decorative" },
-];
-
-const PRIORITY_CONSTRAINTS = [
-  { value: "aesthetic", label: "Aesthetic" },
-  { value: "durability", label: "Durability" },
-  { value: "budget", label: "Budget" },
-  { value: "timeline", label: "Timeline" },
 ];
 
 const APPROVAL_STATUSES = [

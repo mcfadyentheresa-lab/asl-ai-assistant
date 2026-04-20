@@ -24,7 +24,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Search, ArrowLeft, Copy, Check, Star, X, MoreHorizontal, Clipboard, Palette } from "lucide-react";
-import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import type { PaintColor } from "@shared/schema";
@@ -137,7 +136,7 @@ function ColorSwatch({
   );
 }
 
-function ColorDetail({ color, onClose }: { color: PaintColor; onClose: () => void }) {
+function ColorDetail({ color, onClose: _onClose }: { color: PaintColor; onClose: () => void }) {
   const { toast } = useToast();
   const [copied, setCopied] = useState<string | null>(null);
   const textColor = getContrastColor(color.hex);

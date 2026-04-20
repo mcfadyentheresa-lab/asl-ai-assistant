@@ -15,12 +15,11 @@ import {
   UserPlus, Mail, Pencil, Plus, Check, ChevronRight, Shield, Loader2, ChevronDown,
 } from "lucide-react";
 import { apiRequest, queryClient as qc } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
 
 export function ProjectSidebarCards({
-  project, user, users, userRole, onlineUsers, planningBoards, assignedClient,
-  activityLog, seenLocally, toast, updateProject,
+  project, user, users, userRole, onlineUsers: _onlineUsers, planningBoards, assignedClient,
+  activityLog, seenLocally, toast, updateProject: _updateProject,
   notifyTeam, sendingNotification, showNotifyForm, setShowNotifyForm,
   notifyMessage, setNotifyMessage, selectedRecipients, setSelectedRecipients,
   setEditingUser, setProfileForm, setShowAddPerson, setAddPersonForm, setActiveTab, projectId,

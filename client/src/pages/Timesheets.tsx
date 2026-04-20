@@ -28,7 +28,7 @@ import { Link } from "wouter";
 import { format } from "date-fns";
 import type { Project, Milestone, CalendarEvent, TimeEntry } from "@shared/schema";
 
-function getPayPeriod(date: Date) {
+function _getPayPeriod(date: Date) {
   const anchor = new Date(2025, 0, 6);
   const diff = date.getTime() - anchor.getTime();
   const days = Math.floor(diff / (1000 * 60 * 60 * 24));

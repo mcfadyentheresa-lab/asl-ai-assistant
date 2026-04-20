@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { format, parseISO, differenceInDays, addDays, startOfMonth, endOfMonth, eachMonthOfInterval } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -354,7 +354,6 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
   const [dragOverId, setDragOverId] = useState<number | null>(null);
   const [resizePreview, setResizePreview] = useState<{ rowId: number; rowType: BarItem["type"]; startDate: Date; endDate: Date } | null>(null);
 
-  const timelineRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const { mutate: createMilestone, isPending: creatingMilestone } = useCreateMilestone();
   const { mutate: updateMilestone } = useUpdateMilestone();

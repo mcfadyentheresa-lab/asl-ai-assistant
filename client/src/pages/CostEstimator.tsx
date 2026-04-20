@@ -41,7 +41,7 @@ export default function CostEstimator() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const isAdmin = (user as any)?.role === "admin";
-  const isCrew = (user as any)?.role === "crew";
+  const _isCrew = (user as any)?.role === "crew";
   const canEdit = isAdmin;
 
   const [showAddItem, setShowAddItem] = useState(false);
@@ -249,7 +249,7 @@ export default function CostEstimator() {
         ...prev,
         suggestions: prev.suggestions.filter((s: any) => s.itemId !== suggestion.itemId)
       }));
-    } catch (error) {
+    } catch {
       toast({ title: "Failed to apply alternative", variant: "destructive" });
     } finally {
       setApplyingAlt(null);
@@ -432,7 +432,7 @@ export default function CostEstimator() {
         });
       }
       toast({ title: `Receipt scanned — ${lineItems.length} line item(s) extracted` });
-    } catch (error) {
+    } catch {
       toast({ title: "Failed to scan receipt", variant: "destructive" });
     } finally {
       setScanning(false);

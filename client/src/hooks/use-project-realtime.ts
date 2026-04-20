@@ -159,7 +159,7 @@ export function useProjectRealtime(
             break;
           }
         }
-      } catch (_err) {}
+      } catch {}
     };
 
     ws.onclose = () => {

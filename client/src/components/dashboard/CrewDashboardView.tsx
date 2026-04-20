@@ -36,7 +36,7 @@ export function CrewDashboardView({
     }, {});
   }
 
-  function nextStatus(status: string) {
+  function _nextStatus(status: string) {
     return status === "todo" ? "in_progress" : status === "in_progress" ? "done" : "todo";
   }
 

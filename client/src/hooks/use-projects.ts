@@ -177,7 +177,7 @@ export function useCreateMilestone() {
 export function useUpdateMilestone() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, projectId, ...data }: { id: number; projectId: number; title?: string; date?: string | null; startDate?: string | null; endDate?: string | null; completed?: boolean; completedBy?: string | null; order?: number; colorHex?: string | null; paintColorIds?: number[] | null }) => {
+    mutationFn: async ({ id, projectId: _projectId, ...data }: { id: number; projectId: number; title?: string; date?: string | null; startDate?: string | null; endDate?: string | null; completed?: boolean; completedBy?: string | null; order?: number; colorHex?: string | null; paintColorIds?: number[] | null }) => {
       const res = await fetch(`/api/milestones/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -248,7 +248,7 @@ export function useCreateSection() {
 export function useUpdateSection() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, projectId, ...data }: { id: number; projectId: number; title?: string; startDate?: string | null; endDate?: string | null; completed?: boolean; order?: number }) => {
+    mutationFn: async ({ id, projectId: _projectId, ...data }: { id: number; projectId: number; title?: string; startDate?: string | null; endDate?: string | null; completed?: boolean; order?: number }) => {
       const res = await fetch(`/api/sections/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -629,7 +629,7 @@ export function useUpdatePlanningBoard() {
 export function useDeletePlanningBoard() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, projectId }: { id: number; projectId: number }) => {
+    mutationFn: async ({ id, projectId: _projectId }: { id: number; projectId: number }) => {
       const url = buildUrl(api.planningBoards.delete.path, { id });
       const res = await fetch(url, {
         method: "DELETE",
@@ -757,7 +757,7 @@ export function useDeleteCalendarEvent() {
 export function useUploadCalendarEventImage() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ eventId, file, projectId }: { eventId: number; file: File; projectId: number }) => {
+    mutationFn: async ({ eventId, file, projectId: _projectId }: { eventId: number; file: File; projectId: number }) => {
       const formData = new FormData();
       formData.append("image", file);
       const res = await fetch(`/api/calendar/${eventId}/image`, {
@@ -812,7 +812,7 @@ export function useCreatePhoto() {
 export function useDeletePhoto() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, projectId }: { id: number; projectId: number }) => {
+    mutationFn: async ({ id, projectId: _projectId }: { id: number; projectId: number }) => {
       const res = await fetch(`/api/photos/${id}`, {
         method: "DELETE",
         credentials: "include",

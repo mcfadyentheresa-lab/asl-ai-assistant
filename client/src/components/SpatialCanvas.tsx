@@ -7,7 +7,6 @@ import templateFurnitureRefinishingPreview from "@assets/Screenshot_2026-04-09_a
 import templateCollageConceptPreview from "@assets/Screenshot_2026-04-09_at_10.54.53_AM_1775746499391.png";
 import templateMaterialInspirationPreview from "@assets/Screenshot_2026-04-09_at_10.57.06_AM_1775746631248.png";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
@@ -19,11 +18,10 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { format, parseISO } from "date-fns";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Textarea } from "@/components/ui/textarea";
 import {
   StickyNote, Type, ImagePlus, Square, Columns3, Link2, Palette, Trash2, Plus,
-  ZoomIn, ZoomOut, Maximize, Loader2, MoreVertical, Edit3, Download, CheckSquare, GripVertical,
-  X, ChevronDown, ExternalLink, Pencil, Upload, Copy, ArrowUpFromLine,
+  ZoomIn, ZoomOut, Maximize, Loader2, MoreVertical, Edit3, CheckSquare,
+  X, ExternalLink, Pencil, Upload, Copy,
   Bold, Italic, Strikethrough, Underline, List, ListOrdered, Code, Link as LinkIcon,
   Eraser, Undo2, Redo2, Save, PenTool, Sparkles, TypeIcon, Shapes,
   CalendarDays, Milestone, ListChecks, Bell, BellOff,
@@ -255,7 +253,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   const [drawStrokeWidth, setDrawStrokeWidth] = useState(3);
   const [drawingPaths, setDrawingPaths] = useState<any[]>([]);
   const [drawUndoStack, setDrawUndoStack] = useState<any[]>([]);
-  const [isDrawing, setIsDrawing] = useState(false);
+  const [_isDrawing, setIsDrawing] = useState(false);
   const drawCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [aiProcessing, setAiProcessing] = useState(false);
   const autoConvertInFlightRef = useRef(false);
@@ -274,7 +272,6 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     sendElementUpdate,
     sendElementRemove,
     sendElementMove,
-    sendPositionsUpdate,
     sendCursorMove,
   } = useBoardRealtime(selectedBoardId, user);
 
@@ -523,7 +520,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     } catch {}
   };
 
-  const handleDeleteRoomZone = async (id: number) => {
+  const _handleDeleteRoomZone = async (id: number) => {
     const zone = elements[id];
     if (!zone || zone.type !== "room_zone") {
       await handleDeleteElement(id);
@@ -1668,16 +1665,6 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       setEditingId(el.id);
     };
 
-    const dragHandle = (
-      <div
-        className="absolute -top-0 left-0 right-0 h-6 cursor-grab flex items-center justify-center opacity-0 hover:opacity-60 transition-opacity z-10"
-        onMouseDown={(e) => startDrag(el.id, e)}
-        data-testid={`drag-handle-${el.id}`}
-      >
-        <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
-      </div>
-    );
-
     const resizeHandles = (elId: number) => {
       const handleStyle = "absolute opacity-0 hover:opacity-100 transition-opacity z-20";
       const dotStyle = "w-2.5 h-2.5 rounded-full bg-primary/60 border border-primary/80";
@@ -2110,7 +2097,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                 {c.backgroundColor && (
                   <button
                     className="text-[9px] text-muted-foreground hover:text-foreground ml-1"
-                    onClick={(e) => { e.stopPropagation(); const { backgroundColor, ...rest } = c; handleUpdateContent(el.id, rest); }}
+                    onClick={(e) => { e.stopPropagation(); const { backgroundColor: _backgroundColor, ...rest } = c; handleUpdateContent(el.id, rest); }}
                     data-testid={`color-reset-${el.id}`}
                   >
                     <X className="h-3 w-3" />

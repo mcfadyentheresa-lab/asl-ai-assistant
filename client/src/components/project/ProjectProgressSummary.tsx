@@ -1,8 +1,6 @@
 import { Check, Flag, ChevronRight, Clock } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
-import { Link } from "wouter";
 import { cn } from "@/lib/utils";
 
 interface Milestone {
@@ -22,9 +20,9 @@ interface ProjectProgressSummaryProps {
 }
 
 export function ProjectProgressSummary({
-  projectId,
+  projectId: _projectId,
   milestones,
-  userRole,
+  userRole: _userRole,
   onNavigateToTimeline,
 }: ProjectProgressSummaryProps) {
   if (!milestones || milestones.length === 0) return null;

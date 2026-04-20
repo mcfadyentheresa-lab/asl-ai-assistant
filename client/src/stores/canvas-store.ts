@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { CanvasElement, InsertCanvasElement } from "@shared/schema";
+import type { CanvasElement } from "@shared/schema";
 import { api, buildUrl } from "@shared/routes";
 
 type UndoAction =
