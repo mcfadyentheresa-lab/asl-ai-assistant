@@ -5,8 +5,14 @@ import { isAuthenticated } from "./replitAuth";
 // Register auth-specific routes
 export function registerAuthRoutes(app: Express): void {
   // Get current authenticated user
+  // NOTE: Auth is disabled — this returns null so the client knows no user is logged in.
   app.get("/api/auth/user", isAuthenticated, async (req: any, res) => {
     try {
+      // When auth is disabled req.user is not set; return null so the client
+      // can handle the unauthenticated state gracefully.
+      if (!req.user?.claims?.sub) {
+        return res.json(null);
+      }
       const userId = req.user.claims.sub;
       const user = await authStorage.getUser(userId);
       res.json(user);
