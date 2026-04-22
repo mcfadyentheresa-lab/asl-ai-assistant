@@ -1,3 +1,30 @@
+// ─── Environment validation ───────────────────────────────────────────────────
+// Must run BEFORE any imports that touch DATABASE_URL, SESSION_SECRET, or
+// OpenID config so that missing vars produce a clear error instead of a
+// cryptic crash deep inside compiled code.
+const requiredVars = ["DATABASE_URL", "SESSION_SECRET"];
+const missingVars = requiredVars.filter((v) => !process.env[v]);
+if (missingVars.length > 0) {
+  console.error(`FATAL: Missing required environment variables: ${missingVars.join(", ")}`);
+  console.error("Set these variables and restart the service.");
+  process.exit(1);
+}
+
+if (process.env.OPENID_DISABLED !== "true") {
+  const openidVars = ["OPENID_CLIENT_ID", "OPENID_ISSUER_URL"];
+  const missingOpenID = openidVars.filter((v) => !process.env[v]);
+  if (missingOpenID.length > 0) {
+    console.error(`FATAL: Missing OpenID environment variables: ${missingOpenID.join(", ")}`);
+    console.error(
+      "Set OPENID_DISABLED=true to skip OpenID authentication, or provide the missing variables.",
+    );
+    process.exit(1);
+  }
+} else {
+  console.log("OpenID authentication disabled via OPENID_DISABLED=true");
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { storage } from "./storage";
