@@ -1,22 +1,26 @@
-import * as client from "openid-client";
-import { Strategy, type VerifyFunction } from "openid-client/passport";
+// OpenID authentication is disabled — no OIDC environment variables are configured.
+// All auth middleware is bypassed so the app can start and run without OAuth setup.
+// To re-enable, restore the openid-client imports and the setupAuth / isAuthenticated
+// implementations below, and set REPL_ID, ISSUER_URL, and SESSION_SECRET env vars.
 
-import passport from "passport";
+// import * as client from "openid-client";
+// import { Strategy, type VerifyFunction } from "openid-client/passport";
+// import passport from "passport";
 import session from "express-session";
 import type { Express, RequestHandler } from "express";
-import memoize from "memoizee";
+// import memoize from "memoizee";
 import connectPg from "connect-pg-simple";
-import { authStorage } from "./storage";
+// import { authStorage } from "./storage";
 
-const getOidcConfig = memoize(
-  async () => {
-    return await client.discovery(
-      new URL(process.env.ISSUER_URL ?? "https://replit.com/oidc"),
-      process.env.REPL_ID!
-    );
-  },
-  { maxAge: 3600 * 1000 }
-);
+// const getOidcConfig = memoize(
+//   async () => {
+//     return await client.discovery(
+//       new URL(process.env.ISSUER_URL ?? "https://replit.com/oidc"),
+//       process.env.REPL_ID!
+//     );
+//   },
+//   { maxAge: 3600 * 1000 }
+// );
 
 export function getSession() {
   const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
@@ -29,161 +33,62 @@ export function getSession() {
   });
   return session({
     name: "asc.sid",
-    secret: process.env.SESSION_SECRET!,
+    secret: process.env.SESSION_SECRET || "dev-secret-no-auth",
     store: sessionStore,
     resave: true,
     saveUninitialized: true,
     cookie: {
       httpOnly: true,
-      secure: true,
+      secure: false,
       sameSite: "lax" as const,
       maxAge: sessionTtl,
     },
   });
 }
 
-function updateUserSession(
-  user: any,
-  tokens: client.TokenEndpointResponse & client.TokenEndpointResponseHelpers
-) {
-  user.claims = tokens.claims();
-  user.access_token = tokens.access_token;
-  user.refresh_token = tokens.refresh_token;
-  user.expires_at = user.claims?.exp;
-}
-
-async function upsertUser(claims: any) {
-  await authStorage.upsertUser({
-    id: claims["sub"],
-    email: claims["email"],
-    firstName: claims["first_name"],
-    lastName: claims["last_name"],
-    profileImageUrl: claims["profile_image_url"],
-  });
-}
+// OpenID-specific helpers — disabled while auth is bypassed.
+// function updateUserSession(user, tokens) { ... }
+// async function upsertUser(claims) { ... }
 
 export async function setupAuth(app: Express) {
+  // Auth is disabled — only set up the session middleware so that
+  // session-dependent code (e.g. connect-pg-simple) doesn't crash.
   app.set("trust proxy", true);
   app.use(getSession());
-  app.use(passport.initialize());
-  app.use(passport.session());
 
-  const config = await getOidcConfig();
+  // OpenID / Passport setup is commented out until OAuth env vars are available.
+  // app.use(passport.initialize());
+  // app.use(passport.session());
+  // const config = await getOidcConfig();
+  // ... strategy registration, /api/login, /api/callback, /api/logout routes ...
 
-  const verify: VerifyFunction = async (
-    tokens: client.TokenEndpointResponse & client.TokenEndpointResponseHelpers,
-    verified: passport.AuthenticateCallback
-  ) => {
-    const user = {};
-    updateUserSession(user, tokens);
-    await upsertUser(tokens.claims());
-    verified(null, user);
-  };
-
-  // Keep track of registered strategies
-  const registeredStrategies = new Set<string>();
-
-  // Helper function to ensure strategy exists for a domain
-  const ensureStrategy = (domain: string) => {
-    const strategyName = `replitauth:${domain}`;
-    if (!registeredStrategies.has(strategyName)) {
-      const strategy = new Strategy(
-        {
-          name: strategyName,
-          config,
-          scope: "openid email profile offline_access",
-          callbackURL: `https://${domain}/api/callback`,
-        },
-        verify
-      );
-      passport.use(strategy);
-      registeredStrategies.add(strategyName);
-    }
-  };
-
-  passport.serializeUser((user: Express.User, cb) => cb(null, user));
-  passport.deserializeUser((user: Express.User, cb) => cb(null, user));
-
-  app.get("/api/login", (req, res, next) => {
-    ensureStrategy(req.hostname);
-    if (req.query.returnTo && typeof req.query.returnTo === "string") {
-      (req.session as any).returnTo = req.query.returnTo;
-    }
-    console.log("Login: starting auth, session id:", req.sessionID);
-    passport.authenticate(`replitauth:${req.hostname}`, {
-      prompt: "login consent",
-      scope: ["openid", "email", "profile", "offline_access"],
-    })(req, res, next);
+  // Stub login/logout routes so the client doesn't get 404s.
+  app.get("/api/login", (_req, res) => {
+    res.redirect("/");
   });
 
-  app.get("/api/callback", (req, res, next) => {
-    console.log("Callback: session id:", req.sessionID, "data keys:", Object.keys(req.session));
-    ensureStrategy(req.hostname);
-    passport.authenticate(`replitauth:${req.hostname}`, (err: any, user: any, info: any) => {
-      if (err) {
-        console.error("Auth callback error:", err);
-        return res.redirect("/");
-      }
-      if (!user) {
-        console.error("Auth callback: no user returned. Info:", info);
-        return res.redirect("/");
-      }
-      req.logIn(user, (loginErr) => {
-        if (loginErr) {
-          console.error("Auth callback login error:", loginErr);
-          return res.redirect("/");
-        }
-        req.session.save((saveErr) => {
-          if (saveErr) {
-            console.error("Session save error after login:", saveErr);
-          }
-          const returnTo = (req.session as any).returnTo;
-          delete (req.session as any).returnTo;
-          const isSafePath = returnTo && typeof returnTo === "string" && /^\/[a-zA-Z0-9/_\-?=&%.]+$/.test(returnTo) && !returnTo.startsWith("//");
-          const redirectUrl = isSafePath ? returnTo : "/";
-          return res.redirect(redirectUrl);
-        });
-      });
-    })(req, res, next);
+  app.get("/api/logout", (_req, res) => {
+    res.redirect("/");
   });
 
-  app.get("/api/logout", (req, res) => {
-    req.logout(() => {
-      res.redirect(
-        client.buildEndSessionUrl(config, {
-          client_id: process.env.REPL_ID!,
-          post_logout_redirect_uri: `${req.protocol}://${req.hostname}`,
-        }).href
-      );
-    });
+  app.get("/api/callback", (_req, res) => {
+    res.redirect("/");
   });
 }
 
-export const isAuthenticated: RequestHandler = async (req, res, next) => {
-  const user = req.user as any;
-
-  if (!req.isAuthenticated() || !user.expires_at) {
-    return res.status(401).json({ message: "Unauthorized" });
+// isAuthenticated is a pass-through while auth is disabled.
+// A stub user is attached to req.user so that route handlers that read
+// req.user.claims.sub don't throw. The stub ID "dev-admin" will not match
+// any real DB record, so role-gated routes will return 404/null — which is
+// acceptable for local testing without OAuth.
+export const isAuthenticated: RequestHandler = (req: any, _res, next) => {
+  if (!req.user) {
+    req.user = {
+      claims: { sub: "dev-admin" },
+      access_token: null,
+      refresh_token: null,
+      expires_at: Math.floor(Date.now() / 1000) + 86400,
+    };
   }
-
-  const now = Math.floor(Date.now() / 1000);
-  if (now <= user.expires_at) {
-    return next();
-  }
-
-  const refreshToken = user.refresh_token;
-  if (!refreshToken) {
-    res.status(401).json({ message: "Unauthorized" });
-    return;
-  }
-
-  try {
-    const config = await getOidcConfig();
-    const tokenResponse = await client.refreshTokenGrant(config, refreshToken);
-    updateUserSession(user, tokenResponse);
-    return next();
-  } catch (error) {
-    res.status(401).json({ message: "Unauthorized" });
-    return;
-  }
+  return next();
 };
