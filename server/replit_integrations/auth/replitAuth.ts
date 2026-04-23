@@ -1,7 +1,9 @@
-// NOTE: OpenID Connect authentication is temporarily disabled.
-// The openid-client initialization requires REPL_ID / ISSUER_URL env vars that
-// are not available in this deployment. Auth will be re-enabled once OAuth
-// credentials are configured.
+// NOTE: OpenID Connect authentication is conditionally disabled.
+// Set OPENID_DISABLED=true to skip OIDC initialization entirely (e.g. when
+// OPENID_CLIENT_ID / OPENID_ISSUER_URL are not yet configured).
+// When OPENID_DISABLED is not set, OPENID_CLIENT_ID and OPENID_ISSUER_URL
+// must be provided — the env validation in server/index.ts enforces this
+// before any module is imported.
 //
 // import * as client from "openid-client";
 // import { Strategy, type VerifyFunction } from "openid-client/passport";
@@ -21,9 +23,14 @@ export function getSession() {
     ttl: sessionTtl,
     tableName: "sessions",
   });
+
+  // SESSION_SECRET is guaranteed non-empty by the startup validation in
+  // server/index.ts — the non-null assertion is safe here.
+  const secret = process.env.SESSION_SECRET!;
+
   return session({
     name: "asc.sid",
-    secret: process.env.SESSION_SECRET || "dev-secret-change-me",
+    secret,
     store: sessionStore,
     resave: true,
     saveUninitialized: true,
@@ -36,24 +43,45 @@ export function getSession() {
   });
 }
 
-// Auth setup — OIDC disabled. Registers session middleware only.
-// Login/callback/logout routes are stubbed out until OAuth is configured.
+// Auth setup — OIDC is skipped when OPENID_DISABLED=true.
+// Registers session middleware and stubs login/callback/logout routes so that
+// existing links don't 404 while OAuth credentials are not yet configured.
 export async function setupAuth(app: Express) {
   app.set("trust proxy", true);
   app.use(getSession());
 
-  // Stub routes so existing links don't 404
-  app.get("/api/login", (_req, res) => {
-    res.status(503).json({ message: "Authentication is not configured" });
-  });
+  if (process.env.OPENID_DISABLED === "true") {
+    console.log("OpenID authentication disabled — serving stub auth routes");
 
-  app.get("/api/callback", (_req, res) => {
-    res.redirect("/");
-  });
+    // Stub routes so existing links don't 404
+    app.get("/api/login", (_req, res) => {
+      res.status(503).json({ message: "Authentication is not configured" });
+    });
 
-  app.get("/api/logout", (_req, res) => {
-    res.redirect("/");
-  });
+    app.get("/api/callback", (_req, res) => {
+      res.redirect("/");
+    });
+
+    app.get("/api/logout", (_req, res) => {
+      res.redirect("/");
+    });
+  } else {
+    // OpenID is enabled — OPENID_CLIENT_ID and OPENID_ISSUER_URL are present
+    // (validated at startup). Wire up the real OIDC flow here when ready.
+    console.log("OpenID authentication enabled (OIDC client not yet wired — stub routes active)");
+
+    app.get("/api/login", (_req, res) => {
+      res.status(503).json({ message: "OpenID client not yet configured" });
+    });
+
+    app.get("/api/callback", (_req, res) => {
+      res.redirect("/");
+    });
+
+    app.get("/api/logout", (_req, res) => {
+      res.redirect("/");
+    });
+  }
 }
 
 // isAuthenticated is bypassed — all requests are allowed through.
