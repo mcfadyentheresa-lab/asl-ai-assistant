@@ -263,87 +263,92 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
         selection: true,
         preserveObjectStacking: true,
       });
+      // Capture a non-null local so TS narrows correctly inside the event
+      // handlers below (the outer `canvas` is `fabric.Canvas | null` which TS
+      // cannot prove stays non-null inside the captured callbacks). All event
+      // handlers below use this local.
+      const c: fabric.Canvas = canvas;
 
       fabricRef.current = canvas;
       setCanvasReady(true);
 
-      canvas.on("object:modified", () => {
+      c.on("object:modified", () => {
         saveStateRef.current();
         autoSaveRef.current();
       });
-      canvas.on("object:added", () => {
+      c.on("object:added", () => {
         if (!isLoadingCanvas.current) {
           saveStateRef.current();
           autoSaveRef.current();
         }
       });
-      canvas.on("object:removed", () => {
+      c.on("object:removed", () => {
         if (!isLoadingCanvas.current) {
           saveStateRef.current();
           autoSaveRef.current();
         }
       });
-      canvas.on("path:created", () => {
+      c.on("path:created", () => {
         saveStateRef.current();
         autoSaveRef.current();
       });
-      canvas.on("text:editing:exited", () => {
+      c.on("text:editing:exited", () => {
         saveStateRef.current();
         autoSaveRef.current();
       });
 
-      canvas.on("mouse:down", (opt) => {
+      c.on("mouse:down", (opt) => {
         const evt = opt.e as MouseEvent;
-        if ((evt.button === 1 || spaceHeld.current) && !canvas.isDrawingMode) {
+        if ((evt.button === 1 || spaceHeld.current) && !c.isDrawingMode) {
           isPanningRef.current = true;
           setIsPanning(true);
           lastPanPoint.current = { x: evt.clientX, y: evt.clientY };
-          canvas.selection = false;
-          canvas.discardActiveObject();
-          canvas.renderAll();
+          c.selection = false;
+          c.discardActiveObject();
+          c.renderAll();
           evt.preventDefault();
           evt.stopPropagation();
         }
       });
 
-      canvas.on("mouse:move", (opt) => {
+      c.on("mouse:move", (opt) => {
         if (!isPanningRef.current || !lastPanPoint.current) return;
         const evt = opt.e as MouseEvent;
-        const vpt = canvas.viewportTransform!;
+        const vpt = c.viewportTransform!;
         vpt[4] += evt.clientX - lastPanPoint.current.x;
         vpt[5] += evt.clientY - lastPanPoint.current.y;
         lastPanPoint.current = { x: evt.clientX, y: evt.clientY };
-        canvas.setViewportTransform(vpt);
-        canvas.renderAll();
+        c.setViewportTransform(vpt);
+        c.renderAll();
       });
 
-      canvas.on("mouse:up", () => {
+      c.on("mouse:up", () => {
         if (isPanningRef.current) {
           isPanningRef.current = false;
           setIsPanning(false);
           lastPanPoint.current = null;
-          canvas.selection = true;
+          c.selection = true;
         }
       });
 
-      const canvasEl = canvas.getSelectionElement();
+      const canvasEl = c.getSelectionElement();
       const handleWheel = (e: WheelEvent) => {
         e.preventDefault();
         e.stopPropagation();
         if (e.ctrlKey || e.metaKey) {
           const delta = -e.deltaY / 300;
-          let newZoom = canvas.getZoom() + delta;
+          let newZoom = c.getZoom() + delta;
           newZoom = Math.max(0.1, Math.min(5, newZoom));
-          const point = canvas.getScenePoint(e);
-          canvas.zoomToPoint(point, newZoom);
+          const point = c.getScenePoint(e);
+          c.zoomToPoint(point, newZoom);
           setZoom(newZoom);
         } else {
-          const vpt = canvas.viewportTransform!;
+          const vpt = c.viewportTransform!;
           vpt[4] -= e.deltaX;
           vpt[5] -= e.deltaY;
-          canvas.setViewportTransform(vpt);
+          c.setViewportTransform(vpt);
         }
-        canvas.renderAll();
+        c.renderAll();
       };
       canvasEl.addEventListener("wheel", handleWheel, { passive: false });
 
@@ -360,7 +365,7 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
             isPanningRef.current = false;
             setIsPanning(false);
             lastPanPoint.current = null;
-            canvas.selection = true;
+            c.selection = true;
           }
         }
       };
@@ -375,11 +380,11 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
       };
 
       // Lock any newly added object immediately when view-only is active
-      canvas.on("object:added", (e) => {
+      c.on("object:added", (e) => {
         if (isViewOnly()) {
           e.target?.set({ selectable: false, evented: false });
-          canvas.discardActiveObject();
-          canvas.renderAll();
+          c.discardActiveObject();
+          c.renderAll();
         }
       });
 
@@ -405,21 +410,21 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
             e.touches[0].clientY - e.touches[1].clientY
           );
           const delta = (newDist - touchDist) / 200;
-          let newZoom = canvas.getZoom() + delta;
+          let newZoom = c.getZoom() + delta;
           newZoom = Math.max(0.1, Math.min(5, newZoom));
           const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
           const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
           const rect = canvasEl.getBoundingClientRect();
           const point = new fabric.Point(midX - rect.left, midY - rect.top);
-          canvas.zoomToPoint(point, newZoom);
+          c.zoomToPoint(point, newZoom);
           setZoom(newZoom);
           touchDist = newDist;
         } else if (e.touches.length === 1 && lastPanPoint.current) {
-          const vpt = canvas.viewportTransform!;
+          const vpt = c.viewportTransform!;
           vpt[4] += e.touches[0].clientX - lastPanPoint.current.x;
           vpt[5] += e.touches[0].clientY - lastPanPoint.current.y;
-          canvas.setViewportTransform(vpt);
-          canvas.renderAll();
+          c.setViewportTransform(vpt);
+          c.renderAll();
           lastPanPoint.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
         }
       };
@@ -441,7 +446,7 @@ export default function PlanningBoard({ projectId }: PlanningBoardProps) {
       (canvas as any).__touchMoveHandler = handleTouchMove;
       (canvas as any).__touchEndHandler = handleTouchEnd;
 
-      const initialState = JSON.stringify(canvas.toJSON());
+      const initialState = JSON.stringify(c.toJSON());
       undoStack.current = [initialState];
     };
 

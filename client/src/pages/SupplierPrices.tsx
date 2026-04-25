@@ -673,7 +673,14 @@ function PriceFormDialog({
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [priceQueryPath] });
+      // Invalidate every supplier-prices variant (with or without supplierId filter).
+      // priceQueryPath was previously referenced here but only existed in the
+      // parent component's scope, causing a ReferenceError.
+      queryClient.invalidateQueries({
+        predicate: (q) =>
+          typeof q.queryKey[0] === "string" &&
+          (q.queryKey[0] as string).startsWith("/api/supplier-prices"),
+      });
       toast({ title: price ? "Price updated" : "Price added" });
       onClose();
     },
@@ -797,7 +804,12 @@ function AddFromReceiptDialog({
       await apiRequest("POST", "/api/supplier-prices", data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [priceQueryPath] });
+      // See note in PriceFormDialog above: invalidate all supplier-prices keys.
+      queryClient.invalidateQueries({
+        predicate: (q) =>
+          typeof q.queryKey[0] === "string" &&
+          (q.queryKey[0] as string).startsWith("/api/supplier-prices"),
+      });
       toast({ title: "Price added from receipt" });
       onClose();
     },
