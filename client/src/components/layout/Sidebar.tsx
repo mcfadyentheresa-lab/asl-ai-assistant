@@ -211,7 +211,7 @@ export function SidebarNav({ onNavigate, compact = false }: SidebarNavProps) {
         </div>
       </div>
 
-      <WalkthroughModal open={tourOpen} onClose={handleTourClose} />
+      <WalkthroughModal open={tourOpen} onClose={handleTourClose} role={effectiveRole} firstName={user?.firstName ?? null} />
     </>
   );
 }
