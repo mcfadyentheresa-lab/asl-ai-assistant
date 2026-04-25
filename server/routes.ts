@@ -2723,7 +2723,7 @@ function templateCanvasToElements(canvasData: any, boardId: number, createdBy: s
 
   // Estimate Warnings
   app.get("/api/estimates/:id/warnings", isAuthenticated, async (req, res) => {
-    const warnings = await storage.getWarningsByEstimate(parseInt(req.params.id));
+    const warnings = await storage.getWarningsByEstimate(parseInt(String(req.params.id)));
     res.json(warnings);
   });
 

@@ -89,7 +89,7 @@ export async function setupAuth(app: Express) {
 // read req.user.claims.sub do not crash. Re-enable the real implementation
 // once OAuth credentials are configured.
 export const isAuthenticated: RequestHandler = (req, _res, next) => {
-  if (!req.user) {
+  if (!(req as any).user) {
     (req as any).user = {
       claims: { sub: "dev-bypass-user" },
       access_token: null,

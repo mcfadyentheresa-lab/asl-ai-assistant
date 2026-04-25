@@ -9,7 +9,7 @@ export interface IAuthStorage {
   upsertUser(user: UpsertUser): Promise<User>;
   updateUserRole(id: string, role: string): Promise<User | undefined>;
   updateUserPhone(id: string, phone: string | null): Promise<User | undefined>;
-  updateUserProfile(id: string, data: { firstName?: string; lastName?: string; email?: string; role?: string; phone?: string | null; onboardingCompleted?: Date; smsNotifications?: boolean; emailNotifications?: boolean }): Promise<User | undefined>;
+  updateUserProfile(id: string, data: { firstName?: string | null; lastName?: string | null; email?: string; role?: string; phone?: string | null; onboardingCompleted?: Date; smsNotifications?: boolean; emailNotifications?: boolean }): Promise<User | undefined>;
   getUsers(): Promise<User[]>;
   deleteUser(id: string): Promise<boolean>;
   archiveUser(id: string): Promise<User | undefined>;
@@ -90,7 +90,7 @@ class AuthStorage implements IAuthStorage {
     return user;
   }
 
-  async updateUserProfile(id: string, data: { firstName?: string; lastName?: string; email?: string; role?: string; phone?: string | null; onboardingCompleted?: Date; smsNotifications?: boolean; emailNotifications?: boolean }): Promise<User | undefined> {
+  async updateUserProfile(id: string, data: { firstName?: string | null; lastName?: string | null; email?: string; role?: string; phone?: string | null; onboardingCompleted?: Date; smsNotifications?: boolean; emailNotifications?: boolean }): Promise<User | undefined> {
     const setData: Record<string, unknown> = { updatedAt: new Date() };
     if (data.firstName !== undefined) setData.firstName = data.firstName;
     if (data.lastName !== undefined) setData.lastName = data.lastName;

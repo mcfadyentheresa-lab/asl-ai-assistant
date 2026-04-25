@@ -299,7 +299,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   }, []);
 
   useEffect(() => {
-    if (justCreatedBoardId.current && boards.some((board) => board.id === justCreatedBoardId.current)) {
+    if (justCreatedBoardId.current && (boards as any[]).some((board: any) => board.id === justCreatedBoardId.current)) {
       justCreatedBoardId.current = null;
       return;
     }
@@ -347,7 +347,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       }
       closeNewBoardDialog();
       queryClient.invalidateQueries({ queryKey: [api.planningBoards.list.path, projectId] });
-      queryClient.invalidateQueries({ queryKey: [api.planningBoards.detail.path, board.id] });
+      queryClient.invalidateQueries({ queryKey: [api.planningBoards.get.path, board.id] });
       setSelectedBoardId(board.id);
       setBoardId(board.id);
       justCreatedBoardId.current = board.id;
@@ -3485,7 +3485,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                     >
                       <div className="relative h-20 overflow-hidden">
                         <img
-                          src={templatePreviewById[tmpl.id] ?? tmpl.image}
+                          src={templatePreviewById[tmpl.id] ?? ""}
                           alt={tmpl.name}
                           className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                           data-testid={`img-template-${tmpl.id}`}
