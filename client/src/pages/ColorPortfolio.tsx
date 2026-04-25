@@ -396,7 +396,6 @@ export default function ColorPortfolio() {
                     }`}
                     style={{
                       backgroundColor: brand.color,
-                      ringColor: isActive ? brand.color : undefined,
                       ...(isActive ? { boxShadow: `0 0 0 2px var(--background), 0 0 0 4px ${brand.color}` } : {}),
                     }}
                     title={brand.label}

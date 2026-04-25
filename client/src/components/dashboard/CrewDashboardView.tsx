@@ -158,7 +158,7 @@ export function CrewDashboardView({
                         data-testid={`crew-task-${task.id}`}
                       >
                         <button
-                          onClick={() => onToggleTaskStatus(task.id, task.status)}
+                          onClick={() => onToggleTaskStatus(task.id, task.status ?? "todo")}
                           disabled={isPending}
                           className="shrink-0"
                           data-testid={`button-toggle-task-${task.id}`}
@@ -217,7 +217,7 @@ export function CrewDashboardView({
                         data-testid={`crew-all-task-${task.id}`}
                       >
                         <button
-                          onClick={() => onToggleTaskStatus(task.id, task.status)}
+                          onClick={() => onToggleTaskStatus(task.id, task.status ?? "todo")}
                           disabled={isPending}
                           className="shrink-0"
                           data-testid={`button-toggle-all-task-${task.id}`}

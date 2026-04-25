@@ -47,7 +47,7 @@ export function AdminDashboardView({
   onDeleteRequest,
   onNewProject,
   canCreateProjects,
-  _showArchived,
+  showArchived: _showArchived,
 }: AdminDashboardViewProps) {
   const { recentProjects } = useRecentProjects();
 

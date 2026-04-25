@@ -12,8 +12,8 @@ interface Project {
   name: string;
   status: string;
   thumbnailUrl?: string | null;
-  totalBudget?: number;
-  budgetUsed?: number;
+  totalBudget?: number | null;
+  budgetUsed?: number | null;
   description?: string | null;
   address?: string | null;
 }
