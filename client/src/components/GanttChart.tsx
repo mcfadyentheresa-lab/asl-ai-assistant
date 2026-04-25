@@ -4,7 +4,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { ChevronLeft, ChevronDown, ChevronUp, ChevronRight, ZoomIn, ZoomOut, Plus, Trash2, Pencil, FolderPlus, Check, X, MoreVertical, CheckSquare, Square, GripVertical, Palette, Copy } from "lucide-react";
+import { ChevronLeft, ChevronDown, ChevronUp, ChevronRight, ZoomIn, ZoomOut, Plus, Trash2, Pencil, FolderPlus, Check, X, MoreVertical, CheckSquare, Square, GripVertical, Palette, Copy, Search } from "lucide-react";
+import type { PaintColor } from "@shared/schema";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {

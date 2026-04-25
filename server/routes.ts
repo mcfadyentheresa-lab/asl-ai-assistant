@@ -2744,9 +2744,9 @@ function templateCanvasToElements(canvasData: any, boardId: number, createdBy: s
       const projectId = parseInt(req.params.id);
       const project = await storage.getProject(projectId);
       if (!project) return res.status(404).json({ message: "Project not found" });
-      if (dbUser.role === "client" && project.clientId !== userId) {
-        return res.status(403).json({ message: "Access denied" });
-      }
+      // Note: a check for dbUser.role === "client" used to live here, but the
+      // guard above already returns 403 for any role that isn't admin or crew.
+      // The branch was dead code (TS2367) and has been removed.
       const { db } = await import("./db");
       const { planningBoards, canvasElements } = await import("@shared/schema");
       const { eq, and, inArray } = await import("drizzle-orm");

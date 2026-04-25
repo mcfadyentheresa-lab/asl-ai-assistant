@@ -25,7 +25,7 @@ import {
   Bold, Italic, Strikethrough, Underline, List, ListOrdered, Code, Link as LinkIcon,
   Eraser, Undo2, Redo2, Save, PenTool, Sparkles, TypeIcon, Shapes,
   CalendarDays, Milestone, ListChecks, Bell, BellOff,
-  ChefHat, Bath, Home, FileText, LayoutPanelLeft, Move,
+  ChefHat, Bath, Home, FileText, LayoutPanelLeft, LayoutGrid, Move,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { usePlanningBoards, useCreatePlanningBoard, useDeletePlanningBoard, useUpdatePlanningBoard, useUploadImage, useUsers, useProjects, useMilestones, useChecklistItems, useCalendarEvents, useUpdateCalendarEvent, useDeleteCalendarEvent, useCreateCalendarEvent, useCreateMilestone, useCreateChecklistItem, useBoardSnapshots, useCreateBoardSnapshot, useRestoreBoardSnapshot, useDeleteBoardSnapshot } from "@/hooks/use-projects";
@@ -481,6 +481,15 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       ? [...current, userId]
       : current.filter((id: string) => id !== userId);
     handleLinkUpdate("linkedUserIds", next, isAdding && notifyOnLink ? { notifyUsers: true } : undefined);
+  };
+
+  const toggleLinkedProject = (projectId: number) => {
+    const current = (selectedBoard?.linkedProjectIds || []) as number[];
+    const isAdding = !current.includes(projectId);
+    const next = isAdding
+      ? [...current, projectId]
+      : current.filter((id: number) => id !== projectId);
+    handleLinkUpdate("linkedProjectIds", next);
   };
 
   const createElement = async (type: string, x?: number, y?: number) => {
