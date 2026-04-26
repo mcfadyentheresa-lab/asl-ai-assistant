@@ -24,6 +24,7 @@ import { serveStatic } from "./static";
 import { createServer } from "http";
 import { setupWebSocket } from "./websocket";
 import { startSmsQueueProcessor } from "./sms";
+import { bootstrapAdminFromEnv } from "./bootstrap-admin";
 
 const app = express();
 const httpServer = createServer(app);
@@ -85,6 +86,10 @@ app.use((req, res, next) => {
 (async () => {
   await registerRoutes(httpServer, app);
   setupWebSocket(httpServer);
+
+  // Idempotent admin bootstrap from env vars. No-op if ADMIN_EMAIL /
+  // ADMIN_PASSWORD aren't set. Errors are logged but don't block startup.
+  await bootstrapAdminFromEnv();
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
