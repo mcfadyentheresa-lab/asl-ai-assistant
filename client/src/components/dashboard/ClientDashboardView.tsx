@@ -1,12 +1,11 @@
 import { motion } from "framer-motion";
-import { Link } from "wouter";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { ArrowRight, CheckCircle2, Flag } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
-import { heroImageStyle } from "@/lib/hero-frame";
+import { PropertyPhotoBand } from "@/components/client/PropertyPhotoBand";
+import { ProjectHeaderStrip } from "@/components/client/ProjectHeaderStrip";
+import { ThisWeekCard } from "@/components/client/ThisWeekCard";
+import { MilestoneStrip } from "@/components/client/MilestoneStrip";
+import { ReferenceCardGrid } from "@/components/client/ReferenceCardGrid";
 
 interface Project {
   id: number;
@@ -20,6 +19,13 @@ interface Project {
   budgetUsed?: number | null;
   description?: string | null;
   address?: string | null;
+  city?: string | null;
+  code?: string | null;
+  phase?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  currentFocusText?: string | null;
+  currentFocusPhotoId?: number | null;
 }
 
 interface Milestone {
@@ -31,44 +37,24 @@ interface Milestone {
   order?: number | null;
 }
 
+interface Photo {
+  id: number;
+  url: string;
+  caption?: string | null;
+  isShowcase?: boolean | null;
+  createdAt?: string | null;
+}
+
+interface CalendarEvent {
+  id: number;
+  title?: string | null;
+  startTime?: string | null;
+  type?: string | null;
+}
+
 interface ClientDashboardViewProps {
   project: Project;
   isAdminPreview?: boolean;
-}
-
-const statusLabel: Record<string, string> = {
-  planning: "Planning",
-  in_progress: "In Progress",
-  completed: "Completed",
-  archived: "Archived",
-};
-
-function MilestoneProgressRow({ milestone, isActive }: { milestone: Milestone; isActive: boolean }) {
-  return (
-    <div className={`flex items-start gap-2.5 py-1.5 ${isActive ? "opacity-100" : "opacity-60"}`}>
-      <div className={`mt-0.5 shrink-0 h-4 w-4 rounded-full border-[1.5px] flex items-center justify-center ${
-        milestone.completed
-          ? "border-primary bg-primary"
-          : isActive
-            ? "border-primary/60 bg-background"
-            : "border-muted-foreground/25 bg-background"
-      }`}>
-        {milestone.completed && <CheckCircle2 className="h-2.5 w-2.5 text-primary-foreground" />}
-        {!milestone.completed && isActive && <div className="h-1.5 w-1.5 rounded-full bg-primary/60" />}
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className={`text-sm font-medium leading-snug ${milestone.completed ? "text-muted-foreground line-through" : "text-foreground"}`}>
-          {milestone.title}
-        </p>
-        {milestone.completed && (
-          <p className="text-[11px] text-muted-foreground">Completed</p>
-        )}
-        {!milestone.completed && isActive && (
-          <p className="text-[11px] text-primary/80 font-medium">In progress</p>
-        )}
-      </div>
-    </div>
-  );
 }
 
 export function ClientDashboardView({ project, isAdminPreview = false }: ClientDashboardViewProps) {
@@ -83,101 +69,138 @@ export function ClientDashboardView({ project, isAdminPreview = false }: ClientD
     enabled: !!project.id,
   });
 
-  const sortedMilestones = [...(milestones || [])].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-  const completedCount = sortedMilestones.filter((m) => m.completed).length;
-  const totalCount = sortedMilestones.length;
-  const completionPct = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
-  const nextMilestone = sortedMilestones.find((m) => !m.completed);
-  const activeMilestoneIdx = nextMilestone ? sortedMilestones.indexOf(nextMilestone) : -1;
+  const { data: photos } = useQuery<Photo[]>({
+    queryKey: ["client-photos", project.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/projects/${project.id}/photos`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!project.id,
+  });
 
-  const visibleMilestones = sortedMilestones.slice(
-    Math.max(0, activeMilestoneIdx - 1),
-    activeMilestoneIdx + 3
-  ).slice(0, 4);
+  const { data: events } = useQuery<CalendarEvent[]>({
+    queryKey: ["client-events", project.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/projects/${project.id}/calendar-events`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!project.id,
+  });
+
+  // Photo band: project.thumbnailUrl > most recent showcase photo > most recent photo
+  const sortedPhotos = [...(photos || [])].sort((a, b) => {
+    const at = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const bt = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    return bt - at;
+  });
+  const showcasePhoto = sortedPhotos.find((p) => p.isShowcase);
+  const heroSrc = project.thumbnailUrl || showcasePhoto?.url || sortedPhotos[0]?.url || null;
+
+  // This week photo: project.currentFocusPhotoId > most recent photo (excluding hero)
+  const focusPhoto = project.currentFocusPhotoId
+    ? sortedPhotos.find((p) => p.id === project.currentFocusPhotoId)
+    : sortedPhotos.find((p) => p.url !== heroSrc);
+  const focusPhotoUrl = focusPhoto?.url || null;
+
+  // Phase fallback: project.phase > current incomplete milestone title > "Planning"
+  const sortedMilestones = [...(milestones || [])].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  const activeMilestone = sortedMilestones.find((m) => !m.completed);
+  const phase = project.phase || activeMilestone?.title || "Planning";
+
+  // Last visit / next walkthrough: derive from calendar events of type "walkthrough" or "site_visit"
+  const now = new Date();
+  const visitEvents = (events || [])
+    .filter((e) => {
+      const t = (e.type || "").toLowerCase();
+      return t.includes("walkthrough") || t.includes("visit") || t.includes("site");
+    })
+    .filter((e) => !!e.startTime)
+    .sort((a, b) => new Date(a.startTime!).getTime() - new Date(b.startTime!).getTime());
+  const lastVisit = visitEvents.filter((e) => new Date(e.startTime!) <= now).pop()?.startTime || null;
+  const nextWalkthrough = visitEvents.find((e) => new Date(e.startTime!) > now)?.startTime || null;
+
+  // "This week" updated date — use the focus photo's createdAt or the most recent photo
+  const updatedAt = focusPhoto?.createdAt || sortedPhotos[0]?.createdAt || null;
+
+  // Reference cards — link to existing project tabs
+  const referenceCards = [
+    {
+      label: "Design",
+      caption: "Inspiration, selections, and finishes for your home.",
+      href: `/project/${project.id}?tab=board`,
+      testId: "ref-card-design",
+    },
+    {
+      label: "Documents",
+      caption: "Drawings, contracts, permits, and warranties.",
+      href: `/project/${project.id}?tab=documents`,
+      testId: "ref-card-documents",
+    },
+    {
+      label: "Messages",
+      caption: "Talk with the Aster & Spruce team.",
+      href: `/project/${project.id}?tab=messages`,
+      testId: "ref-card-messages",
+    },
+  ];
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 15 }}
+      initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className="max-w-3xl"
+      transition={{ duration: 0.35 }}
+      className="w-full"
       data-testid="client-dashboard-view"
+      data-role="client"
     >
       {isAdminPreview && (
-        <p className="text-xs text-muted-foreground mb-3" data-testid="text-client-preview-notice">
-          Client view — this is what your client sees when they log in.
+        <p
+          className="font-mono text-[10px] tracking-[0.14em] text-muted-foreground uppercase px-4 md:px-8 lg:px-12 pt-3"
+          data-testid="text-client-preview-notice"
+        >
+          Client view preview — this is what your client sees.
         </p>
       )}
 
-      <Link href={`/project/${project.id}`} data-testid={`link-project-${project.id}`}>
-        <Card className="overflow-hidden cursor-pointer hover-elevate transition-shadow" data-testid={`card-project-hero-${project.id}`}>
-          <div className="md:flex">
-            <div className="relative h-52 md:h-auto md:w-72 flex-shrink-0 overflow-hidden">
-              {project.thumbnailUrl ? (
-                <img
-                  src={project.thumbnailUrl}
-                  alt={project.name}
-                  className="h-full w-full object-cover"
-                  style={heroImageStyle(project)}
-                  data-testid={`img-project-hero-${project.id}`}
-                />
-              ) : (
-                <div className="h-full w-full bg-muted min-h-[13rem]" />
-              )}
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent to-background/10 hidden md:block" />
-            </div>
+      <PropertyPhotoBand
+        src={heroSrc}
+        projectName={project.name}
+        city={project.city || project.address}
+      />
 
-            <CardContent className="flex-1 p-6 md:p-8 flex flex-col justify-between">
-              <div>
-                <Badge variant="secondary" className="w-fit mb-3 text-xs" data-testid={`badge-status-${project.id}`}>
-                  {statusLabel[project.status] || project.status}
-                </Badge>
-                <h2 className="font-serif text-xl md:text-2xl font-bold text-foreground mb-1" data-testid={`text-project-name-${project.id}`}>
-                  {project.name}
-                </h2>
-                {project.address && (
-                  <p className="text-xs text-muted-foreground mb-4">{project.address}</p>
-                )}
-              </div>
+      <ProjectHeaderStrip
+        code={project.code}
+        status={project.status}
+        name={project.name}
+        phase={phase}
+        startDate={project.startDate}
+        endDate={project.endDate}
+        lastVisit={lastVisit}
+        nextWalkthrough={nextWalkthrough}
+      />
 
-              {totalCount > 0 && (
-                <div className="space-y-3 mb-4" data-testid="client-milestone-progress">
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <Flag className="h-3 w-3" />
-                      Project Progress
-                    </span>
-                    <span className="font-medium tabular-nums">{completedCount}/{totalCount} milestones</span>
-                  </div>
-                  <Progress value={completionPct} className="h-1.5" data-testid="progress-bar-client" />
+      <ThisWeekCard
+        focusText={project.currentFocusText}
+        focusPhotoUrl={focusPhotoUrl}
+        updatedAt={updatedAt}
+        fallbackText={
+          activeMilestone
+            ? `Currently working on ${activeMilestone.title.toLowerCase()}.`
+            : undefined
+        }
+      />
 
-                  {visibleMilestones.length > 0 && (
-                    <div className="pt-1 space-y-0" data-testid="client-milestone-list">
-                      {visibleMilestones.map((m) => (
-                        <MilestoneProgressRow
-                          key={m.id}
-                          milestone={m}
-                          isActive={!m.completed && m.id === nextMilestone?.id}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
+      {sortedMilestones.length > 0 && <MilestoneStrip milestones={sortedMilestones} />}
 
-              {nextMilestone && (
-                <div className="rounded-md bg-muted/50 border border-border/40 px-3 py-2 mb-4" data-testid="client-next-milestone">
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-0.5">What's next</p>
-                  <p className="text-sm font-medium text-foreground">{nextMilestone.title}</p>
-                </div>
-              )}
+      <ReferenceCardGrid cards={referenceCards} />
 
-              <div className="flex items-center gap-2 text-sm font-medium text-primary mt-auto" data-testid="link-view-project">
-                View Your Project <ArrowRight className="h-4 w-4" />
-              </div>
-            </CardContent>
-          </div>
-        </Card>
-      </Link>
+      <footer className="px-4 md:px-8 lg:px-12 py-6 border-t border-border/60">
+        <p className="font-mono text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
+          Aster &amp; Spruce Living · West Vancouver
+        </p>
+      </footer>
     </motion.div>
   );
 }

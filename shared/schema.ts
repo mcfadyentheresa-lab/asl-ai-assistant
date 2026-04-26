@@ -17,6 +17,11 @@ export const projects = pgTable("projects", {
   startDate: date("start_date"),
   endDate: date("end_date"),
   address: text("address"),
+  city: text("city"), // shown in client view photo-band credit chip
+  code: text("code"), // human-readable project code, e.g. "HWR-204"
+  phase: text("phase"), // human-readable current phase, e.g. "Cabinetry installation"
+  currentFocusText: text("current_focus_text"), // weekly status sentence shown in "This week" card
+  currentFocusPhotoId: integer("current_focus_photo_id"), // FK to photos.id (no .references() to avoid circular dep at table-decl time)
   thumbnailUrl: text("thumbnail_url"),
   heroFocalX: real("hero_focal_x").default(0.5),
   heroFocalY: real("hero_focal_y").default(0.5),

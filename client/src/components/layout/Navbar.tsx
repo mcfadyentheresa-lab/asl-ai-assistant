@@ -16,6 +16,7 @@ import { useViewMode } from "@/hooks/use-view-mode";
 import { useTheme } from "next-themes";
 import { WalkthroughModal } from "@/components/WalkthroughModal";
 import { useAppShell } from "@/contexts/app-shell-context";
+import { ClientTabsNav } from "@/components/client/ClientTabsNav";
 
 interface NavbarShellProps {
   onMenuToggle?: () => void;
@@ -45,6 +46,8 @@ export function NavbarShell({ onMenuToggle }: NavbarShellProps) {
   if (!user) return null;
 
   const isAdmin = user.role === "admin";
+  const effectiveRole = isAdmin ? viewMode : user.role;
+  const isClientView = effectiveRole === "client";
 
   const initials =
     `${(user.firstName || "")[0] || ""}${(user.lastName || "")[0] || ""}`.toUpperCase() || "U";
@@ -68,7 +71,11 @@ export function NavbarShell({ onMenuToggle }: NavbarShellProps) {
               <Menu className="h-5 w-5" />
             </Button>
           )}
-          <Link href="/" data-testid="link-home" className="lg:hidden">
+          <Link
+            href="/"
+            data-testid="link-home"
+            className={isClientView ? "" : "lg:hidden"}
+          >
             <div className="flex flex-col">
               <span className="font-serif text-lg font-bold tracking-tight text-foreground leading-none select-none">
                 Aster &amp; Spruce
@@ -78,6 +85,8 @@ export function NavbarShell({ onMenuToggle }: NavbarShellProps) {
               </span>
             </div>
           </Link>
+
+          {isClientView && <ClientTabsNav />}
         </div>
 
         <div className="flex items-center gap-2">
