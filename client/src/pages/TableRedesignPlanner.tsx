@@ -863,7 +863,7 @@ function FurniturePlannerCore({ fixedProjectId }: { fixedProjectId?: number }) {
                             <p className="text-xs text-muted-foreground mt-1">{selectedPlan.baseSizeNotes || baseRange.notes}</p>
                           </div>
                         </div>
-                        <p className="text-xs text-muted-foreground mt-2 italic">
+                        <p className="text-xs text-muted-foreground mt-2">
                           These values are editable planning estimates, not engineering specifications. Always verify with structural assessment for heavy tops.
                         </p>
                       </CardContent>
@@ -877,7 +877,7 @@ function FurniturePlannerCore({ fixedProjectId }: { fixedProjectId?: number }) {
                     </div>
                   )}
 
-                  <div className="text-xs text-muted-foreground italic border-t pt-3" data-testid="text-disclaimer">
+                  <div className="text-xs text-muted-foreground border-t pt-3" data-testid="text-disclaimer">
                     Concept and planning preview only. Final result may vary based on material availability, structural requirements, and on-site conditions.
                   </div>
                 </CardContent>
@@ -958,7 +958,7 @@ function FurniturePlannerCore({ fixedProjectId }: { fixedProjectId?: number }) {
                           </ul>
                         </div>
                       )}
-                      <p className="text-xs text-muted-foreground italic">
+                      <p className="text-xs text-muted-foreground">
                         Concept and planning preview only. Final result may vary based on material availability, structural requirements, and on-site conditions.
                       </p>
                     </div>

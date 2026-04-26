@@ -99,7 +99,7 @@ export function ClientDashboardView({ project, isAdminPreview = false }: ClientD
       data-testid="client-dashboard-view"
     >
       {isAdminPreview && (
-        <p className="text-xs text-muted-foreground mb-3 italic" data-testid="text-client-preview-notice">
+        <p className="text-xs text-muted-foreground mb-3" data-testid="text-client-preview-notice">
           Client view — this is what your client sees when they log in.
         </p>
       )}
