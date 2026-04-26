@@ -1,4 +1,4 @@
-import { Storage, File } from "@google-cloud/storage";
+import { Storage, File, type StorageOptions } from "@google-cloud/storage";
 import { Response } from "express";
 import { randomUUID } from "crypto";
 import {
@@ -9,26 +9,39 @@ import {
   setObjectAclPolicy,
 } from "./objectAcl";
 
-const REPLIT_SIDECAR_ENDPOINT = "http://127.0.0.1:1106";
+// Configure GCS using the user's own service account, no Replit sidecar.
+//
+// Credentials come from one of:
+//   GCS_CREDENTIALS_JSON   raw JSON of the service-account key (preferred for Railway)
+//   GCS_KEY_FILE           path to a key file on disk
+//   GOOGLE_APPLICATION_CREDENTIALS  standard GCP env (fallback)
+//
+// Required: GCS_PROJECT_ID (or projectId on the key file).
+function buildStorageOptions(): StorageOptions {
+  const projectId = process.env.GCS_PROJECT_ID;
+  const credsJson = process.env.GCS_CREDENTIALS_JSON;
+  const keyFile = process.env.GCS_KEY_FILE;
+
+  if (credsJson) {
+    try {
+      const credentials = JSON.parse(credsJson);
+      return { projectId: projectId || credentials.project_id, credentials };
+    } catch (err) {
+      throw new Error(
+        "GCS_CREDENTIALS_JSON is set but is not valid JSON. " +
+          "It should be the full contents of your service-account key file.",
+      );
+    }
+  }
+  if (keyFile) {
+    return { projectId, keyFilename: keyFile };
+  }
+  // Falls back to GOOGLE_APPLICATION_CREDENTIALS or workload identity if available.
+  return { projectId };
+}
 
 // The object storage client is used to interact with the object storage service.
-export const objectStorageClient = new Storage({
-  credentials: {
-    audience: "replit",
-    subject_token_type: "access_token",
-    token_url: `${REPLIT_SIDECAR_ENDPOINT}/token`,
-    type: "external_account",
-    credential_source: {
-      url: `${REPLIT_SIDECAR_ENDPOINT}/credential`,
-      format: {
-        type: "json",
-        subject_token_field_name: "access_token",
-      },
-    },
-    universe_domain: "googleapis.com",
-  },
-  projectId: "",
-});
+export const objectStorageClient = new Storage(buildStorageOptions());
 
 export class ObjectNotFoundError extends Error {
   constructor() {
@@ -271,30 +284,14 @@ async function signObjectURL({
   method: "GET" | "PUT" | "DELETE" | "HEAD";
   ttlSec: number;
 }): Promise<string> {
-  const request = {
-    bucket_name: bucketName,
-    object_name: objectName,
-    method,
-    expires_at: new Date(Date.now() + ttlSec * 1000).toISOString(),
-  };
-  const response = await fetch(
-    `${REPLIT_SIDECAR_ENDPOINT}/object-storage/signed-object-url`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(request),
-    }
-  );
-  if (!response.ok) {
-    throw new Error(
-      `Failed to sign object URL, errorcode: ${response.status}, ` +
-        `make sure you're running on Replit`
-    );
-  }
-
-  const { signed_url: signedURL } = await response.json();
-  return signedURL;
+  const file = objectStorageClient.bucket(bucketName).file(objectName);
+  const expires = Date.now() + ttlSec * 1000;
+  const action = method === "GET" ? "read" : method === "PUT" ? "write" : method === "DELETE" ? "delete" : "read";
+  const [url] = await file.getSignedUrl({
+    version: "v4",
+    action,
+    expires,
+  });
+  return url;
 }
 
