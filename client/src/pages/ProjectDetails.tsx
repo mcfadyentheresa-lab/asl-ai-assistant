@@ -87,6 +87,8 @@ export default function ProjectDetails() {
   const { viewers } = useProjectRealtime(projectId, user);
   const { toast } = useToast();
   const { trackProject } = useRecentProjects();
+  const heroFileInputRef = useRef<HTMLInputElement>(null);
+  const { mutateAsync: uploadHeroImage, isPending: isUploadingHero } = useUploadImage();
 
   useEffect(() => {
     if (project && user?.role !== "client") {
@@ -208,8 +210,6 @@ export default function ProjectDetails() {
   };
 
   const isAdminUser = user?.role === "admin";
-  const heroFileInputRef = useRef<HTMLInputElement>(null);
-  const { mutateAsync: uploadHeroImage, isPending: isUploadingHero } = useUploadImage();
 
   const handleHeroFileChosen = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
