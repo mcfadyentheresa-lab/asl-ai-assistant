@@ -67,6 +67,7 @@ import { ProjectProgressSummary } from "@/components/project/ProjectProgressSumm
 import { BudgetSnapshot } from "@/components/project/BudgetSnapshot";
 import { ProjectSidebarCards } from "@/components/project/ProjectSidebarCards";
 import { ProgressTab } from "@/components/project/ProgressTab";
+import { ClientProjectHeader } from "@/components/project/ClientProjectHeader";
 import type { ChecklistItem, BoardItem } from "@shared/schema";
 
 export default function ProjectDetails() {
@@ -249,8 +250,21 @@ export default function ProjectDetails() {
     <div className={`min-h-screen bg-background ${safeActiveTab === "board" ? "h-[100dvh] flex flex-col overflow-hidden" : "pb-20"}`}>
       <Navbar />
 
-      {/* Project hero image (above header). Renders if set; admins can upload/replace/remove. */}
-      {(project.thumbnailUrl || isAdminUser) && (
+      {/* Client view: tall photo band + mono meta + 4-col dl row */}
+      {userRole === "client" && (
+        <ClientProjectHeader
+          project={project}
+          milestones={milestones}
+          activityLog={activityLog}
+          isAdminUser={isAdminUser}
+          isUploadingHero={isUploadingHero}
+          onHeroFileChosen={handleHeroFileChosen}
+          onRemoveHero={handleRemoveHero}
+        />
+      )}
+
+      {/* Admin/Crew view: existing narrow hero image (above header). Renders if set; admins can upload/replace/remove. */}
+      {userRole !== "client" && (project.thumbnailUrl || isAdminUser) && (
         <div
           className="w-full bg-muted/30 border-b border-border/60 relative group"
           data-testid="project-hero-image"
