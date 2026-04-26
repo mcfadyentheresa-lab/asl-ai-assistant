@@ -110,9 +110,9 @@ export function BudgetSnapshot({ projectId, userRole }: BudgetSnapshotProps) {
   const usedPercent = budget > 0 ? Math.min((totalSpent / budget) * 100, 100) : 0;
 
   const statusConfig: Record<string, { label: string; color: string; icon: typeof Check; barColor: string }> = {
-    on_track: { label: "On Track", color: "text-green-600", icon: Check, barColor: "bg-green-500" },
-    under_budget: { label: "Under Budget", color: "text-green-600", icon: TrendingDown, barColor: "bg-green-500" },
-    over_budget: { label: "Over Budget", color: "text-red-600", icon: TrendingUp, barColor: "bg-red-500" },
+    on_track: { label: "On Track", color: "text-primary", icon: Check, barColor: "bg-primary" },
+    under_budget: { label: "Under Budget", color: "text-primary", icon: TrendingDown, barColor: "bg-primary" },
+    over_budget: { label: "Over Budget", color: "text-destructive", icon: TrendingUp, barColor: "bg-destructive" },
     no_budget: { label: "No Budget Set", color: "text-muted-foreground", icon: Minus, barColor: "bg-muted-foreground" },
   };
   const sc = statusConfig[status] || statusConfig.no_budget;
@@ -125,7 +125,7 @@ export function BudgetSnapshot({ projectId, userRole }: BudgetSnapshotProps) {
           <CardTitle className="font-serif text-lg flex items-center gap-2" data-testid="text-budget-heading">
             <DollarSign className="h-4 w-4" /> Budget Snapshot
           </CardTitle>
-          <div className={`flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full border ${budgetVisibleToClient ? "bg-sky-500/15 text-sky-700 border-sky-500/30" : sc.color}`} data-testid="badge-budget-status">
+          <div className={`flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full border ${budgetVisibleToClient ? "bg-primary/10 text-primary border-primary/30" : sc.color}`} data-testid="badge-budget-status">
             <StatusIcon className="h-3.5 w-3.5" />
             {sc.label}
           </div>
@@ -156,12 +156,12 @@ export function BudgetSnapshot({ projectId, userRole }: BudgetSnapshotProps) {
               />
             </div>
             {status === "over_budget" && (
-              <p className="text-xs text-red-600 font-medium" data-testid="text-over-budget-warning">
+              <p className="text-xs text-destructive font-medium" data-testid="text-over-budget-warning">
                 {Math.abs(variancePercent).toFixed(1)}% over budget ({formatCurrency(totalSpent - budget)} over)
               </p>
             )}
             {status === "under_budget" && (
-              <p className="text-xs text-green-600" data-testid="text-under-budget-info">
+              <p className="text-xs text-primary" data-testid="text-under-budget-info">
                 {formatCurrency(budget - totalSpent)} remaining
               </p>
             )}

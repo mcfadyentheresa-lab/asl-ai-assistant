@@ -41,7 +41,7 @@ export function ProjectProgressSummary({
   };
 
   const getProgressColor = () => {
-    if (completionPct >= 80) return "text-green-600";
+    if (completionPct >= 80) return "text-primary";
     if (completionPct >= 40) return "text-primary";
     return "text-muted-foreground";
   };
@@ -86,8 +86,8 @@ export function ProjectProgressSummary({
               <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-0.5">Last Completed</p>
               <p className="text-sm font-semibold text-foreground truncate">{lastCompleted.title}</p>
               <div className="flex items-center gap-1 mt-0.5">
-                <Check className="h-3 w-3 text-green-600" />
-                <span className="text-[11px] text-green-600 font-medium">Done</span>
+                <Check className="h-3 w-3 text-primary" />
+                <span className="text-[11px] text-primary font-medium">Done</span>
               </div>
             </div>
           )}

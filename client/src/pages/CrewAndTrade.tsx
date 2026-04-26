@@ -571,7 +571,7 @@ export default function CrewAndTrade() {
                               </Button>
                             </div>
                             {latestRate.notes && (
-                              <p className="text-xs text-muted-foreground italic">{latestRate.notes}</p>
+                              <p className="text-xs text-muted-foreground">{latestRate.notes}</p>
                             )}
                           </div>
                         ) : (
@@ -931,7 +931,7 @@ function ContactCard({
           )}
         </div>
         {contact.notes && (
-          <p className="mt-2 text-xs text-muted-foreground italic" data-testid={`text-notes-${contact.id}`}>
+          <p className="mt-2 text-xs text-muted-foreground" data-testid={`text-notes-${contact.id}`}>
             {contact.notes}
           </p>
         )}

@@ -234,7 +234,7 @@ export default function SupplierPrices() {
                     )}
                   </div>
                   {activeSupplier.notes && (
-                    <p className="text-xs text-muted-foreground mt-2 italic" data-testid="text-supplier-notes">{activeSupplier.notes}</p>
+                    <p className="text-xs text-muted-foreground mt-2" data-testid="text-supplier-notes">{activeSupplier.notes}</p>
                   )}
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
@@ -315,7 +315,7 @@ export default function SupplierPrices() {
                           )}
                         </div>
                         {price.notes && (
-                          <p className="text-xs text-muted-foreground mt-0.5 italic">{price.notes}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">{price.notes}</p>
                         )}
                       </div>
                       <div className="flex items-center gap-0.5 shrink-0">
@@ -401,7 +401,7 @@ export default function SupplierPrices() {
                     </div>
                   </div>
                   {price.notes && (
-                    <p className="hidden md:block text-xs text-muted-foreground mt-1 italic">{price.notes}</p>
+                    <p className="hidden md:block text-xs text-muted-foreground mt-1">{price.notes}</p>
                   )}
                 </CardContent>
               </Card>

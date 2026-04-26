@@ -22,7 +22,7 @@ export default function LandingPage() {
         <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/70" />
 
         <nav className="relative z-10 flex items-center justify-between px-6 md:px-12 py-6" data-testid="nav-landing">
-          <span className="font-serif text-2xl font-bold text-white tracking-tight" data-testid="text-logo">
+          <span className="font-serif text-2xl font-semibold text-white tracking-tight" data-testid="text-logo">
             Aster & Spruce
           </span>
           <Button
@@ -44,7 +44,7 @@ export default function LandingPage() {
               className="max-w-2xl space-y-6"
             >
               <h1
-                className="font-serif text-5xl md:text-7xl font-bold text-white leading-[1.1]"
+                className="font-serif text-5xl md:text-7xl font-semibold text-white leading-[1.1]"
                 data-testid="text-hero-heading"
               >
                 Crafting Timeless Spaces for Modern Living
@@ -98,7 +98,7 @@ export default function LandingPage() {
                 Our Approach
               </p>
               <h2
-                className="font-serif text-3xl md:text-5xl font-bold text-foreground leading-tight"
+                className="font-serif text-3xl md:text-5xl font-semibold text-foreground leading-tight"
                 data-testid="text-craft-heading"
               >
                 Where Heritage Meets Innovation
@@ -127,7 +127,7 @@ export default function LandingPage() {
             <p className="text-xs font-semibold tracking-[0.2em] uppercase text-muted-foreground mb-3">
               The Standard
             </p>
-            <h2 className="font-serif text-3xl md:text-4xl font-bold text-foreground" data-testid="text-features-heading">
+            <h2 className="font-serif text-3xl md:text-4xl font-semibold text-foreground" data-testid="text-features-heading">
               Built on Trust and Transparency
             </h2>
           </motion.div>
@@ -177,7 +177,7 @@ export default function LandingPage() {
       {/* Footer */}
       <footer className="py-12 border-t border-border" data-testid="footer">
         <div className="container mx-auto px-6 md:px-12 flex flex-col md:flex-row justify-between items-center gap-4">
-          <span className="font-serif text-lg font-bold text-foreground">
+          <span className="font-serif text-lg font-semibold text-foreground">
             Aster & Spruce
           </span>
           <p className="text-sm text-muted-foreground">

@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,100..900&family=Inter+Tight:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,100..900&family=Inter+Tight:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -10,7 +10,8 @@ html {
 }
 
 :root {
-  --background: 40 33% 98%;
+  /* Warm paper background to match mockup --color-bg #f3f1ec */
+  --background: 40 20% 94%;
   --foreground: 160 15% 15%;
   --border: 40 12% 88%;
   --input: 40 12% 88%;
@@ -24,7 +25,8 @@ html {
   --popover-foreground: 160 15% 15%;
   --popover-border: 40 12% 90%;
 
-  --primary: 160 30% 12%;
+  /* Spruce #2f4a3a — brand primary. Single accent color across the app. */
+  --primary: 152 22% 24%;
   --primary-foreground: 40 30% 96%;
 
   --secondary: 160 10% 92%;
@@ -56,9 +58,10 @@ html {
 
   --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
   --font-serif: 'Inter Tight', 'Inter', ui-sans-serif, system-ui, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
 
-  --radius: 0.125rem;
+  /* 8px to match mockup --radius-md */
+  --radius: 0.5rem;
   --spacing: 0.25rem;
   --tracking-normal: -0.015em;
 
@@ -227,7 +230,7 @@ html {
 
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-sans);
-    @apply font-bold tracking-tight uppercase;
+    @apply font-semibold tracking-tight;
   }
   h1 { @apply text-4xl; }
   h2 { @apply text-3xl; }

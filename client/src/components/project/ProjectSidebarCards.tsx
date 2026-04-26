@@ -119,7 +119,7 @@ export function ProjectSidebarCards({
                 <Mail className="h-3 w-3" />{u.email}
               </span>
             ) : (
-              <span className="text-xs text-muted-foreground/50 italic">No email</span>
+              <span className="text-xs text-muted-foreground/50">No email</span>
             )}
             {userRole === "admin" && (
               <Button
@@ -334,7 +334,7 @@ export function ProjectSidebarCards({
               {expandedGroups.has("crew") && (
                 <div className="space-y-3 mt-2 ml-5">
                   {crewMembers.length > 0 ? crewMembers.map((u: any) => renderUserRow(u)) : (
-                    <p className="text-xs text-muted-foreground italic">No crew assigned</p>
+                    <p className="text-xs text-muted-foreground">No crew assigned</p>
                   )}
                 </div>
               )}
@@ -357,7 +357,7 @@ export function ProjectSidebarCards({
                   {allClients.length > 0 ? allClients.map((u: any) =>
                     renderUserRow(u, u.id === project.clientId ? "Project owner" : "Board invited")
                   ) : (
-                    <p className="text-xs text-muted-foreground italic">No client assigned</p>
+                    <p className="text-xs text-muted-foreground">No client assigned</p>
                   )}
                 </div>
               )}

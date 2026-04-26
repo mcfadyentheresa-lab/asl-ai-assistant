@@ -44,7 +44,7 @@ export default function Login() {
       <Card className="max-w-md w-full">
         <CardContent className="pt-8 pb-8 space-y-6">
           <div className="text-center space-y-2">
-            <h1 className="font-serif text-3xl font-bold text-primary">Aster &amp; Spruce</h1>
+            <h1 className="font-serif text-3xl font-semibold text-primary">Aster &amp; Spruce</h1>
             <p className="text-muted-foreground text-sm">Sign in to your workspace</p>
           </div>
           <form onSubmit={onSubmit} className="space-y-4" data-testid="form-login">
