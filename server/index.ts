@@ -10,19 +10,11 @@ if (missingVars.length > 0) {
   process.exit(1);
 }
 
-if (process.env.OPENID_DISABLED !== "true") {
-  const openidVars = ["OPENID_CLIENT_ID", "OPENID_ISSUER_URL"];
-  const missingOpenID = openidVars.filter((v) => !process.env[v]);
-  if (missingOpenID.length > 0) {
-    console.error(`FATAL: Missing OpenID environment variables: ${missingOpenID.join(", ")}`);
-    console.error(
-      "Set OPENID_DISABLED=true to skip OpenID authentication, or provide the missing variables.",
-    );
-    process.exit(1);
-  }
-} else {
-  console.log("OpenID authentication disabled via OPENID_DISABLED=true");
-}
+// Email + password auth has no extra required env vars (DATABASE_URL +
+// SESSION_SECRET, validated above, are sufficient). Optional vars:
+//   GMAIL_USER / GMAIL_APP_PASSWORD  - to send invites & resets
+//   APP_URL                          - canonical URL used in invite links
+//   AUTH_DEV_BYPASS=true             - dev-only escape hatch (NODE_ENV != production)
 // ─────────────────────────────────────────────────────────────────────────────
 
 import express, { type Request, Response, NextFunction } from "express";
