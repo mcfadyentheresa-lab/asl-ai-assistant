@@ -68,6 +68,7 @@ import { BudgetSnapshot } from "@/components/project/BudgetSnapshot";
 import { ProjectSidebarCards } from "@/components/project/ProjectSidebarCards";
 import { ProgressTab } from "@/components/project/ProgressTab";
 import { ClientProjectHeader } from "@/components/project/ClientProjectHeader";
+import { ProjectNowCard } from "@/components/project/ProjectNowCard";
 import type { ChecklistItem, BoardItem } from "@shared/schema";
 
 export default function ProjectDetails() {
@@ -252,15 +253,23 @@ export default function ProjectDetails() {
 
       {/* Client view: tall photo band + mono meta + 4-col dl row */}
       {userRole === "client" && (
-        <ClientProjectHeader
-          project={project}
-          milestones={milestones}
-          activityLog={activityLog}
-          isAdminUser={isAdminUser}
-          isUploadingHero={isUploadingHero}
-          onHeroFileChosen={handleHeroFileChosen}
-          onRemoveHero={handleRemoveHero}
-        />
+        <>
+          <ClientProjectHeader
+            project={project}
+            milestones={milestones}
+            activityLog={activityLog}
+            isAdminUser={isAdminUser}
+            isUploadingHero={isUploadingHero}
+            onHeroFileChosen={handleHeroFileChosen}
+            onRemoveHero={handleRemoveHero}
+          />
+          <ProjectNowCard
+            project={project}
+            milestones={milestones}
+            activityLog={activityLog}
+            users={users}
+          />
+        </>
       )}
 
       {/* Admin/Crew view: existing narrow hero image (above header). Renders if set; admins can upload/replace/remove. */}
