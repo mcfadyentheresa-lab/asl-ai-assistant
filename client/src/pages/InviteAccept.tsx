@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Loader2, CheckCircle2, AlertTriangle, Clock } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -23,6 +24,9 @@ export default function InviteAccept() {
   const { user, isLoading: authLoading } = useAuth();
   const [, navigate] = useLocation();
   const [acceptSuccess, setAcceptSuccess] = useState(false);
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [pwError, setPwError] = useState<string | null>(null);
 
   const { data: invite, isLoading, error } = useQuery<InviteValidation>({
     queryKey: ["/api/invites", token, "validate"],
@@ -36,24 +40,25 @@ export default function InviteAccept() {
   });
 
   const acceptMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", `/api/invites/${token}/accept`);
+    mutationFn: async (body?: { password?: string }) => {
+      const res = await apiRequest("POST", `/api/invites/${token}/accept`, body);
       return res.json();
     },
     onSuccess: (data) => {
       setAcceptSuccess(true);
       setTimeout(() => {
-        navigate(`/welcome?project=${data.projectId}`);
+        // Use hard nav so the new session cookie is picked up.
+        window.location.href = `/welcome?project=${data.projectId}`;
       }, 1500);
     },
   });
 
-  useEffect(() => {
-    if (!authLoading && !user && invite?.valid) {
-      const returnUrl = encodeURIComponent(`/invite/${token}`);
-      window.location.href = `/api/login?returnTo=${returnUrl}`;
-    }
-  }, [authLoading, user, invite, token]);
+  function submitWithPassword() {
+    setPwError(null);
+    if (password.length < 8) return setPwError("Password must be at least 8 characters");
+    if (password !== confirm) return setPwError("Passwords don't match");
+    acceptMutation.mutate({ password });
+  }
 
   if (isLoading || authLoading) {
     return (
@@ -142,7 +147,7 @@ export default function InviteAccept() {
               <Button
                 className="w-full"
                 size="lg"
-                onClick={() => acceptMutation.mutate()}
+                onClick={() => acceptMutation.mutate(undefined)}
                 disabled={acceptMutation.isPending}
                 data-testid="button-accept-invite"
               >
@@ -156,9 +161,42 @@ export default function InviteAccept() {
                 )}
               </Button>
             ) : (
-              <Button className="w-full" size="lg" onClick={() => window.location.href = `/api/login?returnTo=${encodeURIComponent(`/invite/${token}`)}`} data-testid="button-login-to-accept">
-                Log In to Accept
-              </Button>
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground text-center">Create a password to access your portal:</p>
+                <Input
+                  type="password"
+                  autoComplete="new-password"
+                  placeholder="Password (min 8 characters)"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  data-testid="input-invite-password"
+                />
+                <Input
+                  type="password"
+                  autoComplete="new-password"
+                  placeholder="Confirm password"
+                  value={confirm}
+                  onChange={(e) => setConfirm(e.target.value)}
+                  data-testid="input-invite-confirm"
+                />
+                {pwError && <p className="text-sm text-destructive">{pwError}</p>}
+                <Button
+                  className="w-full"
+                  size="lg"
+                  onClick={submitWithPassword}
+                  disabled={acceptMutation.isPending}
+                  data-testid="button-accept-invite"
+                >
+                  {acceptMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Setting up your portal...
+                    </>
+                  ) : (
+                    "Create Account & Continue"
+                  )}
+                </Button>
+              </div>
             )}
 
             {acceptMutation.isError && (

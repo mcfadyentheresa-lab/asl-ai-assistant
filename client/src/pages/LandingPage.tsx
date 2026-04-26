@@ -6,7 +6,7 @@ import craftImg from "@/assets/images/craft-interior.png";
 
 export default function LandingPage() {
   const handleLogin = () => {
-    window.location.href = "/api/login";
+    window.location.href = "/login";
   };
 
   return (

@@ -35,6 +35,10 @@ import SocialMediaGenerator from "@/pages/SocialMediaGenerator";
 import TableRedesignPlanner from "@/pages/TableRedesignPlanner";
 import CostEstimator from "@/pages/CostEstimator";
 import InviteAccept from "@/pages/InviteAccept";
+import Login from "@/pages/Login";
+import ForgotPassword from "@/pages/ForgotPassword";
+import ResetPassword from "@/pages/ResetPassword";
+import AcceptInvite from "@/pages/AcceptInvite";
 import Welcome from "@/pages/Welcome";
 import LandingPage from "@/pages/LandingPage";
 import NotFound from "@/pages/not-found";
@@ -87,6 +91,10 @@ function Router() {
   if (!user) {
     return (
       <Switch>
+        <Route path="/login" component={Login} />
+        <Route path="/forgot-password" component={ForgotPassword} />
+        <Route path="/reset-password/:token" component={ResetPassword} />
+        <Route path="/accept-invite/:token" component={AcceptInvite} />
         <Route path="/invite/:token" component={InviteAccept} />
         <Route component={LandingPage} />
       </Switch>
@@ -98,6 +106,11 @@ function Router() {
       <OnboardingGuard />
       <Switch>
         <Route path="/welcome" component={Welcome} />
+        <Route path="/login">
+          {() => { window.location.href = "/"; return null; }}
+        </Route>
+        <Route path="/accept-invite/:token" component={AcceptInvite} />
+        <Route path="/reset-password/:token" component={ResetPassword} />
         <Route path="/invite/:token" component={InviteAccept} />
         <Route>
           {() => (

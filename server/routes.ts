@@ -624,7 +624,12 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/invites/:token/accept", isAuthenticated, async (req: any, res) => {
+  // Client invite acceptance.
+  // - If the user is NOT logged in: they must provide { password } to set
+  //   their password. We then auto-login them.
+  // - If the user IS already logged in (rare; happens if they previously
+  //   accepted another invite), we just link this project to their account.
+  app.post("/api/invites/:token/accept", async (req: any, res) => {
     try {
       const invite = await storage.getClientInviteByToken(req.params.token);
       if (!invite) return res.status(404).json({ message: "Invite not found" });
@@ -636,12 +641,75 @@ export async function registerRoutes(
         return res.status(409).json({ message: "This invite has already been accepted" });
       }
 
+      const inviteEmail = invite.email?.toLowerCase().trim();
+      if (!inviteEmail) return res.status(400).json({ message: "Invite has no email" });
+
+      // Branch: not logged in → set password and link account.
+      if (!req.user) {
+        const password = typeof req.body?.password === "string" ? req.body.password : null;
+        if (!password || password.length < 8) {
+          return res.status(400).json({ message: "Password (min 8 characters) is required" });
+        }
+        const bcryptMod = await import("bcrypt");
+        const hash = await bcryptMod.default.hash(password, 12);
+
+        // Use the user record that the invite already pre-created (or find by email).
+        let user = invite.userId ? await authStorage.getUser(invite.userId) : undefined;
+        if (!user) {
+          const all = await authStorage.getUsers();
+          user = all.find((u) => u.email?.toLowerCase().trim() === inviteEmail);
+        }
+        if (!user) {
+          // Create a new client user.
+          user = await authStorage.upsertUser({
+            email: invite.email,
+            firstName: invite.firstName,
+            lastName: invite.lastName,
+            phone: invite.phone ?? null,
+            role: "client",
+          });
+        }
+
+        // Set the password and ensure role/profile.
+        const { db: _db } = await import("./db");
+        const { users: _users } = await import("@shared/models/auth");
+        const { eq: _eq } = await import("drizzle-orm");
+        await _db
+          .update(_users)
+          .set({
+            passwordHash: hash,
+            role: "client",
+            firstName: invite.firstName,
+            lastName: invite.lastName,
+            phone: invite.phone ?? null,
+            updatedAt: new Date(),
+          })
+          .where(_eq(_users.id, user.id));
+
+        await storage.updateClientInvite(invite.id, {
+          status: "accepted",
+          acceptedAt: new Date(),
+          userId: user.id,
+        });
+        await storage.updateProject(invite.projectId, { clientId: user.id });
+
+        // Auto-login.
+        return req.logIn(user, (err: any) => {
+          if (err) {
+            console.error("Auto-login after invite accept failed:", err);
+            return res.status(500).json({ message: "Account created. Please log in." });
+          }
+          broadcastProjectChange(invite.projectId, ["invites", "project"], "invite_accepted", undefined, user!.id);
+          res.json({ success: true, projectId: invite.projectId });
+        });
+      }
+
+      // Branch: already logged in — must match invite email.
       const userId = req.user.claims.sub;
       const currentUser = await authStorage.getUser(userId);
       const userEmail = currentUser?.email?.toLowerCase().trim();
-      const inviteEmail = invite.email?.toLowerCase().trim();
 
-      if (!userEmail || !inviteEmail || userEmail !== inviteEmail) {
+      if (!userEmail || userEmail !== inviteEmail) {
         return res.status(403).json({ message: "This invite was sent to a different email address. Please log in with the correct account." });
       }
 
