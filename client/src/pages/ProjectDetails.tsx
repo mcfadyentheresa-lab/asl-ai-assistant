@@ -207,9 +207,124 @@ export default function ProjectDetails() {
     archived: "Archived",
   };
 
+  const isAdminUser = user?.role === "admin";
+  const heroFileInputRef = useRef<HTMLInputElement>(null);
+  const { mutateAsync: uploadHeroImage, isPending: isUploadingHero } = useUploadImage();
+
+  const handleHeroFileChosen = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-selecting the same file later
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ title: "Image too large", description: "Max 10 MB.", variant: "destructive" });
+      return;
+    }
+    try {
+      const { url } = await uploadHeroImage(file);
+      updateProject(
+        { id: project.id, data: { thumbnailUrl: url } },
+        {
+          onSuccess: () => toast({ title: "Main image updated" }),
+          onError: (err: any) =>
+            toast({ title: "Couldn't save image", description: err.message, variant: "destructive" }),
+        },
+      );
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleRemoveHero = () => {
+    updateProject(
+      { id: project.id, data: { thumbnailUrl: null } },
+      {
+        onSuccess: () => toast({ title: "Main image removed" }),
+        onError: (err: any) =>
+          toast({ title: "Couldn't remove image", description: err.message, variant: "destructive" }),
+      },
+    );
+  };
+
   return (
     <div className={`min-h-screen bg-background ${safeActiveTab === "board" ? "h-[100dvh] flex flex-col overflow-hidden" : "pb-20"}`}>
       <Navbar />
+
+      {/* Project hero image (above header). Renders if set; admins can upload/replace/remove. */}
+      {(project.thumbnailUrl || isAdminUser) && (
+        <div
+          className="w-full bg-muted/30 border-b border-border/60 relative group"
+          data-testid="project-hero-image"
+        >
+          {project.thumbnailUrl ? (
+            <div className="w-full aspect-[4/1] md:aspect-[5/1] overflow-hidden">
+              <img
+                src={project.thumbnailUrl}
+                alt={project.name}
+                className="w-full h-full object-cover"
+                data-testid="img-project-hero"
+              />
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => heroFileInputRef.current?.click()}
+              disabled={isUploadingHero}
+              className="w-full aspect-[5/1] md:aspect-[6/1] flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors disabled:opacity-60"
+              data-testid="btn-upload-hero-empty"
+            >
+              {isUploadingHero ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <ImageIcon className="h-4 w-4" />
+              )}
+              <span className="text-xs">
+                {isUploadingHero ? "Uploading\u2026" : "Add main project image"}
+              </span>
+            </button>
+          )}
+
+          {isAdminUser && project.thumbnailUrl && (
+            <div className="absolute top-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => heroFileInputRef.current?.click()}
+                disabled={isUploadingHero}
+                className="h-7 px-2 text-[11px]"
+                data-testid="btn-replace-hero"
+              >
+                {isUploadingHero ? (
+                  <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                ) : (
+                  <Upload className="h-3 w-3 mr-1" />
+                )}
+                Replace
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={handleRemoveHero}
+                className="h-7 px-2 text-[11px]"
+                data-testid="btn-remove-hero"
+              >
+                <X className="h-3 w-3 mr-1" />
+                Remove
+              </Button>
+            </div>
+          )}
+
+          {isAdminUser && (
+            <input
+              ref={heroFileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/gif,image/webp"
+              onChange={handleHeroFileChosen}
+              className="hidden"
+              data-testid="input-hero-file"
+            />
+          )}
+        </div>
+      )}
 
       <div className="w-full border-b border-border/60 bg-background/90 backdrop-blur-sm" data-testid="project-hero">
         <div className="container px-5 md:px-8 py-4">

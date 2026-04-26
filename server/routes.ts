@@ -36,7 +36,13 @@ function asyncHandler(fn: (req: any, res: Response, next: NextFunction) => Promi
   };
 }
 
-const uploadDir = path.join(process.cwd(), "uploads");
+// Upload directory. Override with UPLOAD_DIR env var to point at a persistent
+// disk on Railway (e.g. /data/uploads when a volume is mounted there). Falls
+// back to a local ./uploads folder for dev. NOTE: on Railway without a
+// volume, files in this directory are wiped on every redeploy.
+const uploadDir = process.env.UPLOAD_DIR
+  ? path.resolve(process.env.UPLOAD_DIR)
+  : path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
