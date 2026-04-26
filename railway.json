@@ -5,7 +5,7 @@
     "buildCommand": "npm run build && npm run db:push"
   },
   "deploy": {
-    "startCommand": "npm run start",
+    "startCommand": "npm run bootstrap:admin || true && npm run start",
     "healthcheckPath": "/",
     "healthcheckTimeout": 100,
     "restartPolicyType": "ON_FAILURE",
