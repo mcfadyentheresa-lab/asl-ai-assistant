@@ -754,3 +754,55 @@ export const recentProjectViews = pgTable("recent_project_views", {
 ]);
 
 export type RecentProjectView = typeof recentProjectViews.$inferSelect;
+
+// ============================================================================
+// Tenant communication settings
+// One row per tenant. For now, single-tenant; designed for future multi-tenancy.
+// Controls SMS gating, quiet hours, invite SMS toggle, and per-tenant brand info.
+// See docs/PRODUCT_PHILOSOPHY.md — "SMS policy" and "White-label readiness".
+// ============================================================================
+export const tenantSettings = pgTable("tenant_settings", {
+  id: serial("id").primaryKey(),
+  tenantKey: text("tenant_key").notNull().unique().default("default"),
+
+  // Brand
+  brandName: text("brand_name").notNull().default("Aster & Spruce"),
+  brandWebsite: text("brand_website").default("https://asterandspruceliving.ca"),
+  supportEmail: text("support_email").default("info@asterandspruceliving.ca"),
+
+  // SMS gating (off by default per product philosophy)
+  smsEnabled: boolean("sms_enabled").notNull().default(false),
+  smsInvitesEnabled: boolean("sms_invites_enabled").notNull().default(true),
+  smsRequireApproval: boolean("sms_require_approval").notNull().default(true),
+
+  // Quiet hours (24h, in tenant timezone). Default 9am–7pm.
+  smsQuietHoursStart: integer("sms_quiet_hours_start").notNull().default(9),
+  smsQuietHoursEnd: integer("sms_quiet_hours_end").notNull().default(19),
+  smsQuietHoursDays: jsonb("sms_quiet_hours_days").$type<number[]>().notNull().default([1, 2, 3, 4, 5]),
+  timezone: text("timezone").notNull().default("America/Toronto"),
+
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export type TenantSettings = typeof tenantSettings.$inferSelect;
+export type InsertTenantSettings = typeof tenantSettings.$inferInsert;
+
+// ============================================================================
+// Feature flags
+// Per-tenant feature toggles. Used to stage rollouts (e.g., design-board v0.1
+// vs v1.0, AI co-pilot, presentation mode).
+// ============================================================================
+export const featureFlags = pgTable("feature_flags", {
+  id: serial("id").primaryKey(),
+  tenantKey: text("tenant_key").notNull().default("default"),
+  flagKey: text("flag_key").notNull(),
+  enabled: boolean("enabled").notNull().default(false),
+  description: text("description"),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("feature_flags_tenant_key_idx").on(table.tenantKey, table.flagKey),
+]);
+
+export type FeatureFlag = typeof featureFlags.$inferSelect;
+export type InsertFeatureFlag = typeof featureFlags.$inferInsert;
