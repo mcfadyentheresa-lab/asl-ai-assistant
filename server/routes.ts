@@ -3581,7 +3581,7 @@ Respond with valid JSON only:
     }
   });
 
-  // Google Drive export — Replit Google Drive connector integration
+  // Google Drive export — direct googleapis OAuth (no Replit connector).
   app.post("/api/social-posts/export-drive", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -3595,33 +3595,20 @@ Respond with valid JSON only:
       if (!parsed.success) return res.status(400).json({ message: "Invalid input" });
       if (parsed.data.postIds.length === 0) return res.json({ exported: [], folderId: null, folderName: "Aster & Spruce Social" });
 
-      const { ReplitConnectors } = await import("@replit/connectors-sdk");
-      const connectors = new ReplitConnectors();
+      const drive = await import("./integrations/googleDrive");
+      if (!drive.isDriveConfigured()) {
+        return res.status(503).json({
+          message: "Google Drive export is not configured. Set GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET, and GOOGLE_OAUTH_REFRESH_TOKEN.",
+        });
+      }
 
       const folderName = "Aster & Spruce Social";
-      let folderId: string | null = null;
-
-      const driveQuery = encodeURIComponent(`name='${folderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`);
-      const searchRes = await connectors.proxy("google-drive", `/drive/v3/files?q=${driveQuery}&fields=files(id,name)`, { method: "GET" });
-      if (!searchRes.ok) {
-        console.error("Drive search failed:", searchRes.status);
+      let folderId: string;
+      try {
+        folderId = await drive.ensureFolder(folderName);
+      } catch (err) {
+        console.error("Drive folder lookup/create failed:", err);
         return res.status(502).json({ message: "Could not connect to Google Drive" });
-      }
-      const searchData = await searchRes.json();
-      if (searchData.files && searchData.files.length > 0) {
-        folderId = searchData.files[0].id;
-      } else {
-        const createFolderRes = await connectors.proxy("google-drive", "/drive/v3/files", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: folderName, mimeType: "application/vnd.google-apps.folder" }),
-        });
-        if (!createFolderRes.ok) {
-          console.error("Drive folder creation failed:", createFolderRes.status);
-          return res.status(502).json({ message: "Could not create folder in Google Drive" });
-        }
-        const folderData = await createFolderRes.json();
-        folderId = folderData.id;
       }
 
       const exported: any[] = [];
@@ -3636,29 +3623,15 @@ Respond with valid JSON only:
 
         const captionContent = `${post.title}\n\nPlatform: ${post.platform}\nTone: ${post.tone || "—"}\nProject: ${projectName}\n\n---\n\n${post.copy}`;
 
-        const captionBoundary = "----FormBoundary" + randomUUID().replace(/-/g, "");
-        const captionMeta = JSON.stringify({
-          name: `${baseName}.txt`,
-          parents: folderId ? [folderId] : [],
-          mimeType: "text/plain",
-        });
-
-        const captionBodyParts = [
-          `--${captionBoundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${captionMeta}\r\n`,
-          `--${captionBoundary}\r\nContent-Type: text/plain\r\n\r\n${captionContent}\r\n`,
-          `--${captionBoundary}--`,
-        ];
-
-        const captionUploadRes = await connectors.proxy("google-drive", "/upload/drive/v3/files?uploadType=multipart", {
-          method: "POST",
-          headers: { "Content-Type": `multipart/related; boundary=${captionBoundary}` },
-          body: captionBodyParts.join(""),
-        });
-
         let captionFileId: string | null = null;
-        if (captionUploadRes.ok) {
-          const d = await captionUploadRes.json();
-          captionFileId = d.id || null;
+        try {
+          captionFileId = await drive.uploadText({
+            folderId,
+            name: `${baseName}.txt`,
+            content: captionContent,
+          });
+        } catch (err) {
+          console.error("Caption upload to Drive failed for post", postId, err);
         }
 
         let photoFileId: string | null = null;
@@ -3676,27 +3649,12 @@ Respond with valid JSON only:
               const mimeMap: Record<string, string> = { ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".gif": "image/gif", ".webp": "image/webp" };
               const imgContentType = mimeMap[extLower] || "image/jpeg";
               const ext = imgContentType.includes("png") ? "png" : imgContentType.includes("webp") ? "webp" : "jpg";
-              const imgBoundary = "----FormBoundary" + randomUUID().replace(/-/g, "");
-              const imgMeta = JSON.stringify({
+              photoFileId = await drive.uploadBuffer({
+                folderId,
                 name: `${baseName}.${ext}`,
-                parents: folderId ? [folderId] : [],
+                buffer: imgBuffer,
                 mimeType: imgContentType,
               });
-              const imgBody = Buffer.concat([
-                Buffer.from(`--${imgBoundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${imgMeta}\r\n--${imgBoundary}\r\nContent-Type: ${imgContentType}\r\nContent-Transfer-Encoding: base64\r\n\r\n`),
-                Buffer.from(imgBuffer.toString("base64")),
-                Buffer.from(`\r\n--${imgBoundary}--`),
-              ]);
-
-              const imgUploadRes = await connectors.proxy("google-drive", "/upload/drive/v3/files?uploadType=multipart", {
-                method: "POST",
-                headers: { "Content-Type": `multipart/related; boundary=${imgBoundary}` },
-                body: imgBody.toString(),
-              });
-              if (imgUploadRes.ok) {
-                const imgData = await imgUploadRes.json();
-                photoFileId = imgData.id || null;
-              }
             }
           } catch (photoErr) {
             console.error("Photo upload to Drive failed for post", postId, photoErr);
