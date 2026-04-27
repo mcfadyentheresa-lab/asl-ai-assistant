@@ -110,6 +110,10 @@ export function ClientProjectHeader({
   const isRealValue = (v: string | null | undefined): v is string =>
     typeof v === "string" && v.trim() !== "" && v.trim() !== "—";
 
+  const phaseDuplicatesStatus =
+    typeof project.status === "string" &&
+    phase.trim().toLowerCase() === project.status.trim().toLowerCase();
+
   const dlItems: Array<{
     key: string;
     label: string;
@@ -125,7 +129,10 @@ export function ClientProjectHeader({
       value: nextWalkthrough,
       testId: "text-next-walkthrough",
     },
-  ].filter((item) => isRealValue(item.value));
+  ].filter((item) => {
+    if (item.key === "phase" && phaseDuplicatesStatus) return false;
+    return isRealValue(item.value);
+  });
 
   const dlGridCols =
     dlItems.length >= 4
