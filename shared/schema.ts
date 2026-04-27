@@ -156,7 +156,7 @@ export const calendarEvents = pgTable("calendar_events", {
 export const canvasElements = pgTable("canvas_elements", {
   id: serial("id").primaryKey(),
   boardId: integer("board_id").notNull().references(() => planningBoards.id, { onDelete: "cascade" }),
-  type: text("type").notNull(), // note, todo, column, board_link, link, image, color_swatch, section_header
+  type: text("type").notNull(), // text, surface, todo, column, board_link, link, image, room_zone, draw, hardware, product, connector. Legacy: note, plain_text, callout, section_header (-> text), color_swatch, material (-> surface) — lazy-migrated on read
   x: integer("x").notNull().default(0),
   y: integer("y").notNull().default(0),
   width: integer("width").notNull().default(240),

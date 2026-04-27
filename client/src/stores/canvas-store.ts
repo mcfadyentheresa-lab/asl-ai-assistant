@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { CanvasElement } from "@shared/schema";
 import { api, buildUrl } from "@shared/routes";
+import { migrateElement, migrateElements } from "@/lib/board-element-migration";
 
 type UndoAction =
   | { type: "create"; elementId: number }
@@ -44,14 +45,15 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
 
   setElements: (elements) => {
     const map: Record<number, CanvasElement> = {};
-    elements.forEach((e) => { map[e.id] = e; });
+    migrateElements(elements).forEach((e) => { map[e.id] = e; });
     set({ elements: map, dirtyIds: new Set() });
   },
   setBoardId: (id) => set({ boardId: id, undoStack: [] }),
   setLoading: (loading) => set({ loading }),
 
   addElement: (element) => {
-    set((s) => ({ elements: { ...s.elements, [element.id]: element } }));
+    const migrated = migrateElement(element);
+    set((s) => ({ elements: { ...s.elements, [migrated.id]: migrated } }));
   },
   updateElement: (id, updates) => {
     set((s) => {
