@@ -53,6 +53,7 @@ import {
   ChefHat, Bath, Home, FileText, LayoutPanelLeft, LayoutGrid, Move,
   Lock, LockOpen, Hand, Wrench, Check,
   Spline, MoveRight, Slash, Droplet,
+  ChevronDown, ChevronRight,
 } from "lucide-react";
 import HardwarePickerDialog, { type HardwareDraft } from "@/components/board/HardwarePickerDialog";
 import PaletteExtractionDialog, { type PaletteAddPayload } from "@/components/board/PaletteExtractionDialog";
@@ -265,9 +266,9 @@ const ELEMENT_DEFAULTS: Record<string, { width: number; height: number; content:
   column: { width: 240, height: 400, content: { title: "New Column", subtitle: "0 cards" } },
   board_link: { width: 180, height: 80, content: { title: "Board", targetBoardId: null } },
   link: { width: 240, height: 100, content: { title: "", url: "" } },
-  image: { width: 240, height: 200, content: { url: "", caption: "" } },
+  image: { width: 360, height: 260, content: { url: "", caption: "" } },
   color_swatch: { width: 220, height: 220, content: { color: "#1e3a2f", name: "Forest Green", hex: "#1E3A2F" } },
-  section_header: { width: 600, height: 40, content: { title: "Section Title" } },
+  section_header: { width: 600, height: 56, content: { title: "Section Title", tracking: "normal", align: "left", size: "lg" } },
   draw: { width: 400, height: 300, content: { paths: [], color: "#000000", strokeWidth: 2 } },
   room_zone: { width: 500, height: 400, content: { title: "Room Name", color: "#f0ede8", opacity: 0.5 } },
   material: { width: 220, height: 180, content: { name: "Material", supplier: "", code: "", imageUrl: "", notes: "" } },
@@ -370,6 +371,22 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; elementId: number } | null>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showImagePopup, setShowImagePopup] = useState(false);
+  const [railCollapsed, setRailCollapsed] = useState<Record<string, boolean>>(() => {
+    if (typeof window === "undefined") return {};
+    try {
+      const raw = window.localStorage.getItem("asl-board-rail-sections");
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  });
+  const toggleRailSection = (label: string) => {
+    setRailCollapsed((prev) => {
+      const next = { ...prev, [label]: !prev[label] };
+      try { window.localStorage.setItem("asl-board-rail-sections", JSON.stringify(next)); } catch {}
+      return next;
+    });
+  };
   const [showHardwareDialog, setShowHardwareDialog] = useState(false);
   const pendingHardwareDropRef = useRef<{ x: number; y: number } | null>(null);
   const [showPaletteDialog, setShowPaletteDialog] = useState(false);
@@ -2466,7 +2483,34 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     const parentCol = el.parentColumnId ? elements[el.parentColumnId] : null;
     const effectiveZ = parentCol ? Math.max(el.zIndex, (parentCol.zIndex || 0) + 1) : el.zIndex;
     const isDropping = droppingIds.has(el.id);
-    const cardBase = `absolute rounded select-none ${isUnlocked ? "ring-2 ring-amber-400/70 shadow-lg" : isSelected && !activeEdit ? "ring-2 ring-primary/50 shadow-lg" : "shadow-sm"} ${isDragging ? "opacity-80 cursor-grabbing" : ""} ${isDropping && !isDragging ? "transition-[left,top,width,height] duration-300 ease-out" : "transition-shadow"}`;
+    const cardBase = `board-card absolute rounded select-none ${isUnlocked ? "ring-2 ring-amber-400/70" : ""} ${isSelected && !activeEdit ? "is-selected" : ""} ${isDragging ? "is-dragging opacity-80 cursor-grabbing" : ""} ${isDropping && !isDragging ? "transition-[left,top,width,height] duration-300 ease-out" : ""}`;
+
+    // Gesture rule: single tap = select. Double-tap = activate. Long-press = move (touch).
+    // Activation is the type-specific "open / edit / interact" action — must never fire on a single tap.
+    const handleActivate = () => {
+      if (el.type === "board_link" && c.targetBoardId) {
+        setSelectedBoardId(c.targetBoardId);
+        return;
+      }
+      if (el.type === "image" && !c.url) {
+        triggerImageUpload(el.id);
+        return;
+      }
+      if (el.type === "link" && c.url) {
+        window.open(c.url, "_blank", "noopener,noreferrer");
+        return;
+      }
+      if (el.type === "hardware" && c.vendorUrl) {
+        window.open(c.vendorUrl, "_blank", "noopener,noreferrer");
+        return;
+      }
+      if (el.type === "product" && c.url) {
+        window.open(c.url, "_blank", "noopener,noreferrer");
+        return;
+      }
+      // Other types: activation just selects (which already enters edit mode for editable cards).
+      setEditingId(el.id);
+    };
 
     const handleClick = (e: React.MouseEvent) => {
       e.stopPropagation();
@@ -2481,13 +2525,45 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
         }
         return;
       }
-      if (el.type === "board_link" && c.targetBoardId) {
-        setSelectedBoardId(c.targetBoardId);
-        return;
-      }
+      // Single tap = select only. Never opens / uploads / navigates.
       setEditingId(el.id);
       setSelectedConnectorId(null);
     };
+
+    const handleDoubleClick = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (connectMode) return;
+      handleActivate();
+    };
+
+    // Whether this element has a meaningful "activate" action that differs from select.
+    const hasActivateAction =
+      (el.type === "board_link" && !!c.targetBoardId) ||
+      (el.type === "image" && !c.url) ||
+      (el.type === "link" && !!c.url) ||
+      (el.type === "hardware" && !!c.vendorUrl) ||
+      (el.type === "product" && !!c.url);
+
+    // Open-icon button shown on selected element as an explicit alternative to double-tap.
+    const renderOpenButton = () => (
+      hasActivateAction ? (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-11 w-11 md:h-6 md:w-6 hover:bg-primary/10 hover:text-primary"
+              onClick={(e) => { e.stopPropagation(); handleActivate(); }}
+              data-testid={`button-activate-${el.id}`}
+              aria-label="Open"
+            >
+              <ExternalLink className="h-3 w-3" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="text-xs">Open (or double-tap)</TooltipContent>
+        </Tooltip>
+      ) : null
+    );
 
     const resizeHandles = (elId: number) => {
       if (lockLayout) return null;
@@ -2554,6 +2630,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             startDrag(el.id, e);
           }}
           onClick={handleClick}
+          onDoubleClick={handleDoubleClick}
           onContextMenu={(e) => openContextMenu(e, el.id)}
           onTouchStart={handleElementTouchStart(el.id)}
           onTouchEnd={handleLongPressEnd}
@@ -2622,6 +2699,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           className="absolute select-none"
           style={{ left: el.x, top: el.y, width: el.width, zIndex: effectiveZ }}
           onClick={handleClick}
+          onDoubleClick={handleDoubleClick}
           onContextMenu={(e) => openContextMenu(e, el.id)}
           onTouchStart={handleElementTouchStart(el.id)}
           onTouchEnd={handleLongPressEnd}
@@ -2629,27 +2707,75 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           onMouseDown={(e) => startDrag(el.id, e)}
           data-testid={`element-section-header-${el.id}`}
         >
-          {isSelected && (
-            <div className="absolute -top-8 right-0 flex gap-1">
-              <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleDeleteElement(el.id)} data-testid={`button-delete-${el.id}`}>
-                <Trash2 className="h-3 w-3" />
-              </Button>
-            </div>
-          )}
-          {isSelected ? (
-            <input
-              className="w-full bg-transparent border-none text-lg font-serif font-semibold text-foreground/70 outline-none pb-1"
-              style={{ borderBottom: "1px solid hsl(var(--border))" }}
-              defaultValue={c.title}
-              onBlur={(e) => handleUpdateContent(el.id, { ...c, title: e.target.value })}
-              autoFocus
-              data-testid={`input-section-title-${el.id}`}
-            />
-          ) : (
-            <div className="text-lg font-serif font-semibold text-foreground/70 border-b border-border pb-1 cursor-grab" data-testid={`text-section-title-${el.id}`}>
-              {c.title || "Section Title"}
-            </div>
-          )}
+          {(() => {
+            const tracking = (c.tracking as "tight" | "normal" | "wide" | undefined) || "normal";
+            const align = (c.align as "left" | "center" | undefined) || "left";
+            const size = (c.size as "sm" | "md" | "lg" | undefined) || "lg";
+            const sizeClass = size === "sm" ? "text-xl" : size === "md" ? "text-2xl" : "text-2xl md:text-3xl";
+            const alignClass = align === "center" ? "text-center" : "text-left";
+            const headerClass = `board-section-header tracking-${tracking} ${sizeClass} ${alignClass} text-foreground/85`;
+            return (
+              <>
+                {isSelected && (
+                  <div className="absolute -top-9 right-0 flex items-center gap-1 bg-card/90 backdrop-blur border border-border rounded-md shadow-sm px-1 py-0.5">
+                    <div className="flex items-center gap-0.5 px-1 text-[10px] font-mono text-muted-foreground">
+                      {(["sm","md","lg"] as const).map((s) => (
+                        <button
+                          key={s}
+                          type="button"
+                          className={`px-1.5 py-0.5 rounded hover:bg-primary/10 transition-colors ${size === s ? "bg-primary/15 text-primary" : ""}`}
+                          onClick={() => handleUpdateContent(el.id, { ...c, size: s })}
+                          data-testid={`section-size-${s}-${el.id}`}
+                        >{s.toUpperCase()}</button>
+                      ))}
+                    </div>
+                    <Separator orientation="vertical" className="h-4" />
+                    <div className="flex items-center gap-0.5 px-1 text-[10px] font-mono text-muted-foreground">
+                      {(["tight","normal","wide"] as const).map((t) => (
+                        <button
+                          key={t}
+                          type="button"
+                          className={`px-1.5 py-0.5 rounded hover:bg-primary/10 transition-colors ${tracking === t ? "bg-primary/15 text-primary" : ""}`}
+                          onClick={() => handleUpdateContent(el.id, { ...c, tracking: t })}
+                          data-testid={`section-tracking-${t}-${el.id}`}
+                        >{t}</button>
+                      ))}
+                    </div>
+                    <Separator orientation="vertical" className="h-4" />
+                    <div className="flex items-center gap-0.5 px-1">
+                      {(["left","center"] as const).map((a) => (
+                        <button
+                          key={a}
+                          type="button"
+                          className={`px-1.5 py-0.5 rounded hover:bg-primary/10 transition-colors text-[10px] font-mono ${align === a ? "bg-primary/15 text-primary" : "text-muted-foreground"}`}
+                          onClick={() => handleUpdateContent(el.id, { ...c, align: a })}
+                          data-testid={`section-align-${a}-${el.id}`}
+                        >{a === "left" ? "L" : "C"}</button>
+                      ))}
+                    </div>
+                    <Separator orientation="vertical" className="h-4" />
+                    <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleDeleteElement(el.id)} data-testid={`button-delete-${el.id}`}>
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                )}
+                {isSelected ? (
+                  <input
+                    className={`w-full bg-transparent border-none ${headerClass} outline-none pb-1`}
+                    style={{ borderBottom: "1px solid hsl(var(--border))" }}
+                    defaultValue={c.title}
+                    onBlur={(e) => handleUpdateContent(el.id, { ...c, title: e.target.value })}
+                    autoFocus
+                    data-testid={`input-section-title-${el.id}`}
+                  />
+                ) : (
+                  <div className={`${headerClass} border-b border-border/60 pb-1 cursor-grab`} data-testid={`text-section-title-${el.id}`}>
+                    {c.title || "Section Title"}
+                  </div>
+                )}
+              </>
+            );
+          })()}
         </div>
       );
     }
@@ -2666,6 +2792,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             startDrag(el.id, e);
           }}
           onClick={handleClick}
+          onDoubleClick={handleDoubleClick}
           onContextMenu={(e) => openContextMenu(e, el.id)}
           onTouchStart={handleElementTouchStart(el.id)}
           onTouchEnd={handleLongPressEnd}
@@ -2701,6 +2828,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           </div>
           {isSelected && (
             <div className="absolute -top-8 right-0 flex gap-1">
+              {renderOpenButton()}
               <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleDeleteElement(el.id)} data-testid={`button-delete-${el.id}`}>
                 <Trash2 className="h-3 w-3" />
               </Button>
@@ -2724,6 +2852,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             startDrag(el.id, e);
           }}
           onClick={handleClick}
+          onDoubleClick={handleDoubleClick}
           onContextMenu={(e) => openContextMenu(e, el.id)}
           onTouchStart={handleElementTouchStart(el.id)}
           onTouchEnd={handleLongPressEnd}
@@ -2796,6 +2925,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           </div>
           {isSelected && (
             <div className="absolute -top-8 right-0 flex gap-1">
+              {renderOpenButton()}
               <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleDeleteElement(el.id)} data-testid={`button-delete-${el.id}`}>
                 <Trash2 className="h-3 w-3" />
               </Button>
@@ -2862,6 +2992,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             ...(hasCustomBg ? { backgroundColor: c.backgroundColor } : {}),
           }}
           onClick={handleClick}
+          onDoubleClick={handleDoubleClick}
           onContextMenu={(e) => openContextMenu(e, el.id)}
           onTouchStart={handleElementTouchStart(el.id)}
           onTouchEnd={handleLongPressEnd}
@@ -2947,6 +3078,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             startDrag(el.id, e);
           }}
           onClick={handleClick}
+          onDoubleClick={handleDoubleClick}
           onContextMenu={(e) => openContextMenu(e, el.id)}
           onTouchStart={handleElementTouchStart(el.id)}
           onTouchEnd={handleLongPressEnd}
@@ -3050,6 +3182,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           </div>
           {isSelected && (
             <div className="absolute -top-8 right-0 flex gap-1">
+              {renderOpenButton()}
               <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleDeleteElement(el.id)} data-testid={`button-delete-${el.id}`}>
                 <Trash2 className="h-3 w-3" />
               </Button>
@@ -3071,6 +3204,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             startDrag(el.id, e);
           }}
           onClick={handleClick}
+          onDoubleClick={handleDoubleClick}
           onContextMenu={(e) => openContextMenu(e, el.id)}
           onTouchStart={handleElementTouchStart(el.id)}
           onTouchEnd={handleLongPressEnd}
@@ -3171,6 +3305,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           )}
           {isSelected && (
             <div className="absolute -top-8 right-0 flex gap-1">
+              {renderOpenButton()}
               <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleDeleteElement(el.id)} data-testid={`button-delete-${el.id}`}>
                 <Trash2 className="h-3 w-3" />
               </Button>
@@ -3199,6 +3334,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             startDrag(el.id, e);
           }}
           onClick={handleClick}
+          onDoubleClick={handleDoubleClick}
           onContextMenu={(e) => openContextMenu(e, el.id)}
           onTouchStart={handleElementTouchStart(el.id)}
           onTouchEnd={handleLongPressEnd}
@@ -3274,6 +3410,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           )}
           {isSelected && (
             <div className="absolute -top-8 right-0 flex gap-1">
+              {renderOpenButton()}
               <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleDeleteElement(el.id)} data-testid={`button-delete-${el.id}`}>
                 <Trash2 className="h-3 w-3" />
               </Button>
@@ -3296,6 +3433,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             startDrag(el.id, e);
           }}
           onClick={handleClick}
+          onDoubleClick={handleDoubleClick}
           onContextMenu={(e) => openContextMenu(e, el.id)}
           onTouchStart={handleElementTouchStart(el.id)}
           onTouchEnd={handleLongPressEnd}
@@ -3337,6 +3475,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           </div>
           {isSelected && (
             <div className="absolute -top-8 right-0 flex gap-1">
+              {renderOpenButton()}
               <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleDeleteElement(el.id)} data-testid={`button-delete-${el.id}`}>
                 <Trash2 className="h-3 w-3" />
               </Button>
@@ -3358,6 +3497,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             startDrag(el.id, e);
           }}
           onClick={handleClick}
+          onDoubleClick={handleDoubleClick}
           onContextMenu={(e) => openContextMenu(e, el.id)}
           onTouchStart={handleElementTouchStart(el.id)}
           onTouchEnd={handleLongPressEnd}
@@ -3440,6 +3580,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             startDrag(el.id, e);
           }}
           onClick={handleClick}
+          onDoubleClick={handleDoubleClick}
           onContextMenu={(e) => openContextMenu(e, el.id)}
           onTouchStart={handleElementTouchStart(el.id)}
           onTouchEnd={handleLongPressEnd}
@@ -3491,10 +3632,13 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     }
 
     if (el.type === "image") {
+      // Edge-bleed when at default (or larger) size with no caption — the image fills the card to the bezel.
+      const isDefaultIsh = (el.width >= 320) && !c.caption;
+      const isEdgeBleed = !!c.url && isDefaultIsh && !isSelected;
       return (
         <div
           key={el.id}
-          className={`${cardBase} bg-card border border-border overflow-hidden cursor-grab`}
+          className={`${cardBase} bg-card overflow-hidden cursor-grab ${isSelected || activeEdit ? "border border-border" : ""}`}
           style={{ left: el.x, top: el.y, width: el.width, ...(el.height ? { height: el.height } : {}), zIndex: effectiveZ }}
           onMouseDown={(e) => {
             const tag = (e.target as HTMLElement).tagName.toLowerCase();
@@ -3502,6 +3646,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             startDrag(el.id, e);
           }}
           onClick={handleClick}
+          onDoubleClick={handleDoubleClick}
           onContextMenu={(e) => openContextMenu(e, el.id)}
           onTouchStart={handleElementTouchStart(el.id)}
           onTouchEnd={handleLongPressEnd}
@@ -3509,12 +3654,16 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           data-testid={`element-image-${el.id}`}
         >
           {c.url ? (
-            <img src={c.url} alt={c.caption || ""} className="w-full object-cover pointer-events-none select-none" style={{ height: el.height ? Math.max(el.height - (c.caption ? 32 : 0), 40) : "auto", maxHeight: el.height ? undefined : 300 }} draggable={false} />
+            <>
+              <img src={c.url} alt={c.caption || ""} className="w-full object-cover pointer-events-none select-none" style={{ height: el.height ? Math.max(el.height - ((c.caption && !isEdgeBleed) ? 32 : 0), 40) : "auto", maxHeight: el.height ? undefined : 300 }} draggable={false} />
+              {isEdgeBleed && (isSelected || isUnlocked) && c.caption && (
+                <div className="absolute bottom-2 left-2 max-w-[80%] bg-card/85 backdrop-blur px-2 py-0.5 rounded text-[10px] text-foreground/80 truncate pointer-events-none">{c.caption}</div>
+              )}
+            </>
           ) : (
             <div
-              className="bg-muted flex flex-col items-center justify-center gap-2 cursor-pointer"
+              className="bg-muted flex flex-col items-center justify-center gap-2"
               style={{ height: el.height ? Math.max(el.height, 60) : 120 }}
-              onClick={(e) => { e.stopPropagation(); triggerImageUpload(el.id); }}
               data-testid={`image-upload-area-${el.id}`}
             >
               {isUploading && uploadTargetId === el.id ? (
@@ -3522,48 +3671,51 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
               ) : (
                 <>
                   <Upload className="h-6 w-6 text-muted-foreground/50" />
-                  <span className="text-[10px] text-muted-foreground/60">Click to upload image</span>
+                  <span className="text-[10px] text-muted-foreground/60">Double-tap to upload</span>
                 </>
               )}
             </div>
           )}
-          <div className="p-3">
-            {isSelected ? (
-              <div className="space-y-2">
-                <div className="flex gap-1.5">
+          {!isEdgeBleed && (
+            <div className="p-3">
+              {isSelected ? (
+                <div className="space-y-2">
+                  <div className="flex gap-1.5">
+                    <input
+                      className="flex-1 bg-transparent border-none text-xs outline-none"
+                      defaultValue={c.url}
+                      placeholder="Image URL..."
+                      onBlur={(e) => handleUpdateContent(el.id, { ...c, url: e.target.value })}
+                      data-testid={`input-image-url-${el.id}`}
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-xs shrink-0"
+                      onClick={(e) => { e.stopPropagation(); triggerImageUpload(el.id); }}
+                      disabled={isUploading}
+                      data-testid={`button-upload-image-${el.id}`}
+                    >
+                      {isUploading && uploadTargetId === el.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
+                    </Button>
+                  </div>
                   <input
-                    className="flex-1 bg-transparent border-none text-xs outline-none"
-                    defaultValue={c.url}
-                    placeholder="Image URL..."
-                    onBlur={(e) => handleUpdateContent(el.id, { ...c, url: e.target.value })}
-                    data-testid={`input-image-url-${el.id}`}
+                    className="w-full bg-transparent border-none text-xs text-muted-foreground outline-none"
+                    defaultValue={c.caption}
+                    placeholder="Caption (optional)"
+                    onBlur={(e) => handleUpdateContent(el.id, { ...c, caption: e.target.value })}
+                    data-testid={`input-image-caption-${el.id}`}
                   />
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 px-2 text-xs shrink-0"
-                    onClick={(e) => { e.stopPropagation(); triggerImageUpload(el.id); }}
-                    disabled={isUploading}
-                    data-testid={`button-upload-image-${el.id}`}
-                  >
-                    {isUploading && uploadTargetId === el.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
-                  </Button>
                 </div>
-                <input
-                  className="w-full bg-transparent border-none text-xs text-muted-foreground outline-none"
-                  defaultValue={c.caption}
-                  placeholder="Caption (optional)"
-                  onBlur={(e) => handleUpdateContent(el.id, { ...c, caption: e.target.value })}
-                  data-testid={`input-image-caption-${el.id}`}
-                />
-              </div>
-            ) : (
-              c.caption && <div className="text-xs text-muted-foreground">{c.caption}</div>
-            )}
-          </div>
+              ) : (
+                c.caption && <div className="text-xs text-muted-foreground">{c.caption}</div>
+              )}
+            </div>
+          )}
           {isSelected && (
             <>
               <div className="absolute -top-8 right-0 flex gap-1">
+                {renderOpenButton()}
                 {effectiveRole !== "client" && c.url && (
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -3611,6 +3763,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             startDrag(el.id, e);
           }}
           onClick={handleClick}
+          onDoubleClick={handleDoubleClick}
           onContextMenu={(e) => openContextMenu(e, el.id)}
           onTouchStart={handleElementTouchStart(el.id)}
           onTouchEnd={handleLongPressEnd}
@@ -3643,6 +3796,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           </div>
           {isSelected && (
             <div className="absolute -top-8 right-0 flex gap-1">
+              {renderOpenButton()}
               <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleDeleteElement(el.id)} data-testid={`button-delete-${el.id}`}>
                 <Trash2 className="h-3 w-3" />
               </Button>
@@ -3705,11 +3859,13 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
 
   return (
     <div className="flex flex-col h-full overflow-hidden" data-testid="spatial-canvas-root">
-      {/* Board selector bar */}
-      <div className="flex items-center gap-1.5 mb-1 flex-wrap mobile-landscape:flex-nowrap mobile-landscape:overflow-x-auto mobile-landscape:mb-0 shrink-0">
+      {/* Top toolbar — split into two clusters: board management (left) and canvas controls (right) */}
+      <div className="flex items-center gap-1.5 mb-1 flex-wrap mobile-landscape:flex-nowrap mobile-landscape:overflow-x-auto mobile-landscape:mb-0 shrink-0 px-2 py-1.5 bg-card/80 backdrop-blur border-b border-border" data-testid="canvas-top-toolbar">
+        {/* Left cluster — board management */}
+        <div className="flex items-center gap-1.5">
         {!isLoadingBoards && boards.length > 0 && (
           <Select value={String(selectedBoardId || "")} onValueChange={(v) => setSelectedBoardId(Number(v))}>
-            <SelectTrigger className="w-[200px] mobile-landscape:w-[140px]" data-testid="select-board-trigger">
+            <SelectTrigger className="w-[200px] mobile-landscape:w-[140px] h-8 bg-transparent" data-testid="select-board-trigger">
               <SelectValue placeholder="Select board" />
             </SelectTrigger>
             <SelectContent>
@@ -3721,30 +3877,14 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             </SelectContent>
           </Select>
         )}
-        <Button variant="outline" size="sm" onClick={() => { setNewBoardName(""); setShowNewBoardDialog(true); }} data-testid="button-new-board">
+        <Button variant="ghost" size="sm" className="h-8 hover:bg-primary/10 hover:text-primary" onClick={() => { setNewBoardName(""); setShowNewBoardDialog(true); }} data-testid="button-new-board">
           <Plus className="h-3.5 w-3.5 mobile-landscape:mr-0 mr-1" /> <span className="mobile-landscape:hidden">New Board</span>
         </Button>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="secondary" size="sm" disabled={isUploading} data-testid="button-add-board-image">
-              {isUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <ImagePlus className="h-3.5 w-3.5 mr-1" />}
-              <span className="mobile-landscape:hidden">Add Image</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            <DropdownMenuItem onClick={() => fileInputRef.current?.click()} data-testid="menu-add-image-device">
-              <ImagePlus className="h-4 w-4 mr-2" /> Upload from Device
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => { setImageUrlInput(""); setShowImagePopup(true); }} data-testid="menu-add-image-url">
-              <Link2 className="h-4 w-4 mr-2" /> Paste Image URL
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
         {selectedBoardId && (
           <>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" data-testid="button-board-menu">
+                <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-primary/10 hover:text-primary" data-testid="button-board-menu">
                   <MoreVertical className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
@@ -3771,6 +3911,8 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             </DropdownMenu>
           </>
         )}
+        </div>
+        <Separator orientation="vertical" className="h-5 mx-1.5 hidden md:block" />
         {(selectedBoard?.linkedUserIds?.length ?? 0) > 0 && (
           <div className="hidden md:flex items-center gap-1" data-testid="badges-linked-people">
             <div className="flex -space-x-1.5">
@@ -3848,10 +3990,11 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
         })()}
         </div>
         <div className="flex-1" />
-        <div className="flex items-center gap-1">
+        {/* Right cluster — canvas controls */}
+        <div className="flex items-center gap-0.5">
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button size="icon" variant="ghost" onClick={handleUndo} disabled={undoStack.length === 0} data-testid="button-undo">
+              <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-primary/10 hover:text-primary" onClick={handleUndo} disabled={undoStack.length === 0} data-testid="button-undo">
                 <Undo2 className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
@@ -3861,12 +4004,12 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             <TooltipTrigger asChild>
               <Button
                 size="icon"
-                variant={lockLayout ? "default" : "ghost"}
+                variant="ghost"
                 onClick={toggleLockLayout}
                 aria-pressed={lockLayout}
                 aria-label="Lock layout"
                 data-testid="button-lock-layout"
-                className="min-h-11 min-w-11"
+                className={`h-8 w-8 ${lockLayout ? "bg-primary/15 text-primary" : "hover:bg-primary/10 hover:text-primary"}`}
               >
                 {lockLayout ? <Lock className="h-4 w-4" /> : <LockOpen className="h-4 w-4" />}
               </Button>
@@ -3879,12 +4022,12 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             <TooltipTrigger asChild>
               <Button
                 size="icon"
-                variant={fingerDrawing ? "default" : "ghost"}
+                variant="ghost"
                 onClick={toggleFingerDrawing}
                 aria-pressed={fingerDrawing}
                 aria-label="Finger drawing"
                 data-testid="button-finger-drawing"
-                className="min-h-11 min-w-11"
+                className={`h-8 w-8 ${fingerDrawing ? "bg-primary/15 text-primary" : "hover:bg-primary/10 hover:text-primary"}`}
               >
                 <Hand className="h-4 w-4" />
               </Button>
@@ -3893,22 +4036,22 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
               {fingerDrawing ? "Finger drawing on (Pencil always draws)" : "Finger drawing off — fingers pan"}
             </TooltipContent>
           </Tooltip>
-          <div className="hidden md:flex items-center gap-1">
+          <div className="hidden md:flex items-center gap-0.5">
           <Separator orientation="vertical" className="h-4 mx-1" />
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button size="icon" variant="ghost" onClick={() => setZoom((z) => Math.max(0.15, z - 0.1))} data-testid="button-zoom-out">
+              <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-primary/10 hover:text-primary" onClick={() => setZoom((z) => Math.max(0.15, z - 0.1))} data-testid="button-zoom-out">
                 <ZoomOut className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom" className="text-xs">Zoom Out</TooltipContent>
           </Tooltip>
-          <button className="text-xs text-muted-foreground min-w-[3rem] text-center cursor-pointer hover:text-foreground transition-colors" onClick={resetView} data-testid="button-reset-zoom">
+          <button className="text-[11px] font-mono text-muted-foreground min-w-[3rem] text-center cursor-pointer hover:text-foreground transition-colors" onClick={resetView} data-testid="button-reset-zoom">
             {Math.round(zoom * 100)}%
           </button>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button size="icon" variant="ghost" onClick={() => setZoom((z) => Math.min(4, z + 0.1))} data-testid="button-zoom-in">
+              <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-primary/10 hover:text-primary" onClick={() => setZoom((z) => Math.min(4, z + 0.1))} data-testid="button-zoom-in">
                 <ZoomIn className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
@@ -3916,7 +4059,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button size="icon" variant="ghost" onClick={fitToScreen} data-testid="button-fit-screen">
+              <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-primary/10 hover:text-primary" onClick={fitToScreen} data-testid="button-fit-screen">
                 <Maximize className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
@@ -3968,33 +4111,45 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
 
       {boards.length > 0 && selectedBoardId && (
         <div className="flex flex-1 gap-0 min-h-0">
-          {/* Left sidebar — desktop only */}
-          <div className="hidden md:flex w-[52px] shrink-0 border-r border-border/25 flex-col items-center py-3 bg-background overflow-y-auto" data-testid="canvas-sidebar">
-            {sidebarToolGroups.map((group, gi) => (
-              <div key={group.label} className="w-full flex flex-col items-center">
-                {gi > 0 && <div className="w-6 h-px bg-border/30 my-2" />}
-                <span className="text-[7px] uppercase tracking-[0.14em] text-foreground/25 font-semibold mb-0.5 select-none">{group.label}</span>
-                {group.tools.map((t) => (
-                  <Tooltip key={t.type}>
-                    <TooltipTrigger asChild>
-                      <button
-                        className={`w-10 h-10 flex items-center justify-center rounded-md transition-all duration-200 cursor-grab active:cursor-grabbing active:scale-[0.92] shrink-0 ${t.type === "connect" && connectMode ? "bg-primary/15 text-primary" : "text-foreground/50 hover:text-foreground hover:bg-foreground/[0.06]"}`}
-                        draggable
-                        onDragStart={(e) => {
-                          e.dataTransfer.setData("tool-type", t.type);
-                          e.dataTransfer.effectAllowed = "copy";
-                        }}
-                        onClick={() => t.type === "image" ? setShowImagePopup(!showImagePopup) : t.type === "draw" ? (() => { setDrawingMode(true); setDrawTool("pen"); setDrawingPaths([]); drawPathsRef.current = []; setDrawUndoStack([]); setEditingId(null); })() : t.type === "hardware" ? (() => { pendingHardwareDropRef.current = null; setShowHardwareDialog(true); })() : t.type === "connect" ? (() => { if (connectMode) { exitConnectMode(); } else { setConnectMode(true); setConnectSourceId(null); setSelectedConnectorId(null); setEditingId(null); } })() : t.type === "palette" ? (() => { palettePresetSourceRef.current = null; setPalettePresetUrl(null); setShowPaletteDialog(true); })() : createElement(t.type)}
-                        data-testid={`sidebar-tool-${t.type}`}
-                      >
-                        <t.icon className="h-[18px] w-[18px]" strokeWidth={1.5} />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="right" sideOffset={6} className="text-xs font-medium tracking-wide">{t.label}</TooltipContent>
-                  </Tooltip>
-                ))}
-              </div>
-            ))}
+          {/* Left sidebar — desktop only — scrollable + collapsible sections */}
+          <div className="hidden md:flex w-[52px] shrink-0 border-r border-border/25 flex-col items-center py-3 bg-card/40 overflow-y-auto canvas-rail-scroll" data-testid="canvas-sidebar">
+            {sidebarToolGroups.map((group, gi) => {
+              const isCollapsed = !!railCollapsed[group.label];
+              return (
+                <div key={group.label} className="w-full flex flex-col items-center">
+                  {gi > 0 && <div className="w-6 h-px bg-border/30 my-2" />}
+                  <button
+                    type="button"
+                    onClick={() => toggleRailSection(group.label)}
+                    className="w-full px-1 py-0.5 flex items-center justify-center gap-0.5 text-[7px] uppercase tracking-[0.14em] text-foreground/40 hover:text-foreground/70 font-semibold mb-0.5 select-none transition-colors"
+                    aria-expanded={!isCollapsed}
+                    data-testid={`rail-section-toggle-${group.label.toLowerCase()}`}
+                  >
+                    {isCollapsed ? <ChevronRight className="h-2 w-2" /> : <ChevronDown className="h-2 w-2" />}
+                    <span>{group.label}</span>
+                  </button>
+                  {!isCollapsed && group.tools.map((t) => (
+                    <Tooltip key={t.type}>
+                      <TooltipTrigger asChild>
+                        <button
+                          className={`w-10 h-10 flex items-center justify-center rounded-md transition-all duration-200 cursor-grab active:cursor-grabbing active:scale-[0.92] shrink-0 ${t.type === "connect" && connectMode ? "bg-primary/15 text-primary" : "text-foreground/50 hover:text-foreground hover:bg-foreground/[0.06]"}`}
+                          draggable
+                          onDragStart={(e) => {
+                            e.dataTransfer.setData("tool-type", t.type);
+                            e.dataTransfer.effectAllowed = "copy";
+                          }}
+                          onClick={() => t.type === "image" ? setShowImagePopup(!showImagePopup) : t.type === "draw" ? (() => { setDrawingMode(true); setDrawTool("pen"); setDrawingPaths([]); drawPathsRef.current = []; setDrawUndoStack([]); setEditingId(null); })() : t.type === "hardware" ? (() => { pendingHardwareDropRef.current = null; setShowHardwareDialog(true); })() : t.type === "connect" ? (() => { if (connectMode) { exitConnectMode(); } else { setConnectMode(true); setConnectSourceId(null); setSelectedConnectorId(null); setEditingId(null); } })() : t.type === "palette" ? (() => { palettePresetSourceRef.current = null; setPalettePresetUrl(null); setShowPaletteDialog(true); })() : createElement(t.type)}
+                          data-testid={`sidebar-tool-${t.type}`}
+                        >
+                          <t.icon className="h-[18px] w-[18px]" strokeWidth={1.5} />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="right" sideOffset={6} className="text-xs font-medium tracking-wide">{t.label}</TooltipContent>
+                    </Tooltip>
+                  ))}
+                </div>
+              );
+            })}
             <div className="w-6 h-px bg-border/30 my-2" />
             <Tooltip>
               <TooltipTrigger asChild>
@@ -4050,7 +4205,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           {/* Canvas area */}
           <div
             ref={containerRef}
-            className="flex-1 relative overflow-hidden bg-background"
+            className="flex-1 relative overflow-hidden canvas-paper"
             style={{
               cursor: isPanning ? "grabbing" : spaceRef.current ? "grab" : "default",
               touchAction: "none",

@@ -257,8 +257,8 @@ export default function ProjectDetails() {
     <div className={`min-h-screen bg-background ${safeActiveTab === "board" ? "h-[100dvh] flex flex-col overflow-hidden" : "pb-20"}`}>
       <Navbar />
 
-      {/* Client view: tall photo band + mono meta + 4-col dl row */}
-      {userRole === "client" && (
+      {/* Client view: tall photo band + mono meta + 4-col dl row — only on Overview tab */}
+      {userRole === "client" && safeActiveTab === "overview" && (
         <>
           <ClientProjectHeader
             project={project}
@@ -282,8 +282,8 @@ export default function ProjectDetails() {
         </>
       )}
 
-      {/* Admin/Crew view: existing narrow hero image (above header). Renders if set; admins can upload/replace/remove. */}
-      {userRole !== "client" && (project.thumbnailUrl || isAdminUser) && (
+      {/* Admin/Crew view: narrow hero image — only on Overview tab. Renders if set; admins can upload/replace/remove. */}
+      {userRole !== "client" && safeActiveTab === "overview" && (project.thumbnailUrl || isAdminUser) && (
         <div
           className="w-full bg-muted/30 border-b border-border/60 relative group"
           data-testid="project-hero-image"
@@ -359,46 +359,78 @@ export default function ProjectDetails() {
         </div>
       )}
 
-      <div className="w-full border-b border-border/60 bg-background/90 backdrop-blur-sm" data-testid="project-hero">
-        <div className="container px-5 md:px-8 py-4">
-          <Link href="/" className="inline-flex items-center text-[11px] text-muted-foreground mb-2 transition-colors hover:text-foreground" onClick={() => window.sessionStorage.setItem("aster-spruce:last-planning-board", String(projectId))} data-testid="link-back">
-            <ArrowLeft className="mr-1 h-3.5 w-3.5" /> Back to Dashboard
-          </Link>
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-2">
-            <div className="space-y-1">
-              <div className="flex items-center flex-wrap gap-2">
-                <h1 className="font-serif text-xl md:text-2xl font-bold text-foreground leading-tight" data-testid="text-project-title">
-                  {project.name}
-                </h1>
-                <Badge variant="secondary" className="text-[10px]" data-testid="badge-project-status">
-                  {statusLabel[project.status] || project.status}
-                </Badge>
-                {viewers.length > 0 && (
-                  <div className="flex items-center gap-1 ml-1" data-testid="active-viewers">
-                    <div className="flex -space-x-1.5">
-                      {viewers.map(v => (
-                        <div key={v.userId} className="w-6 h-6 rounded-full bg-primary/20 border-2 border-background flex items-center justify-center text-[10px] font-medium" title={`${v.firstName} ${v.lastName}`} data-testid={`viewer-avatar-${v.userId}`}>
-                          {v.profileImageUrl ? (
-                            <img src={v.profileImageUrl} className="w-full h-full rounded-full object-cover" alt={`${v.firstName} ${v.lastName}`} />
-                          ) : (
-                            <span>{(v.firstName?.[0] || '') + (v.lastName?.[0] || '')}</span>
-                          )}
-                        </div>
-                      ))}
+      {safeActiveTab === "overview" ? (
+        <div className="w-full border-b border-border/60 bg-background/90 backdrop-blur-sm" data-testid="project-hero">
+          <div className="container px-5 md:px-8 py-4">
+            <Link href="/" className="inline-flex items-center text-[11px] text-muted-foreground mb-2 transition-colors hover:text-foreground" onClick={() => window.sessionStorage.setItem("aster-spruce:last-planning-board", String(projectId))} data-testid="link-back">
+              <ArrowLeft className="mr-1 h-3.5 w-3.5" /> Back to Dashboard
+            </Link>
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-2">
+              <div className="space-y-1">
+                <div className="flex items-center flex-wrap gap-2">
+                  <h1 className="font-serif text-xl md:text-2xl font-bold text-foreground leading-tight" data-testid="text-project-title">
+                    {project.name}
+                  </h1>
+                  <Badge variant="secondary" className="text-[10px]" data-testid="badge-project-status">
+                    {statusLabel[project.status] || project.status}
+                  </Badge>
+                  {viewers.length > 0 && (
+                    <div className="flex items-center gap-1 ml-1" data-testid="active-viewers">
+                      <div className="flex -space-x-1.5">
+                        {viewers.map(v => (
+                          <div key={v.userId} className="w-6 h-6 rounded-full bg-primary/20 border-2 border-background flex items-center justify-center text-[10px] font-medium" title={`${v.firstName} ${v.lastName}`} data-testid={`viewer-avatar-${v.userId}`}>
+                            {v.profileImageUrl ? (
+                              <img src={v.profileImageUrl} className="w-full h-full rounded-full object-cover" alt={`${v.firstName} ${v.lastName}`} />
+                            ) : (
+                              <span>{(v.firstName?.[0] || '') + (v.lastName?.[0] || '')}</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                      <span className="text-[10px] text-muted-foreground" data-testid="text-viewer-count">{viewers.length} viewing</span>
                     </div>
-                    <span className="text-[10px] text-muted-foreground" data-testid="text-viewer-count">{viewers.length} viewing</span>
-                  </div>
+                  )}
+                </div>
+                {project.description && (
+                  <p className="text-muted-foreground max-w-2xl text-xs" data-testid="text-project-desc">
+                    {project.description}
+                  </p>
                 )}
               </div>
-              {project.description && (
-                <p className="text-muted-foreground max-w-2xl text-xs" data-testid="text-project-desc">
-                  {project.description}
-                </p>
-              )}
             </div>
           </div>
         </div>
-      </div>
+      ) : (
+        <div className="w-full border-b border-border/60 bg-background/90 backdrop-blur-sm" data-testid="project-thin-header">
+          <div className="container px-5 md:px-8 h-10 flex items-center gap-3">
+            <Link href="/" className="inline-flex items-center text-[11px] text-muted-foreground transition-colors hover:text-foreground shrink-0" onClick={() => window.sessionStorage.setItem("aster-spruce:last-planning-board", String(projectId))} data-testid="link-back-thin">
+              <ArrowLeft className="mr-1 h-3.5 w-3.5" /> Dashboard
+            </Link>
+            <span className="text-border/80">·</span>
+            <h1 className="font-serif text-sm font-semibold text-foreground leading-none truncate" data-testid="text-project-title-thin">
+              {project.name}
+            </h1>
+            <span className="text-[10px] font-mono uppercase tracking-[0.12em] text-muted-foreground shrink-0" data-testid="badge-project-status-thin">
+              {statusLabel[project.status] || project.status}
+            </span>
+            {viewers.length > 0 && (
+              <div className="hidden md:flex items-center gap-1 ml-auto" data-testid="active-viewers-thin">
+                <div className="flex -space-x-1.5">
+                  {viewers.map(v => (
+                    <div key={v.userId} className="w-5 h-5 rounded-full bg-primary/20 border-2 border-background flex items-center justify-center text-[9px] font-medium" title={`${v.firstName} ${v.lastName}`}>
+                      {v.profileImageUrl ? (
+                        <img src={v.profileImageUrl} className="w-full h-full rounded-full object-cover" alt={`${v.firstName} ${v.lastName}`} />
+                      ) : (
+                        <span>{(v.firstName?.[0] || '') + (v.lastName?.[0] || '')}</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <main className={`container px-5 md:px-8 ${safeActiveTab === "board" ? "mt-0 flex flex-col flex-1 min-h-0" : "mt-4"}`} id="project-main">
         <Tabs value={safeActiveTab} onValueChange={setActiveTab} className={safeActiveTab === "board" ? "space-y-1 flex flex-col flex-1 min-h-0" : "space-y-4"}>
