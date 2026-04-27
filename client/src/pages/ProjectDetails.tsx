@@ -69,6 +69,7 @@ import { ProjectSidebarCards } from "@/components/project/ProjectSidebarCards";
 import { ProgressTab } from "@/components/project/ProgressTab";
 import { ClientProjectHeader } from "@/components/project/ClientProjectHeader";
 import { ProjectNowCard } from "@/components/project/ProjectNowCard";
+import { ClientMilestoneList } from "@/components/project/ClientMilestoneList";
 import type { ChecklistItem, BoardItem } from "@shared/schema";
 
 export default function ProjectDetails() {
@@ -406,11 +407,9 @@ export default function ProjectDetails() {
           <TabsContent value="overview" className="space-y-8">
             {userRole === "client" ? (
               <div className="space-y-5">
-                <ProjectProgressSummary
-                  projectId={projectId}
+                <ClientMilestoneList
                   milestones={milestones}
-                  userRole={userRole}
-                  onNavigateToTimeline={() => setActiveTab("checklist")}
+                  activityLog={activityLog}
                 />
                 <button
                   onClick={() => setShowOpenItemsDrawer(true)}
