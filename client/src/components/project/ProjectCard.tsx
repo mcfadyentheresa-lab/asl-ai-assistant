@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { MapPin, MoreVertical, Archive, Trash2, User } from "lucide-react";
 import { Link } from "wouter";
 import type { Project } from "@shared/schema";
+import { heroImageStyle } from "@/lib/hero-frame";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -44,6 +45,7 @@ export function ProjectCard({ project, onArchive, onDelete, clientName }: Projec
                 src={project.thumbnailUrl}
                 alt={project.name}
                 className="h-full w-full object-cover"
+                style={heroImageStyle(project)}
                 data-testid={`img-project-${project.id}`}
               />
             ) : (

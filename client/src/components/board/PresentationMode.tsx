@@ -33,6 +33,9 @@ interface ProjectInfo {
   name: string;
   address?: string | null;
   thumbnailUrl?: string | null;
+  heroFocalX?: number | null;
+  heroFocalY?: number | null;
+  heroZoom?: number | null;
 }
 
 const EDITORIAL_FILTER = "saturate(0.85) contrast(0.96)";
@@ -271,11 +274,14 @@ export default function PresentationMode({
       >
         {heroImage ? (
           <div
-            className={`absolute inset-0 transition-all duration-[800ms] ease-out ${titleEntered ? "scale-100 opacity-100" : "scale-105 opacity-0"}`}
+            className={`absolute inset-0 transition-all duration-[800ms] ease-out ${titleEntered ? "opacity-100" : "opacity-0"}`}
             style={{
               backgroundImage: `url(${heroImage})`,
               backgroundSize: "cover",
-              backgroundPosition: "center",
+              backgroundPosition: `${(((project?.heroFocalX ?? 0.5) as number) * 100).toFixed(2)}% ${(((project?.heroFocalY ?? 0.5) as number) * 100).toFixed(2)}%`,
+              backgroundRepeat: "no-repeat",
+              transform: `scale(${(((project?.heroZoom ?? 1) as number) * (titleEntered ? 1 : 1.05)).toFixed(3)})`,
+              transformOrigin: `${(((project?.heroFocalX ?? 0.5) as number) * 100).toFixed(2)}% ${(((project?.heroFocalY ?? 0.5) as number) * 100).toFixed(2)}%`,
               filter: EDITORIAL_FILTER,
             }}
           />

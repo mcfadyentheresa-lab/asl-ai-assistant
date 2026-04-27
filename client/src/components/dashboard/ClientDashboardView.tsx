@@ -6,12 +6,16 @@ import { Progress } from "@/components/ui/progress";
 import { ArrowRight, CheckCircle2, Flag } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
+import { heroImageStyle } from "@/lib/hero-frame";
 
 interface Project {
   id: number;
   name: string;
   status: string;
   thumbnailUrl?: string | null;
+  heroFocalX?: number | null;
+  heroFocalY?: number | null;
+  heroZoom?: number | null;
   totalBudget?: number | null;
   budgetUsed?: number | null;
   description?: string | null;
@@ -113,6 +117,7 @@ export function ClientDashboardView({ project, isAdminPreview = false }: ClientD
                   src={project.thumbnailUrl}
                   alt={project.name}
                   className="h-full w-full object-cover"
+                  style={heroImageStyle(project)}
                   data-testid={`img-project-hero-${project.id}`}
                 />
               ) : (

@@ -2600,6 +2600,143 @@ Use designer language naturally. Be specific. Mention items by their actual name
     }
   }));
 
+  // ────────────────────────────────────────────────────────────────────────
+  // Hero focal point: dedicated PATCH (admin/crew) and AI auto-frame.
+  // ────────────────────────────────────────────────────────────────────────
+  const heroPatchSchema = z.object({
+    heroFocalX: z.number().min(0).max(1).optional(),
+    heroFocalY: z.number().min(0).max(1).optional(),
+    heroZoom: z.number().min(1).max(3).optional(),
+  });
+
+  app.patch("/api/projects/:id/hero", isAuthenticated, asyncHandler(async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const dbUser = await authStorage.getUser(userId);
+    if (!dbUser || (dbUser.role !== "admin" && dbUser.role !== "crew")) {
+      return res.status(403).json({ error: "Admins and crew only" });
+    }
+    const projectId = Number(req.params.id);
+    const existing = await storage.getProject(projectId);
+    if (!existing) return res.status(404).json({ error: "Project not found" });
+    const parsed = heroPatchSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: parsed.error.errors[0]?.message || "Invalid hero values" });
+    }
+    const project = await storage.updateProject(projectId, parsed.data);
+    res.json(project);
+    broadcastProjectChange(projectId, ["project"], "updated", undefined, userId);
+  }));
+
+  const autoFrameLimits = new Map<string, number[]>();
+  const AUTO_FRAME_LIMIT = 5;
+  const AUTO_FRAME_WINDOW_MS = 60 * 60 * 1000;
+
+  app.post("/api/projects/:id/hero/auto-frame", isAuthenticated, asyncHandler(async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const dbUser = await authStorage.getUser(userId);
+    if (!dbUser || (dbUser.role !== "admin" && dbUser.role !== "crew")) {
+      return res.status(403).json({ error: "Admins and crew only" });
+    }
+    const projectId = Number(req.params.id);
+    const project = await storage.getProject(projectId);
+    if (!project) return res.status(404).json({ error: "Project not found" });
+    if (!project.thumbnailUrl) {
+      return res.status(400).json({ error: "Project has no hero image yet" });
+    }
+
+    const key = `${projectId}:${userId}`;
+    const now = Date.now();
+    const stamps = (autoFrameLimits.get(key) || []).filter((t) => now - t < AUTO_FRAME_WINDOW_MS);
+    if (stamps.length >= AUTO_FRAME_LIMIT) {
+      return res.status(429).json({ error: "Auto-frame limit reached. Try again later." });
+    }
+    stamps.push(now);
+    autoFrameLimits.set(key, stamps);
+
+    let imageUrl = project.thumbnailUrl;
+    if (imageUrl.startsWith("/")) {
+      const protocol = (req.headers["x-forwarded-proto"] as string) || req.protocol || "http";
+      const host = req.headers["x-forwarded-host"] || req.headers.host;
+      imageUrl = `${protocol}://${host}${imageUrl}`;
+    }
+
+    let dataUrl: string | null = null;
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10_000);
+      const fetched = await fetch(imageUrl, { signal: controller.signal });
+      clearTimeout(timeout);
+      if (!fetched.ok) {
+        return res.status(502).json({ error: "Couldn't fetch the hero image" });
+      }
+      const contentType = fetched.headers.get("content-type") || "image/jpeg";
+      const buf = Buffer.from(await fetched.arrayBuffer());
+      if (buf.length > 8 * 1024 * 1024) {
+        return res.status(413).json({ error: "Hero image too large to analyse" });
+      }
+      dataUrl = `data:${contentType};base64,${buf.toString("base64")}`;
+    } catch (err: any) {
+      console.error("Auto-frame fetch error:", err);
+      return res.status(502).json({ error: "Couldn't fetch the hero image" });
+    }
+
+    const systemPrompt = `You help frame hero photographs for an interior-design portfolio website. Given a photograph, choose:
+- focalX: horizontal focal point as 0..1 (0 = left edge, 1 = right edge)
+- focalY: vertical focal point as 0..1 (0 = top, 1 = bottom)
+- zoom: 1.0..2.0 (1.0 = no zoom; only zoom in if the subject is small or surrounded by dead space)
+- reasoning: one short sentence explaining the choice
+
+Prefer faces, architectural focal subjects, strong compositional anchors (a fireplace, a vignette, a window). Avoid cropping into dead space. Return only minified JSON.`;
+
+    try {
+      const OpenAI = (await import("openai")).default;
+      const client = new OpenAI({
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+      });
+
+      const response = await client.chat.completions.create({
+        model: "gpt-4o-mini",
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: systemPrompt },
+          {
+            role: "user",
+            content: [
+              { type: "text", text: "Pick the best focal point and zoom for this image as a hero. Return JSON: {focalX, focalY, zoom, reasoning}." },
+              { type: "image_url", image_url: { url: dataUrl } },
+            ] as any,
+          },
+        ],
+      } as any);
+
+      const raw = response.choices[0]?.message?.content?.trim() || "{}";
+      let parsed: any;
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        return res.status(502).json({ error: "Auto-frame returned invalid output" });
+      }
+
+      const clamp = (n: any, lo: number, hi: number, fallback: number) => {
+        const v = typeof n === "number" ? n : Number(n);
+        if (!Number.isFinite(v)) return fallback;
+        return Math.min(hi, Math.max(lo, v));
+      };
+
+      const result = {
+        focalX: clamp(parsed.focalX, 0, 1, 0.5),
+        focalY: clamp(parsed.focalY, 0, 1, 0.5),
+        zoom: clamp(parsed.zoom, 1, 2, 1),
+        reasoning: typeof parsed.reasoning === "string" ? parsed.reasoning.slice(0, 240) : "",
+      };
+      res.json(result);
+    } catch (error: any) {
+      console.error("Auto-frame error:", error);
+      res.status(500).json({ error: "Failed to auto-frame the image" });
+    }
+  }));
+
   app.post("/api/presence/heartbeat", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub;
     const dbUser = await authStorage.getUser(userId);

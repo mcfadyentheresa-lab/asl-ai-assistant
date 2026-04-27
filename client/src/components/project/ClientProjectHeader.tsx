@@ -1,7 +1,8 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { format, differenceInCalendarDays } from "date-fns";
-import { Loader2, ImageIcon, Upload, X } from "lucide-react";
+import { Loader2, ImageIcon, Upload, X, Crop } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { HeroImageEditor } from "./HeroImageEditor";
 
 interface Milestone {
   id: number;
@@ -30,6 +31,9 @@ interface ProjectLike {
   status?: string | null;
   address?: string | null;
   thumbnailUrl?: string | null;
+  heroFocalX?: number | null;
+  heroFocalY?: number | null;
+  heroZoom?: number | null;
   startDate?: string | null;
   endDate?: string | null;
 }
@@ -124,6 +128,16 @@ export function ClientProjectHeader({
   onRemoveHero,
 }: ClientProjectHeaderProps) {
   const heroFileInputRef = useRef<HTMLInputElement>(null);
+  const [editingHero, setEditingHero] = useState(false);
+  // Optimistic local override so the saved values render immediately, before the
+  // parent re-fetches the project.
+  const [localHero, setLocalHero] = useState<{ focalX: number; focalY: number; zoom: number } | null>(null);
+
+  const focalX = localHero?.focalX ?? project.heroFocalX ?? 0.5;
+  const focalY = localHero?.focalY ?? project.heroFocalY ?? 0.5;
+  const zoom = localHero?.zoom ?? project.heroZoom ?? 1.0;
+  const heroObjectPosition = `${(focalX * 100).toFixed(2)}% ${(focalY * 100).toFixed(2)}%`;
+  const heroTransform = `scale(${zoom.toFixed(3)})`;
 
   const projectCode = deriveProjectCode(project.id);
   const statusLabel = formatStatus(project.status);
@@ -191,7 +205,12 @@ export function ClientProjectHeader({
                 src={project.thumbnailUrl}
                 alt={project.name}
                 className="w-full h-full object-cover block"
-                style={{ filter: "saturate(0.85) contrast(0.96)" }}
+                style={{
+                  filter: "saturate(0.85) contrast(0.96)",
+                  objectPosition: heroObjectPosition,
+                  transform: heroTransform,
+                  transformOrigin: heroObjectPosition,
+                }}
                 data-testid="img-project-hero"
               />
               <div
@@ -230,6 +249,16 @@ export function ClientProjectHeader({
 
           {isAdminUser && project.thumbnailUrl && (
             <div className="absolute top-3 right-3 flex gap-1.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => setEditingHero(true)}
+                className="h-7 px-2 text-[11px]"
+                data-testid="btn-edit-hero"
+              >
+                <Crop className="h-3 w-3 mr-1" />
+                Edit hero
+              </Button>
               <Button
                 size="sm"
                 variant="secondary"
@@ -325,6 +354,21 @@ export function ClientProjectHeader({
           )}
         </div>
       </div>
+
+      {isAdminUser && editingHero && project.thumbnailUrl && (
+        <HeroImageEditor
+          projectId={project.id}
+          imageUrl={project.thumbnailUrl}
+          initialFocalX={focalX}
+          initialFocalY={focalY}
+          initialZoom={zoom}
+          onCancel={() => setEditingHero(false)}
+          onSaved={(next) => {
+            setLocalHero(next);
+            setEditingHero(false);
+          }}
+        />
+      )}
     </>
   );
 }
