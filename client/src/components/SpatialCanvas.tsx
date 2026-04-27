@@ -58,6 +58,7 @@ import {
 } from "lucide-react";
 import HardwarePickerDialog, { type HardwareDraft } from "@/components/board/HardwarePickerDialog";
 import PaletteExtractionDialog, { type PaletteAddPayload } from "@/components/board/PaletteExtractionDialog";
+import RoomRenderDialog from "@/components/board/RoomRenderDialog";
 import CanvasConnectors, { CONNECTOR_DEFAULT_COLOR, anchorDots, type ConnectorContent, type ConnectorStyle, type ConnectorCurve } from "@/components/board/CanvasConnectors";
 import PresentationMode from "@/components/board/PresentationMode";
 import AIPartnerPanel from "@/components/board/AIPartnerPanel";
@@ -459,6 +460,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   const [showHardwareDialog, setShowHardwareDialog] = useState(false);
   const pendingHardwareDropRef = useRef<{ x: number; y: number } | null>(null);
   const [showPaletteDialog, setShowPaletteDialog] = useState(false);
+  const [renderRoomName, setRenderRoomName] = useState<string | null>(null);
   const [palettePresetUrl, setPalettePresetUrl] = useState<string | null>(null);
   const palettePresetSourceRef = useRef<{ x: number; y: number; w: number; h: number } | null>(null);
   const [imageUrlInput, setImageUrlInput] = useState("");
@@ -5356,6 +5358,11 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             onRenameTab={boardMode === "library" ? renameCategoryEverywhere : renameRoomEverywhere}
             onCreateTab={boardMode === "library" ? createCategoryFromTabStrip : createRoomFromTabStrip}
             onToggleStatusFilter={toggleStatusFilter}
+            onRenderRoom={
+              boardMode === "project" && (effectiveRole === "admin" || effectiveRole === "crew")
+                ? (room) => setRenderRoomName(room)
+                : undefined
+            }
           />
           {showSecondaryAxis && (
             <SecondaryAxisChips
@@ -6841,6 +6848,34 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
         onOpenChange={(v) => { setShowHardwareDialog(v); if (!v) pendingHardwareDropRef.current = null; }}
         onSubmit={createHardware}
       />
+
+      {renderRoomName && selectedBoardId && (() => {
+        const target = renderRoomName.trim().toLowerCase();
+        const zone = elementsList.find((e) => {
+          if (e.type !== "room_zone") return false;
+          const c = (e.content || {}) as any;
+          const n = String(c.name || c.title || c.label || "").trim().toLowerCase();
+          return n === target;
+        });
+        const sourceUrl = zone ? ((zone.content as any)?.sourcePhotoUrl ?? null) : null;
+        return (
+          <RoomRenderDialog
+            open={!!renderRoomName}
+            onOpenChange={(v) => { if (!v) setRenderRoomName(null); }}
+            projectId={projectId}
+            boardId={selectedBoardId}
+            roomName={renderRoomName}
+            roomZoneElementId={zone?.id ?? null}
+            initialSourcePhotoUrl={sourceUrl}
+            onSourcePhotoUpdated={(url) => {
+              if (!zone) return;
+              updateElement(zone.id, {
+                content: { ...((zone.content as any) || {}), sourcePhotoUrl: url },
+              } as any);
+            }}
+          />
+        );
+      })()}
 
       <PaletteExtractionDialog
         open={showPaletteDialog}
