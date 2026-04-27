@@ -1999,6 +1999,101 @@ function templateCanvasToElements(canvasData: any, boardId: number, createdBy: s
     }
   });
 
+  // Vendor URL unfurl — fetches OG/meta tags so the Hardware/Material picker
+  // can pre-fill name, image, and price from a paste-in product URL.
+  // Admin/crew only; rate-limited per user (in-memory).
+  const unfurlBuckets = new Map<string, { count: number; resetAt: number }>();
+  const UNFURL_LIMIT = 30;
+  const UNFURL_WINDOW_MS = 5 * 60_000;
+
+  app.post("/api/board/unfurl-vendor", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const dbUser = await authStorage.getUser(userId);
+      if (dbUser?.role !== "admin" && dbUser?.role !== "crew") {
+        return res.status(403).json({ message: "Only admin/crew can unfurl vendor URLs" });
+      }
+
+      const now = Date.now();
+      const bucket = unfurlBuckets.get(userId);
+      if (!bucket || bucket.resetAt < now) {
+        unfurlBuckets.set(userId, { count: 1, resetAt: now + UNFURL_WINDOW_MS });
+      } else {
+        if (bucket.count >= UNFURL_LIMIT) {
+          return res.status(429).json({ message: "Too many unfurl requests; try again in a few minutes." });
+        }
+        bucket.count += 1;
+      }
+
+      const url = String(req.body?.url || "").trim();
+      if (!url || !/^https?:\/\//i.test(url)) {
+        return res.status(400).json({ message: "A valid http(s) URL is required" });
+      }
+
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 6000);
+      let html = "";
+      try {
+        const r = await fetch(url, {
+          signal: controller.signal,
+          redirect: "follow",
+          headers: {
+            "User-Agent": "Mozilla/5.0 (compatible; AsterSpruceBoard/1.0; +https://asterandspruceliving.ca)",
+            "Accept": "text/html,application/xhtml+xml",
+          },
+        });
+        if (!r.ok) {
+          return res.status(422).json({ message: "Couldn't read that page; try manual entry." });
+        }
+        html = await r.text();
+      } catch {
+        clearTimeout(timer);
+        return res.status(422).json({ message: "Couldn't read that page; try manual entry." });
+      } finally {
+        clearTimeout(timer);
+      }
+
+      const headMatch = html.match(/<head\b[^>]*>([\s\S]*?)<\/head>/i);
+      const head = headMatch ? headMatch[1] : html.slice(0, 50_000);
+
+      const metaContent = (re: RegExp): string | undefined => {
+        const m = head.match(re);
+        return m ? m[1].replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").trim() : undefined;
+      };
+
+      const ogTitle = metaContent(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i)
+        || metaContent(/<meta[^>]+name=["']twitter:title["'][^>]+content=["']([^"']+)["']/i);
+      const titleTag = metaContent(/<title[^>]*>([^<]+)<\/title>/i);
+      const ogImage = metaContent(/<meta[^>]+property=["']og:image(?::secure_url)?["'][^>]+content=["']([^"']+)["']/i)
+        || metaContent(/<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i);
+      const ogSiteName = metaContent(/<meta[^>]+property=["']og:site_name["'][^>]+content=["']([^"']+)["']/i);
+      const priceAmount = metaContent(/<meta[^>]+property=["'](?:og:price:amount|product:price:amount)["'][^>]+content=["']([^"']+)["']/i)
+        || metaContent(/<meta[^>]+itemprop=["']price["'][^>]+content=["']([^"']+)["']/i);
+      const priceCurrency = metaContent(/<meta[^>]+property=["'](?:og:price:currency|product:price:currency)["'][^>]+content=["']([^"']+)["']/i)
+        || metaContent(/<meta[^>]+itemprop=["']priceCurrency["'][^>]+content=["']([^"']+)["']/i);
+
+      const priceNum = priceAmount ? Number(String(priceAmount).replace(/[^0-9.]/g, "")) : undefined;
+
+      let absoluteImage: string | undefined = ogImage;
+      if (absoluteImage && /^\/\//.test(absoluteImage)) absoluteImage = "https:" + absoluteImage;
+      else if (absoluteImage && /^\//.test(absoluteImage)) {
+        try { absoluteImage = new URL(absoluteImage, url).toString(); } catch { /* keep raw */ }
+      }
+
+      res.json({
+        title: ogTitle || titleTag,
+        image: absoluteImage,
+        siteName: ogSiteName,
+        price: Number.isFinite(priceNum as number) ? priceNum : undefined,
+        currency: priceCurrency,
+        sourceUrl: url,
+      });
+    } catch (err: any) {
+      console.error("Vendor unfurl error:", err.message);
+      res.status(422).json({ message: "Couldn't read that page; try manual entry." });
+    }
+  });
+
   // Board Snapshots
   app.get(api.boardSnapshots.list.path, isAuthenticated, async (req: any, res) => {
     try {
