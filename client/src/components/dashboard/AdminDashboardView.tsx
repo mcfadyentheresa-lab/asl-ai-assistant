@@ -7,6 +7,7 @@ import { FolderOpen, Briefcase } from "lucide-react";
 import { Link } from "wouter";
 import type { Project } from "@shared/schema";
 import { useRecentProjects } from "@/hooks/use-recent-projects";
+import { heroImageStyle } from "@/lib/hero-frame";
 
 interface AdminDashboardViewProps {
   projects: Project[] | undefined;
@@ -105,6 +106,7 @@ export function AdminDashboardView({
                         src={project.thumbnailUrl}
                         alt={project.name}
                         className="w-full h-24 object-cover"
+                        style={heroImageStyle(project)}
                         data-testid={`img-recent-thumbnail-${project.id}`}
                       />
                     ) : (

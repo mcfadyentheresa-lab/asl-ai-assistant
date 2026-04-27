@@ -68,6 +68,8 @@ import { BudgetSnapshot } from "@/components/project/BudgetSnapshot";
 import { ProjectSidebarCards } from "@/components/project/ProjectSidebarCards";
 import { ProgressTab } from "@/components/project/ProgressTab";
 import { ClientProjectHeader } from "@/components/project/ClientProjectHeader";
+import { HeroImageEditor } from "@/components/project/HeroImageEditor";
+import { Crop } from "lucide-react";
 import { ProjectNowCard } from "@/components/project/ProjectNowCard";
 import { ClientMilestoneList } from "@/components/project/ClientMilestoneList";
 import { ClientReferenceCards } from "@/components/project/ClientReferenceCards";
@@ -218,6 +220,10 @@ export default function ProjectDetails() {
   };
 
   const isAdminUser = user?.role === "admin";
+  const isCrewUser = user?.role === "crew";
+
+  const [heroEditing, setHeroEditing] = useState(false);
+  const [heroLocal, setHeroLocal] = useState<{ focalX: number; focalY: number; zoom: number } | null>(null);
 
   const handleHeroFileChosen = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -294,6 +300,11 @@ export default function ProjectDetails() {
                 src={project.thumbnailUrl}
                 alt={project.name}
                 className="w-full h-full object-cover"
+                style={{
+                  objectPosition: `${(((heroLocal?.focalX ?? project.heroFocalX ?? 0.5) as number) * 100).toFixed(2)}% ${(((heroLocal?.focalY ?? project.heroFocalY ?? 0.5) as number) * 100).toFixed(2)}%`,
+                  transform: `scale(${((heroLocal?.zoom ?? project.heroZoom ?? 1.0) as number).toFixed(3)})`,
+                  transformOrigin: `${(((heroLocal?.focalX ?? project.heroFocalX ?? 0.5) as number) * 100).toFixed(2)}% ${(((heroLocal?.focalY ?? project.heroFocalY ?? 0.5) as number) * 100).toFixed(2)}%`,
+                }}
                 data-testid="img-project-hero"
               />
             </div>
@@ -316,33 +327,47 @@ export default function ProjectDetails() {
             </button>
           )}
 
-          {isAdminUser && project.thumbnailUrl && (
+          {(isAdminUser || isCrewUser) && project.thumbnailUrl && (
             <div className="absolute top-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
               <Button
                 size="sm"
                 variant="secondary"
-                onClick={() => heroFileInputRef.current?.click()}
-                disabled={isUploadingHero}
+                onClick={() => setHeroEditing(true)}
                 className="h-7 px-2 text-[11px]"
-                data-testid="btn-replace-hero"
+                data-testid="btn-edit-hero"
               >
-                {isUploadingHero ? (
-                  <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                ) : (
-                  <Upload className="h-3 w-3 mr-1" />
-                )}
-                Replace
+                <Crop className="h-3 w-3 mr-1" />
+                Edit hero
               </Button>
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={handleRemoveHero}
-                className="h-7 px-2 text-[11px]"
-                data-testid="btn-remove-hero"
-              >
-                <X className="h-3 w-3 mr-1" />
-                Remove
-              </Button>
+              {isAdminUser && (
+                <>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => heroFileInputRef.current?.click()}
+                    disabled={isUploadingHero}
+                    className="h-7 px-2 text-[11px]"
+                    data-testid="btn-replace-hero"
+                  >
+                    {isUploadingHero ? (
+                      <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                    ) : (
+                      <Upload className="h-3 w-3 mr-1" />
+                    )}
+                    Replace
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={handleRemoveHero}
+                    className="h-7 px-2 text-[11px]"
+                    data-testid="btn-remove-hero"
+                  >
+                    <X className="h-3 w-3 mr-1" />
+                    Remove
+                  </Button>
+                </>
+              )}
             </div>
           )}
 
@@ -357,6 +382,22 @@ export default function ProjectDetails() {
             />
           )}
         </div>
+      )}
+
+      {(isAdminUser || isCrewUser) && heroEditing && project.thumbnailUrl && (
+        <HeroImageEditor
+          projectId={project.id}
+          imageUrl={project.thumbnailUrl}
+          initialFocalX={(heroLocal?.focalX ?? project.heroFocalX ?? 0.5) as number}
+          initialFocalY={(heroLocal?.focalY ?? project.heroFocalY ?? 0.5) as number}
+          initialZoom={(heroLocal?.zoom ?? project.heroZoom ?? 1.0) as number}
+          onCancel={() => setHeroEditing(false)}
+          onSaved={(next) => {
+            setHeroLocal(next);
+            setHeroEditing(false);
+            queryClient.invalidateQueries({ queryKey: ["/api/projects/:id", project.id] });
+          }}
+        />
       )}
 
       {safeActiveTab === "overview" ? (

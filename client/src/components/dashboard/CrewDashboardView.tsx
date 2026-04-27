@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Clock, CalendarDays, CheckCircle2, Circle, PlayCircle, Calendar, History, ArrowRight, Image } from "lucide-react";
 import type { Task, CalendarEvent, Project } from "@shared/schema";
 import { useRecentProjects } from "@/hooks/use-recent-projects";
+import { heroImageStyle } from "@/lib/hero-frame";
 
 type TaskWithProject = Task & { projectName: string };
 type EventWithProject = CalendarEvent & { projectName: string };
@@ -92,6 +93,7 @@ export function CrewDashboardView({
                         src={project.thumbnailUrl}
                         alt={project.name}
                         className="w-full h-24 object-cover"
+                        style={heroImageStyle(project)}
                         data-testid={`img-crew-recent-thumbnail-${project.id}`}
                       />
                     ) : (

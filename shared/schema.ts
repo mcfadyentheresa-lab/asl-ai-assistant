@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, date, jsonb, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, date, jsonb, uniqueIndex, real } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -18,6 +18,9 @@ export const projects = pgTable("projects", {
   endDate: date("end_date"),
   address: text("address"),
   thumbnailUrl: text("thumbnail_url"),
+  heroFocalX: real("hero_focal_x").default(0.5),
+  heroFocalY: real("hero_focal_y").default(0.5),
+  heroZoom: real("hero_zoom").default(1.0),
   totalBudget: integer("total_budget").default(0),
   budgetUsed: integer("budget_used").default(0),
   budgetVisibleToClient: boolean("budget_visible_to_client").default(false),
