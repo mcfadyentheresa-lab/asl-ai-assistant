@@ -68,6 +68,7 @@ import { BudgetSnapshot } from "@/components/project/BudgetSnapshot";
 import { ProjectSidebarCards } from "@/components/project/ProjectSidebarCards";
 import { ProgressTab } from "@/components/project/ProgressTab";
 import { ClientProjectHeader } from "@/components/project/ClientProjectHeader";
+import { ClientProjectFooter, deriveProjectCode as deriveFooterProjectCode } from "@/components/project/ClientProjectFooter";
 import { HeroImageEditor } from "@/components/project/HeroImageEditor";
 import { Crop } from "lucide-react";
 import { ProjectNowCard } from "@/components/project/ProjectNowCard";
@@ -1011,6 +1012,13 @@ export default function ProjectDetails() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {userRole === "client" && safeActiveTab !== "board" && (
+        <ClientProjectFooter
+          projectName={project.name}
+          projectCode={deriveFooterProjectCode(project.id)}
+        />
+      )}
     </div>
   );
 }
