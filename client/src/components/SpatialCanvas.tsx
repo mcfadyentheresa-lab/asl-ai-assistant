@@ -52,9 +52,10 @@ import {
   CalendarDays, Milestone, ListChecks, Bell, BellOff,
   ChefHat, Bath, Home, FileText, LayoutPanelLeft, LayoutGrid, Move,
   Lock, LockOpen, Hand, Wrench, Check,
-  Spline, MoveRight, Slash,
+  Spline, MoveRight, Slash, Droplet,
 } from "lucide-react";
 import HardwarePickerDialog, { type HardwareDraft } from "@/components/board/HardwarePickerDialog";
+import PaletteExtractionDialog, { type PaletteAddPayload } from "@/components/board/PaletteExtractionDialog";
 import CanvasConnectors, { CONNECTOR_DEFAULT_COLOR, anchorDots, type ConnectorContent, type ConnectorStyle, type ConnectorCurve } from "@/components/board/CanvasConnectors";
 import { useToast } from "@/hooks/use-toast";
 import { usePlanningBoards, useCreatePlanningBoard, useDeletePlanningBoard, useUpdatePlanningBoard, useUploadImage, useUsers, useProjects, useMilestones, useChecklistItems, useCalendarEvents, useUpdateCalendarEvent, useDeleteCalendarEvent, useCreateCalendarEvent, useCreateMilestone, useCreateChecklistItem, useBoardSnapshots, useCreateBoardSnapshot, useRestoreBoardSnapshot, useDeleteBoardSnapshot } from "@/hooks/use-projects";
@@ -371,6 +372,9 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   const [showImagePopup, setShowImagePopup] = useState(false);
   const [showHardwareDialog, setShowHardwareDialog] = useState(false);
   const pendingHardwareDropRef = useRef<{ x: number; y: number } | null>(null);
+  const [showPaletteDialog, setShowPaletteDialog] = useState(false);
+  const [palettePresetUrl, setPalettePresetUrl] = useState<string | null>(null);
+  const palettePresetSourceRef = useRef<{ x: number; y: number; w: number; h: number } | null>(null);
   const [imageUrlInput, setImageUrlInput] = useState("");
   const imageUrlInputRef = useRef<HTMLInputElement | null>(null);
   const noteTextareaRefs = useRef<Record<string, HTMLTextAreaElement | HTMLInputElement | null>>({});
@@ -753,6 +757,90 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       toast({ title: "Hardware added", description: draft.name });
     } catch {
       toast({ title: "Error", description: "Failed to add hardware", variant: "destructive" });
+    }
+  };
+
+  // Drop a row of color_swatch elements onto the board from an extracted palette.
+  // If the extraction came from a board image, anchor the row just below it; otherwise
+  // anchor at the current viewport center.
+  const createPaletteSwatches = async (payload: PaletteAddPayload) => {
+    if (!selectedBoardId) return;
+    const def = ELEMENT_DEFAULTS.color_swatch;
+    const gap = 12;
+    const rowSpacing = def.width + gap;
+
+    const source = palettePresetSourceRef.current;
+    palettePresetSourceRef.current = null;
+    const rows = payload.rows;
+    const totalWidth = rows.length * def.width + (rows.length - 1) * gap;
+
+    let startX: number;
+    let startY: number;
+    if (source) {
+      startX = source.x + Math.round((source.w - totalWidth) / 2);
+      startY = source.y + source.h + 24;
+    } else {
+      const viewW = containerRef.current?.clientWidth || 800;
+      const viewH = containerRef.current?.clientHeight || 600;
+      const centerX = (-pan.x + viewW / 2) / zoom;
+      const centerY = (-pan.y + viewH / 2) / zoom;
+      startX = Math.round(centerX - totalWidth / 2);
+      startY = Math.round(centerY - def.height / 2);
+    }
+
+    const baseZ = maxZ;
+    setMaxZ((z) => z + rows.length);
+
+    const url = buildUrl(api.canvasElements.create.path, { boardId: selectedBoardId });
+    let added = 0;
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const matchHex = row.match?.hex || row.hex;
+      const content: any = {
+        color: matchHex,
+        hex: matchHex,
+        name: row.match?.name || "Extracted color",
+      };
+      if (row.match) {
+        content.brand = row.match.brand;
+        content.code = row.match.code;
+        if (typeof row.match.lrv === "number") content.lrv = row.match.lrv;
+      }
+      if (payload.room) content.room = payload.room;
+
+      try {
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            type: "color_swatch",
+            x: startX + i * rowSpacing,
+            y: startY,
+            width: def.width,
+            height: def.height,
+            zIndex: baseZ + i,
+            content,
+          }),
+        });
+        const el = await res.json();
+        addElement(el);
+        sendElementAdd(el);
+        pushUndo({ type: "create", elementId: el.id });
+        added++;
+      } catch {
+        // Continue dropping the rest; we'll surface a partial-success toast at the end.
+      }
+    }
+    if (added === 0) {
+      toast({ title: "Error", description: "Failed to add palette to board", variant: "destructive" });
+    } else {
+      toast({
+        title: "Palette added",
+        description: payload.room
+          ? `${added} color${added === 1 ? "" : "s"} for ${payload.room}`
+          : `${added} color${added === 1 ? "" : "s"} dropped on the board`,
+      });
     }
   };
 
@@ -3476,6 +3564,27 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           {isSelected && (
             <>
               <div className="absolute -top-8 right-0 flex gap-1">
+                {effectiveRole !== "client" && c.url && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-6 w-6"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          palettePresetSourceRef.current = { x: el.x, y: el.y, w: el.width, h: el.height };
+                          setPalettePresetUrl(c.url);
+                          setShowPaletteDialog(true);
+                        }}
+                        data-testid={`button-extract-palette-${el.id}`}
+                      >
+                        <Droplet className="h-3 w-3" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="text-xs">Extract palette</TooltipContent>
+                  </Tooltip>
+                )}
                 <Button size="icon" variant="ghost" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); triggerImageUpload(el.id); }} disabled={isUploading} data-testid={`button-replace-image-${el.id}`}>
                   <Upload className="h-3 w-3" />
                 </Button>
@@ -3580,6 +3689,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       tools: [
         { type: "draw", icon: Pencil, label: "Draw" },
         ...(effectiveRole === "client" ? [] : [{ type: "connect", icon: Spline, label: "Connect" }]),
+        ...(effectiveRole === "client" ? [] : [{ type: "palette", icon: Droplet, label: "Extract palette" }]),
       ],
     },
   ];
@@ -3874,7 +3984,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                           e.dataTransfer.setData("tool-type", t.type);
                           e.dataTransfer.effectAllowed = "copy";
                         }}
-                        onClick={() => t.type === "image" ? setShowImagePopup(!showImagePopup) : t.type === "draw" ? (() => { setDrawingMode(true); setDrawTool("pen"); setDrawingPaths([]); drawPathsRef.current = []; setDrawUndoStack([]); setEditingId(null); })() : t.type === "hardware" ? (() => { pendingHardwareDropRef.current = null; setShowHardwareDialog(true); })() : t.type === "connect" ? (() => { if (connectMode) { exitConnectMode(); } else { setConnectMode(true); setConnectSourceId(null); setSelectedConnectorId(null); setEditingId(null); } })() : createElement(t.type)}
+                        onClick={() => t.type === "image" ? setShowImagePopup(!showImagePopup) : t.type === "draw" ? (() => { setDrawingMode(true); setDrawTool("pen"); setDrawingPaths([]); drawPathsRef.current = []; setDrawUndoStack([]); setEditingId(null); })() : t.type === "hardware" ? (() => { pendingHardwareDropRef.current = null; setShowHardwareDialog(true); })() : t.type === "connect" ? (() => { if (connectMode) { exitConnectMode(); } else { setConnectMode(true); setConnectSourceId(null); setSelectedConnectorId(null); setEditingId(null); } })() : t.type === "palette" ? (() => { palettePresetSourceRef.current = null; setPalettePresetUrl(null); setShowPaletteDialog(true); })() : createElement(t.type)}
                         data-testid={`sidebar-tool-${t.type}`}
                       >
                         <t.icon className="h-[18px] w-[18px]" strokeWidth={1.5} />
@@ -5237,6 +5347,29 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
         open={showHardwareDialog}
         onOpenChange={(v) => { setShowHardwareDialog(v); if (!v) pendingHardwareDropRef.current = null; }}
         onSubmit={createHardware}
+      />
+
+      <PaletteExtractionDialog
+        open={showPaletteDialog}
+        onOpenChange={(v) => {
+          setShowPaletteDialog(v);
+          if (!v) {
+            setPalettePresetUrl(null);
+            palettePresetSourceRef.current = null;
+          }
+        }}
+        boardImages={elementsList
+          .filter((e) => e.type === "image" && (e.content as any)?.url)
+          .map((e) => ({ id: e.id, url: (e.content as any).url, caption: (e.content as any).caption }))}
+        roomSuggestions={Array.from(new Set(
+          elementsList
+            .filter((e) => e.type === "room_zone" && (e.content as any)?.title)
+            .map((e) => String((e.content as any).title).trim())
+            .filter(Boolean)
+        ))}
+        uploadImage={async (file) => uploadImage(file)}
+        onAdd={createPaletteSwatches}
+        presetImageUrl={palettePresetUrl}
       />
 
       <Sheet open={!!linkDetailSheet} onOpenChange={(open) => { if (!open) setLinkDetailSheet(null); }}>
