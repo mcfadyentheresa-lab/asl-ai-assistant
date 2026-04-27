@@ -2000,19 +2000,20 @@ function templateCanvasToElements(canvasData: any, boardId: number, createdBy: s
     }
   });
 
-  // Vendor URL unfurl — fetches OG/meta tags so the Hardware/Material picker
-  // can pre-fill name, image, and price from a paste-in product URL.
+  // URL unfurl — fetches OG/meta tags so any paste-in product or reference URL
+  // gets a thumbnail, title, site name, and (when present) price/currency.
+  // Used by the Hardware/Material picker and by board link elements.
   // Admin/crew only; rate-limited per user (in-memory).
   const unfurlBuckets = new Map<string, { count: number; resetAt: number }>();
   const UNFURL_LIMIT = 30;
   const UNFURL_WINDOW_MS = 5 * 60_000;
 
-  app.post("/api/board/unfurl-vendor", isAuthenticated, async (req: any, res) => {
+  const handleUnfurl = async (req: any, res: any) => {
     try {
       const userId = req.user.claims.sub;
       const dbUser = await authStorage.getUser(userId);
       if (dbUser?.role !== "admin" && dbUser?.role !== "crew") {
-        return res.status(403).json({ message: "Only admin/crew can unfurl vendor URLs" });
+        return res.status(403).json({ message: "Only admin/crew can unfurl URLs" });
       }
 
       const now = Date.now();
@@ -2068,6 +2069,9 @@ function templateCanvasToElements(canvasData: any, boardId: number, createdBy: s
       const ogImage = metaContent(/<meta[^>]+property=["']og:image(?::secure_url)?["'][^>]+content=["']([^"']+)["']/i)
         || metaContent(/<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i);
       const ogSiteName = metaContent(/<meta[^>]+property=["']og:site_name["'][^>]+content=["']([^"']+)["']/i);
+      const ogDescription = metaContent(/<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)["']/i)
+        || metaContent(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i)
+        || metaContent(/<meta[^>]+name=["']twitter:description["'][^>]+content=["']([^"']+)["']/i);
       const priceAmount = metaContent(/<meta[^>]+property=["'](?:og:price:amount|product:price:amount)["'][^>]+content=["']([^"']+)["']/i)
         || metaContent(/<meta[^>]+itemprop=["']price["'][^>]+content=["']([^"']+)["']/i);
       const priceCurrency = metaContent(/<meta[^>]+property=["'](?:og:price:currency|product:price:currency)["'][^>]+content=["']([^"']+)["']/i)
@@ -2085,15 +2089,20 @@ function templateCanvasToElements(canvasData: any, boardId: number, createdBy: s
         title: ogTitle || titleTag,
         image: absoluteImage,
         siteName: ogSiteName,
+        description: ogDescription,
         price: Number.isFinite(priceNum as number) ? priceNum : undefined,
         currency: priceCurrency,
         sourceUrl: url,
       });
     } catch (err: any) {
-      console.error("Vendor unfurl error:", err.message);
+      console.error("Unfurl error:", err.message);
       res.status(422).json({ message: "Couldn't read that page; try manual entry." });
     }
-  });
+  };
+
+  app.post("/api/board/unfurl", isAuthenticated, handleUnfurl);
+  // Back-compat alias — hardware/material picker still calls this path.
+  app.post("/api/board/unfurl-vendor", isAuthenticated, handleUnfurl);
 
   // Board palette extraction — k-means cluster on a photo, snap each
   // centroid to the nearest paint color in the seeded catalogue.

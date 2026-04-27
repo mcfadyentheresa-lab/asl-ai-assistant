@@ -107,7 +107,16 @@ export default function PresentationMode({
     const colorSwatches = elements.filter((e) =>
       e.type === "color_swatch" || (e.type === "surface" && (e.content as any)?.kind === "paint")
     );
-    const images = elements.filter((e) => e.type === "image");
+    const allImages = elements.filter((e) => e.type === "image");
+    // Curated inspiration grid: only images explicitly flagged inspiration=true.
+    // If no images are flagged on a board (existing decks pre-facet), fall back to the
+    // full set so the deck never renders empty unintentionally.
+    const flaggedImages = allImages.filter((e) => (e.content as any)?.inspiration === true);
+    const images = flaggedImages.length > 0 ? flaggedImages : allImages;
+    const isImageDeckCurated = flaggedImages.length > 0;
+    const totalBoardImages = allImages.length;
+    const deckImageCount = images.length;
+
     const hardware = elements.filter((e) => e.type === "hardware");
     const material = elements.filter((e) =>
       e.type === "material" || (e.type === "surface" && (e.content as any)?.kind === "material")
@@ -121,7 +130,18 @@ export default function PresentationMode({
       e.type === "section_header" || (e.type === "text" && (e.content as any)?.variant === "heading")
     );
 
-    return { colorSwatches, images, hardware, material, product, notes, sectionHeaders };
+    return {
+      colorSwatches,
+      images,
+      hardware,
+      material,
+      product,
+      notes,
+      sectionHeaders,
+      isImageDeckCurated,
+      totalBoardImages,
+      deckImageCount,
+    };
   }, [elements]);
 
   // Lock body scroll while presentation is open.
@@ -346,6 +366,19 @@ export default function PresentationMode({
       {grouped.images.length > 0 && (
         <FadeUpSection className="presentation-page presentation-section w-full px-8 md:px-16 lg:px-24 py-24 md:py-32 border-t border-border">
           <SectionHeader eyebrow="Inspiration" title="Reference & mood" />
+          {/* Deck builder hint — only for admin/crew view, never on client shares.
+              Suppressed in print so the printed deck stays clean. */}
+          {!watermarkOnly && grouped.totalBoardImages > 0 && (
+            <div
+              className="mt-4 text-[10px] uppercase tracking-[0.18em] text-muted-foreground/80 print:hidden"
+              style={{ fontFamily: "var(--font-mono)" }}
+              data-testid="presentation-deck-hint"
+            >
+              {grouped.isImageDeckCurated
+                ? `Showing ${grouped.deckImageCount} of ${grouped.totalBoardImages} board images — flag more on the board to add them to the deck.`
+                : `No images flagged yet — showing all ${grouped.totalBoardImages}. Flag favorites on the board to curate the deck.`}
+            </div>
+          )}
           <div className="presentation-image-grid mt-12">
             {grouped.images.map((img, idx) => {
               const c: any = img.content || {};
