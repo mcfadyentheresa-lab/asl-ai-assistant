@@ -70,6 +70,7 @@ import { ProgressTab } from "@/components/project/ProgressTab";
 import { ClientProjectHeader } from "@/components/project/ClientProjectHeader";
 import { ProjectNowCard } from "@/components/project/ProjectNowCard";
 import { ClientMilestoneList } from "@/components/project/ClientMilestoneList";
+import { ClientReferenceCards } from "@/components/project/ClientReferenceCards";
 import type { ChecklistItem, BoardItem } from "@shared/schema";
 
 export default function ProjectDetails() {
@@ -411,6 +412,7 @@ export default function ProjectDetails() {
                   milestones={milestones}
                   activityLog={activityLog}
                 />
+                <ClientReferenceCards project={project} users={users} />
                 <button
                   onClick={() => setShowOpenItemsDrawer(true)}
                   className="text-xs text-primary hover:underline cursor-pointer -mt-1 block"
