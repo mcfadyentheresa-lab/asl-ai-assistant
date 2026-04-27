@@ -79,9 +79,8 @@ export function ClientMilestoneList({
     }
   }, [inProgressId, expandedId]);
 
-  if (!milestones || milestones.length === 0) return null;
-
   const totalCount = sorted.length;
+  const isEmpty = totalCount === 0;
 
   return (
     <section className="space-y-4" data-testid="client-milestone-list">
@@ -123,10 +122,28 @@ export function ClientMilestoneList({
           style={{ fontFamily: "var(--font-mono)" }}
           data-testid="text-milestones-count"
         >
-          {totalCount} milestone{totalCount === 1 ? "" : "s"}
+          {isEmpty
+            ? "Planning underway"
+            : `${totalCount} milestone${totalCount === 1 ? "" : "s"}`}
         </span>
       </div>
 
+      {isEmpty ? (
+        <div
+          className="rounded-md border border-border/60 bg-muted/30 px-6 py-12 text-center"
+          data-testid="milestone-empty-state"
+        >
+          <div
+            className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground"
+            style={{ fontFamily: "var(--font-mono)" }}
+          >
+            Coming soon
+          </div>
+          <p className="mt-3 text-sm text-muted-foreground">
+            Milestones will appear here as Theresa plans the project.
+          </p>
+        </div>
+      ) : (
       <ol className="border-t border-border/60" role="list">
         {sorted.map((m, idx) => {
           const status = getStatus(m, inProgressId);
@@ -286,6 +303,7 @@ export function ClientMilestoneList({
           );
         })}
       </ol>
+      )}
     </section>
   );
 }
