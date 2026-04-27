@@ -1587,6 +1587,42 @@ Respond with valid JSON only:
     res.json(board);
   }));
 
+  // Suggested categories — deduped, frequency-sorted list of `category` values
+  // used across every board/element on a project. Powers the autocomplete in
+  // card editors and the +Category dialog. Cached for 30s per project; we
+  // recompute on the fly otherwise (small volume, no separate write path).
+  const suggestedCategoriesCache = new Map<number, { at: number; data: string[] }>();
+  app.get("/api/projects/:projectId/suggested-categories", isAuthenticated, asyncHandler(async (req: any, res) => {
+    const projectId = Number(req.params.projectId);
+    const ok = await checkProjectAccess(req, res, projectId);
+    if (!ok) return;
+    const cached = suggestedCategoriesCache.get(projectId);
+    if (cached && Date.now() - cached.at < 30_000) {
+      res.json(cached.data);
+      return;
+    }
+    const { planningBoards: pbTable, canvasElements: ceTable } = await import("@shared/schema");
+    const { eq, inArray } = await import("drizzle-orm");
+    const { db } = await import("./db");
+    const boardRows = await db.select({ id: pbTable.id }).from(pbTable).where(eq(pbTable.projectId, projectId));
+    const ids = boardRows.map((b) => b.id);
+    const counts = new Map<string, number>();
+    if (ids.length > 0) {
+      const rows = await db.select({ content: ceTable.content }).from(ceTable).where(inArray(ceTable.boardId, ids));
+      for (const r of rows) {
+        const c = (r.content as any) || {};
+        const cat = typeof c.category === "string" ? c.category.trim() : "";
+        if (!cat) continue;
+        counts.set(cat, (counts.get(cat) || 0) + 1);
+      }
+    }
+    const data = Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([name]) => name);
+    suggestedCategoriesCache.set(projectId, { at: Date.now(), data });
+    res.json(data);
+  }));
+
   app.get("/api/board-templates", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub;
     const userRecord = await authStorage.getUser(userId);

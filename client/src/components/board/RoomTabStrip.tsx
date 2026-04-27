@@ -1,14 +1,20 @@
-// Rooms-as-the-spine tab strip.
+// Mode-aware board tab strip.
 //
-// Lives directly above the canvas, below the top toolbar. Shows "All" + one
-// tab per room name (derived from `room_zone` elements and explicit `room`
-// fields on hardware/surface/product). Tabs are reorderable (drag), renameable
-// inline, and a trailing "+ Room" tab opens a small dialog to drop a new
-// room_zone with optional W × D dimensions.
+// The primary axis depends on the board's `mode`:
+//   - 'project' (default): tabs are rooms — Kitchen, Powder, Primary Bath…
+//   - 'library':           tabs are categories — Fabric, Stone, Hardware…
 //
-// Active room is persisted per board in localStorage. Status filter pills sit
+// Lives directly above the canvas. Tabs are reorderable (drag), renameable
+// inline, and a trailing "+ Room" / "+ Category" tab opens a small dialog to
+// add a new lane.
+//
+// On project boards the new lane drops a `room_zone` element onto the canvas
+// (existing behavior). On library boards the new lane is a metadata-only
+// addition: an empty Category isn't pinned anywhere until a card carries it.
+//
+// Active tab is persisted per board in localStorage. Status filter pills sit
 // just below the tabs and are multi-select. A budget rollup pill is rendered
-// at the right end of the active room's strip.
+// at the right end of the active tab's strip.
 //
 // iPad-first: 44pt min height, swipe-scroll horizontally.
 
@@ -29,17 +35,23 @@ import {
 } from "@/lib/board-rooms";
 import type { CanvasElement, Project } from "@shared/schema";
 
+export type BoardMode = "project" | "library";
+
 interface RoomTabStripProps {
-  rooms: string[];
-  activeRoom: string | null; // null = "All"
+  mode: BoardMode;
+  // Primary tab labels (rooms when mode='project', categories when mode='library').
+  tabs: string[];
+  activeTab: string | null; // null = "All"
   statusFilters: Set<RoomStatus>;
   elements: CanvasElement[];
   project: Project | undefined;
   isLocked: boolean;
-  onSelectRoom: (room: string | null) => void;
-  onReorderRooms: (orderedRoomNames: string[]) => void;
-  onRenameRoom: (oldName: string, newName: string) => void;
-  onCreateRoom: (payload: { name: string; widthFt?: number; widthIn?: number; depthFt?: number; depthIn?: number }) => void;
+  onSelectTab: (tab: string | null) => void;
+  onReorderTabs: (orderedTabNames: string[]) => void;
+  onRenameTab: (oldName: string, newName: string) => void;
+  // Project-mode payload includes optional dimensions for the new room_zone.
+  // Library-mode payload uses only `name`.
+  onCreateTab: (payload: { name: string; widthFt?: number; widthIn?: number; depthFt?: number; depthIn?: number }) => void;
   onToggleStatusFilter: (s: RoomStatus) => void;
 }
 
@@ -51,109 +63,113 @@ const STATUS_PILL_CLASS: Record<RoomStatus, { dot: string; label: string }> = {
 };
 
 export default function RoomTabStrip({
-  rooms,
-  activeRoom,
+  mode,
+  tabs,
+  activeTab,
   statusFilters,
   elements,
   project,
   isLocked,
-  onSelectRoom,
-  onReorderRooms,
-  onRenameRoom,
-  onCreateRoom,
+  onSelectTab,
+  onReorderTabs,
+  onRenameTab,
+  onCreateTab,
   onToggleStatusFilter,
 }: RoomTabStripProps) {
-  const [renamingRoom, setRenamingRoom] = useState<string | null>(null);
+  const [renamingTab, setRenamingTab] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
-  const [dragRoom, setDragRoom] = useState<string | null>(null);
-  const [dragOverRoom, setDragOverRoom] = useState<string | null>(null);
+  const [dragTab, setDragTab] = useState<string | null>(null);
+  const [dragOverTab, setDragOverTab] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const renameInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (renamingRoom && renameInputRef.current) {
+    if (renamingTab && renameInputRef.current) {
       renameInputRef.current.focus();
       renameInputRef.current.select();
     }
-  }, [renamingRoom]);
+  }, [renamingTab]);
 
-  const counts = useMemo(() => countByStatus(elements, activeRoom), [elements, activeRoom]);
-  // Whether this tab has any status-bearing cards (hardware/surface/product) at all.
-  // The pills row is noise when there's nothing to filter — hide it. Scope: active room
-  // when one is selected, otherwise the whole board ("All" tab).
+  // Status pills + budget rollup are scoped to the active room when in project
+  // mode. In library mode there's no inherent room scope on the primary axis,
+  // so status counts are computed across the whole board (the user can still
+  // narrow by category via the active tab).
+  const scopedRoomForStatus = mode === "project" ? activeTab : null;
+  const counts = useMemo(() => countByStatus(elements, scopedRoomForStatus), [elements, scopedRoomForStatus]);
   const hasStatusBearingElements = useMemo(() => {
     for (const el of elements) {
       if (!isRoomable(el)) continue;
-      if (activeRoom != null && resolveRoomFor(el, elements) !== activeRoom) continue;
+      if (scopedRoomForStatus != null && resolveRoomFor(el, elements) !== scopedRoomForStatus) continue;
       return true;
     }
     return false;
-  }, [elements, activeRoom]);
-  const budget = useMemo(() => computeRoomBudget(elements, activeRoom), [elements, activeRoom]);
+  }, [elements, scopedRoomForStatus]);
+  const budget = useMemo(() => computeRoomBudget(elements, scopedRoomForStatus), [elements, scopedRoomForStatus]);
   const totalBudget = project?.totalBudget ?? 0;
   const overBy = budget.total - totalBudget;
 
-  const beginRename = (room: string) => {
+  const beginRename = (tab: string) => {
     if (isLocked) return;
-    setRenamingRoom(room);
-    setRenameDraft(room);
+    setRenamingTab(tab);
+    setRenameDraft(tab);
   };
 
   const commitRename = () => {
-    if (!renamingRoom) return;
+    if (!renamingTab) return;
     const next = renameDraft.trim();
-    if (next && next !== renamingRoom) {
-      onRenameRoom(renamingRoom, next);
+    if (next && next !== renamingTab) {
+      onRenameTab(renamingTab, next);
     }
-    setRenamingRoom(null);
+    setRenamingTab(null);
     setRenameDraft("");
   };
 
-  const handleDragStart = (room: string) => (e: React.DragEvent) => {
+  const handleDragStart = (tab: string) => (e: React.DragEvent) => {
     if (isLocked) return;
-    setDragRoom(room);
+    setDragTab(tab);
     e.dataTransfer.effectAllowed = "move";
-    e.dataTransfer.setData("text/plain", room);
+    e.dataTransfer.setData("text/plain", tab);
   };
 
-  const handleDragOver = (room: string) => (e: React.DragEvent) => {
-    if (!dragRoom || dragRoom === room) return;
+  const handleDragOver = (tab: string) => (e: React.DragEvent) => {
+    if (!dragTab || dragTab === tab) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
-    setDragOverRoom(room);
+    setDragOverTab(tab);
   };
 
-  const handleDrop = (room: string) => (e: React.DragEvent) => {
+  const handleDrop = (tab: string) => (e: React.DragEvent) => {
     e.preventDefault();
-    if (!dragRoom || dragRoom === room) {
-      setDragRoom(null);
-      setDragOverRoom(null);
+    if (!dragTab || dragTab === tab) {
+      setDragTab(null);
+      setDragOverTab(null);
       return;
     }
-    const fromIdx = rooms.indexOf(dragRoom);
-    const toIdx = rooms.indexOf(room);
+    const fromIdx = tabs.indexOf(dragTab);
+    const toIdx = tabs.indexOf(tab);
     if (fromIdx < 0 || toIdx < 0) {
-      setDragRoom(null);
-      setDragOverRoom(null);
+      setDragTab(null);
+      setDragOverTab(null);
       return;
     }
-    const next = rooms.slice();
+    const next = tabs.slice();
     const [moved] = next.splice(fromIdx, 1);
     next.splice(toIdx, 0, moved);
-    onReorderRooms(next);
-    setDragRoom(null);
-    setDragOverRoom(null);
+    onReorderTabs(next);
+    setDragTab(null);
+    setDragOverTab(null);
   };
 
   const handleDragEnd = () => {
-    setDragRoom(null);
-    setDragOverRoom(null);
+    setDragTab(null);
+    setDragOverTab(null);
   };
 
   const tabBase = "min-h-[44px] px-4 inline-flex items-center gap-2 text-sm whitespace-nowrap rounded-t-md transition-colors select-none";
+  const addLabel = mode === "library" ? "Category" : "Room";
 
   return (
-    <div className="shrink-0 bg-card border-b border-border relative z-10" data-testid="room-tab-strip">
+    <div className="shrink-0 bg-card border-b border-border relative z-10" data-testid="room-tab-strip" data-mode={mode}>
       <div
         className="flex items-end gap-1 overflow-x-auto px-2 pt-1 hide-scrollbar"
         style={{ scrollbarWidth: "none" }}
@@ -161,28 +177,28 @@ export default function RoomTabStrip({
       >
         <button
           type="button"
-          className={`${tabBase} ${activeRoom === null ? "bg-[#2f4a3a] text-white" : "bg-[#f7f1e7] text-foreground/80 hover:bg-[#f0e8d6]"}`}
+          className={`${tabBase} ${activeTab === null ? "bg-[#2f4a3a] text-white" : "bg-[#f7f1e7] text-foreground/80 hover:bg-[#f0e8d6]"}`}
           style={{ fontFamily: "Inter Tight, Inter, sans-serif", fontWeight: 500 }}
-          onClick={() => onSelectRoom(null)}
+          onClick={() => onSelectTab(null)}
           data-testid="room-tab-all"
         >
           All
         </button>
 
-        {rooms.map((room) => {
-          const isActive = room === activeRoom;
-          const isRenaming = room === renamingRoom;
-          const isDragOver = room === dragOverRoom;
+        {tabs.map((tab) => {
+          const isActive = tab === activeTab;
+          const isRenaming = tab === renamingTab;
+          const isDragOver = tab === dragOverTab;
           return (
             <div
-              key={room}
+              key={tab}
               draggable={!isLocked && !isRenaming}
-              onDragStart={handleDragStart(room)}
-              onDragOver={handleDragOver(room)}
-              onDrop={handleDrop(room)}
+              onDragStart={handleDragStart(tab)}
+              onDragOver={handleDragOver(tab)}
+              onDrop={handleDrop(tab)}
               onDragEnd={handleDragEnd}
               className={`relative ${isDragOver ? "ring-2 ring-[#2f4a3a]/40 rounded-t-md" : ""}`}
-              data-testid={`room-tab-wrap-${room}`}
+              data-testid={`room-tab-wrap-${tab}`}
             >
               {isRenaming ? (
                 <div className={`${tabBase} bg-white border border-[#2f4a3a]/40`}>
@@ -193,14 +209,14 @@ export default function RoomTabStrip({
                     onKeyDown={(e) => {
                       if (e.key === "Enter") commitRename();
                       if (e.key === "Escape") {
-                        setRenamingRoom(null);
+                        setRenamingTab(null);
                         setRenameDraft("");
                       }
                     }}
                     onBlur={commitRename}
                     className="h-6 w-32 bg-transparent border-none text-sm outline-none"
                     style={{ fontFamily: "Inter Tight, Inter, sans-serif" }}
-                    data-testid={`room-tab-rename-input-${room}`}
+                    data-testid={`room-tab-rename-input-${tab}`}
                   />
                 </div>
               ) : (
@@ -208,12 +224,12 @@ export default function RoomTabStrip({
                   type="button"
                   className={`${tabBase} ${isActive ? "bg-[#2f4a3a] text-white" : "bg-[#f7f1e7] text-foreground/80 hover:bg-[#f0e8d6]"}`}
                   style={{ fontFamily: "Inter Tight, Inter, sans-serif", fontWeight: 500 }}
-                  onClick={() => onSelectRoom(room)}
-                  onDoubleClick={() => beginRename(room)}
-                  data-testid={`room-tab-${room}`}
+                  onClick={() => onSelectTab(tab)}
+                  onDoubleClick={() => beginRename(tab)}
+                  data-testid={`room-tab-${tab}`}
                   title="Double-tap to rename"
                 >
-                  {room}
+                  {tab}
                   {isActive && !isLocked && (
                     <span
                       role="button"
@@ -221,16 +237,16 @@ export default function RoomTabStrip({
                       className="ml-1 inline-flex items-center justify-center h-5 w-5 rounded hover:bg-white/15"
                       onClick={(e) => {
                         e.stopPropagation();
-                        beginRename(room);
+                        beginRename(tab);
                       }}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
                           e.stopPropagation();
-                          beginRename(room);
+                          beginRename(tab);
                         }
                       }}
-                      aria-label={`Rename ${room}`}
-                      data-testid={`room-tab-rename-${room}`}
+                      aria-label={`Rename ${tab}`}
+                      data-testid={`room-tab-rename-${tab}`}
                     >
                       <Pencil className="h-3 w-3" />
                     </span>
@@ -248,14 +264,14 @@ export default function RoomTabStrip({
           onClick={() => setDialogOpen(true)}
           data-testid="room-tab-add"
         >
-          <Plus className="h-4 w-4" /> Room
+          <Plus className="h-4 w-4" /> {addLabel}
         </button>
 
         <div className="flex-1" />
 
         {/* Budget rollup pill — sits at the right end of the strip. Only renders when
             there is something to say (at least one selected/ordered card OR a target budget). */}
-        {(budget.total > 0 || (activeRoom !== null && totalBudget > 0)) && (
+        {(budget.total > 0 || (activeTab !== null && totalBudget > 0)) && (
           <div className="ml-auto pr-1 pb-0.5 flex items-center gap-1.5">
             {budget.hasMixedCurrency && (
               <span
@@ -278,7 +294,7 @@ export default function RoomTabStrip({
                 <span>Ordered: {formatCad(budget.ordered)}</span>
               </span>
             )}
-            {activeRoom === null && totalBudget > 0 && budget.total > 0 && (
+            {activeTab === null && totalBudget > 0 && budget.total > 0 && (
               <span
                 className={`inline-flex items-center text-[11px] px-2 py-1 rounded-md ${overBy > 0 ? "bg-amber-100 text-amber-800 border border-amber-300" : "bg-[#2f4a3a]/10 text-[#2f4a3a]"}`}
                 style={{ fontFamily: "var(--font-mono)" }}
@@ -336,19 +352,26 @@ export default function RoomTabStrip({
       </div>
       )}
 
-      <NewRoomDialog open={dialogOpen} onOpenChange={setDialogOpen} onCreate={onCreateRoom} />
+      <NewTabDialog
+        mode={mode}
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        onCreate={onCreateTab}
+      />
     </div>
   );
 }
 
-function NewRoomDialog({
+function NewTabDialog({
+  mode,
   open,
   onOpenChange,
   onCreate,
 }: {
+  mode: BoardMode;
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  onCreate: RoomTabStripProps["onCreateRoom"];
+  onCreate: RoomTabStripProps["onCreateTab"];
 }) {
   const [name, setName] = useState("");
   const [wFt, setWFt] = useState("");
@@ -379,13 +402,17 @@ function NewRoomDialog({
     onOpenChange(false);
   };
 
+  const isLibrary = mode === "library";
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md" data-testid="new-room-dialog">
         <DialogHeader>
-          <DialogTitle className="font-serif">New room</DialogTitle>
+          <DialogTitle className="font-serif">{isLibrary ? "New category" : "New room"}</DialogTitle>
           <DialogDescription>
-            Add a room lane. Dimensions are optional — useful for scale planning later.
+            {isLibrary
+              ? "Add a category lane. Cards tagged with this category will appear here."
+              : "Add a room lane. Dimensions are optional — useful for scale planning later."}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3 mt-2">
@@ -395,26 +422,30 @@ function NewRoomDialog({
               id="new-room-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Kitchen, Primary Bath…"
+              placeholder={isLibrary ? "Fabric Samples, Stone, Hardware…" : "Kitchen, Primary Bath…"}
               autoFocus
               onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
               data-testid="new-room-name"
             />
           </div>
-          <div>
-            <Label className="text-xs">Width <span className="text-muted-foreground">(optional)</span></Label>
-            <div className="flex items-center gap-2 mt-1">
-              <Input value={wFt} onChange={(e) => setWFt(e.target.value)} placeholder="ft" inputMode="numeric" data-testid="new-room-w-ft" />
-              <Input value={wIn} onChange={(e) => setWIn(e.target.value)} placeholder="in" inputMode="numeric" data-testid="new-room-w-in" />
-            </div>
-          </div>
-          <div>
-            <Label className="text-xs">Depth <span className="text-muted-foreground">(optional)</span></Label>
-            <div className="flex items-center gap-2 mt-1">
-              <Input value={dFt} onChange={(e) => setDFt(e.target.value)} placeholder="ft" inputMode="numeric" data-testid="new-room-d-ft" />
-              <Input value={dIn} onChange={(e) => setDIn(e.target.value)} placeholder="in" inputMode="numeric" data-testid="new-room-d-in" />
-            </div>
-          </div>
+          {!isLibrary && (
+            <>
+              <div>
+                <Label className="text-xs">Width <span className="text-muted-foreground">(optional)</span></Label>
+                <div className="flex items-center gap-2 mt-1">
+                  <Input value={wFt} onChange={(e) => setWFt(e.target.value)} placeholder="ft" inputMode="numeric" data-testid="new-room-w-ft" />
+                  <Input value={wIn} onChange={(e) => setWIn(e.target.value)} placeholder="in" inputMode="numeric" data-testid="new-room-w-in" />
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs">Depth <span className="text-muted-foreground">(optional)</span></Label>
+                <div className="flex items-center gap-2 mt-1">
+                  <Input value={dFt} onChange={(e) => setDFt(e.target.value)} placeholder="ft" inputMode="numeric" data-testid="new-room-d-ft" />
+                  <Input value={dIn} onChange={(e) => setDIn(e.target.value)} placeholder="in" inputMode="numeric" data-testid="new-room-d-in" />
+                </div>
+              </div>
+            </>
+          )}
         </div>
         <DialogFooter className="mt-4">
           <Button variant="ghost" onClick={() => onOpenChange(false)} data-testid="new-room-cancel">Cancel</Button>
