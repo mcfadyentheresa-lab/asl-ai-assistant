@@ -2601,6 +2601,271 @@ Use designer language naturally. Be specific. Mention items by their actual name
   }));
 
   // ────────────────────────────────────────────────────────────────────────
+  // AI Partner mode: board-pulse (proactive) + board-prompt (manual).
+  // Shared rate-limit pool, generous: 12/board/user/hour.
+  // ────────────────────────────────────────────────────────────────────────
+  const partnerLimits = new Map<string, number[]>();
+  const PARTNER_LIMIT = 12;
+  const PARTNER_WINDOW_MS = 60 * 60 * 1000;
+
+  function partnerRateCheck(boardId: number, userId: string) {
+    const key = `${boardId}:${userId}`;
+    const now = Date.now();
+    const stamps = (partnerLimits.get(key) || []).filter((t) => now - t < PARTNER_WINDOW_MS);
+    if (stamps.length >= PARTNER_LIMIT) {
+      const oldest = stamps[0];
+      const retryMs = PARTNER_WINDOW_MS - (now - oldest);
+      return { ok: false as const, retryMs };
+    }
+    stamps.push(now);
+    partnerLimits.set(key, stamps);
+    return { ok: true as const, remaining: PARTNER_LIMIT - stamps.length };
+  }
+
+  const SuggestionSchema = z.object({
+    type: z.enum(["gap", "conflict", "pairing", "opportunity"]),
+    room: z.string().optional(),
+    severity: z.enum(["info", "nudge", "flag"]),
+    text: z.string().min(1).max(200),
+    referencedElementIds: z.array(z.number()).max(8).optional(),
+  });
+
+  const PulseDigestSchema = z.object({
+    boardId: z.number(),
+    rooms: z.array(z.object({
+      name: z.string(),
+      items: z.array(z.object({
+        id: z.number(),
+        kind: z.string(),
+        name: z.string().optional(),
+        finish: z.string().optional(),
+        color: z.string().optional(),
+        price: z.number().optional(),
+        status: z.string().optional(),
+      })).max(40),
+    })).max(20).optional(),
+    palette: z.array(z.object({
+      id: z.number(),
+      name: z.string().optional(),
+      hex: z.string().optional(),
+      lrv: z.number().optional(),
+      brand: z.string().optional(),
+      sheen: z.string().optional(),
+      room: z.string().optional(),
+    })).max(40).optional(),
+    materials: z.array(z.object({
+      id: z.number(),
+      name: z.string().optional(),
+      kind: z.string().optional(),
+      lrv: z.number().optional(),
+      supplier: z.string().optional(),
+      room: z.string().optional(),
+    })).max(40).optional(),
+    inspirationCount: z.number().optional(),
+    signature: z.string().optional(),
+  });
+
+  app.post("/api/ai/board-pulse", isAuthenticated, asyncHandler(async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const dbUser = await authStorage.getUser(userId);
+    if (!dbUser || (dbUser.role !== "admin" && dbUser.role !== "crew")) {
+      return res.status(403).json({ error: "Admins and crew only" });
+    }
+
+    const parsed = PulseDigestSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: "Invalid digest" });
+    const digest = parsed.data;
+
+    const board = await storage.getPlanningBoard(digest.boardId);
+    if (!board) return res.status(404).json({ error: "Board not found" });
+
+    const rate = partnerRateCheck(digest.boardId, userId);
+    if (!rate.ok) {
+      const minutes = Math.max(1, Math.ceil(rate.retryMs / 60000));
+      return res.status(429).json({ error: "Partner rate limit reached", retryMinutes: minutes });
+    }
+
+    const project = await storage.getProject(board.projectId);
+
+    const lines: string[] = [];
+    lines.push(`Project: ${project?.name || "Untitled"}`);
+    if (digest.rooms?.length) {
+      for (const r of digest.rooms) {
+        if (!r.items.length) continue;
+        lines.push(`Room — ${r.name}:`);
+        for (const it of r.items) {
+          const parts = [
+            `[id:${it.id}]`,
+            it.kind,
+            it.name,
+            it.finish,
+            it.color,
+            it.status ? `(${it.status})` : null,
+            typeof it.price === "number" ? `$${it.price}` : null,
+          ].filter(Boolean);
+          lines.push(`  - ${parts.join(" · ")}`);
+        }
+      }
+    }
+    if (digest.palette?.length) {
+      lines.push("Palette:");
+      for (const p of digest.palette) {
+        const parts = [
+          `[id:${p.id}]`,
+          p.name,
+          p.brand,
+          p.hex,
+          typeof p.lrv === "number" ? `LRV ${p.lrv}` : null,
+          p.sheen,
+          p.room,
+        ].filter(Boolean);
+        lines.push(`  - ${parts.join(" · ")}`);
+      }
+    }
+    if (digest.materials?.length) {
+      lines.push("Materials:");
+      for (const m of digest.materials) {
+        const parts = [
+          `[id:${m.id}]`,
+          m.name,
+          m.kind,
+          m.supplier,
+          typeof m.lrv === "number" ? `LRV ${m.lrv}` : null,
+          m.room,
+        ].filter(Boolean);
+        lines.push(`  - ${parts.join(" · ")}`);
+      }
+    }
+    if (typeof digest.inspirationCount === "number") {
+      lines.push(`Inspiration images on board: ${digest.inspirationCount}`);
+    }
+
+    const summary = lines.join("\n");
+
+    const systemPrompt = `You are an interior designer working alongside another designer on a live moodboard. You're the partner in the room — warm, fast, specific. Watch what's happening and share AT MOST 3 short observations. Each is one of:
+- gap: something a room is clearly missing
+- conflict: two choices that fight (finish clash, LRV mismatch, palette tension)
+- pairing: a strong pairing already on the board worth naming
+- opportunity: a small move that would lift the room
+
+Rules:
+- text ≤ 140 characters, conversational, like you're standing next to them
+- when an observation refers to specific items, include their numeric ids in referencedElementIds (the [id:N] tokens above)
+- severity: info = neutral noticing, nudge = soft suggestion, flag = real concern
+- if the board is too sparse to say anything useful, return an empty array
+
+Respond with ONLY a JSON object: { "suggestions": Suggestion[] } where Suggestion is { type, room?, severity, text, referencedElementIds? }. No prose outside JSON.`;
+
+    try {
+      const OpenAI = (await import("openai")).default;
+      const client = new OpenAI({
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+      });
+
+      const response = await client.chat.completions.create({
+        model: "gpt-5-mini",
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: `Board state:\n\n${summary}` },
+        ],
+      } as any);
+
+      const raw = response.choices[0]?.message?.content?.trim() || "{}";
+      let parsedJson: any = {};
+      try { parsedJson = JSON.parse(raw); } catch { parsedJson = {}; }
+      const arr = Array.isArray(parsedJson?.suggestions) ? parsedJson.suggestions : [];
+      const suggestions = arr
+        .map((s: any) => SuggestionSchema.safeParse(s))
+        .filter((r: any) => r.success)
+        .map((r: any) => r.data)
+        .slice(0, 3);
+
+      res.json({
+        suggestions,
+        generatedAt: new Date().toISOString(),
+        signature: digest.signature ?? null,
+      });
+    } catch (error: any) {
+      console.error("Board pulse error:", error);
+      res.status(500).json({ error: "Failed to generate partner suggestions" });
+    }
+  }));
+
+  const BoardPromptSchema = PulseDigestSchema.extend({
+    prompt: z.string().min(1).max(500),
+  });
+
+  app.post("/api/ai/board-prompt", isAuthenticated, asyncHandler(async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const dbUser = await authStorage.getUser(userId);
+    if (!dbUser || (dbUser.role !== "admin" && dbUser.role !== "crew")) {
+      return res.status(403).json({ error: "Admins and crew only" });
+    }
+
+    const parsed = BoardPromptSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: "Invalid request" });
+    const digest = parsed.data;
+
+    const board = await storage.getPlanningBoard(digest.boardId);
+    if (!board) return res.status(404).json({ error: "Board not found" });
+
+    const rate = partnerRateCheck(digest.boardId, userId);
+    if (!rate.ok) {
+      const minutes = Math.max(1, Math.ceil(rate.retryMs / 60000));
+      return res.status(429).json({ error: "Partner rate limit reached", retryMinutes: minutes });
+    }
+
+    const project = await storage.getProject(board.projectId);
+
+    const lines: string[] = [];
+    lines.push(`Project: ${project?.name || "Untitled"}`);
+    if (digest.rooms?.length) {
+      for (const r of digest.rooms) {
+        if (!r.items.length) continue;
+        lines.push(`Room — ${r.name}:`);
+        for (const it of r.items) {
+          const parts = [`[id:${it.id}]`, it.kind, it.name, it.finish, it.color, it.status ? `(${it.status})` : null].filter(Boolean);
+          lines.push(`  - ${parts.join(" · ")}`);
+        }
+      }
+    }
+    if (digest.palette?.length) {
+      lines.push("Palette:");
+      for (const p of digest.palette) {
+        const parts = [`[id:${p.id}]`, p.name, p.brand, p.hex, typeof p.lrv === "number" ? `LRV ${p.lrv}` : null].filter(Boolean);
+        lines.push(`  - ${parts.join(" · ")}`);
+      }
+    }
+    const summary = lines.join("\n");
+
+    const systemPrompt = `You are an interior designer responding to a co-designer's question about their working moodboard. Reply in 1-3 short sentences (≤ 280 characters total), conversational and specific. Reference items by name when relevant. Do not list. Just talk.`;
+
+    try {
+      const OpenAI = (await import("openai")).default;
+      const client = new OpenAI({
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+      });
+
+      const response = await client.chat.completions.create({
+        model: "gpt-5-mini",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: `Board state:\n${summary}\n\nMy question: ${digest.prompt}` },
+        ],
+      } as any);
+
+      const text = response.choices[0]?.message?.content?.trim() || "Couldn't read the board well enough — try again?";
+      res.json({ text, generatedAt: new Date().toISOString() });
+    } catch (error: any) {
+      console.error("Board prompt error:", error);
+      res.status(500).json({ error: "Failed to generate response" });
+    }
+  }));
+
+  // ────────────────────────────────────────────────────────────────────────
   // Hero focal point: dedicated PATCH (admin/crew) and AI auto-frame.
   // ────────────────────────────────────────────────────────────────────────
   const heroPatchSchema = z.object({
