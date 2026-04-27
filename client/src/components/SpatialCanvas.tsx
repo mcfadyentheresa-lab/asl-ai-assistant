@@ -4837,8 +4837,9 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
 
   return (
     <div className="flex flex-col h-full overflow-hidden" data-testid="spatial-canvas-root">
-      {/* Top toolbar — split into two clusters: board management (left) and canvas controls (right) */}
-      <div className="flex items-center gap-1.5 mb-1 flex-wrap mobile-landscape:flex-nowrap mobile-landscape:overflow-x-auto mobile-landscape:mb-0 shrink-0 px-2 py-1.5 bg-card/80 backdrop-blur border-b border-border" data-testid="canvas-top-toolbar">
+      {/* Top toolbar — split into two clusters: board management (left) and canvas controls (right).
+          Opaque background + relative+z so canvas content can never bleed through behind it. */}
+      <div className="flex items-center gap-1.5 mb-1 flex-wrap mobile-landscape:flex-nowrap mobile-landscape:overflow-x-auto mobile-landscape:mb-0 shrink-0 px-2 py-1.5 bg-card border-b border-border relative z-20" data-testid="canvas-top-toolbar">
         {/* Left cluster — board management */}
         <div className="flex items-center gap-1.5">
         {!isLoadingBoards && boards.length > 0 && (
@@ -5173,10 +5174,14 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
               opens a tactile, color-keyed palette of categories. View/canvas controls
               live in the top toolbar's right cluster — not duplicated here. */}
           <div className="hidden md:flex w-[64px] shrink-0 border-r border-border/25 flex-col items-center py-3 gap-2 bg-card/40" data-testid="canvas-sidebar">
+            {/* Tooltip wraps the PopoverTrigger so the inner button is a direct child of
+                both Slot.asChild calls — radix's `asChild` pattern can't merge through a
+                Tooltip Root provider, which silently dropped the popover trigger handlers
+                and made the Add button do nothing. Both Slots now compose onto the button. */}
             <Popover open={addPaletteOpen} onOpenChange={setAddPaletteOpen}>
-              <PopoverTrigger asChild>
-                <Tooltip>
-                  <TooltipTrigger asChild>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <PopoverTrigger asChild>
                     <button
                       type="button"
                       className={`w-12 h-12 flex flex-col items-center justify-center rounded-xl shrink-0 transition-all border ${addPaletteOpen ? "bg-[#2f4a3a] text-white border-[#2f4a3a]" : "bg-card text-foreground/80 border-border hover:border-[#2f4a3a]/40 hover:text-[#2f4a3a]"}`}
@@ -5192,12 +5197,12 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                         Add
                       </span>
                     </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="right" sideOffset={6} className="text-xs font-medium tracking-wide">
-                    Add to board
-                  </TooltipContent>
-                </Tooltip>
-              </PopoverTrigger>
+                  </PopoverTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="right" sideOffset={6} className="text-xs font-medium tracking-wide">
+                  Add to board
+                </TooltipContent>
+              </Tooltip>
               <PopoverContent
                 side="right"
                 align="start"
