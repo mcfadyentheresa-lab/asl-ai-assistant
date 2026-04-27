@@ -21,6 +21,27 @@ interface User {
   role?: string | null;
 }
 
+interface CalendarEvent {
+  id: number;
+  title?: string | null;
+  type?: string | null;
+  date: string;
+  endDate?: string | null;
+}
+
+interface ChecklistItemLike {
+  id: number;
+  title: string;
+  completed?: boolean | null;
+  status?: string | null;
+}
+
+interface PhotoLike {
+  id: number;
+  url: string;
+  createdAt?: string | Date | null;
+}
+
 interface ProjectLike {
   id: number;
   name: string;
@@ -32,6 +53,9 @@ interface ProjectNowCardProps {
   milestones: Milestone[] | undefined;
   activityLog: ActivityEntry[] | undefined;
   users: User[] | undefined;
+  calendarEvents: CalendarEvent[] | undefined;
+  checklistItems: ChecklistItemLike[] | undefined;
+  photos: PhotoLike[] | undefined;
 }
 
 const FALLBACK_BODY =
@@ -94,41 +118,94 @@ function getMostRecentAdminEntry(
   return candidates[0];
 }
 
+const DAY_ABBR = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+function getThisWeekRange(): { start: Date; end: Date } {
+  const start = new Date();
+  const day = start.getDay();
+  const diffToMonday = (day + 6) % 7;
+  start.setDate(start.getDate() - diffToMonday);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 7);
+  return { start, end };
+}
+
 function deriveOnSiteThisWeek(
   activityLog: ActivityEntry[] | undefined,
   users: User[] | undefined,
+  calendarEvents: CalendarEvent[] | undefined,
 ): string {
-  if (!activityLog || activityLog.length === 0) {
-    // TODO(now-card): Replace with calendar-event query for "on site" days once
-    // calendar events are fetched at the ProjectDetails level.
-    return "—";
+  const { start, end } = getThisWeekRange();
+  const onSiteRe = /(crew|on[- ]site|inspection|installation|delivery|walkthrough|visit)/i;
+  const eventDays = new Set<number>();
+  for (const e of calendarEvents ?? []) {
+    const haystack = `${e.type ?? ""} ${e.title ?? ""}`;
+    if (!onSiteRe.test(haystack)) continue;
+    const d = new Date(e.date);
+    if (Number.isNaN(d.getTime())) continue;
+    if (d >= start && d < end) eventDays.add(d.getDay());
+    if (e.endDate) {
+      const ed = new Date(e.endDate);
+      if (!Number.isNaN(ed.getTime())) {
+        for (let t = new Date(d); t <= ed; t.setDate(t.getDate() + 1)) {
+          if (t >= start && t < end) eventDays.add(t.getDay());
+        }
+      }
+    }
   }
+  if (eventDays.size > 0) {
+    const order = [1, 2, 3, 4, 5, 6, 0];
+    const sortedDays = order.filter((d) => eventDays.has(d));
+    if (sortedDays.length === 1) {
+      return `Crew ${DAY_ABBR[sortedDays[0]]}`;
+    }
+    return `Crew ${DAY_ABBR[sortedDays[0]]}–${DAY_ABBR[sortedDays[sortedDays.length - 1]]}`;
+  }
+
+  if (!activityLog || activityLog.length === 0) return "—";
   const adminCrewIds = new Set(
     (users ?? [])
       .filter((u) => u.role === "admin" || u.role === "crew")
       .map((u) => u.id),
   );
-  const now = new Date();
-  const startOfWeek = new Date(now);
-  const day = startOfWeek.getDay();
-  const diffToMonday = (day + 6) % 7;
-  startOfWeek.setDate(startOfWeek.getDate() - diffToMonday);
-  startOfWeek.setHours(0, 0, 0, 0);
-
   const count = activityLog.filter((e) => {
     if (!e.createdAt) return false;
     if (e.userId && !adminCrewIds.has(e.userId)) return false;
     const d = new Date(e.createdAt as string | Date);
     if (Number.isNaN(d.getTime())) return false;
-    return d >= startOfWeek;
+    return d >= start && d < end;
   }).length;
 
-  if (count === 0) {
-    // TODO(now-card): No crew activity this week — wire to calendar events for
-    // a richer "Crew on site Tue–Thu"-style derived value.
-    return "—";
-  }
+  if (count === 0) return "—";
   return `${count} update${count === 1 ? "" : "s"} this week`;
+}
+
+function isOpenClientItem(item: ChecklistItemLike): boolean {
+  if (item.completed) return false;
+  if (item.status && item.status === "done") return false;
+  return true;
+}
+
+function deriveAwaiting(items: ChecklistItemLike[] | undefined): string {
+  if (!items) return "—";
+  const open = items.filter(isOpenClientItem);
+  return `${open.length} open`;
+}
+
+function deriveLatestPhotoUrl(
+  photos: PhotoLike[] | undefined,
+  fallback: string | null,
+): string | null {
+  if (photos && photos.length > 0) {
+    const sorted = [...photos].sort((a, b) => {
+      const aT = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const bT = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return bT - aT;
+    });
+    if (sorted[0]?.url) return sorted[0].url;
+  }
+  return fallback;
 }
 
 export function ProjectNowCard({
@@ -136,6 +213,9 @@ export function ProjectNowCard({
   milestones,
   activityLog,
   users,
+  calendarEvents,
+  checklistItems,
+  photos,
 }: ProjectNowCardProps) {
   const inProgress = getInProgressMilestone(milestones);
   const recentAdminEntry = getMostRecentAdminEntry(activityLog, users);
@@ -150,26 +230,22 @@ export function ProjectNowCard({
     FALLBACK_BODY;
   const body = truncate(rawBody, MAX_BODY_CHARS);
 
-  const onSiteThisWeek = deriveOnSiteThisWeek(activityLog, users);
+  const onSiteThisWeek = deriveOnSiteThisWeek(activityLog, users, calendarEvents);
 
   const next = getNextMilestoneAfter(milestones, inProgress);
   const comingUp = next?.title || "—";
 
-  // TODO(now-card): "Awaiting from you" should reflect open client-action
-  // checklist items / decisions awaiting the client. Checklist items aren't
-  // currently fetched at the ProjectDetails level, so falling back to "—".
-  const awaitingFromYou = "—";
+  const awaitingFromYou = deriveAwaiting(checklistItems);
 
-  // TODO(now-card): Most recent project photo isn't queried at the parent;
-  // fall back to thumbnailUrl, then placeholder. Wire usePhotos in a future PR.
-  const photoUrl = project.thumbnailUrl ?? null;
+  const photoUrl = deriveLatestPhotoUrl(photos, project.thumbnailUrl ?? null);
 
+  const hasAwaiting = awaitingFromYou !== "—" && awaitingFromYou !== "0 open";
   const isEmptyState =
     !inProgress &&
     !recentAdminEntry?.description &&
     onSiteThisWeek === "—" &&
     comingUp === "—" &&
-    awaitingFromYou === "—";
+    !hasAwaiting;
 
   if (isEmptyState) {
     return (
