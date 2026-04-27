@@ -164,6 +164,79 @@ export function ProjectNowCard({
   // fall back to thumbnailUrl, then placeholder. Wire usePhotos in a future PR.
   const photoUrl = project.thumbnailUrl ?? null;
 
+  const isEmptyState =
+    !inProgress &&
+    !recentAdminEntry?.description &&
+    onSiteThisWeek === "—" &&
+    comingUp === "—" &&
+    awaitingFromYou === "—";
+
+  if (isEmptyState) {
+    return (
+      <section
+        aria-labelledby="now-heading"
+        className="container px-5 md:px-8 pt-8 md:pt-10"
+        data-testid="section-now-card"
+      >
+        <article
+          className="overflow-hidden rounded-lg border border-border/60 bg-card"
+          data-testid="now-card"
+          data-empty-state="true"
+        >
+          <div className="bg-muted/40 h-40 w-full" data-testid="now-photo">
+            {photoUrl ? (
+              <img
+                src={photoUrl}
+                alt={`${project.name} progress`}
+                className="w-full h-full object-cover block"
+                style={{ filter: "saturate(0.85) contrast(0.96)" }}
+                data-testid="img-now-photo"
+              />
+            ) : (
+              <div
+                className="w-full h-full flex flex-col items-center justify-center gap-2 text-muted-foreground"
+                data-testid="now-photo-empty"
+              >
+                <ImageIcon className="h-5 w-5" aria-hidden="true" />
+                <span
+                  className="text-[11px] tracking-[0.14em] uppercase"
+                  style={{ fontFamily: "var(--font-mono)" }}
+                >
+                  Photo coming soon
+                </span>
+              </div>
+            )}
+          </div>
+          <div className="flex flex-col gap-4 p-6 md:p-8 lg:p-10">
+            <div
+              className="text-[11px] tracking-[0.14em] uppercase"
+              style={{
+                fontFamily: "var(--font-mono)",
+                color: "var(--primary)",
+              }}
+              data-testid="text-now-label"
+            >
+              Current focus
+            </div>
+            <h2
+              id="now-heading"
+              className="font-semibold text-xl md:text-2xl leading-tight tracking-tight max-w-[24ch] text-foreground"
+              data-testid="text-now-title"
+            >
+              {title}
+            </h2>
+            <p
+              className="text-base text-muted-foreground max-w-[56ch] leading-relaxed"
+              data-testid="text-now-body"
+            >
+              {body}
+            </p>
+          </div>
+        </article>
+      </section>
+    );
+  }
+
   return (
     <section
       aria-labelledby="now-heading"
