@@ -24,6 +24,8 @@ import {
   computeRoomBudget,
   countByStatus,
   formatCad,
+  isRoomable,
+  resolveRoomFor,
 } from "@/lib/board-rooms";
 import type { CanvasElement, Project } from "@shared/schema";
 
@@ -76,6 +78,17 @@ export default function RoomTabStrip({
   }, [renamingRoom]);
 
   const counts = useMemo(() => countByStatus(elements, activeRoom), [elements, activeRoom]);
+  // Whether this tab has any status-bearing cards (hardware/surface/product) at all.
+  // The pills row is noise when there's nothing to filter — hide it. Scope: active room
+  // when one is selected, otherwise the whole board ("All" tab).
+  const hasStatusBearingElements = useMemo(() => {
+    for (const el of elements) {
+      if (!isRoomable(el)) continue;
+      if (activeRoom != null && resolveRoomFor(el, elements) !== activeRoom) continue;
+      return true;
+    }
+    return false;
+  }, [elements, activeRoom]);
   const budget = useMemo(() => computeRoomBudget(elements, activeRoom), [elements, activeRoom]);
   const totalBudget = project?.totalBudget ?? 0;
   const overBy = budget.total - totalBudget;
@@ -140,7 +153,7 @@ export default function RoomTabStrip({
   const tabBase = "min-h-[44px] px-4 inline-flex items-center gap-2 text-sm whitespace-nowrap rounded-t-md transition-colors select-none";
 
   return (
-    <div className="shrink-0 bg-card/70 backdrop-blur border-b border-border" data-testid="room-tab-strip">
+    <div className="shrink-0 bg-card border-b border-border relative z-10" data-testid="room-tab-strip">
       <div
         className="flex items-end gap-1 overflow-x-auto px-2 pt-1 hide-scrollbar"
         style={{ scrollbarWidth: "none" }}
@@ -280,7 +293,10 @@ export default function RoomTabStrip({
         )}
       </div>
 
-      {/* Status filter pills — multi-select, with counts. Hidden when no roomable cards exist. */}
+      {/* Status filter pills — multi-select, with counts. Hidden when the active scope
+          has no status-bearing cards (hardware / surface / product) — a row of zero counts
+          plus a "Clear" button is just noise on an empty board or a non-product tab. */}
+      {hasStatusBearingElements && (
       <div className="flex items-center gap-1.5 px-3 py-1.5 overflow-x-auto" data-testid="status-filter-row">
         {ROOM_STATUSES.map((s) => {
           const count = counts[s] || 0;
@@ -318,6 +334,7 @@ export default function RoomTabStrip({
           </button>
         )}
       </div>
+      )}
 
       <NewRoomDialog open={dialogOpen} onOpenChange={setDialogOpen} onCreate={onCreateRoom} />
     </div>
