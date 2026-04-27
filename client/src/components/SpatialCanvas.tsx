@@ -51,8 +51,9 @@ import {
   Eraser, Undo2, Redo2, Save, PenTool, Sparkles, TypeIcon, Shapes,
   CalendarDays, Milestone, ListChecks, Bell, BellOff,
   ChefHat, Bath, Home, FileText, LayoutPanelLeft, LayoutGrid, Move,
-  Lock, LockOpen, Hand,
+  Lock, LockOpen, Hand, Wrench, Check,
 } from "lucide-react";
+import HardwarePickerDialog, { type HardwareDraft } from "@/components/board/HardwarePickerDialog";
 import { useToast } from "@/hooks/use-toast";
 import { usePlanningBoards, useCreatePlanningBoard, useDeletePlanningBoard, useUpdatePlanningBoard, useUploadImage, useUsers, useProjects, useMilestones, useChecklistItems, useCalendarEvents, useUpdateCalendarEvent, useDeleteCalendarEvent, useCreateCalendarEvent, useCreateMilestone, useCreateChecklistItem, useBoardSnapshots, useCreateBoardSnapshot, useRestoreBoardSnapshot, useDeleteBoardSnapshot } from "@/hooks/use-projects";
 import { Badge } from "@/components/ui/badge";
@@ -69,10 +70,23 @@ import type { CanvasElement, PlanningBoard as PlanningBoardType, PaintColor } fr
 import { queryClient } from "@/lib/queryClient";
 import { useQuery } from "@tanstack/react-query";
 
-function BmColorPicker({ onSelect }: { onSelect: (color: PaintColor) => void }) {
+const SHEENS = ["Flat", "Eggshell", "Satin", "Semi-Gloss", "Gloss"] as const;
+type Sheen = typeof SHEENS[number];
+
+function BmColorPicker({
+  onSelect,
+  initialRoom,
+  initialSheen,
+}: {
+  onSelect: (color: PaintColor, extras: { room?: string; sheen?: Sheen }) => void;
+  initialRoom?: string;
+  initialSheen?: Sheen;
+}) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [family, setFamily] = useState<string | null>(null);
+  const [room, setRoom] = useState<string>(initialRoom ?? "");
+  const [sheen, setSheen] = useState<Sheen | "">(initialSheen ?? "");
   const brand = "Benjamin Moore";
 
   const queryUrl = `/api/paint-colors?brand=${encodeURIComponent(brand)}`;
@@ -103,6 +117,25 @@ function BmColorPicker({ onSelect }: { onSelect: (color: PaintColor) => void }) 
       </PopoverTrigger>
       <PopoverContent className="w-72 p-2" align="start" side="bottom">
         <div className="space-y-2">
+          <div className="grid grid-cols-2 gap-1.5">
+            <Input
+              value={room}
+              onChange={(e) => setRoom(e.target.value)}
+              placeholder="Room (e.g. Kitchen)"
+              className="h-7 text-xs"
+              data-testid="input-bm-room"
+            />
+            <Select value={sheen} onValueChange={(v) => setSheen(v as Sheen)}>
+              <SelectTrigger className="h-7 text-xs" data-testid="select-bm-sheen">
+                <SelectValue placeholder="Sheen" />
+              </SelectTrigger>
+              <SelectContent>
+                {SHEENS.map((s) => (
+                  <SelectItem key={s} value={s} data-testid={`option-bm-sheen-${s.toLowerCase()}`}>{s}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -137,7 +170,7 @@ function BmColorPicker({ onSelect }: { onSelect: (color: PaintColor) => void }) 
                       <button
                         className="w-full aspect-square rounded-sm border border-border/40 hover-elevate"
                         style={{ backgroundColor: pc.hex }}
-                        onClick={() => { onSelect(pc); setOpen(false); }}
+                        onClick={() => { onSelect(pc, { room: room.trim() || undefined, sheen: sheen || undefined }); setOpen(false); }}
                         data-testid={`bm-color-${pc.id}`}
                       />
                     </TooltipTrigger>
@@ -237,6 +270,15 @@ const ELEMENT_DEFAULTS: Record<string, { width: number; height: number; content:
   material: { width: 220, height: 180, content: { name: "Material", supplier: "", code: "", imageUrl: "", notes: "" } },
   callout: { width: 200, height: 80, content: { text: "Add note...", color: "#fef9c3" } },
   product: { width: 240, height: 120, content: { name: "Product", price: "", supplier: "", url: "" } },
+  hardware: { width: 280, height: 200, content: { category: "pull", name: "New hardware", status: "idea", currency: "CAD" } },
+};
+
+// Status chip styling — used by hardware now; reusable for future material/color picks.
+const STATUS_CHIP: Record<string, { className: string; label: string; withCheck?: boolean }> = {
+  idea:      { className: "bg-muted text-muted-foreground",       label: "Idea" },
+  shortlist: { className: "bg-primary/10 text-primary",            label: "Shortlist" },
+  selected:  { className: "bg-primary text-primary-foreground",    label: "Selected" },
+  ordered:   { className: "bg-primary text-primary-foreground",    label: "Ordered", withCheck: true },
 };
 
 function getContrastColor(hex: string): string {
@@ -324,6 +366,8 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; elementId: number } | null>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showImagePopup, setShowImagePopup] = useState(false);
+  const [showHardwareDialog, setShowHardwareDialog] = useState(false);
+  const pendingHardwareDropRef = useRef<{ x: number; y: number } | null>(null);
   const [imageUrlInput, setImageUrlInput] = useState("");
   const imageUrlInputRef = useRef<HTMLInputElement | null>(null);
   const noteTextareaRefs = useRef<Record<string, HTMLTextAreaElement | HTMLInputElement | null>>({});
@@ -658,6 +702,41 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       pushUndo({ type: "create", elementId: el.id });
     } catch {
       toast({ title: "Error", description: "Failed to create element", variant: "destructive" });
+    }
+  };
+
+  const createHardware = async (draft: HardwareDraft) => {
+    if (!selectedBoardId) return;
+    const def = ELEMENT_DEFAULTS.hardware;
+    const drop = pendingHardwareDropRef.current;
+    pendingHardwareDropRef.current = null;
+    const centerX = drop ? drop.x : Math.round((-pan.x + (containerRef.current?.clientWidth || 800) / 2) / zoom - def.width / 2);
+    const centerY = drop ? drop.y : Math.round((-pan.y + (containerRef.current?.clientHeight || 600) / 2) / zoom - def.height / 2);
+    const newZ = maxZ;
+    setMaxZ((z) => z + 1);
+    try {
+      const url = buildUrl(api.canvasElements.create.path, { boardId: selectedBoardId });
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          type: "hardware",
+          x: centerX,
+          y: centerY,
+          width: def.width,
+          height: def.height,
+          zIndex: newZ,
+          content: { ...draft },
+        }),
+      });
+      const el = await res.json();
+      addElement(el);
+      sendElementAdd(el);
+      pushUndo({ type: "create", elementId: el.id });
+      toast({ title: "Hardware added", description: draft.name });
+    } catch {
+      toast({ title: "Error", description: "Failed to add hardware", variant: "destructive" });
     }
   };
 
@@ -2588,7 +2667,16 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           data-testid={`element-color-swatch-${el.id}`}
         >
           <div className="h-[140px] relative pointer-events-none select-none" style={{ backgroundColor: c.color || "#1e3a2f" }}>
-            <span className="absolute bottom-2 left-3 text-xs text-white/80 font-mono">{(c.hex || c.color || "#1E3A2F").toUpperCase()}</span>
+            <span className="absolute bottom-2 left-3 text-xs text-white/80" style={{ fontFamily: "var(--font-mono)" }}>{(c.hex || c.color || "#1E3A2F").toUpperCase()}</span>
+            {typeof c.lrv === "number" && (
+              <span
+                className="absolute top-2 right-2 text-[10px] px-1.5 py-0.5 rounded-sm bg-black/35 text-white"
+                style={{ fontFamily: "var(--font-mono)" }}
+                data-testid={`chip-swatch-lrv-${el.id}`}
+              >
+                LRV {c.lrv}
+              </span>
+            )}
           </div>
           <div className="p-3">
             {isSelected ? (
@@ -2611,13 +2699,65 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                   />
                 </div>
                 <BmColorPicker
-                  onSelect={(pc) => handleUpdateContent(el.id, { ...c, color: pc.hex, hex: pc.hex, name: pc.name, brand: pc.brand, code: pc.code })}
+                  initialRoom={c.room}
+                  initialSheen={c.sheen}
+                  onSelect={(pc, extras) => handleUpdateContent(el.id, {
+                    ...c,
+                    color: pc.hex,
+                    hex: pc.hex,
+                    name: pc.name,
+                    brand: pc.brand,
+                    code: pc.code,
+                    lrv: pc.lrv ?? c.lrv,
+                    room: extras.room ?? c.room,
+                    sheen: extras.sheen ?? c.sheen,
+                  })}
                 />
+                <div className="grid grid-cols-2 gap-1.5">
+                  <input
+                    className="bg-transparent border border-border/50 rounded text-xs outline-none px-1.5 py-0.5"
+                    defaultValue={c.room || ""}
+                    placeholder="Room"
+                    onBlur={(e) => handleUpdateContent(el.id, { ...c, room: e.target.value || undefined })}
+                    data-testid={`input-swatch-room-${el.id}`}
+                  />
+                  <select
+                    className="bg-transparent border border-border/50 rounded text-xs outline-none px-1.5 py-0.5"
+                    defaultValue={c.sheen || ""}
+                    onChange={(e) => handleUpdateContent(el.id, { ...c, sheen: e.target.value || undefined })}
+                    data-testid={`select-swatch-sheen-${el.id}`}
+                  >
+                    <option value="">Sheen</option>
+                    {SHEENS.map((s) => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
               </div>
             ) : (
               <div>
                 <div className="text-sm font-medium">{c.name || "Color"}</div>
-                {c.code && <div className="text-[10px] text-muted-foreground">{c.code}</div>}
+                {c.code && <div className="text-[10px] text-muted-foreground" style={{ fontFamily: "var(--font-mono)" }}>{c.code}</div>}
+                {(c.room || c.sheen) && (
+                  <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                    {c.room && (
+                      <span
+                        className="text-[10px] px-1.5 py-0.5 rounded-sm bg-muted text-muted-foreground uppercase tracking-wider"
+                        style={{ fontFamily: "var(--font-mono)" }}
+                        data-testid={`chip-swatch-room-${el.id}`}
+                      >
+                        {c.room}
+                      </span>
+                    )}
+                    {c.sheen && (
+                      <span
+                        className="text-[10px] text-muted-foreground"
+                        style={{ fontFamily: "var(--font-mono)" }}
+                        data-testid={`chip-swatch-sheen-${el.id}`}
+                      >
+                        {c.sheen}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -2686,6 +2826,20 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                   onBlur={(e) => handleUpdateContent(el.id, { ...c, imageUrl: e.target.value })}
                   data-testid={`input-material-image-${el.id}`}
                 />
+                <input
+                  className="w-full bg-transparent border-none text-xs outline-none"
+                  defaultValue={c.category || ""}
+                  placeholder="Category (Stone, Wood, Tile…)"
+                  onBlur={(e) => handleUpdateContent(el.id, { ...c, category: e.target.value || undefined })}
+                  data-testid={`input-material-category-${el.id}`}
+                />
+                <input
+                  className="w-full bg-transparent border-none text-xs text-primary outline-none"
+                  defaultValue={c.vendorUrl || ""}
+                  placeholder="Vendor URL"
+                  onBlur={(e) => handleUpdateContent(el.id, { ...c, vendorUrl: e.target.value || undefined })}
+                  data-testid={`input-material-vendor-url-${el.id}`}
+                />
                 <textarea
                   className="w-full bg-transparent border border-border/50 rounded text-xs outline-none p-1.5 resize-none"
                   rows={2}
@@ -2701,12 +2855,136 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                   <Shapes className="h-3 w-3 text-muted-foreground shrink-0" />
                   <span className="text-sm font-medium truncate">{c.name || "Material"}</span>
                 </div>
+                {c.category && (
+                  <span
+                    className="inline-block mt-1 text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-sm bg-muted text-muted-foreground"
+                    style={{ fontFamily: "var(--font-mono)" }}
+                    data-testid={`chip-material-category-${el.id}`}
+                  >
+                    {c.category}
+                  </span>
+                )}
                 {c.supplier && <div className="text-[10px] text-muted-foreground mt-0.5 truncate">{c.supplier}</div>}
-                {c.code && <div className="text-[10px] font-mono text-muted-foreground/70 truncate">{c.code}</div>}
+                {c.code && <div className="text-[10px] text-muted-foreground/70 truncate" style={{ fontFamily: "var(--font-mono)" }}>{c.code}</div>}
                 {c.notes && <div className="text-[10px] text-muted-foreground mt-1 line-clamp-2">{c.notes}</div>}
               </div>
             )}
           </div>
+          {c.vendorUrl && (
+            <a
+              href={c.vendorUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="absolute bottom-1.5 right-1.5 p-1 rounded text-muted-foreground/70 hover:text-primary hover:bg-foreground/[0.06]"
+              onClick={(e) => e.stopPropagation()}
+              data-testid={`link-material-vendor-${el.id}`}
+            >
+              <ExternalLink className="h-3 w-3" />
+            </a>
+          )}
+          {isSelected && (
+            <div className="absolute -top-8 right-0 flex gap-1">
+              <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleDeleteElement(el.id)} data-testid={`button-delete-${el.id}`}>
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    if (el.type === "hardware") {
+      const status = (c.status as keyof typeof STATUS_CHIP) || "idea";
+      const chip = STATUS_CHIP[status] || STATUS_CHIP.idea;
+      const priceLabel = typeof c.price === "number" && Number.isFinite(c.price)
+        ? `${(c.currency || "CAD")} ${c.price.toFixed(2)}`
+        : null;
+      const labelTop = [String(c.category || "hardware"), c.room].filter(Boolean).join(" · ");
+
+      return (
+        <div
+          key={el.id}
+          className={`${cardBase} bg-card border border-border overflow-hidden cursor-grab`}
+          style={{ left: el.x, top: el.y, width: el.width, zIndex: effectiveZ }}
+          onMouseDown={(e) => {
+            const tag = (e.target as HTMLElement).tagName.toLowerCase();
+            if (tag === "input" || tag === "textarea" || tag === "button" || (e.target as HTMLElement).closest("button") || (e.target as HTMLElement).closest("a")) return;
+            startDrag(el.id, e);
+          }}
+          onClick={handleClick}
+          onContextMenu={(e) => openContextMenu(e, el.id)}
+          onTouchStart={handleElementTouchStart(el.id)}
+          onTouchEnd={handleLongPressEnd}
+          onTouchCancel={handleLongPressEnd}
+          data-testid={`element-hardware-${el.id}`}
+        >
+          <div className="p-3 flex flex-col gap-2 pointer-events-none select-none">
+            <div className="flex items-start gap-3">
+              {c.imageUrl && (
+                <div
+                  className="w-[72px] h-[72px] rounded-sm bg-muted overflow-hidden shrink-0"
+                  style={{ filter: "saturate(0.85) contrast(0.96)" }}
+                >
+                  <img src={c.imageUrl} alt={c.name || "Hardware"} className="w-full h-full object-cover" />
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <div
+                  className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground truncate"
+                  style={{ fontFamily: "var(--font-mono)" }}
+                  data-testid={`text-hardware-meta-${el.id}`}
+                >
+                  {labelTop || "hardware"}
+                </div>
+                <div className="text-sm font-semibold leading-snug mt-0.5 line-clamp-2" data-testid={`text-hardware-name-${el.id}`}>
+                  {c.name || "New hardware"}
+                </div>
+                {(c.brand || c.finish) && (
+                  <div className="text-[11px] text-muted-foreground mt-0.5 truncate">
+                    {[c.brand, c.finish].filter(Boolean).join(" · ")}
+                  </div>
+                )}
+                {c.sku && (
+                  <div className="text-[10px] text-muted-foreground/80 mt-0.5 truncate" style={{ fontFamily: "var(--font-mono)" }}>
+                    {c.sku}
+                  </div>
+                )}
+                {c.dimensions && (
+                  <div className="text-[10px] text-muted-foreground/80 truncate" style={{ fontFamily: "var(--font-mono)" }}>
+                    {c.dimensions}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center justify-between gap-2 pt-1">
+              <div className="text-xs" style={{ fontFamily: "var(--font-mono)" }} data-testid={`text-hardware-price-${el.id}`}>
+                {priceLabel || <span className="text-muted-foreground/60">—</span>}
+              </div>
+              <span
+                className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-sm inline-flex items-center gap-1 ${chip.className}`}
+                style={{ fontFamily: "var(--font-mono)" }}
+                data-testid={`chip-hardware-status-${el.id}`}
+              >
+                {chip.withCheck && <Check className="h-2.5 w-2.5" strokeWidth={2.5} />}
+                {chip.label}
+              </span>
+            </div>
+            {c.notes && (
+              <div className="text-[11px] text-muted-foreground line-clamp-2">{c.notes}</div>
+            )}
+          </div>
+          {c.vendorUrl && (
+            <a
+              href={c.vendorUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="absolute bottom-1.5 right-1.5 p-1 rounded text-muted-foreground/70 hover:text-primary hover:bg-foreground/[0.06]"
+              onClick={(e) => e.stopPropagation()}
+              data-testid={`link-hardware-vendor-${el.id}`}
+            >
+              <ExternalLink className="h-3 w-3" />
+            </a>
+          )}
           {isSelected && (
             <div className="absolute -top-8 right-0 flex gap-1">
               <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleDeleteElement(el.id)} data-testid={`button-delete-${el.id}`}>
@@ -3093,6 +3371,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       tools: [
         { type: "color_swatch", icon: Palette, label: "Color" },
         { type: "material", icon: Shapes, label: "Material" },
+        ...(effectiveRole === "client" ? [] : [{ type: "hardware", icon: Wrench, label: "Hardware" }]),
         { type: "callout", icon: Sparkles, label: "Callout" },
         { type: "product", icon: ExternalLink, label: "Product" },
       ],
@@ -3393,7 +3672,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                           e.dataTransfer.setData("tool-type", t.type);
                           e.dataTransfer.effectAllowed = "copy";
                         }}
-                        onClick={() => t.type === "image" ? setShowImagePopup(!showImagePopup) : t.type === "draw" ? (() => { setDrawingMode(true); setDrawTool("pen"); setDrawingPaths([]); drawPathsRef.current = []; setDrawUndoStack([]); setEditingId(null); })() : createElement(t.type)}
+                        onClick={() => t.type === "image" ? setShowImagePopup(!showImagePopup) : t.type === "draw" ? (() => { setDrawingMode(true); setDrawTool("pen"); setDrawingPaths([]); drawPathsRef.current = []; setDrawUndoStack([]); setEditingId(null); })() : t.type === "hardware" ? (() => { pendingHardwareDropRef.current = null; setShowHardwareDialog(true); })() : createElement(t.type)}
                         data-testid={`sidebar-tool-${t.type}`}
                       >
                         <t.icon className="h-[18px] w-[18px]" strokeWidth={1.5} />
@@ -3489,6 +3768,9 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                 triggerImageUpload();
               } else if (toolType === "draw") {
                 setDrawingMode(true); setDrawTool("pen"); setDrawingPaths([]); drawPathsRef.current = []; setDrawUndoStack([]); setEditingId(null);
+              } else if (toolType === "hardware") {
+                pendingHardwareDropRef.current = { x: canvasX, y: canvasY };
+                setShowHardwareDialog(true);
               } else {
                 createElement(toolType, canvasX, canvasY);
               }
@@ -3710,6 +3992,9 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                         drawPathsRef.current = [];
                         setDrawUndoStack([]);
                         setEditingId(null);
+                      } else if (t.type === "hardware") {
+                        pendingHardwareDropRef.current = null;
+                        setShowHardwareDialog(true);
                       } else {
                         createElement(t.type);
                       }
@@ -4560,6 +4845,12 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <HardwarePickerDialog
+        open={showHardwareDialog}
+        onOpenChange={(v) => { setShowHardwareDialog(v); if (!v) pendingHardwareDropRef.current = null; }}
+        onSubmit={createHardware}
+      />
 
       <Sheet open={!!linkDetailSheet} onOpenChange={(open) => { if (!open) setLinkDetailSheet(null); }}>
         <SheetContent className="sm:max-w-md" data-testid="sheet-link-detail">
