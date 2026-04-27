@@ -132,6 +132,7 @@ export interface IStorage {
   getBoardSnapshots(boardId: number): Promise<BoardSnapshot[]>;
   createBoardSnapshot(snapshot: InsertBoardSnapshot): Promise<BoardSnapshot>;
   getBoardSnapshot(id: number): Promise<BoardSnapshot | undefined>;
+  renameBoardSnapshot(id: number, name: string): Promise<BoardSnapshot | undefined>;
   deleteBoardSnapshot(id: number): Promise<void>;
 
   // Cost Categories
@@ -700,6 +701,10 @@ export class DatabaseStorage implements IStorage {
   async getBoardSnapshot(id: number): Promise<BoardSnapshot | undefined> {
     const [snap] = await db.select().from(boardSnapshots).where(eq(boardSnapshots.id, id));
     return snap;
+  }
+  async renameBoardSnapshot(id: number, name: string): Promise<BoardSnapshot | undefined> {
+    const [updated] = await db.update(boardSnapshots).set({ name }).where(eq(boardSnapshots.id, id)).returning();
+    return updated;
   }
   async deleteBoardSnapshot(id: number): Promise<void> {
     await db.delete(boardSnapshots).where(eq(boardSnapshots.id, id));

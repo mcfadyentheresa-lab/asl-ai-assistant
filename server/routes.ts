@@ -2154,9 +2154,19 @@ function templateCanvasToElements(canvasData: any, boardId: number, createdBy: s
     }
   });
 
-  // Board Snapshots
+  // Board Snapshots — admin/crew only (clients never see Versions UI)
+  async function requireBoardSnapshotAccess(req: any, res: any): Promise<boolean> {
+    const dbUser = await authStorage.getUser(req.user.id);
+    if (!dbUser || (dbUser.role !== "admin" && dbUser.role !== "crew")) {
+      res.status(403).json({ message: "Only admin/crew can manage board versions" });
+      return false;
+    }
+    return true;
+  }
+
   app.get(api.boardSnapshots.list.path, isAuthenticated, async (req: any, res) => {
     try {
+      if (!(await requireBoardSnapshotAccess(req, res))) return;
       const boardId = parseInt(req.params.boardId);
       const snapshots = await storage.getBoardSnapshots(boardId);
       res.json(snapshots);
@@ -2167,6 +2177,7 @@ function templateCanvasToElements(canvasData: any, boardId: number, createdBy: s
 
   app.post(api.boardSnapshots.create.path, isAuthenticated, async (req: any, res) => {
     try {
+      if (!(await requireBoardSnapshotAccess(req, res))) return;
       const boardId = parseInt(req.params.boardId);
       const { name } = api.boardSnapshots.create.input.parse(req.body);
       const elements = await storage.getCanvasElements(boardId);
@@ -2182,8 +2193,22 @@ function templateCanvasToElements(canvasData: any, boardId: number, createdBy: s
     }
   });
 
+  app.patch(api.boardSnapshots.rename.path, isAuthenticated, async (req: any, res) => {
+    try {
+      if (!(await requireBoardSnapshotAccess(req, res))) return;
+      const id = parseInt(req.params.id);
+      const { name } = api.boardSnapshots.rename.input.parse(req.body);
+      const updated = await storage.renameBoardSnapshot(id, name);
+      if (!updated) return res.status(404).json({ message: "Snapshot not found" });
+      res.json(updated);
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to rename snapshot" });
+    }
+  });
+
   app.post(api.boardSnapshots.restore.path, isAuthenticated, async (req: any, res) => {
     try {
+      if (!(await requireBoardSnapshotAccess(req, res))) return;
       const snapshotId = parseInt(req.params.id);
       const snapshot = await storage.getBoardSnapshot(snapshotId);
       if (!snapshot) return res.status(404).json({ message: "Snapshot not found" });
@@ -2220,6 +2245,7 @@ function templateCanvasToElements(canvasData: any, boardId: number, createdBy: s
 
   app.delete(api.boardSnapshots.delete.path, isAuthenticated, async (req: any, res) => {
     try {
+      if (!(await requireBoardSnapshotAccess(req, res))) return;
       const id = parseInt(req.params.id);
       await storage.deleteBoardSnapshot(id);
       res.json({ success: true });

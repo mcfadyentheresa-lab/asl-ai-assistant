@@ -470,6 +470,14 @@ export const api = {
         200: z.object({ success: z.boolean() }),
       },
     },
+    rename: {
+      method: 'PATCH' as const,
+      path: '/api/board-snapshots/:id' as const,
+      input: z.object({ name: z.string().min(1) }),
+      responses: {
+        200: z.custom<typeof boardSnapshots.$inferSelect>(),
+      },
+    },
     delete: {
       method: 'DELETE' as const,
       path: '/api/board-snapshots/:id' as const,
