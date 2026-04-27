@@ -53,8 +53,7 @@ import {
   ChefHat, Bath, Home, FileText, LayoutPanelLeft, LayoutGrid, Move,
   Lock, LockOpen, Hand, Wrench, Check,
   Spline, MoveRight, Slash, Droplet,
-  ChevronDown, ChevronRight,
-  Play, MessageSquareQuote,
+  Play,
 } from "lucide-react";
 import HardwarePickerDialog, { type HardwareDraft } from "@/components/board/HardwarePickerDialog";
 import PaletteExtractionDialog, { type PaletteAddPayload } from "@/components/board/PaletteExtractionDialog";
@@ -376,22 +375,18 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; elementId: number } | null>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showImagePopup, setShowImagePopup] = useState(false);
-  const [railCollapsed, setRailCollapsed] = useState<Record<string, boolean>>(() => {
-    if (typeof window === "undefined") return {};
+  // Add palette popover — persisted open/closed across sessions for power users.
+  const [addPaletteOpen, setAddPaletteOpen] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
     try {
-      const raw = window.localStorage.getItem("asl-board-rail-sections");
-      return raw ? JSON.parse(raw) : {};
+      return window.localStorage.getItem("asl-board-add-palette-open") === "1";
     } catch {
-      return {};
+      return false;
     }
   });
-  const toggleRailSection = (label: string) => {
-    setRailCollapsed((prev) => {
-      const next = { ...prev, [label]: !prev[label] };
-      try { window.localStorage.setItem("asl-board-rail-sections", JSON.stringify(next)); } catch {}
-      return next;
-    });
-  };
+  useEffect(() => {
+    try { window.localStorage.setItem("asl-board-add-palette-open", addPaletteOpen ? "1" : "0"); } catch {}
+  }, [addPaletteOpen]);
   const [showHardwareDialog, setShowHardwareDialog] = useState(false);
   const pendingHardwareDropRef = useRef<{ x: number; y: number } | null>(null);
   const [showPaletteDialog, setShowPaletteDialog] = useState(false);
@@ -1062,6 +1057,41 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     toast({ title: "Undone", description: "Last action reversed." });
   }, [selectedBoardId, elements]);
 
+  // Unified action dispatcher used by the Add palette, mobile bar, and shortcuts.
+  // "image" / "connect" arm a placement cursor or open a dialog; everything else
+  // inserts at viewport center.
+  const runTool = useCallback((type: string) => {
+    if (type === "image") {
+      setShowImagePopup((v) => !v);
+    } else if (type === "draw") {
+      setDrawingMode(true);
+      setDrawTool("pen");
+      setDrawingPaths([]);
+      drawPathsRef.current = [];
+      setDrawUndoStack([]);
+      setEditingId(null);
+    } else if (type === "hardware") {
+      pendingHardwareDropRef.current = null;
+      setShowHardwareDialog(true);
+    } else if (type === "connect") {
+      if (connectMode) {
+        exitConnectMode();
+      } else {
+        setConnectMode(true);
+        setConnectSourceId(null);
+        setSelectedConnectorId(null);
+        setEditingId(null);
+      }
+    } else if (type === "palette") {
+      palettePresetSourceRef.current = null;
+      setPalettePresetUrl(null);
+      setShowPaletteDialog(true);
+    } else {
+      createElement(type);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connectMode, exitConnectMode]);
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
@@ -1072,10 +1102,36 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
         if (connectMode) exitConnectMode();
         if (selectedConnectorId !== null) setSelectedConnectorId(null);
       }
+      // Add-palette shortcuts — only fire when no input/textarea/contenteditable
+      // is focused and there are no modifiers other than shift.
+      if (!e.metaKey && !e.ctrlKey && !e.altKey) {
+        const t = e.target as HTMLElement | null;
+        const tag = t?.tagName?.toLowerCase();
+        const isEditable = tag === "input" || tag === "textarea" || (t && t.isContentEditable);
+        if (!isEditable) {
+          const map: Record<string, string> = {
+            n: "note",
+            t: "plain_text",
+            i: "image",
+            c: "color_swatch",
+            h: "hardware",
+            d: "draw",
+            a: "connect",
+          };
+          const key = e.key.toLowerCase();
+          const type = map[key];
+          if (type) {
+            // Skip role-restricted tools.
+            if ((type === "hardware" || type === "connect") && effectiveRole === "client") return;
+            e.preventDefault();
+            runTool(type);
+          }
+        }
+      }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [handleUndo, connectMode, exitConnectMode, selectedConnectorId]);
+  }, [handleUndo, connectMode, exitConnectMode, selectedConnectorId, runTool, effectiveRole]);
 
   // Connector endpoint re-targeting drag.
   useEffect(() => {
@@ -1567,23 +1623,42 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     }
   };
 
-  const renderFormattingToolbar = (elementId: number) => (
-    <div
-      className="absolute -top-9 left-0 flex items-center gap-0.5 bg-card border border-border rounded-md shadow-md px-1 py-0.5 z-20"
-      onMouseDown={(e) => e.stopPropagation()}
-      data-testid={`formatting-toolbar-${elementId}`}
-    >
-      <button className="p-1 rounded hover:bg-muted transition-colors" onClick={() => applyFormat(elementId, "bold")} data-testid={`format-bold-${elementId}`}><Bold className="h-3.5 w-3.5" /></button>
-      <button className="p-1 rounded hover:bg-muted transition-colors" onClick={() => applyFormat(elementId, "italic")} data-testid={`format-italic-${elementId}`}><Italic className="h-3.5 w-3.5" /></button>
-      <button className="p-1 rounded hover:bg-muted transition-colors" onClick={() => applyFormat(elementId, "strikethrough")} data-testid={`format-strikethrough-${elementId}`}><Strikethrough className="h-3.5 w-3.5" /></button>
-      <button className="p-1 rounded hover:bg-muted transition-colors" onClick={() => applyFormat(elementId, "underline")} data-testid={`format-underline-${elementId}`}><Underline className="h-3.5 w-3.5" /></button>
-      <div className="w-px h-4 bg-border mx-0.5" />
-      <button className="p-1 rounded hover:bg-muted transition-colors" onClick={() => applyFormat(elementId, "bullet")} data-testid={`format-bullet-${elementId}`}><List className="h-3.5 w-3.5" /></button>
-      <button className="p-1 rounded hover:bg-muted transition-colors" onClick={() => applyFormat(elementId, "numbered")} data-testid={`format-numbered-${elementId}`}><ListOrdered className="h-3.5 w-3.5" /></button>
-      <div className="w-px h-4 bg-border mx-0.5" />
-      <button className="p-1 rounded hover:bg-muted transition-colors" onClick={() => applyFormat(elementId, "code")} data-testid={`format-code-${elementId}`}><Code className="h-3.5 w-3.5" /></button>
-      <button className="p-1 rounded hover:bg-muted transition-colors" onClick={() => applyFormat(elementId, "link")} data-testid={`format-link-${elementId}`}><LinkIcon className="h-3.5 w-3.5" /></button>
-    </div>
+  // Inline formatting chip — a single contextual button on the card's action row.
+  // Tapping opens a popover with bold/italic/list/link/etc. so we don't ship a third
+  // floating toolbar competing with the top toolbar and Add palette.
+  const renderFormattingChip = (elementId: number) => (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-6 w-6"
+          onMouseDown={(e) => e.stopPropagation()}
+          aria-label="Format text"
+          data-testid={`format-chip-${elementId}`}
+        >
+          <Bold className="h-3 w-3" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="end"
+        side="top"
+        className="w-auto p-1 flex items-center gap-0.5"
+        onMouseDown={(e) => e.stopPropagation()}
+        data-testid={`format-popover-${elementId}`}
+      >
+        <button className="p-1.5 rounded hover:bg-muted transition-colors min-w-[32px] min-h-[32px] flex items-center justify-center" onClick={() => applyFormat(elementId, "bold")} data-testid={`format-bold-${elementId}`} aria-label="Bold"><Bold className="h-3.5 w-3.5" /></button>
+        <button className="p-1.5 rounded hover:bg-muted transition-colors min-w-[32px] min-h-[32px] flex items-center justify-center" onClick={() => applyFormat(elementId, "italic")} data-testid={`format-italic-${elementId}`} aria-label="Italic"><Italic className="h-3.5 w-3.5" /></button>
+        <button className="p-1.5 rounded hover:bg-muted transition-colors min-w-[32px] min-h-[32px] flex items-center justify-center" onClick={() => applyFormat(elementId, "strikethrough")} data-testid={`format-strikethrough-${elementId}`} aria-label="Strikethrough"><Strikethrough className="h-3.5 w-3.5" /></button>
+        <button className="p-1.5 rounded hover:bg-muted transition-colors min-w-[32px] min-h-[32px] flex items-center justify-center" onClick={() => applyFormat(elementId, "underline")} data-testid={`format-underline-${elementId}`} aria-label="Underline"><Underline className="h-3.5 w-3.5" /></button>
+        <div className="w-px h-4 bg-border mx-0.5" />
+        <button className="p-1.5 rounded hover:bg-muted transition-colors min-w-[32px] min-h-[32px] flex items-center justify-center" onClick={() => applyFormat(elementId, "bullet")} data-testid={`format-bullet-${elementId}`} aria-label="Bulleted list"><List className="h-3.5 w-3.5" /></button>
+        <button className="p-1.5 rounded hover:bg-muted transition-colors min-w-[32px] min-h-[32px] flex items-center justify-center" onClick={() => applyFormat(elementId, "numbered")} data-testid={`format-numbered-${elementId}`} aria-label="Numbered list"><ListOrdered className="h-3.5 w-3.5" /></button>
+        <div className="w-px h-4 bg-border mx-0.5" />
+        <button className="p-1.5 rounded hover:bg-muted transition-colors min-w-[32px] min-h-[32px] flex items-center justify-center" onClick={() => applyFormat(elementId, "code")} data-testid={`format-code-${elementId}`} aria-label="Code"><Code className="h-3.5 w-3.5" /></button>
+        <button className="p-1.5 rounded hover:bg-muted transition-colors min-w-[32px] min-h-[32px] flex items-center justify-center" onClick={() => applyFormat(elementId, "link")} data-testid={`format-link-${elementId}`} aria-label="Link"><LinkIcon className="h-3.5 w-3.5" /></button>
+      </PopoverContent>
+    </Popover>
   );
 
   const handleAddImageByUrl = async (url: string) => {
@@ -2804,7 +2879,6 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           onTouchCancel={handleLongPressEnd}
           data-testid={`element-note-${el.id}`}
         >
-          {isSelected && renderFormattingToolbar(el.id)}
           <div className={c.plain ? "p-0" : "p-3.5"}>
             {isSelected ? (
               <div className="space-y-2">
@@ -2833,6 +2907,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           </div>
           {isSelected && (
             <div className="absolute -top-8 right-0 flex gap-1">
+              {renderFormattingChip(el.id)}
               {renderOpenButton()}
               <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleDeleteElement(el.id)} data-testid={`button-delete-${el.id}`}>
                 <Trash2 className="h-3 w-3" />
@@ -2864,7 +2939,6 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           onTouchCancel={handleLongPressEnd}
           data-testid={`element-todo-${el.id}`}
         >
-          {isSelected && renderFormattingToolbar(el.id)}
           <div className="p-3.5">
             <div className="flex items-center justify-between mb-2 gap-1">
               {isSelected ? (
@@ -2930,6 +3004,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           </div>
           {isSelected && (
             <div className="absolute -top-8 right-0 flex gap-1">
+              {renderFormattingChip(el.id)}
               {renderOpenButton()}
               <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleDeleteElement(el.id)} data-testid={`button-delete-${el.id}`}>
                 <Trash2 className="h-3 w-3" />
@@ -3814,6 +3889,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     return null;
   };
 
+  // Legacy structure used by the mobile floating bottom toolbar.
   const sidebarToolGroups = [
     {
       label: "Content",
@@ -3849,6 +3925,83 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
         { type: "draw", icon: Pencil, label: "Draw" },
         ...(effectiveRole === "client" ? [] : [{ type: "connect", icon: Spline, label: "Connect" }]),
         ...(effectiveRole === "client" ? [] : [{ type: "palette", icon: Droplet, label: "Extract palette" }]),
+      ],
+    },
+  ];
+
+  // Tactile Add palette — categories color-keyed against the spruce + warm-paper system.
+  // `arms` items open a placement cursor or dialog; everything else inserts at viewport
+  // center. `key` is a one-letter shortcut surfaced in the popover and bound globally
+  // when no input is focused.
+  type AddPaletteItem = {
+    type: string;
+    icon: typeof StickyNote;
+    label: string;
+    hint: string;
+    key?: string;
+  };
+  type AddPaletteGroup = {
+    label: string;
+    tint: string; // tailwind bg color tone (warm paper palette)
+    accent: string; // border / text accent
+    items: AddPaletteItem[];
+  };
+  const addPaletteGroups: AddPaletteGroup[] = [
+    {
+      label: "Words",
+      tint: "bg-[#f7f1e7]/70",
+      accent: "text-[#2f4a3a]",
+      items: [
+        { type: "note", icon: StickyNote, label: "Note", hint: "Sticky thought with title", key: "N" },
+        { type: "plain_text", icon: FileText, label: "Text", hint: "Plain text, no card", key: "T" },
+        { type: "callout", icon: Sparkles, label: "Callout", hint: "Highlight with arrow" },
+      ],
+    },
+    {
+      label: "Visual",
+      tint: "bg-[#eef0e8]/70",
+      accent: "text-[#2f4a3a]",
+      items: [
+        { type: "image", icon: ImagePlus, label: "Image", hint: "Upload or paste URL", key: "I" },
+        { type: "color_swatch", icon: Palette, label: "Color", hint: "Paint swatch + LRV", key: "C" },
+        { type: "material", icon: Shapes, label: "Material", hint: "Photo + supplier code" },
+        ...(effectiveRole === "client"
+          ? []
+          : [{ type: "palette", icon: Droplet, label: "Extract palette", hint: "Pull colors from a photo" }]),
+      ],
+    },
+    {
+      label: "Selections",
+      tint: "bg-[#e8ece4]/70",
+      accent: "text-[#2f4a3a]",
+      items: [
+        ...(effectiveRole === "client"
+          ? []
+          : [{ type: "hardware", icon: Wrench, label: "Hardware", hint: "Pull, knob, faucet — typed", key: "H" }]),
+        { type: "product", icon: ExternalLink, label: "Product", hint: "Linked product card" },
+      ],
+    },
+    {
+      label: "Layout",
+      tint: "bg-[#f1ece1]/70",
+      accent: "text-[#2f4a3a]",
+      items: [
+        { type: "room_zone", icon: Square, label: "Room zone", hint: "Lane background" },
+        { type: "section_header", icon: Type, label: "Section header", hint: "Heading band" },
+        { type: "todo", icon: CheckSquare, label: "To-do", hint: "Task list" },
+        { type: "column", icon: Columns3, label: "Column", hint: "Stacked container" },
+        { type: "link", icon: Link2, label: "Board link", hint: "Jump to another board" },
+      ],
+    },
+    {
+      label: "Draw",
+      tint: "bg-[#ece8de]/70",
+      accent: "text-[#2f4a3a]",
+      items: [
+        { type: "draw", icon: Pencil, label: "Pencil mode", hint: "Toggle freehand drawing", key: "D" },
+        ...(effectiveRole === "client"
+          ? []
+          : [{ type: "connect", icon: Spline, label: "Arrow connector", hint: "Tap source → tap target", key: "A" }]),
       ],
     },
   ];
@@ -4067,21 +4220,6 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
               <Separator orientation="vertical" className="h-4 mx-1" />
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => setShowCritique(true)}
-                    data-testid="button-design-critique"
-                    aria-label="Design critique"
-                    className="h-8 w-8 hover:bg-primary/10 hover:text-primary"
-                  >
-                    <MessageSquareQuote className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="text-xs">Design critique</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
                   <span>
                     <Button
                       size="icon"
@@ -4099,6 +4237,21 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                 <TooltipContent side="bottom" className="text-xs">
                   {Object.keys(elements).length < 3 ? "Add a few items first" : "Present"}
                 </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => setShowCritique(true)}
+                    data-testid="button-design-critique"
+                    aria-label="AI critique"
+                    className="h-8 w-8 hover:bg-primary/10 hover:text-primary"
+                  >
+                    <Sparkles className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">AI critique</TooltipContent>
               </Tooltip>
             </>
           )}
@@ -4156,58 +4309,122 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
 
       {boards.length > 0 && selectedBoardId && (
         <div className="flex flex-1 gap-0 min-h-0">
-          {/* Left sidebar — desktop only — scrollable + collapsible sections */}
-          <div className="hidden md:flex w-[52px] shrink-0 border-r border-border/25 flex-col items-center py-3 bg-card/40 overflow-y-auto canvas-rail-scroll" data-testid="canvas-sidebar">
-            {sidebarToolGroups.map((group, gi) => {
-              const isCollapsed = !!railCollapsed[group.label];
-              return (
-                <div key={group.label} className="w-full flex flex-col items-center">
-                  {gi > 0 && <div className="w-6 h-px bg-border/30 my-2" />}
-                  <button
-                    type="button"
-                    onClick={() => toggleRailSection(group.label)}
-                    className="w-full px-1 py-0.5 flex items-center justify-center gap-0.5 text-[7px] uppercase tracking-[0.14em] text-foreground/40 hover:text-foreground/70 font-semibold mb-0.5 select-none transition-colors"
-                    aria-expanded={!isCollapsed}
-                    data-testid={`rail-section-toggle-${group.label.toLowerCase()}`}
+          {/* Left rail — desktop only — strictly "what to add". A single Add button
+              opens a tactile, color-keyed palette of categories. View/canvas controls
+              live in the top toolbar's right cluster — not duplicated here. */}
+          <div className="hidden md:flex w-[64px] shrink-0 border-r border-border/25 flex-col items-center py-3 gap-2 bg-card/40" data-testid="canvas-sidebar">
+            <Popover open={addPaletteOpen} onOpenChange={setAddPaletteOpen}>
+              <PopoverTrigger asChild>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      className={`w-12 h-12 flex flex-col items-center justify-center rounded-xl shrink-0 transition-all border ${addPaletteOpen ? "bg-[#2f4a3a] text-white border-[#2f4a3a]" : "bg-card text-foreground/80 border-border hover:border-[#2f4a3a]/40 hover:text-[#2f4a3a]"}`}
+                      aria-label="Add to board"
+                      aria-expanded={addPaletteOpen}
+                      data-testid="add-palette-trigger"
+                    >
+                      <Plus className="h-5 w-5" strokeWidth={1.75} />
+                      <span
+                        className="text-[8px] font-semibold uppercase tracking-[0.14em] mt-0.5"
+                        style={{ fontFamily: "var(--font-mono)" }}
+                      >
+                        Add
+                      </span>
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right" sideOffset={6} className="text-xs font-medium tracking-wide">
+                    Add to board
+                  </TooltipContent>
+                </Tooltip>
+              </PopoverTrigger>
+              <PopoverContent
+                side="right"
+                align="start"
+                sideOffset={8}
+                className="w-[320px] p-0 border-border/60 shadow-xl bg-[#fbf8f1]"
+                onMouseDown={(e) => e.stopPropagation()}
+                data-testid="add-palette-popover"
+              >
+                <div
+                  className="px-4 pt-3 pb-2 border-b border-border/40 flex items-center justify-between"
+                  style={{ fontFamily: "Inter Tight, Inter, sans-serif" }}
+                >
+                  <span className="text-sm font-semibold text-[#2f4a3a]">Add to board</span>
+                  <span
+                    className="text-[10px] uppercase text-muted-foreground tracking-[0.2em]"
+                    style={{ fontFamily: "var(--font-mono)" }}
                   >
-                    {isCollapsed ? <ChevronRight className="h-2 w-2" /> : <ChevronDown className="h-2 w-2" />}
-                    <span>{group.label}</span>
-                  </button>
-                  {!isCollapsed && group.tools.map((t) => (
-                    <Tooltip key={t.type}>
-                      <TooltipTrigger asChild>
-                        <button
-                          className={`w-10 h-10 flex items-center justify-center rounded-md transition-all duration-200 cursor-grab active:cursor-grabbing active:scale-[0.92] shrink-0 ${t.type === "connect" && connectMode ? "bg-primary/15 text-primary" : "text-foreground/50 hover:text-foreground hover:bg-foreground/[0.06]"}`}
-                          draggable
-                          onDragStart={(e) => {
-                            e.dataTransfer.setData("tool-type", t.type);
-                            e.dataTransfer.effectAllowed = "copy";
-                          }}
-                          onClick={() => t.type === "image" ? setShowImagePopup(!showImagePopup) : t.type === "draw" ? (() => { setDrawingMode(true); setDrawTool("pen"); setDrawingPaths([]); drawPathsRef.current = []; setDrawUndoStack([]); setEditingId(null); })() : t.type === "hardware" ? (() => { pendingHardwareDropRef.current = null; setShowHardwareDialog(true); })() : t.type === "connect" ? (() => { if (connectMode) { exitConnectMode(); } else { setConnectMode(true); setConnectSourceId(null); setSelectedConnectorId(null); setEditingId(null); } })() : t.type === "palette" ? (() => { palettePresetSourceRef.current = null; setPalettePresetUrl(null); setShowPaletteDialog(true); })() : createElement(t.type)}
-                          data-testid={`sidebar-tool-${t.type}`}
-                        >
-                          <t.icon className="h-[18px] w-[18px]" strokeWidth={1.5} />
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent side="right" sideOffset={6} className="text-xs font-medium tracking-wide">{t.label}</TooltipContent>
-                    </Tooltip>
+                    Tap once
+                  </span>
+                </div>
+                <div className="max-h-[70vh] overflow-y-auto py-1">
+                  {addPaletteGroups.map((group) => (
+                    <div key={group.label} className={`${group.tint} px-2 py-2 my-0.5`}>
+                      <div
+                        className={`px-2 pb-1 text-[10px] font-semibold uppercase tracking-[0.18em] ${group.accent}`}
+                        style={{ fontFamily: "var(--font-mono)" }}
+                      >
+                        {group.label}
+                      </div>
+                      <div className="flex flex-col gap-0.5">
+                        {group.items.map((it) => {
+                          const isActive = it.type === "connect" && connectMode;
+                          return (
+                            <button
+                              key={it.type}
+                              type="button"
+                              draggable
+                              onDragStart={(e) => {
+                                e.dataTransfer.setData("tool-type", it.type);
+                                e.dataTransfer.effectAllowed = "copy";
+                              }}
+                              onClick={() => {
+                                runTool(it.type);
+                                if (it.type !== "connect") setAddPaletteOpen(false);
+                              }}
+                              className={`w-full flex items-center gap-3 px-2 py-2 rounded-md text-left transition-colors min-h-[44px] ${isActive ? "bg-[#2f4a3a]/10 text-[#2f4a3a]" : "hover:bg-white/70 text-foreground"}`}
+                              data-testid={`add-palette-${it.type}`}
+                            >
+                              <span className={`flex h-9 w-9 items-center justify-center rounded-md bg-white/80 border border-border/40 shrink-0 ${isActive ? "text-[#2f4a3a]" : "text-foreground/70"}`}>
+                                <it.icon className="h-4 w-4" strokeWidth={1.75} />
+                              </span>
+                              <span className="flex-1 min-w-0">
+                                <span className="block text-sm font-medium leading-tight" style={{ fontFamily: "Inter Tight, Inter, sans-serif" }}>{it.label}</span>
+                                <span className="block text-[11px] text-muted-foreground leading-tight mt-0.5">{it.hint}</span>
+                              </span>
+                              {it.key && (
+                                <kbd
+                                  className="text-[10px] px-1.5 py-0.5 rounded bg-white/70 border border-border/40 text-muted-foreground shrink-0"
+                                  style={{ fontFamily: "var(--font-mono)" }}
+                                >
+                                  {it.key}
+                                </kbd>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                   ))}
                 </div>
-              );
-            })}
-            <div className="w-6 h-px bg-border/30 my-2" />
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  className="w-10 h-10 flex items-center justify-center rounded-md text-foreground/30 hover:text-destructive hover:bg-destructive/[0.06] transition-all duration-200 shrink-0"
-                  onClick={() => { if (editingId) handleDeleteElement(editingId); }}
-                  data-testid="sidebar-tool-delete"
-                >
-                  <Trash2 className="h-[18px] w-[18px]" strokeWidth={1.5} />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="right" sideOffset={6} className="text-xs font-medium tracking-wide">Delete Selected</TooltipContent>
-            </Tooltip>
+              </PopoverContent>
+            </Popover>
+            {editingId && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    className="w-10 h-10 flex items-center justify-center rounded-md text-foreground/40 hover:text-destructive hover:bg-destructive/[0.06] transition-all duration-200 shrink-0"
+                    onClick={() => { if (editingId) handleDeleteElement(editingId); }}
+                    data-testid="sidebar-tool-delete"
+                    aria-label="Delete selected"
+                  >
+                    <Trash2 className="h-[18px] w-[18px]" strokeWidth={1.5} />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="right" sideOffset={6} className="text-xs font-medium tracking-wide">Delete Selected</TooltipContent>
+              </Tooltip>
+            )}
           </div>
 
           {showImagePopup && (

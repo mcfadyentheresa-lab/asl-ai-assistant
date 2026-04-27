@@ -145,14 +145,30 @@ export default function DesignCritiquePanel({
                 Powered by AI
               </div>
             </div>
-            <button
-              onClick={onClose}
-              className="text-muted-foreground hover:text-foreground p-1.5 rounded-full hover:bg-muted transition-colors"
-              aria-label="Close critique"
-              data-testid="critique-close"
-            >
-              <X className="h-4 w-4" />
-            </button>
+            <div className="flex items-center gap-1">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={generate}
+                    disabled={loading}
+                    className="text-muted-foreground hover:text-foreground p-1.5 rounded-full hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    aria-label="Re-run critique"
+                    data-testid="critique-rerun-header"
+                  >
+                    {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">Re-run critique</TooltipContent>
+              </Tooltip>
+              <button
+                onClick={onClose}
+                className="text-muted-foreground hover:text-foreground p-1.5 rounded-full hover:bg-muted transition-colors"
+                aria-label="Close critique"
+                data-testid="critique-close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
           </div>
         </header>
 
@@ -175,17 +191,6 @@ export default function DesignCritiquePanel({
         </div>
 
         <footer className="px-6 py-4 border-t border-border flex items-center gap-2 bg-card">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={generate}
-            disabled={loading}
-            className="gap-2"
-            data-testid="critique-regenerate"
-          >
-            {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-            Regenerate
-          </Button>
           <div className="flex-1" />
           {hasClient ? (
             <Button
