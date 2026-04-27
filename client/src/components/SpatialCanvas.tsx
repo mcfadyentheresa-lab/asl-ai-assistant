@@ -60,6 +60,18 @@ import PaletteExtractionDialog, { type PaletteAddPayload } from "@/components/bo
 import CanvasConnectors, { CONNECTOR_DEFAULT_COLOR, anchorDots, type ConnectorContent, type ConnectorStyle, type ConnectorCurve } from "@/components/board/CanvasConnectors";
 import PresentationMode from "@/components/board/PresentationMode";
 import DesignCritiquePanel from "@/components/board/DesignCritiquePanel";
+import RoomTabStrip from "@/components/board/RoomTabStrip";
+import {
+  ROOM_STATUSES,
+  STATUS_EDGE_COLOR,
+  type RoomStatus,
+  deriveRooms,
+  isRoomable,
+  nextStatus,
+  orderRooms,
+  resolveRoomFor,
+  roomZoneName,
+} from "@/lib/board-rooms";
 import { useToast } from "@/hooks/use-toast";
 import { usePlanningBoards, useCreatePlanningBoard, useDeletePlanningBoard, useUpdatePlanningBoard, useUploadImage, useUsers, useProjects, useMilestones, useChecklistItems, useCalendarEvents, useUpdateCalendarEvent, useDeleteCalendarEvent, useCreateCalendarEvent, useCreateMilestone, useCreateChecklistItem, useBoardSnapshots, useCreateBoardSnapshot, useRestoreBoardSnapshot, useDeleteBoardSnapshot } from "@/hooks/use-projects";
 import { Badge } from "@/components/ui/badge";
@@ -282,7 +294,7 @@ const ELEMENT_DEFAULTS: Record<string, { width: number; height: number; content:
   image: { width: 360, height: 260, content: { url: "", caption: "" } },
   draw: { width: 400, height: 300, content: { paths: [], color: "#000000", strokeWidth: 2 } },
   room_zone: { width: 500, height: 400, content: { title: "Room Name", color: "#f0ede8", opacity: 0.5 } },
-  product: { width: 240, height: 120, content: { name: "Product", price: "", supplier: "", url: "" } },
+  product: { width: 240, height: 120, content: { name: "Product", price: "", supplier: "", url: "", status: "idea" } },
   hardware: { width: 280, height: 200, content: { category: "pull", name: "New hardware", status: "idea", currency: "CAD" } },
   connector: { width: 0, height: 0, content: { fromId: 0, toId: 0, style: "arrow", curve: "curved" } },
 };
@@ -482,6 +494,76 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       return next;
     });
   }, [lockLayoutKey]);
+
+  // Room spine — active room tab and saved order, persisted per-board in localStorage.
+  // `activeRoomKey` keeps the user where they left off when revisiting the board.
+  const activeRoomKey = selectedBoardId ? `asl:board:${selectedBoardId}:activeRoom` : null;
+  const roomOrderKey = selectedBoardId ? `asl:board:${selectedBoardId}:roomOrder` : null;
+  const statusFilterKey = selectedBoardId ? `asl:board:${selectedBoardId}:statusFilter` : null;
+  const [activeRoom, setActiveRoom] = useState<string | null>(null);
+  const [savedRoomOrder, setSavedRoomOrder] = useState<string[]>([]);
+  const [statusFilters, setStatusFilters] = useState<Set<RoomStatus>>(() => new Set());
+  useEffect(() => {
+    if (!selectedBoardId) return;
+    if (activeRoomKey) {
+      const raw = localStorage.getItem(activeRoomKey);
+      setActiveRoom(raw && raw !== "__all__" ? raw : null);
+    }
+    if (roomOrderKey) {
+      try {
+        const raw = localStorage.getItem(roomOrderKey);
+        const parsed = raw ? JSON.parse(raw) : [];
+        setSavedRoomOrder(Array.isArray(parsed) ? parsed.filter((s) => typeof s === "string") : []);
+      } catch {
+        setSavedRoomOrder([]);
+      }
+    }
+    if (statusFilterKey) {
+      try {
+        const raw = localStorage.getItem(statusFilterKey);
+        const parsed = raw ? JSON.parse(raw) : [];
+        const allowed = new Set<RoomStatus>(ROOM_STATUSES);
+        const next = new Set<RoomStatus>(
+          (Array.isArray(parsed) ? parsed : []).filter((v): v is RoomStatus => typeof v === "string" && allowed.has(v as RoomStatus)),
+        );
+        setStatusFilters(next);
+      } catch {
+        setStatusFilters(new Set());
+      }
+    }
+  }, [selectedBoardId, activeRoomKey, roomOrderKey, statusFilterKey]);
+  const persistActiveRoom = useCallback(
+    (room: string | null) => {
+      setActiveRoom(room);
+      if (activeRoomKey) {
+        try { localStorage.setItem(activeRoomKey, room ?? "__all__"); } catch {}
+      }
+    },
+    [activeRoomKey],
+  );
+  const persistRoomOrder = useCallback(
+    (order: string[]) => {
+      setSavedRoomOrder(order);
+      if (roomOrderKey) {
+        try { localStorage.setItem(roomOrderKey, JSON.stringify(order)); } catch {}
+      }
+    },
+    [roomOrderKey],
+  );
+  const toggleStatusFilter = useCallback(
+    (s: RoomStatus) => {
+      setStatusFilters((prev) => {
+        const next = new Set(prev);
+        if (next.has(s)) next.delete(s);
+        else next.add(s);
+        if (statusFilterKey) {
+          try { localStorage.setItem(statusFilterKey, JSON.stringify(Array.from(next))); } catch {}
+        }
+        return next;
+      });
+    },
+    [statusFilterKey],
+  );
 
   // Finger-drawing toggle: persisted globally in localStorage. Pencil ignores this toggle.
   const [fingerDrawing, setFingerDrawing] = useState<boolean>(() => {
@@ -771,13 +853,20 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     const newZ = maxZ;
     setMaxZ((z) => z + 1);
 
+    // Auto-tag the new card with the active room when one is focused — keeps room
+    // membership in lockstep with the user's mental model of "where am I working?".
+    const baseContent: any = { ...def.content };
+    if (activeRoom && (persistedType === "hardware" || persistedType === "surface" || persistedType === "product")) {
+      baseContent.room = activeRoom;
+    }
+
     try {
       const url = buildUrl(api.canvasElements.create.path, { boardId: selectedBoardId });
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ type: persistedType, x: centerX, y: centerY, width: def.width, height: def.height, zIndex: newZ, content: { ...def.content } }),
+        body: JSON.stringify({ type: persistedType, x: centerX, y: centerY, width: def.width, height: def.height, zIndex: newZ, content: baseContent }),
       });
       const el = await res.json();
       addElement(el);
@@ -799,6 +888,8 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     setMaxZ((z) => z + 1);
     try {
       const url = buildUrl(api.canvasElements.create.path, { boardId: selectedBoardId });
+      const hardwareContent: any = { ...draft };
+      if (activeRoom && !hardwareContent.room) hardwareContent.room = activeRoom;
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -810,7 +901,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           width: def.width,
           height: def.height,
           zIndex: newZ,
-          content: { ...draft },
+          content: hardwareContent,
         }),
       });
       const el = await res.json();
@@ -2672,6 +2763,190 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     toggleLinkedUser(clientUser.id);
   };
   const elementsList = Object.values(elements);
+  const rawRoomNames = deriveRooms(elementsList);
+  const roomNames = orderRooms(rawRoomNames, savedRoomOrder);
+
+  // Resolve which room each element belongs to. Lookup table avoids re-scanning
+  // the canvas for every render call. Floating cards (no explicit room, no
+  // containment) belong to "All" only.
+  const elementRoomById = (() => {
+    const out: Record<number, string | undefined> = {};
+    for (const el of elementsList) {
+      out[el.id] = resolveRoomFor(el, elementsList);
+    }
+    return out;
+  })();
+
+  // Visibility for the active room tab + status filter. Hides via opacity 0
+  // (and disables pointer events), never deletes — switching back restores everything.
+  const isElementHiddenByRoom = (el: CanvasElement): boolean => {
+    if (activeRoom == null) return false;
+    if (el.type === "connector") return false; // connectors follow their endpoints
+    if (el.type === "draw") return false; // freehand strokes always show
+    if (el.type === "room_zone") {
+      // Show only the active room zone(s); other zones hidden under their tab.
+      const name = roomZoneName(el);
+      return !!name && name !== activeRoom;
+    }
+    const room = elementRoomById[el.id];
+    return room !== activeRoom;
+  };
+
+  const isElementHiddenByStatus = (el: CanvasElement): boolean => {
+    if (statusFilters.size === 0) return false;
+    if (!isRoomable(el)) return false;
+    const status = (((el.content as any)?.status) as RoomStatus | undefined) || "idea";
+    return !statusFilters.has(status);
+  };
+
+  const isElementHidden = (el: CanvasElement): boolean =>
+    isElementHiddenByRoom(el) || isElementHiddenByStatus(el);
+
+  // Status quick-cycle — used by the contextual chip on roomable cards.
+  const cycleStatusForElement = (id: number) => {
+    const el = elements[id];
+    if (!el || !isRoomable(el)) return;
+    const c = (el.content || {}) as any;
+    const cur = (c.status as RoomStatus | undefined) || "idea";
+    const next = nextStatus(cur);
+    handleUpdateContent(id, { ...c, status: next });
+  };
+
+  // Rooms-as-the-spine handlers — create/rename/reorder. Reorder is purely a
+  // UI concern (saved to localStorage) so it doesn't churn server state.
+  const createRoomFromTabStrip = async (payload: { name: string; widthFt?: number; widthIn?: number; depthFt?: number; depthIn?: number }) => {
+    if (!selectedBoardId) return;
+    const def = ELEMENT_DEFAULTS.room_zone;
+    // Drop the new lane in an empty area: just past the rightmost element.
+    const rightmost = elementsList.reduce((max, e) => Math.max(max, e.x + (e.width || 0)), 0);
+    const startX = rightmost > 0 ? rightmost + 80 : Math.round((-pan.x + (containerRef.current?.clientWidth || 800) / 2) / zoom);
+    const startY = 80;
+    const newZ = maxZ;
+    setMaxZ((z) => z + 1);
+    const content: any = {
+      ...def.content,
+      title: payload.name,
+    };
+    if (payload.widthFt || payload.widthIn) {
+      content.dimensionsW = { ft: payload.widthFt ?? 0, in: payload.widthIn ?? 0 };
+    }
+    if (payload.depthFt || payload.depthIn) {
+      content.dimensionsD = { ft: payload.depthFt ?? 0, in: payload.depthIn ?? 0 };
+    }
+    try {
+      const url = buildUrl(api.canvasElements.create.path, { boardId: selectedBoardId });
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ type: "room_zone", x: startX, y: startY, width: def.width, height: def.height, zIndex: newZ, content }),
+      });
+      const el = await res.json();
+      addElement(el);
+      sendElementAdd(el);
+      pushUndo({ type: "create", elementId: el.id });
+      persistActiveRoom(payload.name);
+      // Pin the new room at the end of the saved order if we already have one.
+      if (savedRoomOrder.length > 0 && !savedRoomOrder.includes(payload.name)) {
+        persistRoomOrder([...savedRoomOrder, payload.name]);
+      }
+    } catch {
+      toast({ title: "Error", description: "Failed to create room", variant: "destructive" });
+    }
+  };
+
+  const renameRoomEverywhere = async (oldName: string, newName: string) => {
+    if (!selectedBoardId) return;
+    // Update every element that references this room: the room_zone title and
+    // any `room` field on hardware/surface/product. The simple fan-out keeps
+    // the rename atomic from the user's perspective.
+    const updates: { id: number; nextContent: any }[] = [];
+    for (const el of elementsList) {
+      const c = (el.content || {}) as any;
+      if (el.type === "room_zone" && typeof c.title === "string" && c.title.trim() === oldName) {
+        updates.push({ id: el.id, nextContent: { ...c, title: newName } });
+      } else if (isRoomable(el) && typeof c.room === "string" && c.room === oldName) {
+        updates.push({ id: el.id, nextContent: { ...c, room: newName } });
+      }
+    }
+    for (const u of updates) {
+      updateElement(u.id, { content: u.nextContent });
+      sendElementUpdate(u.id, { content: u.nextContent });
+      try {
+        const url = buildUrl(api.canvasElements.update.path, { id: u.id });
+        await fetch(url, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ content: u.nextContent }),
+        });
+      } catch {}
+    }
+    if (activeRoom === oldName) persistActiveRoom(newName);
+    if (savedRoomOrder.length > 0) {
+      persistRoomOrder(savedRoomOrder.map((r) => (r === oldName ? newName : r)));
+    }
+  };
+
+  // Quick-cycle status chip — shown in the selected card's action row. Tap
+  // cycles idea → shortlist → selected → ordered → idea. Identical signal to
+  // the picker, just one tap deep so the user can advance a card without
+  // opening the property panel.
+  const renderStatusCycleChip = (el: CanvasElement) => {
+    if (!isRoomable(el)) return null;
+    const status = (((el.content as any)?.status) as RoomStatus | undefined) || "idea";
+    const meta = STATUS_CHIP[status];
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            className={`h-6 px-1.5 rounded text-[9px] uppercase tracking-wider inline-flex items-center gap-1 ${meta.className}`}
+            style={{ fontFamily: "var(--font-mono)" }}
+            onClick={(e) => {
+              e.stopPropagation();
+              cycleStatusForElement(el.id);
+            }}
+            onMouseDown={(e) => e.stopPropagation()}
+            aria-label={`Status ${meta.label} — tap to advance`}
+            data-testid={`status-cycle-chip-${el.id}`}
+          >
+            {meta.withCheck && <Check className="h-2.5 w-2.5" strokeWidth={2.5} />}
+            {meta.label}
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="text-xs">Tap to advance status</TooltipContent>
+      </Tooltip>
+    );
+  };
+
+  // Status as a visible signal on hardware/surface/product cards. Renders a 3px
+  // colored left edge tied to status, plus a small checkmark badge when ordered.
+  // Returns nothing for non-roomable types so the existing renderers stay clean.
+  const renderStatusEdge = (el: CanvasElement) => {
+    if (!isRoomable(el)) return null;
+    const status = (((el.content as any)?.status) as RoomStatus | undefined) || "idea";
+    const color = STATUS_EDGE_COLOR[status];
+    return (
+      <>
+        <div
+          className="absolute left-0 top-0 bottom-0 pointer-events-none"
+          style={{ width: 3, backgroundColor: color, borderTopLeftRadius: 4, borderBottomLeftRadius: 4 }}
+          aria-hidden
+          data-testid={`status-edge-${el.id}`}
+        />
+        {status === "ordered" && (
+          <div
+            className="absolute top-1.5 right-1.5 inline-flex items-center justify-center h-4 w-4 rounded-full bg-[#2f4a3a] text-white pointer-events-none shadow-sm"
+            aria-hidden
+            data-testid={`status-ordered-badge-${el.id}`}
+          >
+            <Check className="h-2.5 w-2.5" strokeWidth={3} />
+          </div>
+        )}
+      </>
+    );
+  };
 
   // Card renderers
   const renderElement = (el: CanvasElement) => {
@@ -3420,6 +3695,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             onTouchCancel={handleLongPressEnd}
             data-testid={`element-surface-paint-${el.id}`}
           >
+            {renderStatusEdge(el)}
             {kindPicker}
             <div className="h-[140px] relative pointer-events-none select-none" style={{ backgroundColor: c.color || "#1e3a2f" }}>
               <span className="absolute bottom-2 left-3 text-xs text-white/80" style={{ fontFamily: "var(--font-mono)" }}>{(c.hex || c.color || "#1E3A2F").toUpperCase()}</span>
@@ -3521,7 +3797,8 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
               )}
             </div>
             {isSelected && (
-              <div className="absolute -top-8 right-0 flex gap-1">
+              <div className="absolute -top-8 right-0 flex items-center gap-1">
+                {renderStatusCycleChip(el)}
                 {renderOpenButton()}
                 <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleDeleteElement(el.id)} data-testid={`button-delete-${el.id}`}>
                   <Trash2 className="h-3 w-3" />
@@ -3551,6 +3828,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           onTouchCancel={handleLongPressEnd}
           data-testid={`element-surface-material-${el.id}`}
         >
+          {renderStatusEdge(el)}
           {kindPicker}
           {c.imageUrl && (
             <div className="h-[80px] bg-muted overflow-hidden">
@@ -3649,7 +3927,8 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             </a>
           )}
           {isSelected && (
-            <div className="absolute -top-8 right-0 flex gap-1">
+            <div className="absolute -top-8 right-0 flex items-center gap-1">
+              {renderStatusCycleChip(el)}
               {renderOpenButton()}
               <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleDeleteElement(el.id)} data-testid={`button-delete-${el.id}`}>
                 <Trash2 className="h-3 w-3" />
@@ -3686,6 +3965,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           onTouchCancel={handleLongPressEnd}
           data-testid={`element-hardware-${el.id}`}
         >
+          {renderStatusEdge(el)}
           <div className="p-3 flex flex-col gap-2 pointer-events-none select-none">
             <div className="flex items-start gap-3">
               {c.imageUrl && (
@@ -3754,7 +4034,8 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             </a>
           )}
           {isSelected && (
-            <div className="absolute -top-8 right-0 flex gap-1">
+            <div className="absolute -top-8 right-0 flex items-center gap-1">
+              {renderStatusCycleChip(el)}
               {renderOpenButton()}
               <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleDeleteElement(el.id)} data-testid={`button-delete-${el.id}`}>
                 <Trash2 className="h-3 w-3" />
@@ -3784,6 +4065,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           onTouchCancel={handleLongPressEnd}
           data-testid={`element-product-${el.id}`}
         >
+          {renderStatusEdge(el)}
           <div className="p-3">
             {isSelected ? (
               <div className="space-y-1.5">
@@ -3815,6 +4097,27 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                   onBlur={(e) => handleUpdateContent(el.id, { ...c, url: e.target.value })}
                   data-testid={`input-product-url-${el.id}`}
                 />
+                <input
+                  className="w-full bg-transparent border border-border/50 rounded text-xs outline-none px-1.5 py-0.5"
+                  defaultValue={c.room || ""}
+                  placeholder="Room"
+                  onBlur={(e) => handleUpdateContent(el.id, { ...c, room: e.target.value || undefined })}
+                  data-testid={`input-product-room-${el.id}`}
+                />
+                <div className="flex items-center gap-1 mt-1.5" onMouseDown={(e) => e.stopPropagation()}>
+                  {(["idea","shortlist","selected","ordered"] as const).map((s) => {
+                    const cur = (c.status as RoomStatus) || "idea";
+                    return (
+                      <button
+                        key={s}
+                        type="button"
+                        className={`px-1.5 py-0.5 rounded text-[9px] font-mono uppercase tracking-wider transition-colors ${cur === s ? STATUS_CHIP[s].className : "text-muted-foreground hover:bg-primary/10"}`}
+                        onClick={() => handleUpdateContent(el.id, { ...c, status: s })}
+                        data-testid={`product-status-${s}-${el.id}`}
+                      >{STATUS_CHIP[s].label}</button>
+                    );
+                  })}
+                </div>
               </div>
             ) : (
               <div>
@@ -3823,6 +4126,15 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                   {c.price && <span className="text-xs font-medium text-primary shrink-0">{c.price}</span>}
                 </div>
                 {c.supplier && <div className="text-[10px] text-muted-foreground mt-0.5">{c.supplier}</div>}
+                {c.room && (
+                  <span
+                    className="inline-block mt-1 text-[10px] px-1.5 py-0.5 rounded-sm bg-muted text-muted-foreground uppercase tracking-wider"
+                    style={{ fontFamily: "var(--font-mono)" }}
+                    data-testid={`chip-product-room-${el.id}`}
+                  >
+                    {c.room}
+                  </span>
+                )}
                 {c.url && (
                   <div className="flex items-center gap-1 mt-1">
                     <ExternalLink className="h-2.5 w-2.5 text-primary shrink-0" />
@@ -3833,7 +4145,8 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             )}
           </div>
           {isSelected && (
-            <div className="absolute -top-8 right-0 flex gap-1">
+            <div className="absolute -top-8 right-0 flex items-center gap-1">
+              {renderStatusCycleChip(el)}
               {c.url && (
                 <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => window.open(c.url, "_blank")} data-testid={`button-open-product-${el.id}`}>
                   <ExternalLink className="h-3 w-3" />
@@ -4672,6 +4985,22 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       )}
 
       {boards.length > 0 && selectedBoardId && (
+        <RoomTabStrip
+          rooms={roomNames}
+          activeRoom={activeRoom}
+          statusFilters={statusFilters}
+          elements={elementsList}
+          project={clientProject as any}
+          isLocked={lockLayout}
+          onSelectRoom={persistActiveRoom}
+          onReorderRooms={persistRoomOrder}
+          onRenameRoom={renameRoomEverywhere}
+          onCreateRoom={createRoomFromTabStrip}
+          onToggleStatusFilter={toggleStatusFilter}
+        />
+      )}
+
+      {boards.length > 0 && selectedBoardId && (
         <div className="flex flex-1 gap-0 min-h-0">
           {/* Left rail — desktop only — strictly "what to add". A single Add button
               opens a tactile, color-keyed palette of categories. View/canvas controls
@@ -4897,7 +5226,24 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
               }}
               data-testid="spatial-canvas-transform"
             >
-              {elementsList.map(renderElement)}
+              {elementsList.map((el) => {
+                const node = renderElement(el);
+                if (!node) return null;
+                const hidden = isElementHidden(el);
+                if (!hidden) return node;
+                // Hide via wrapper opacity — never delete. Coming back to "All"
+                // (or matching the filter) restores everything intact.
+                return (
+                  <div
+                    key={`vis-${el.id}`}
+                    style={{ opacity: 0, pointerEvents: "none" }}
+                    aria-hidden
+                    data-testid={`element-hidden-${el.id}`}
+                  >
+                    {node}
+                  </div>
+                );
+              })}
 
               {/* Per-element annotations layer (Pencil ink-on-card, etc.) */}
               {elementsList.map((el) => {

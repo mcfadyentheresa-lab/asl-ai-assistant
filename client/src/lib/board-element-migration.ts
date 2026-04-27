@@ -18,6 +18,11 @@ type AnyContent = Record<string, any>;
 export function migrateElement(el: CanvasElement): CanvasElement {
   const c: AnyContent = (el.content as AnyContent) || {};
 
+  // Lazy-add status to product elements that predate the status spine.
+  if (el.type === "product" && !c.status) {
+    return { ...el, content: { ...c, status: "idea" } as any };
+  }
+
   if (el.type === "text" || el.type === "surface") {
     return el;
   }
