@@ -22,7 +22,8 @@
  * Annotations (`content.annotations: Stroke[]`) live inside the element's bounding box; coordinates
  * are stored relative to the element's top-left corner so the ink moves with the card.
  */
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, cloneElement, isValidElement } from "react";
+import type { ReactElement } from "react";
 import { getStroke } from "perfect-freehand";
 import templateKitchenPreview from "../assets/images/template-kitchen-faux.png";
 import templateBathroomPreview from "../assets/images/template-bathroom-faux.png";
@@ -59,7 +60,7 @@ import HardwarePickerDialog, { type HardwareDraft } from "@/components/board/Har
 import PaletteExtractionDialog, { type PaletteAddPayload } from "@/components/board/PaletteExtractionDialog";
 import CanvasConnectors, { CONNECTOR_DEFAULT_COLOR, anchorDots, type ConnectorContent, type ConnectorStyle, type ConnectorCurve } from "@/components/board/CanvasConnectors";
 import PresentationMode from "@/components/board/PresentationMode";
-import DesignCritiquePanel from "@/components/board/DesignCritiquePanel";
+import AIPartnerPanel from "@/components/board/AIPartnerPanel";
 import RoomTabStrip from "@/components/board/RoomTabStrip";
 import {
   ROOM_STATUSES,
@@ -4920,15 +4921,15 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                   <Button
                     size="icon"
                     variant="ghost"
-                    onClick={() => setShowCritique(true)}
+                    onClick={() => setShowCritique((v) => !v)}
                     data-testid="button-design-critique"
-                    aria-label="AI critique"
+                    aria-label="AI partner"
                     className="h-8 w-8 hover:bg-primary/10 hover:text-primary"
                   >
                     <Sparkles className="h-4 w-4" />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent side="bottom" className="text-xs">AI critique</TooltipContent>
+                <TooltipContent side="bottom" className="text-xs">AI partner</TooltipContent>
               </Tooltip>
             </>
           )}
@@ -5227,8 +5228,14 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
               data-testid="spatial-canvas-transform"
             >
               {elementsList.map((el) => {
-                const node = renderElement(el);
-                if (!node) return null;
+                const rendered = renderElement(el);
+                if (!rendered) return null;
+                // Tag the rendered element with a data attribute so the AI partner
+                // panel can find and highlight it. We clone to inject the attr
+                // without re-wrapping (which would break absolute positioning).
+                const node = isValidElement(rendered)
+                  ? cloneElement(rendered as ReactElement<any>, { "data-board-element-id": el.id })
+                  : rendered;
                 const hidden = isElementHidden(el);
                 if (!hidden) return node;
                 // Hide via wrapper opacity — never delete. Coming back to "All"
@@ -6720,8 +6727,8 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           elements={Object.values(elements)}
         />
       )}
-      {showCritique && selectedBoardId !== null && (
-        <DesignCritiquePanel
+      {showCritique && selectedBoardId !== null && (actualRole === "admin" || actualRole === "crew") && (
+        <AIPartnerPanel
           open={showCritique}
           onClose={() => setShowCritique(false)}
           projectId={projectId}
