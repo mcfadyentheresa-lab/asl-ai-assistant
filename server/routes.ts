@@ -2094,6 +2094,56 @@ function templateCanvasToElements(canvasData: any, boardId: number, createdBy: s
     }
   });
 
+  // Board palette extraction — k-means cluster on a photo, snap each
+  // centroid to the nearest paint color in the seeded catalogue.
+  // Admin/crew only; rate-limited per user.
+  const paletteBuckets = new Map<string, { count: number; resetAt: number }>();
+  const PALETTE_LIMIT = 20;
+  const PALETTE_WINDOW_MS = 5 * 60_000;
+
+  app.post("/api/board/extract-palette", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const dbUser = await authStorage.getUser(userId);
+      if (dbUser?.role !== "admin" && dbUser?.role !== "crew") {
+        return res.status(403).json({ message: "Only admin/crew can extract palettes" });
+      }
+
+      const now = Date.now();
+      const bucket = paletteBuckets.get(userId);
+      if (!bucket || bucket.resetAt < now) {
+        paletteBuckets.set(userId, { count: 1, resetAt: now + PALETTE_WINDOW_MS });
+      } else {
+        if (bucket.count >= PALETTE_LIMIT) {
+          return res.status(429).json({ message: "Too many palette extractions; try again in a few minutes." });
+        }
+        bucket.count += 1;
+      }
+
+      const imageUrl = String(req.body?.imageUrl || "").trim();
+      const kRaw = Number(req.body?.k);
+      const k = Number.isFinite(kRaw) ? kRaw : 5;
+      if (!imageUrl) return res.status(400).json({ message: "imageUrl is required" });
+      if (!/^https?:\/\//i.test(imageUrl) && !imageUrl.startsWith("/")) {
+        return res.status(400).json({ message: "imageUrl must be http(s) or a /uploads/... path" });
+      }
+
+      const { extractPalette } = await import("./palette-extraction");
+      const paintColors = await storage.getPaintColors();
+      if (paintColors.length === 0) {
+        return res.status(503).json({ message: "Paint catalogue not seeded" });
+      }
+
+      const origin = req.protocol + "://" + req.get("host");
+      const extracted = await extractPalette({ imageUrl, k, paintColors, originBaseUrl: origin });
+      res.json({ extracted });
+    } catch (err: any) {
+      const msg = err?.message || "Couldn't extract palette";
+      const status = /too large|too small|unreadable|Invalid path|Not an image/i.test(msg) ? 422 : 500;
+      res.status(status).json({ message: status === 422 ? msg : "Couldn't extract palette from that image." });
+    }
+  });
+
   // Board Snapshots
   app.get(api.boardSnapshots.list.path, isAuthenticated, async (req: any, res) => {
     try {
