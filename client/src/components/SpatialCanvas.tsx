@@ -1,4 +1,29 @@
+/**
+ * SpatialCanvas — interaction model
+ * --------------------------------------------------------------
+ * Input is dispatched by `event.pointerType`:
+ *   - 'pen'   (Apple Pencil / stylus): always draws.
+ *               • Pointerdown on an element → ink saved as `content.annotations` on that element.
+ *               • Pointerdown on board background → freestanding `draw` element (legacy flow).
+ *   - 'touch' (finger): pan/zoom by default.
+ *               • One-finger drag on background = pan.
+ *               • Two-finger pinch / drag = zoom & pan.
+ *               • Tap on element = select. Tap-and-drag does NOT move it.
+ *               • Long-press (300ms, ≤6px slop) on a selected element arms drag, then drag moves it.
+ *               • If "Finger drawing" toggle is ON, a single finger draws (two fingers still pan/zoom).
+ *   - 'mouse' (desktop): selection / drag / panning unchanged. Drawing when the Draw tool is active.
+ *
+ * Discipline knobs:
+ *   - Lock layout: when ON, no element can be moved/resized/deleted. Drawing & selection still work.
+ *     Default ON for client view, OFF for admin/crew. Persisted per board in localStorage.
+ *   - Finger drawing: toggle persisted in localStorage. Pencil ignores this toggle.
+ *   - Palm rejection: while a Pen pointer is active, all concurrent touch pointers are ignored.
+ *
+ * Annotations (`content.annotations: Stroke[]`) live inside the element's bounding box; coordinates
+ * are stored relative to the element's top-left corner so the ink moves with the card.
+ */
 import { useEffect, useRef, useState, useCallback } from "react";
+import { getStroke } from "perfect-freehand";
 import templateKitchenPreview from "../assets/images/template-kitchen-faux.png";
 import templateBathroomPreview from "../assets/images/template-bathroom-faux.png";
 import templateCottagePreview from "../assets/images/template-cottage-faux.png";
@@ -26,6 +51,7 @@ import {
   Eraser, Undo2, Redo2, Save, PenTool, Sparkles, TypeIcon, Shapes,
   CalendarDays, Milestone, ListChecks, Bell, BellOff,
   ChefHat, Bath, Home, FileText, LayoutPanelLeft, LayoutGrid, Move,
+  Lock, LockOpen, Hand,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { usePlanningBoards, useCreatePlanningBoard, useDeletePlanningBoard, useUpdatePlanningBoard, useUploadImage, useUsers, useProjects, useMilestones, useChecklistItems, useCalendarEvents, useUpdateCalendarEvent, useDeleteCalendarEvent, useCreateCalendarEvent, useCreateMilestone, useCreateChecklistItem, useBoardSnapshots, useCreateBoardSnapshot, useRestoreBoardSnapshot, useDeleteBoardSnapshot } from "@/hooks/use-projects";
@@ -140,6 +166,61 @@ interface SpatialCanvasProps {
 }
 
 const GRID_SIZE = 20;
+const LONG_PRESS_MS = 300;
+const LONG_PRESS_SLOP_PX = 6;
+
+type StrokePoint = [number, number, number];
+interface Stroke {
+  id: string;
+  points: StrokePoint[];
+  color: string;
+  width: number;
+  createdAt: number;
+  createdBy?: string;
+}
+
+const PERFECT_FREEHAND_OPTS = {
+  size: 4,
+  thinning: 0.55,
+  smoothing: 0.5,
+  streamline: 0.5,
+  easing: (t: number) => t,
+  start: { taper: 0, cap: true },
+  end: { taper: 0, cap: true },
+};
+
+function strokeToSvgPath(stroke: Stroke): string {
+  if (stroke.points.length === 0) return "";
+  const polygon = getStroke(stroke.points, {
+    ...PERFECT_FREEHAND_OPTS,
+    size: stroke.width,
+  });
+  if (polygon.length === 0) return "";
+  const d: string[] = [];
+  d.push(`M ${polygon[0][0].toFixed(2)} ${polygon[0][1].toFixed(2)}`);
+  for (let i = 1; i < polygon.length; i++) {
+    d.push(`L ${polygon[i][0].toFixed(2)} ${polygon[i][1].toFixed(2)}`);
+  }
+  d.push("Z");
+  return d.join(" ");
+}
+
+function renderAnnotations(annotations: Stroke[] | undefined, idPrefix: string) {
+  if (!annotations || annotations.length === 0) return null;
+  return (
+    <svg
+      className="absolute inset-0 pointer-events-none"
+      style={{ width: "100%", height: "100%", overflow: "visible" }}
+      data-testid={`${idPrefix}-annotations`}
+    >
+      {annotations.map((s) => {
+        const d = strokeToSvgPath(s);
+        if (!d) return null;
+        return <path key={s.id} d={d} fill={s.color} stroke="none" />;
+      })}
+    </svg>
+  );
+}
 
 const ELEMENT_DEFAULTS: Record<string, { width: number; height: number; content: any }> = {
   note: { width: 240, height: 140, content: { title: "", text: "Type your note here...", plain: false } },
@@ -257,6 +338,69 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   const drawCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [aiProcessing, setAiProcessing] = useState(false);
   const autoConvertInFlightRef = useRef(false);
+
+  // Lock layout: persisted per-board in localStorage. Default ON for client, OFF for admin/crew.
+  const lockLayoutKey = selectedBoardId ? `asl-board-locked-${selectedBoardId}` : null;
+  const [lockLayout, setLockLayout] = useState<boolean>(false);
+  useEffect(() => {
+    if (!lockLayoutKey) return;
+    const raw = localStorage.getItem(lockLayoutKey);
+    if (raw === "1") setLockLayout(true);
+    else if (raw === "0") setLockLayout(false);
+    else setLockLayout(effectiveRole === "client");
+  }, [lockLayoutKey, effectiveRole]);
+  const toggleLockLayout = useCallback(() => {
+    setLockLayout((v) => {
+      const next = !v;
+      if (lockLayoutKey) localStorage.setItem(lockLayoutKey, next ? "1" : "0");
+      return next;
+    });
+  }, [lockLayoutKey]);
+
+  // Finger-drawing toggle: persisted globally in localStorage. Pencil ignores this toggle.
+  const [fingerDrawing, setFingerDrawing] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("asl-board-finger-drawing") === "1";
+  });
+  const toggleFingerDrawing = useCallback(() => {
+    setFingerDrawing((v) => {
+      const next = !v;
+      try { localStorage.setItem("asl-board-finger-drawing", next ? "1" : "0"); } catch {}
+      return next;
+    });
+  }, []);
+
+  // Pointer-event bookkeeping
+  const activePointersRef = useRef<Map<number, { x: number; y: number; type: string }>>(new Map());
+  const penActiveRef = useRef(false);
+  const longPressArmRef = useRef<{
+    pointerId: number;
+    elementId: number;
+    startX: number;
+    startY: number;
+    elX: number;
+    elY: number;
+    timer: ReturnType<typeof setTimeout> | null;
+  } | null>(null);
+  const [longPressActiveId, setLongPressActiveId] = useState<number | null>(null);
+  const cancelLongPress = useCallback(() => {
+    if (longPressArmRef.current?.timer) clearTimeout(longPressArmRef.current.timer);
+    longPressArmRef.current = null;
+    setLongPressActiveId(null);
+  }, []);
+
+  // Per-element annotation drawing (live stroke) — keyed by element id
+  const elementInkRef = useRef<{
+    pointerId: number;
+    elementId: number;
+    points: StrokePoint[];
+    color: string;
+    width: number;
+  } | null>(null);
+  const [liveElementStroke, setLiveElementStroke] = useState<{
+    elementId: number;
+    stroke: Stroke;
+  } | null>(null);
 
   const elements = useCanvasStore((s) => s.elements);
   const loading = useCanvasStore((s) => s.loading);
@@ -518,6 +662,10 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   };
 
   const handleDeleteElement = async (id: number) => {
+    if (lockLayout) {
+      toast({ title: "Layout locked", description: "Unlock layout to delete elements." });
+      return;
+    }
     const el = elements[id];
     if (el) pushUndo({ type: "delete", element: { ...el } });
     removeElement(id);
@@ -730,19 +878,33 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     if (!el) return;
     e.stopPropagation();
 
-    if (editingId === elementId) {
-      // Second tap on already-selected element: arm threshold drag
-      setMobileUnlockedId(elementId);
-      pendingDragRef.current = { id: elementId, x: touch.clientX, y: touch.clientY, elX: el.x, elY: el.y };
-      const newZ = maxZ;
-      setMaxZ((z) => z + 1);
-      updateElement(elementId, { zIndex: newZ });
-    } else {
-      // First tap: just select — no drag started yet
-      setEditingId(elementId);
+    // Layout locked: tap = select only, never arm drag
+    setEditingId(elementId);
+    if (lockLayout) {
       setMobileUnlockedId(null);
       pendingDragRef.current = null;
+      cancelLongPress();
+      return;
     }
+
+    // Long-press to arm drag (no double-tap required)
+    longPressArmRef.current?.timer && clearTimeout(longPressArmRef.current.timer);
+    longPressArmRef.current = {
+      pointerId: -1,
+      elementId,
+      startX: touch.clientX,
+      startY: touch.clientY,
+      elX: el.x,
+      elY: el.y,
+      timer: setTimeout(() => {
+        setMobileUnlockedId(elementId);
+        setLongPressActiveId(elementId);
+        pendingDragRef.current = { id: elementId, x: touch.clientX, y: touch.clientY, elX: el.x, elY: el.y };
+        const newZ = maxZ;
+        setMaxZ((z) => z + 1);
+        updateElement(elementId, { zIndex: newZ });
+      }, LONG_PRESS_MS),
+    };
   };
 
   const handleLongPressEnd = () => {
@@ -750,6 +912,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
     }
+    cancelLongPress();
   };
 
   // Touch-based canvas handlers for drag, pan & pinch-to-zoom on mobile
@@ -805,6 +968,14 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     if (longPressTimerRef.current) {
       clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
+    }
+    // Cancel any pending long-press arm if finger moves beyond slop before timer fires
+    if (longPressArmRef.current && longPressArmRef.current.timer) {
+      const dx = touch.clientX - longPressArmRef.current.startX;
+      const dy = touch.clientY - longPressArmRef.current.startY;
+      if (Math.hypot(dx, dy) > LONG_PRESS_SLOP_PX) {
+        cancelLongPress();
+      }
     }
     // Threshold-based drag: activate once finger moves > 8px from pending-drag start
     if (pendingDragRef.current && draggingId === null && e.touches.length === 1) {
@@ -1279,7 +1450,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
         }
       }
       if (e.key === "Delete" || e.key === "Backspace") {
-        if (editingId && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) {
+        if (editingId && !lockLayout && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) {
           handleDeleteElement(editingId);
         }
       }
@@ -1324,6 +1495,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   }, [selectedBoardId]);
 
   const startResize = (id: number, handle: string, e: React.MouseEvent) => {
+    if (lockLayout) return;
     e.stopPropagation();
     e.preventDefault();
     const el = elements[id];
@@ -1339,6 +1511,12 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   };
 
   const startDrag = (id: number, e: React.MouseEvent) => {
+    if (lockLayout) {
+      // Locked layout: select but never start a drag.
+      e.stopPropagation();
+      setEditingId(id);
+      return;
+    }
     e.stopPropagation();
     const el = elements[id];
     if (!el) return;
@@ -1494,6 +1672,55 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     }
   }, [redrawOverlayCanvas]);
 
+  const pendingFreestandingDrawRef = useRef<{
+    points: Array<{ x: number; y: number; pressure: number }>;
+    color: string;
+    strokeWidth: number;
+  } | null>(null);
+  const [liveFreestandingDraw, setLiveFreestandingDraw] = useState<{
+    points: StrokePoint[];
+    color: string;
+    width: number;
+  } | null>(null);
+
+  // ---------------------------------------------------------------------------
+  // Pointer-based drawing (Pencil + finger-draw + mouse) — produces perfect-freehand strokes.
+  // Routes ink either to a per-element annotation layer (when pointerdown started over a card)
+  // or to a freestanding board-level draw element (legacy flow).
+  // Palm rejection: when a Pen pointer is active, all concurrent touch pointers are ignored.
+  // ---------------------------------------------------------------------------
+  const elementHitAt = useCallback((clientX: number, clientY: number): CanvasElement | null => {
+    if (!containerRef.current) return null;
+    const rect = containerRef.current.getBoundingClientRect();
+    const wx = (clientX - rect.left - pan.x) / zoom;
+    const wy = (clientY - rect.top - pan.y) / zoom;
+    let best: CanvasElement | null = null;
+    let bestZ = -Infinity;
+    Object.values(elements).forEach((el) => {
+      if (el.type === "section_header" || el.type === "draw" || el.type === "room_zone") return;
+      const w = el.width || 200;
+      const h = el.height || 60;
+      if (wx >= el.x && wx <= el.x + w && wy >= el.y && wy <= el.y + h) {
+        const z = el.zIndex || 0;
+        if (z > bestZ) {
+          bestZ = z;
+          best = el;
+        }
+      }
+    });
+    return best;
+  }, [pan, zoom, elements]);
+
+  // Should this pointer draw?
+  // pen → always draws.
+  // touch → only if fingerDrawing toggle is on.
+  // mouse → only if drawingMode is on.
+  const shouldPointerDraw = useCallback((pointerType: string): boolean => {
+    if (pointerType === "pen") return true;
+    if (pointerType === "touch") return fingerDrawing && drawingMode;
+    return drawingMode;
+  }, [fingerDrawing, drawingMode]);
+
   // Attach native DOM event listeners for drawing - works reliably on mouse, touch, and stylus
   useEffect(() => {
     const canvas = drawCanvasRef.current;
@@ -1642,6 +1869,228 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     };
   }, [drawingMode, drawTool, drawColor, drawStrokeWidth, pan, zoom, redrawOverlayCanvas, trySnapLastPath, tryAutoTextConvert]);
 
+  // Save an annotation stroke to the element's content.annotations array.
+  const saveAnnotationStroke = useCallback(async (elementId: number, stroke: Stroke) => {
+    const el = elements[elementId];
+    if (!el) return;
+    const c = (el.content || {}) as any;
+    const prev: Stroke[] = Array.isArray(c.annotations) ? c.annotations : [];
+    const nextAnnotations = [...prev, stroke];
+    const nextContent = { ...c, annotations: nextAnnotations };
+    pushUndo({ type: "update", elementId, prevUpdates: { content: { ...c } } });
+    updateElement(elementId, { content: nextContent });
+    sendElementUpdate(elementId, { content: nextContent });
+    try {
+      const url = buildUrl(api.canvasElements.update.path, { id: elementId });
+      await fetch(url, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ content: nextContent }),
+      });
+    } catch {
+      toast({ title: "Error", description: "Failed to save annotation", variant: "destructive" });
+    }
+  }, [elements, pushUndo, updateElement, sendElementUpdate, toast]);
+
+  // Pointer-event pipeline. Attached to the canvas viewport. Branches by pointerType:
+  //   pen → always ink (annotates element if pointerdown is over one, else freestanding draw)
+  //   touch → ink only when fingerDrawing toggle is on
+  //   mouse → existing handlers continue to drive selection/drag; this pipeline only inks if drawingMode is on
+  // Palm rejection: any touch pointer that arrives while a pen pointer is active is ignored.
+  useEffect(() => {
+    const root = containerRef.current;
+    if (!root) return;
+
+    const getBoardCoord = (clientX: number, clientY: number) => {
+      const rect = root.getBoundingClientRect();
+      return {
+        x: (clientX - rect.left - pan.x) / zoom,
+        y: (clientY - rect.top - pan.y) / zoom,
+      };
+    };
+
+    const onPointerDown = (e: PointerEvent) => {
+      // Palm rejection.
+      if (penActiveRef.current && e.pointerType === "touch") {
+        e.preventDefault();
+        return;
+      }
+      activePointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY, type: e.pointerType });
+      if (e.pointerType === "pen") {
+        penActiveRef.current = true;
+      }
+      if (!shouldPointerDraw(e.pointerType)) return;
+      // Don't start an ink stroke if the user is interacting with an input or button.
+      const target = e.target as HTMLElement | null;
+      if (target && (target.closest("input,textarea,button,[data-no-ink]"))) return;
+
+      // Capture the pointer so subsequent move/up events fire even if we leave the element.
+      try { (e.currentTarget as Element)?.setPointerCapture?.(e.pointerId); } catch {}
+      e.preventDefault();
+
+      const hit = elementHitAt(e.clientX, e.clientY);
+      const pressure = e.pressure && e.pressure > 0 ? e.pressure : (e.pointerType === "pen" ? 0.5 : 0.5);
+
+      if (hit && (e.pointerType === "pen" || (e.pointerType !== "pen" && (drawingMode || fingerDrawing)))) {
+        // Annotate ON the element. Coordinates are stored relative to the element's top-left.
+        const board = getBoardCoord(e.clientX, e.clientY);
+        elementInkRef.current = {
+          pointerId: e.pointerId,
+          elementId: hit.id,
+          points: [[board.x - hit.x, board.y - hit.y, pressure]],
+          color: drawColor,
+          width: drawStrokeWidth * 2.4,
+        };
+        setLiveElementStroke({
+          elementId: hit.id,
+          stroke: {
+            id: `live-${e.pointerId}`,
+            points: elementInkRef.current.points,
+            color: drawColor,
+            width: drawStrokeWidth * 2.4,
+            createdAt: Date.now(),
+            createdBy: user?.id,
+          },
+        });
+      } else {
+        // Freestanding draw: only when drawingMode is on (preserves legacy save UX).
+        if (!drawingMode && e.pointerType !== "pen") return;
+        if (!drawingMode && e.pointerType === "pen") {
+          // Pencil on empty canvas → enter drawingMode automatically so the existing save UI shows up
+          setDrawingMode(true);
+          setDrawTool("pen");
+        }
+        const board = getBoardCoord(e.clientX, e.clientY);
+        pendingFreestandingDrawRef.current = {
+          points: [{ x: board.x, y: board.y, pressure }],
+          color: drawColor,
+          strokeWidth: drawStrokeWidth,
+        };
+      }
+    };
+
+    const onPointerMove = (e: PointerEvent) => {
+      if (penActiveRef.current && e.pointerType === "touch") return; // palm rejection
+      const tracker = activePointersRef.current.get(e.pointerId);
+      if (tracker) {
+        tracker.x = e.clientX;
+        tracker.y = e.clientY;
+      }
+      const pressure = e.pressure && e.pressure > 0 ? e.pressure : 0.5;
+
+      const ink = elementInkRef.current;
+      if (ink && ink.pointerId === e.pointerId) {
+        const el = elements[ink.elementId];
+        if (!el) return;
+        const board = getBoardCoord(e.clientX, e.clientY);
+        ink.points.push([board.x - el.x, board.y - el.y, pressure]);
+        setLiveElementStroke({
+          elementId: ink.elementId,
+          stroke: {
+            id: `live-${e.pointerId}`,
+            points: [...ink.points],
+            color: ink.color,
+            width: ink.width,
+            createdAt: Date.now(),
+            createdBy: user?.id,
+          },
+        });
+        e.preventDefault();
+        return;
+      }
+
+      const fs = pendingFreestandingDrawRef.current;
+      if (fs) {
+        const board = getBoardCoord(e.clientX, e.clientY);
+        fs.points.push({ x: board.x, y: board.y, pressure });
+        setLiveFreestandingDraw({
+          points: fs.points.map((p) => [p.x, p.y, p.pressure] as StrokePoint),
+          color: fs.color,
+          width: fs.strokeWidth * 2.4,
+        });
+        e.preventDefault();
+      }
+    };
+
+    const onPointerUp = (e: PointerEvent) => {
+      activePointersRef.current.delete(e.pointerId);
+      if (e.pointerType === "pen") {
+        // No more pen pointers? Clear palm-rejection flag.
+        let stillPen = false;
+        activePointersRef.current.forEach((v) => { if (v.type === "pen") stillPen = true; });
+        if (!stillPen) penActiveRef.current = false;
+      }
+
+      const ink = elementInkRef.current;
+      if (ink && ink.pointerId === e.pointerId) {
+        const stroke: Stroke = {
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          points: ink.points,
+          color: ink.color,
+          width: ink.width,
+          createdAt: Date.now(),
+          createdBy: user?.id,
+        };
+        if (stroke.points.length >= 2) saveAnnotationStroke(ink.elementId, stroke);
+        elementInkRef.current = null;
+        setLiveElementStroke(null);
+        return;
+      }
+
+      const fs = pendingFreestandingDrawRef.current;
+      if (fs) {
+        // Push into the existing drawing pipeline so legacy save / shape recognition keeps working.
+        if (fs.points.length >= 2) {
+          const newPath = {
+            points: fs.points.map((p) => ({ x: p.x, y: p.y })),
+            color: fs.color,
+            strokeWidth: fs.strokeWidth,
+            pressurePoints: fs.points.map((p) => [p.x, p.y, p.pressure] as StrokePoint),
+          };
+          drawPathsRef.current = [...drawPathsRef.current, newPath];
+          setDrawingPaths([...drawPathsRef.current]);
+          if (drawingMode) {
+            redrawOverlayCanvas();
+            // Trigger handwriting auto-convert on idle, matching the legacy timer.
+            if (handwritingTimerRef.current) clearTimeout(handwritingTimerRef.current);
+            handwritingTimerRef.current = setTimeout(() => {
+              tryAutoTextConvert();
+            }, 800);
+          }
+        }
+        pendingFreestandingDrawRef.current = null;
+        setLiveFreestandingDraw(null);
+      }
+    };
+
+    const onPointerCancel = (e: PointerEvent) => {
+      activePointersRef.current.delete(e.pointerId);
+      if (elementInkRef.current?.pointerId === e.pointerId) {
+        elementInkRef.current = null;
+        setLiveElementStroke(null);
+      }
+      if (pendingFreestandingDrawRef.current) {
+        pendingFreestandingDrawRef.current = null;
+        setLiveFreestandingDraw(null);
+      }
+      let stillPen = false;
+      activePointersRef.current.forEach((v) => { if (v.type === "pen") stillPen = true; });
+      if (!stillPen) penActiveRef.current = false;
+    };
+
+    root.addEventListener("pointerdown", onPointerDown);
+    root.addEventListener("pointermove", onPointerMove);
+    root.addEventListener("pointerup", onPointerUp);
+    root.addEventListener("pointercancel", onPointerCancel);
+    return () => {
+      root.removeEventListener("pointerdown", onPointerDown);
+      root.removeEventListener("pointermove", onPointerMove);
+      root.removeEventListener("pointerup", onPointerUp);
+      root.removeEventListener("pointercancel", onPointerCancel);
+    };
+  }, [pan, zoom, elements, elementHitAt, shouldPointerDraw, drawColor, drawStrokeWidth, drawingMode, fingerDrawing, redrawOverlayCanvas, saveAnnotationStroke, tryAutoTextConvert, user]);
+
   const selectedBoard = boards.find((b: PlanningBoardType) => b.id === selectedBoardId);
   const clientProject = allProjects.find((p: any) => p.id === projectId);
   const clientUser = allUsers.find((u: any) => u.id === clientProject?.clientId);
@@ -1675,6 +2124,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     };
 
     const resizeHandles = (elId: number) => {
+      if (lockLayout) return null;
       const handleStyle = "absolute opacity-0 hover:opacity-100 transition-opacity z-20";
       const dotStyle = "w-2.5 h-2.5 rounded-full bg-primary/60 border border-primary/80";
       return (
@@ -2655,6 +3105,13 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     },
   ];
 
+  // Mode indicator label shown in the bottom-left of the canvas.
+  const modeIndicatorLabel = lockLayout
+    ? "Layout locked"
+    : fingerDrawing
+      ? "Fingers draw · 2-finger pan"
+      : "Pencil draws · Fingers pan";
+
   return (
     <div className="flex flex-col h-full overflow-hidden" data-testid="spatial-canvas-root">
       {/* Board selector bar */}
@@ -2808,6 +3265,42 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom" className="text-xs">Undo (Ctrl+Z)</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="icon"
+                variant={lockLayout ? "default" : "ghost"}
+                onClick={toggleLockLayout}
+                aria-pressed={lockLayout}
+                aria-label="Lock layout"
+                data-testid="button-lock-layout"
+                className="min-h-11 min-w-11"
+              >
+                {lockLayout ? <Lock className="h-4 w-4" /> : <LockOpen className="h-4 w-4" />}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-xs">
+              {lockLayout ? "Layout locked — tap to unlock" : "Lock layout"}
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="icon"
+                variant={fingerDrawing ? "default" : "ghost"}
+                onClick={toggleFingerDrawing}
+                aria-pressed={fingerDrawing}
+                aria-label="Finger drawing"
+                data-testid="button-finger-drawing"
+                className="min-h-11 min-w-11"
+              >
+                <Hand className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-xs">
+              {fingerDrawing ? "Finger drawing on (Pencil always draws)" : "Finger drawing off — fingers pan"}
+            </TooltipContent>
           </Tooltip>
           <div className="hidden md:flex items-center gap-1">
           <Separator orientation="vertical" className="h-4 mx-1" />
@@ -2967,7 +3460,13 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           <div
             ref={containerRef}
             className="flex-1 relative overflow-hidden bg-background"
-            style={{ cursor: isPanning ? "grabbing" : spaceRef.current ? "grab" : "default", touchAction: "none" }}
+            style={{
+              cursor: isPanning ? "grabbing" : spaceRef.current ? "grab" : "default",
+              touchAction: "none",
+              userSelect: "none",
+              WebkitUserSelect: "none",
+              WebkitTouchCallout: "none",
+            }}
             onMouseDown={handleCanvasMouseDown}
             onMouseMove={handleCanvasMouseMove}
             onMouseUp={handleCanvasMouseUp}
@@ -3024,6 +3523,59 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
               data-testid="spatial-canvas-transform"
             >
               {elementsList.map(renderElement)}
+
+              {/* Per-element annotations layer (Pencil ink-on-card, etc.) */}
+              {elementsList.map((el) => {
+                const c = (el.content || {}) as any;
+                const annotations: Stroke[] = Array.isArray(c.annotations) ? c.annotations : [];
+                const liveOverlay = liveElementStroke && liveElementStroke.elementId === el.id ? liveElementStroke.stroke : null;
+                if (annotations.length === 0 && !liveOverlay) return null;
+                const w = el.width || 200;
+                const h = el.height || 60;
+                return (
+                  <div
+                    key={`annot-${el.id}`}
+                    className="absolute pointer-events-none"
+                    style={{ left: el.x, top: el.y, width: w, height: h, overflow: "hidden", zIndex: (el.zIndex || 0) + 0.5 }}
+                    data-testid={`annot-layer-${el.id}`}
+                  >
+                    <svg width="100%" height="100%" style={{ overflow: "visible" }}>
+                      {annotations.map((s) => {
+                        const d = strokeToSvgPath(s);
+                        if (!d) return null;
+                        return <path key={s.id} d={d} fill={s.color} stroke="none" />;
+                      })}
+                      {liveOverlay && (() => {
+                        const d = strokeToSvgPath(liveOverlay);
+                        if (!d) return null;
+                        return <path d={d} fill={liveOverlay.color} stroke="none" opacity={0.85} />;
+                      })()}
+                    </svg>
+                  </div>
+                );
+              })}
+
+              {/* Live freestanding stroke preview (board-level draw, before pointerup commits it) */}
+              {liveFreestandingDraw && (() => {
+                const d = strokeToSvgPath({
+                  id: "live-fs",
+                  points: liveFreestandingDraw.points,
+                  color: liveFreestandingDraw.color,
+                  width: liveFreestandingDraw.width,
+                  createdAt: 0,
+                });
+                if (!d) return null;
+                return (
+                  <svg
+                    key="live-freestanding"
+                    className="absolute pointer-events-none"
+                    style={{ left: 0, top: 0, width: 99999, height: 99999, overflow: "visible", zIndex: 99996 }}
+                    data-testid="live-freestanding-stroke"
+                  >
+                    <path d={d} fill={liveFreestandingDraw.color} stroke="none" opacity={0.85} />
+                  </svg>
+                );
+              })()}
 
               {/* Mobile unlock badge — shown above the double-tapped element */}
               {mobileUnlockedId !== null && (() => {
@@ -3098,13 +3650,24 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                 </div>
               ))}
 
-              {/* Saved draw element paths rendered as SVG */}
+              {/* Saved draw element paths rendered as SVG. Paths with pressurePoints render via perfect-freehand. */}
               {elementsList.filter((el) => el.type === "draw").map((el) => {
                 const paths = ((el.content || {}) as any).paths || [];
                 if (paths.length === 0) return null;
                 return (
                   <svg key={`draw-svg-${el.id}`} className="absolute pointer-events-none" style={{ left: 0, top: 0, width: 99999, height: 99999, overflow: "visible" }}>
                     {paths.map((path: any, pi: number) => {
+                      if (path.pressurePoints && Array.isArray(path.pressurePoints) && path.pressurePoints.length >= 2) {
+                        const d = strokeToSvgPath({
+                          id: `${el.id}-${pi}`,
+                          points: path.pressurePoints,
+                          color: path.color || "#1e3a2f",
+                          width: (path.strokeWidth || 3) * 2.4,
+                          createdAt: 0,
+                        });
+                        if (!d) return null;
+                        return <path key={pi} d={d} fill={path.color || "#1e3a2f"} stroke="none" />;
+                      }
                       if (!path.points || path.points.length < 2) return null;
                       const d = path.points.map((pt: any, i: number) => `${i === 0 ? "M" : "L"}${pt.x},${pt.y}`).join(" ");
                       return <path key={pi} d={d} stroke={path.color || "#1e3a2f"} strokeWidth={path.strokeWidth || 3} fill="none" strokeLinecap="round" strokeLinejoin="round" />;
@@ -3112,6 +3675,16 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                   </svg>
                 );
               })}
+            </div>
+
+            {/* Mode indicator (bottom-left) */}
+            <div
+              className="absolute bottom-3 left-3 z-30 flex items-center gap-1.5 px-2 py-1 rounded-full bg-background/85 border border-border/50 shadow-sm text-[11px] text-muted-foreground backdrop-blur-sm pointer-events-none"
+              style={{ fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }}
+              data-testid="canvas-mode-indicator"
+            >
+              {lockLayout ? <Lock className="h-3 w-3" /> : fingerDrawing ? <Hand className="h-3 w-3" /> : <PenTool className="h-3 w-3" />}
+              <span className="leading-none">{modeIndicatorLabel}</span>
             </div>
 
             {/* Mobile floating bottom toolbar */}
@@ -3174,6 +3747,25 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                   data-testid="mobile-fit-screen"
                 >
                   <Maximize className="h-[18px] w-[18px]" strokeWidth={1.5} />
+                </button>
+                <div className="h-5 w-px bg-border/40 mx-1 shrink-0" />
+                <button
+                  className={`h-11 w-11 flex items-center justify-center rounded-full shrink-0 ${lockLayout ? "bg-primary/15 text-primary" : "text-foreground/60 active:bg-foreground/10"}`}
+                  onClick={(e) => { e.stopPropagation(); toggleLockLayout(); }}
+                  aria-pressed={lockLayout}
+                  data-testid="mobile-lock-layout"
+                  aria-label="Lock layout"
+                >
+                  {lockLayout ? <Lock className="h-[18px] w-[18px]" strokeWidth={1.5} /> : <LockOpen className="h-[18px] w-[18px]" strokeWidth={1.5} />}
+                </button>
+                <button
+                  className={`h-11 w-11 flex items-center justify-center rounded-full shrink-0 ${fingerDrawing ? "bg-primary/15 text-primary" : "text-foreground/60 active:bg-foreground/10"}`}
+                  onClick={(e) => { e.stopPropagation(); toggleFingerDrawing(); }}
+                  aria-pressed={fingerDrawing}
+                  data-testid="mobile-finger-drawing"
+                  aria-label="Finger drawing"
+                >
+                  <Hand className="h-[18px] w-[18px]" strokeWidth={1.5} />
                 </button>
                 {editingId && (
                   <>
@@ -3378,7 +3970,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       {boards.length > 0 && selectedBoardId && (
         <div className="flex items-center justify-between mt-1.5 px-1">
           <p className="text-[10px] text-muted-foreground">
-            Scroll to pan. Ctrl+scroll to zoom. Hold Space to drag canvas. Click elements to edit.
+            Pencil draws · fingers pan · two-finger pinch zooms · long-press to move (when unlocked).
           </p>
           <p className="text-[10px] text-muted-foreground">{elementsList.length} element{elementsList.length !== 1 ? "s" : ""}</p>
         </div>
