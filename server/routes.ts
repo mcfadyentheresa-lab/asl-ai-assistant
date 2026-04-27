@@ -5119,6 +5119,124 @@ Rules:
     res.status(201).json(element);
   }));
 
+  // ── Cinematic Reviews (PR-N1: Ken-Burns backend) ──────────────────────────
+  // Admin/crew only. Rate-limited 3/board/user/hour. AI-cinematic format ships
+  // in PR-N2; for now it returns 503.
+  const cinematicRateBuckets = new Map<string, { count: number; resetAt: number }>();
+  const CINEMATIC_LIMIT = 3;
+  const CINEMATIC_WINDOW_MS = 60 * 60_000;
+
+  app.post("/api/rooms/cinematic-review", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const dbUser = await authStorage.getUser(userId);
+      if (dbUser?.role !== "admin" && dbUser?.role !== "crew") {
+        return res.status(403).json({ message: "Only admin/crew can request cinematic reviews" });
+      }
+
+      const bodySchema = z.object({
+        projectId: z.number().int().positive(),
+        boardId: z.number().int().positive(),
+        roomName: z.string().min(1).max(200),
+        format: z.enum(["ken-burns", "ai-cinematic"]),
+      });
+      const parsed = bodySchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid request", errors: parsed.error.errors });
+      }
+      const { projectId, boardId, roomName, format } = parsed.data;
+
+      if (format === "ai-cinematic") {
+        return res.status(503).json({
+          error: "AI cinematic ships in PR-N2",
+          supportedFormats: ["ken-burns"],
+        });
+      }
+
+      const board = await storage.getPlanningBoard(boardId);
+      if (!board || board.projectId !== projectId) {
+        return res.status(404).json({ message: "Board not found for project" });
+      }
+
+      const bucketKey = `${boardId}:${userId}`;
+      const now = Date.now();
+      const bucket = cinematicRateBuckets.get(bucketKey);
+      if (!bucket || bucket.resetAt < now) {
+        cinematicRateBuckets.set(bucketKey, { count: 1, resetAt: now + CINEMATIC_WINDOW_MS });
+      } else {
+        if (bucket.count >= CINEMATIC_LIMIT) {
+          return res.status(429).json({ message: "Cinematic rate limit reached (3/hour per board); try again later." });
+        }
+        bucket.count += 1;
+      }
+
+      const { createCinematicReview } = await import("./cinematic/db");
+      const { kickCinematicWorker } = await import("./cinematic/worker");
+      const created = await createCinematicReview({
+        projectId,
+        boardId,
+        roomName,
+        format,
+        status: "queued",
+        createdBy: userId,
+      });
+      kickCinematicWorker();
+      res.status(202).json({ jobId: created.id, status: created.status });
+    } catch (err: any) {
+      console.error("Cinematic review error:", err?.message || err);
+      res.status(500).json({ message: "Failed to enqueue cinematic review" });
+    }
+  });
+
+  app.get("/api/rooms/cinematic-review/:jobId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const dbUser = await authStorage.getUser(userId);
+      if (dbUser?.role !== "admin" && dbUser?.role !== "crew") {
+        return res.status(403).json({ message: "Only admin/crew can view cinematic reviews" });
+      }
+      const jobId = Number(req.params.jobId);
+      if (!Number.isFinite(jobId)) {
+        return res.status(400).json({ message: "Invalid job id" });
+      }
+      const { getCinematicReview } = await import("./cinematic/db");
+      const row = await getCinematicReview(jobId);
+      if (!row) return res.status(404).json({ message: "Not found" });
+      res.json(row);
+    } catch (err: any) {
+      console.error("Cinematic review fetch error:", err?.message || err);
+      res.status(500).json({ message: "Failed to load cinematic review" });
+    }
+  });
+
+  app.get("/api/projects/:projectId/cinematic-reviews", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const dbUser = await authStorage.getUser(userId);
+      if (dbUser?.role !== "admin" && dbUser?.role !== "crew") {
+        return res.status(403).json({ message: "Only admin/crew can view cinematic reviews" });
+      }
+      const projectId = Number(req.params.projectId);
+      if (!Number.isFinite(projectId)) {
+        return res.status(400).json({ message: "Invalid project id" });
+      }
+      const { listCinematicReviewsForProject } = await import("./cinematic/db");
+      const rows = await listCinematicReviewsForProject(projectId, 20);
+      res.json(rows);
+    } catch (err: any) {
+      console.error("Cinematic reviews list error:", err?.message || err);
+      res.status(500).json({ message: "Failed to list cinematic reviews" });
+    }
+  });
+
+  // Resume any orphaned 'queued' jobs left over from a previous boot.
+  try {
+    const { kickCinematicWorker } = await import("./cinematic/worker");
+    kickCinematicWorker();
+  } catch (err) {
+    console.warn("[cinematic] failed to start worker on boot:", (err as Error).message);
+  }
+
   // Initialize seed data
   await seedDatabase();
 
