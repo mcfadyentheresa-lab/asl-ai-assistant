@@ -52,8 +52,10 @@ import {
   CalendarDays, Milestone, ListChecks, Bell, BellOff,
   ChefHat, Bath, Home, FileText, LayoutPanelLeft, LayoutGrid, Move,
   Lock, LockOpen, Hand, Wrench, Check,
+  Spline, MoveRight, Slash,
 } from "lucide-react";
 import HardwarePickerDialog, { type HardwareDraft } from "@/components/board/HardwarePickerDialog";
+import CanvasConnectors, { CONNECTOR_DEFAULT_COLOR, anchorDots, type ConnectorContent, type ConnectorStyle, type ConnectorCurve } from "@/components/board/CanvasConnectors";
 import { useToast } from "@/hooks/use-toast";
 import { usePlanningBoards, useCreatePlanningBoard, useDeletePlanningBoard, useUpdatePlanningBoard, useUploadImage, useUsers, useProjects, useMilestones, useChecklistItems, useCalendarEvents, useUpdateCalendarEvent, useDeleteCalendarEvent, useCreateCalendarEvent, useCreateMilestone, useCreateChecklistItem, useBoardSnapshots, useCreateBoardSnapshot, useRestoreBoardSnapshot, useDeleteBoardSnapshot } from "@/hooks/use-projects";
 import { Badge } from "@/components/ui/badge";
@@ -271,6 +273,7 @@ const ELEMENT_DEFAULTS: Record<string, { width: number; height: number; content:
   callout: { width: 200, height: 80, content: { text: "Add note...", color: "#fef9c3" } },
   product: { width: 240, height: 120, content: { name: "Product", price: "", supplier: "", url: "" } },
   hardware: { width: 280, height: 200, content: { category: "pull", name: "New hardware", status: "idea", currency: "CAD" } },
+  connector: { width: 0, height: 0, content: { fromId: 0, toId: 0, style: "arrow", curve: "curved" } },
 };
 
 // Status chip styling — used by hardware now; reusable for future material/color picks.
@@ -382,6 +385,19 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   const drawCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [aiProcessing, setAiProcessing] = useState(false);
   const autoConvertInFlightRef = useRef(false);
+
+  // Connect tool — two-tap arrow connector creation. Admin/crew only.
+  const zombieConnectorMissesRef = useRef<Map<number, number>>(new Map());
+  const [connectMode, setConnectMode] = useState(false);
+  const [connectSourceId, setConnectSourceId] = useState<number | null>(null);
+  const [selectedConnectorId, setSelectedConnectorId] = useState<number | null>(null);
+  const [connectCursor, setConnectCursor] = useState<{ x: number; y: number } | null>(null);
+  const [connectorEdgeDrag, setConnectorEdgeDrag] = useState<{ connectorId: number; endpoint: "from" | "to"; clientX: number; clientY: number } | null>(null);
+  const exitConnectMode = useCallback(() => {
+    setConnectMode(false);
+    setConnectSourceId(null);
+    setConnectCursor(null);
+  }, []);
 
   // Lock layout: persisted per-board in localStorage. Default ON for client, OFF for admin/crew.
   const lockLayoutKey = selectedBoardId ? `asl-board-locked-${selectedBoardId}` : null;
@@ -740,6 +756,27 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     }
   };
 
+  const createConnector = async (fromId: number, toId: number) => {
+    if (!selectedBoardId || fromId === toId) return;
+    const content: ConnectorContent = { fromId, toId, style: "arrow", curve: "curved" };
+    try {
+      const url = buildUrl(api.canvasElements.create.path, { boardId: selectedBoardId });
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ type: "connector", x: 0, y: 0, width: 0, height: 0, zIndex: 0, content }),
+      });
+      const el = await res.json();
+      addElement(el);
+      sendElementAdd(el);
+      pushUndo({ type: "create", elementId: el.id });
+      setSelectedConnectorId(el.id);
+    } catch {
+      toast({ title: "Error", description: "Failed to create connector", variant: "destructive" });
+    }
+  };
+
   const handleDeleteElement = async (id: number) => {
     if (lockLayout) {
       toast({ title: "Layout locked", description: "Unlock layout to delete elements." });
@@ -747,12 +784,68 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     }
     const el = elements[id];
     if (el) pushUndo({ type: "delete", element: { ...el } });
+    // Find dangling connectors that reference this element and delete them too.
+    const danglingConnectorIds: number[] = [];
+    Object.values(elements).forEach((other) => {
+      if (other.type !== "connector") return;
+      const c = (other.content || {}) as ConnectorContent;
+      if (c.fromId === id || c.toId === id) danglingConnectorIds.push(other.id);
+    });
+    for (const cid of danglingConnectorIds) {
+      const conn = elements[cid];
+      if (conn) pushUndo({ type: "delete", element: { ...conn } });
+      removeElement(cid);
+      sendElementRemove(cid);
+      try {
+        const cUrl = buildUrl(api.canvasElements.delete.path, { id: cid });
+        await fetch(cUrl, { method: "DELETE", credentials: "include" });
+      } catch {}
+    }
+    if (selectedConnectorId && danglingConnectorIds.includes(selectedConnectorId)) {
+      setSelectedConnectorId(null);
+    }
     removeElement(id);
     sendElementRemove(id);
     setEditingId(null);
     try {
       const url = buildUrl(api.canvasElements.delete.path, { id });
       await fetch(url, { method: "DELETE", credentials: "include" });
+    } catch {}
+  };
+
+  const handleDeleteConnector = async (id: number) => {
+    if (lockLayout) {
+      toast({ title: "Layout locked", description: "Unlock layout to delete connectors." });
+      return;
+    }
+    const el = elements[id];
+    if (el) pushUndo({ type: "delete", element: { ...el } });
+    removeElement(id);
+    sendElementRemove(id);
+    setSelectedConnectorId(null);
+    try {
+      const url = buildUrl(api.canvasElements.delete.path, { id });
+      await fetch(url, { method: "DELETE", credentials: "include" });
+    } catch {}
+  };
+
+  const handleUpdateConnector = async (id: number, patch: Partial<ConnectorContent>) => {
+    if (lockLayout) return;
+    const el = elements[id];
+    if (!el) return;
+    const prev = (el.content || {}) as ConnectorContent;
+    const next = { ...prev, ...patch };
+    pushUndo({ type: "update", elementId: id, prevUpdates: { content: prev as any } });
+    updateElement(id, { content: next as any });
+    sendElementUpdate(id, { content: next as any });
+    try {
+      const url = buildUrl(api.canvasElements.update.path, { id });
+      await fetch(url, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ content: next }),
+      });
     } catch {}
   };
 
@@ -865,10 +958,96 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
         e.preventDefault();
         handleUndo();
       }
+      if (e.key === "Escape") {
+        if (connectMode) exitConnectMode();
+        if (selectedConnectorId !== null) setSelectedConnectorId(null);
+      }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [handleUndo]);
+  }, [handleUndo, connectMode, exitConnectMode, selectedConnectorId]);
+
+  // Connector endpoint re-targeting drag.
+  useEffect(() => {
+    if (!connectorEdgeDrag) return;
+    const onMove = (e: PointerEvent) => {
+      setConnectorEdgeDrag((d) => d ? { ...d, clientX: e.clientX, clientY: e.clientY } : d);
+    };
+    const hitTestForConnector = (clientX: number, clientY: number): CanvasElement | null => {
+      if (!containerRef.current) return null;
+      const rect = containerRef.current.getBoundingClientRect();
+      const wx = (clientX - rect.left - pan.x) / zoom;
+      const wy = (clientY - rect.top - pan.y) / zoom;
+      let best: CanvasElement | null = null;
+      let bestZ = -Infinity;
+      Object.values(elements).forEach((el) => {
+        if (el.type === "section_header" || el.type === "draw" || el.type === "room_zone" || el.type === "connector") return;
+        const w = el.width || 200;
+        const h = el.height || 60;
+        if (wx >= el.x && wx <= el.x + w && wy >= el.y && wy <= el.y + h) {
+          const z = el.zIndex || 0;
+          if (z > bestZ) { bestZ = z; best = el; }
+        }
+      });
+      return best;
+    };
+    const onUp = (e: PointerEvent) => {
+      const drag = connectorEdgeDrag;
+      if (!drag) return;
+      const hit = hitTestForConnector(e.clientX, e.clientY);
+      if (hit && hit.id !== drag.connectorId) {
+        const conn = elements[drag.connectorId];
+        if (conn && conn.type === "connector") {
+          const c = (conn.content || {}) as ConnectorContent;
+          const otherId = drag.endpoint === "from" ? c.toId : c.fromId;
+          if (hit.id !== otherId) {
+            const patch: Partial<ConnectorContent> = drag.endpoint === "from"
+              ? { fromId: hit.id, fromAnchor: "auto" }
+              : { toId: hit.id, toAnchor: "auto" };
+            handleUpdateConnector(drag.connectorId, patch);
+          }
+        }
+      }
+      setConnectorEdgeDrag(null);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+  }, [connectorEdgeDrag, elements, pan, zoom]);
+
+  // Zombie-connector sweep: any connector whose endpoints have been gone for a couple of
+  // render passes gets quietly deleted. Avoids leaving dangling rows when peers delete elements.
+  useEffect(() => {
+    if (!selectedBoardId) return;
+    const elList = Object.values(elements);
+    const misses = zombieConnectorMissesRef.current;
+    const stillExists = new Set(elList.map((e) => e.id));
+    const toCull: number[] = [];
+    elList.forEach((el) => {
+      if (el.type !== "connector") return;
+      const c = (el.content || {}) as ConnectorContent;
+      const danglingFrom = !stillExists.has(c.fromId);
+      const danglingTo = !stillExists.has(c.toId);
+      if (danglingFrom || danglingTo) {
+        const n = (misses.get(el.id) || 0) + 1;
+        misses.set(el.id, n);
+        if (n >= 2) toCull.push(el.id);
+      } else {
+        misses.delete(el.id);
+      }
+    });
+    toCull.forEach(async (id) => {
+      misses.delete(id);
+      removeElement(id);
+      try {
+        const url = buildUrl(api.canvasElements.delete.path, { id });
+        await fetch(url, { method: "DELETE", credentials: "include" });
+      } catch {}
+    });
+  }, [elements, selectedBoardId, removeElement]);
 
   const handleFileUpload = async (file: File, targetElementId?: number) => {
     if (!selectedBoardId) return;
@@ -1379,6 +1558,10 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   const lastCursorSentRef = useRef(0);
 
   const handleCanvasMouseMove = (e: React.MouseEvent) => {
+    if (connectMode && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      setConnectCursor({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+    }
     if (drawingMode) return;
 
     if (containerRef.current) {
@@ -1776,7 +1959,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     let best: CanvasElement | null = null;
     let bestZ = -Infinity;
     Object.values(elements).forEach((el) => {
-      if (el.type === "section_header" || el.type === "draw" || el.type === "room_zone") return;
+      if (el.type === "section_header" || el.type === "draw" || el.type === "room_zone" || el.type === "connector") return;
       const w = el.width || 200;
       const h = el.height || 60;
       if (wx >= el.x && wx <= el.x + w && wy >= el.y && wy <= el.y + h) {
@@ -1795,10 +1978,11 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   // touch → only if fingerDrawing toggle is on.
   // mouse → only if drawingMode is on.
   const shouldPointerDraw = useCallback((pointerType: string): boolean => {
+    if (connectMode) return false;
     if (pointerType === "pen") return true;
     if (pointerType === "touch") return fingerDrawing && drawingMode;
     return drawingMode;
-  }, [fingerDrawing, drawingMode]);
+  }, [fingerDrawing, drawingMode, connectMode]);
 
   // Attach native DOM event listeners for drawing - works reliably on mouse, touch, and stylus
   useEffect(() => {
@@ -2188,6 +2372,9 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     const c = (el.content || {}) as any;
     const activeEdit = activeEdits[el.id];
 
+    // Connectors are rendered by the SVG overlay, not as cards.
+    if (el.type === "connector") return null;
+
     const parentCol = el.parentColumnId ? elements[el.parentColumnId] : null;
     const effectiveZ = parentCol ? Math.max(el.zIndex, (parentCol.zIndex || 0) + 1) : el.zIndex;
     const isDropping = droppingIds.has(el.id);
@@ -2195,11 +2382,23 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
 
     const handleClick = (e: React.MouseEvent) => {
       e.stopPropagation();
+      if (connectMode) {
+        if (connectSourceId === null) {
+          setConnectSourceId(el.id);
+        } else if (connectSourceId === el.id) {
+          // Tap same element — no-op.
+        } else {
+          createConnector(connectSourceId, el.id);
+          exitConnectMode();
+        }
+        return;
+      }
       if (el.type === "board_link" && c.targetBoardId) {
         setSelectedBoardId(c.targetBoardId);
         return;
       }
       setEditingId(el.id);
+      setSelectedConnectorId(null);
     };
 
     const resizeHandles = (elId: number) => {
@@ -3380,16 +3579,19 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       label: "Tools",
       tools: [
         { type: "draw", icon: Pencil, label: "Draw" },
+        ...(effectiveRole === "client" ? [] : [{ type: "connect", icon: Spline, label: "Connect" }]),
       ],
     },
   ];
 
   // Mode indicator label shown in the bottom-left of the canvas.
-  const modeIndicatorLabel = lockLayout
-    ? "Layout locked"
-    : fingerDrawing
-      ? "Fingers draw · 2-finger pan"
-      : "Pencil draws · Fingers pan";
+  const modeIndicatorLabel = connectMode
+    ? (connectSourceId === null ? "Connect: tap source → tap target" : "Connect: tap target...")
+    : lockLayout
+      ? "Layout locked"
+      : fingerDrawing
+        ? "Fingers draw · 2-finger pan"
+        : "Pencil draws · Fingers pan";
 
   return (
     <div className="flex flex-col h-full overflow-hidden" data-testid="spatial-canvas-root">
@@ -3666,13 +3868,13 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                   <Tooltip key={t.type}>
                     <TooltipTrigger asChild>
                       <button
-                        className="w-10 h-10 flex items-center justify-center rounded-md text-foreground/50 hover:text-foreground hover:bg-foreground/[0.06] transition-all duration-200 cursor-grab active:cursor-grabbing active:scale-[0.92] shrink-0"
+                        className={`w-10 h-10 flex items-center justify-center rounded-md transition-all duration-200 cursor-grab active:cursor-grabbing active:scale-[0.92] shrink-0 ${t.type === "connect" && connectMode ? "bg-primary/15 text-primary" : "text-foreground/50 hover:text-foreground hover:bg-foreground/[0.06]"}`}
                         draggable
                         onDragStart={(e) => {
                           e.dataTransfer.setData("tool-type", t.type);
                           e.dataTransfer.effectAllowed = "copy";
                         }}
-                        onClick={() => t.type === "image" ? setShowImagePopup(!showImagePopup) : t.type === "draw" ? (() => { setDrawingMode(true); setDrawTool("pen"); setDrawingPaths([]); drawPathsRef.current = []; setDrawUndoStack([]); setEditingId(null); })() : t.type === "hardware" ? (() => { pendingHardwareDropRef.current = null; setShowHardwareDialog(true); })() : createElement(t.type)}
+                        onClick={() => t.type === "image" ? setShowImagePopup(!showImagePopup) : t.type === "draw" ? (() => { setDrawingMode(true); setDrawTool("pen"); setDrawingPaths([]); drawPathsRef.current = []; setDrawUndoStack([]); setEditingId(null); })() : t.type === "hardware" ? (() => { pendingHardwareDropRef.current = null; setShowHardwareDialog(true); })() : t.type === "connect" ? (() => { if (connectMode) { exitConnectMode(); } else { setConnectMode(true); setConnectSourceId(null); setSelectedConnectorId(null); setEditingId(null); } })() : createElement(t.type)}
                         data-testid={`sidebar-tool-${t.type}`}
                       >
                         <t.icon className="h-[18px] w-[18px]" strokeWidth={1.5} />
@@ -3754,7 +3956,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             onTouchMove={handleCanvasTouchMove}
             onTouchEnd={handleCanvasTouchEnd}
             onWheel={handleWheel}
-            onClick={() => { if (!draggingId) { setEditingId(null); setContextMenu(null); } }}
+            onClick={() => { if (!draggingId) { setEditingId(null); setContextMenu(null); setSelectedConnectorId(null); if (connectMode) setConnectSourceId(null); } }}
             onContextMenu={(e) => { e.preventDefault(); setContextMenu(null); }}
             onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; }}
             onDrop={(e) => {
@@ -3808,6 +4010,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
 
               {/* Per-element annotations layer (Pencil ink-on-card, etc.) */}
               {elementsList.map((el) => {
+                if (el.type === "connector") return null;
                 const c = (el.content || {}) as any;
                 const annotations: Stroke[] = Array.isArray(c.annotations) ? c.annotations : [];
                 const liveOverlay = liveElementStroke && liveElementStroke.elementId === el.id ? liveElementStroke.stroke : null;
@@ -3856,6 +4059,50 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                   >
                     <path d={d} fill={liveFreestandingDraw.color} stroke="none" opacity={0.85} />
                   </svg>
+                );
+              })()}
+
+              {/* Arrow connectors overlay — single SVG above element DOM, below toolbar. */}
+              <CanvasConnectors
+                elements={elements}
+                selectedConnectorId={selectedConnectorId}
+                zoom={zoom}
+                defaultColorHex="hsl(var(--primary))"
+                onConnectorClick={(id) => {
+                  if (connectMode) return;
+                  setSelectedConnectorId(id);
+                  setEditingId(null);
+                }}
+                onEndpointPointerDown={(id, endpoint, e) => {
+                  if (lockLayout) return;
+                  setConnectorEdgeDrag({ connectorId: id, endpoint, clientX: e.clientX, clientY: e.clientY });
+                }}
+              />
+
+              {/* Connect-mode source highlight + anchor dots */}
+              {connectMode && connectSourceId !== null && (() => {
+                const src = elements[connectSourceId];
+                if (!src) return null;
+                const w = src.width || 200;
+                const h = src.height || 60;
+                const dots = anchorDots(src);
+                return (
+                  <div
+                    key="connect-source-overlay"
+                    className="absolute pointer-events-none"
+                    style={{ left: src.x - 4, top: src.y - 4, width: w + 8, height: h + 8, zIndex: 99996 }}
+                    data-testid="connect-source-overlay"
+                  >
+                    <div className="absolute inset-0 rounded ring-2 ring-primary/70" />
+                    {dots.map((d) => (
+                      <div
+                        key={`anchor-${d.side}`}
+                        className="absolute w-2.5 h-2.5 -ml-[5px] -mt-[5px] rounded-full bg-primary border border-background shadow"
+                        style={{ left: d.x - src.x + 4, top: d.y - src.y + 4 }}
+                        data-testid={`connect-anchor-${d.side}`}
+                      />
+                    ))}
+                  </div>
                 );
               })()}
 
@@ -3959,13 +4206,150 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
               })}
             </div>
 
+            {/* Connect-mode floating label near cursor */}
+            {connectMode && connectSourceId !== null && connectCursor && (
+              <div
+                className="absolute pointer-events-none px-2 py-1 rounded-md bg-primary text-primary-foreground text-[10px] uppercase tracking-[0.12em] shadow-md"
+                style={{ left: connectCursor.x + 14, top: connectCursor.y + 14, zIndex: 99997, fontFamily: "var(--font-mono)" }}
+                data-testid="connect-floating-label"
+              >
+                Tap target…
+              </div>
+            )}
+
+            {/* Connector edit toolbar */}
+            {selectedConnectorId !== null && (() => {
+              const conn = elements[selectedConnectorId];
+              if (!conn || conn.type !== "connector") return null;
+              const c = (conn.content || {}) as ConnectorContent;
+              const fromEl = elements[c.fromId];
+              const toEl = elements[c.toId];
+              if (!fromEl || !toEl) return null;
+              // Place the toolbar near the midpoint, in screen coords.
+              const midBoardX = ((fromEl.x + (fromEl.width || 200) / 2) + (toEl.x + (toEl.width || 200) / 2)) / 2;
+              const midBoardY = ((fromEl.y + (fromEl.height || 60) / 2) + (toEl.y + (toEl.height || 60) / 2)) / 2;
+              const screenX = midBoardX * zoom + pan.x;
+              const screenY = midBoardY * zoom + pan.y;
+              const styleOpt: ConnectorStyle = c.style || "arrow";
+              const curveOpt: ConnectorCurve = c.curve || "curved";
+              return (
+                <div
+                  key="connector-edit-toolbar"
+                  className="absolute z-40 flex items-center gap-1 px-2 py-1 rounded-full bg-background/95 border border-border/60 shadow-lg backdrop-blur-sm"
+                  style={{ left: Math.max(8, screenX - 140), top: Math.max(8, screenY - 56) }}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                  data-testid="connector-edit-toolbar"
+                >
+                  {/* Style toggle */}
+                  {(["arrow", "line", "dotted"] as ConnectorStyle[]).map((s) => (
+                    <button
+                      key={s}
+                      className={`h-7 w-7 flex items-center justify-center rounded ${styleOpt === s ? "bg-primary/15 text-primary" : "text-foreground/60 hover:text-foreground"} ${lockLayout ? "opacity-50 cursor-not-allowed" : ""}`}
+                      onClick={() => !lockLayout && handleUpdateConnector(conn.id, { style: s })}
+                      data-testid={`connector-style-${s}`}
+                      title={s}
+                    >
+                      {s === "arrow" ? <MoveRight className="h-3.5 w-3.5" strokeWidth={1.75} /> : s === "line" ? <Slash className="h-3.5 w-3.5" strokeWidth={1.75} /> : <span className="text-[10px] font-mono tracking-tighter">···</span>}
+                    </button>
+                  ))}
+                  <div className="h-4 w-px bg-border/50 mx-0.5" />
+                  {/* Curve toggle */}
+                  {(["curved", "orthogonal", "straight"] as ConnectorCurve[]).map((cv) => (
+                    <button
+                      key={cv}
+                      className={`h-7 px-1.5 text-[9px] uppercase tracking-wider rounded ${curveOpt === cv ? "bg-primary/15 text-primary" : "text-foreground/60 hover:text-foreground"} ${lockLayout ? "opacity-50 cursor-not-allowed" : ""}`}
+                      style={{ fontFamily: "var(--font-mono)" }}
+                      onClick={() => !lockLayout && handleUpdateConnector(conn.id, { curve: cv })}
+                      data-testid={`connector-curve-${cv}`}
+                    >
+                      {cv === "curved" ? "curve" : cv === "orthogonal" ? "elbow" : "line"}
+                    </button>
+                  ))}
+                  <div className="h-4 w-px bg-border/50 mx-0.5" />
+                  {/* Color picker */}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button
+                        className={`h-7 w-7 flex items-center justify-center rounded ${lockLayout ? "opacity-50 cursor-not-allowed" : "hover:bg-foreground/[0.06]"}`}
+                        data-testid="connector-color-trigger"
+                        disabled={lockLayout}
+                      >
+                        <div
+                          className="w-3.5 h-3.5 rounded-full border border-border/60"
+                          style={{ backgroundColor: !c.color || c.color === CONNECTOR_DEFAULT_COLOR ? "hsl(var(--primary))" : c.color }}
+                        />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-56 p-2" align="center">
+                      <div className="grid grid-cols-5 gap-1.5">
+                        {[
+                          { v: CONNECTOR_DEFAULT_COLOR, hex: "hsl(var(--primary))", label: "spruce" },
+                          { v: "#9ca3af", hex: "#9ca3af", label: "muted" },
+                          { v: "#1f2937", hex: "#1f2937", label: "ink" },
+                          { v: "#b45309", hex: "#b45309", label: "amber" },
+                          { v: "#be123c", hex: "#be123c", label: "rose" },
+                        ].map((opt) => (
+                          <button
+                            key={opt.label}
+                            className="h-7 w-7 rounded-full border border-border/60 hover:scale-110 transition-transform"
+                            style={{ backgroundColor: opt.hex }}
+                            onClick={() => handleUpdateConnector(conn.id, { color: opt.v === CONNECTOR_DEFAULT_COLOR ? null : opt.v })}
+                            data-testid={`connector-color-${opt.label}`}
+                            aria-label={opt.label}
+                          />
+                        ))}
+                      </div>
+                      <div className="mt-2 flex gap-1">
+                        <input
+                          type="text"
+                          placeholder="#hex"
+                          className="flex-1 bg-transparent border border-border rounded px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-primary"
+                          style={{ fontFamily: "var(--font-mono)" }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              const v = (e.target as HTMLInputElement).value.trim();
+                              if (/^#[0-9a-fA-F]{6}$/.test(v)) handleUpdateConnector(conn.id, { color: v });
+                            }
+                          }}
+                          data-testid="connector-color-hex"
+                        />
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                  <div className="h-4 w-px bg-border/50 mx-0.5" />
+                  {/* Label */}
+                  <input
+                    type="text"
+                    value={c.label || ""}
+                    placeholder="label"
+                    className="bg-transparent border border-border rounded px-2 py-1 text-[10px] uppercase tracking-[0.1em] w-20 outline-none focus:ring-1 focus:ring-primary"
+                    style={{ fontFamily: "var(--font-mono)" }}
+                    onChange={(e) => handleUpdateConnector(conn.id, { label: e.target.value })}
+                    disabled={lockLayout}
+                    data-testid="connector-label-input"
+                  />
+                  <div className="h-4 w-px bg-border/50 mx-0.5" />
+                  {/* Delete */}
+                  <button
+                    className={`h-7 w-7 flex items-center justify-center rounded ${lockLayout ? "opacity-50 cursor-not-allowed" : "text-destructive/70 hover:bg-destructive/[0.08] hover:text-destructive"}`}
+                    onClick={() => !lockLayout && handleDeleteConnector(conn.id)}
+                    data-testid="connector-delete"
+                    title="Delete connector"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} />
+                  </button>
+                </div>
+              );
+            })()}
+
             {/* Mode indicator (bottom-left) */}
             <div
               className="absolute bottom-3 left-3 z-30 flex items-center gap-1.5 px-2 py-1 rounded-full bg-background/85 border border-border/50 shadow-sm text-[11px] text-muted-foreground backdrop-blur-sm pointer-events-none"
               style={{ fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }}
               data-testid="canvas-mode-indicator"
             >
-              {lockLayout ? <Lock className="h-3 w-3" /> : fingerDrawing ? <Hand className="h-3 w-3" /> : <PenTool className="h-3 w-3" />}
+              {connectMode ? <Spline className="h-3 w-3" /> : lockLayout ? <Lock className="h-3 w-3" /> : fingerDrawing ? <Hand className="h-3 w-3" /> : <PenTool className="h-3 w-3" />}
               <span className="leading-none">{modeIndicatorLabel}</span>
             </div>
 
@@ -3980,7 +4364,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                 {sidebarToolGroups.flatMap((g) => g.tools).map((t) => (
                   <button
                     key={t.type}
-                    className="h-11 w-11 flex items-center justify-center rounded-full text-foreground/60 active:bg-foreground/10 shrink-0"
+                    className={`h-11 w-11 flex items-center justify-center rounded-full shrink-0 ${t.type === "connect" && connectMode ? "bg-primary/15 text-primary" : "text-foreground/60 active:bg-foreground/10"}`}
                     onClick={(e) => {
                       e.stopPropagation();
                       if (t.type === "image") {
@@ -3995,6 +4379,9 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                       } else if (t.type === "hardware") {
                         pendingHardwareDropRef.current = null;
                         setShowHardwareDialog(true);
+                      } else if (t.type === "connect") {
+                        if (connectMode) { exitConnectMode(); }
+                        else { setConnectMode(true); setConnectSourceId(null); setSelectedConnectorId(null); setEditingId(null); }
                       } else {
                         createElement(t.type);
                       }
