@@ -104,13 +104,22 @@ export default function PresentationMode({
   const [copied, setCopied] = useState(false);
 
   const grouped = useMemo(() => {
-    const colorSwatches = elements.filter((e) => e.type === "color_swatch");
+    const colorSwatches = elements.filter((e) =>
+      e.type === "color_swatch" || (e.type === "surface" && (e.content as any)?.kind === "paint")
+    );
     const images = elements.filter((e) => e.type === "image");
     const hardware = elements.filter((e) => e.type === "hardware");
-    const material = elements.filter((e) => e.type === "material");
+    const material = elements.filter((e) =>
+      e.type === "material" || (e.type === "surface" && (e.content as any)?.kind === "material")
+    );
     const product = elements.filter((e) => e.type === "product");
-    const notes = elements.filter((e) => e.type === "note" || e.type === "plain_text");
-    const sectionHeaders = elements.filter((e) => e.type === "section_header");
+    const notes = elements.filter((e) =>
+      e.type === "note" || e.type === "plain_text" ||
+      (e.type === "text" && ((e.content as any)?.variant === "note" || (e.content as any)?.variant === "clean"))
+    );
+    const sectionHeaders = elements.filter((e) =>
+      e.type === "section_header" || (e.type === "text" && (e.content as any)?.variant === "heading")
+    );
 
     return { colorSwatches, images, hardware, material, product, notes, sectionHeaders };
   }, [elements]);
@@ -183,7 +192,7 @@ export default function PresentationMode({
   const selections = [...grouped.hardware, ...grouped.material, ...grouped.product];
   const selectionsByCategory = selections.reduce<Record<string, CanvasElement[]>>((acc, el) => {
     const c: any = el.content || {};
-    const cat = String(c.category || el.type || "other").toLowerCase();
+    const cat = String(c.category || c.kind || el.type || "other").toLowerCase();
     if (!acc[cat]) acc[cat] = [];
     acc[cat].push(el);
     return acc;

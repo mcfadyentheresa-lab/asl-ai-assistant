@@ -1654,22 +1654,22 @@ function templateCanvasToElements(canvasData: any, boardId: number, createdBy: s
       if (isSectionTitle) {
         elements.push({
           ...base,
-          type: "section_header",
+          type: "text",
           x: Math.round(obj.left ?? 0),
           y: Math.round(obj.top ?? 0),
           width: Math.round(obj.width ?? 240),
           height: Math.max(48, Math.round(fontSize * 3)),
-          content: { title: text },
+          content: { variant: "heading", title: text },
         });
       } else {
         elements.push({
           ...base,
-          type: "note",
+          type: "text",
           x: Math.round(obj.left ?? 0),
           y: Math.round(obj.top ?? 0),
           width: Math.round(obj.width ?? 240),
           height: Math.max(48, Math.round(fontSize * 3)),
-          content: { text },
+          content: { variant: "note", text },
         });
       }
       continue;
@@ -1679,12 +1679,13 @@ function templateCanvasToElements(canvasData: any, boardId: number, createdBy: s
       const innerText = obj.objects?.find((o: any) => o.type === "textbox")?.text || "";
       elements.push({
         ...base,
-        type: "note",
+        type: "text",
         x: Math.round(obj.left ?? 0),
         y: Math.round(obj.top ?? 0),
         width: Math.round(obj.width ?? 180),
         height: Math.round(obj.height ?? 100),
         content: {
+          variant: "note",
           text: innerText,
           color: obj.objects?.find((o: any) => o.type === "rect")?.fill || "#fef9c3",
         },
@@ -1708,12 +1709,12 @@ function templateCanvasToElements(canvasData: any, boardId: number, createdBy: s
     if (obj.type === "template_color_swatch") {
       elements.push({
         ...base,
-        type: "color_swatch",
+        type: "surface",
         x: Math.round(obj.left ?? 0),
         y: Math.round(obj.top ?? 0),
         width: Math.round(obj.width ?? 180),
         height: Math.round(obj.height ?? 200),
-        content: { color: obj.color || "#1e3a2f", name: obj.name || "", hex: obj.hex || obj.color || "#1E3A2F", code: obj.code || "", brand: obj.brand || "" },
+        content: { kind: "paint", color: obj.color || "#1e3a2f", name: obj.name || "", hex: obj.hex || obj.color || "#1E3A2F", code: obj.code || "", brand: obj.brand || "", status: "idea" },
       });
       continue;
     }
@@ -1734,12 +1735,12 @@ function templateCanvasToElements(canvasData: any, boardId: number, createdBy: s
     if (obj.type === "template_material") {
       elements.push({
         ...base,
-        type: "material",
+        type: "surface",
         x: Math.round(obj.left ?? 0),
         y: Math.round(obj.top ?? 0),
         width: Math.round(obj.width ?? 220),
         height: Math.round(obj.height ?? 180),
-        content: { name: obj.name || "", supplier: obj.supplier || "", code: obj.code || "", imageUrl: obj.imageUrl || "", notes: obj.notes || "" },
+        content: { kind: "material", name: obj.name || "", supplier: obj.supplier || "", code: obj.code || "", imageUrl: obj.imageUrl || "", notes: obj.notes || "", status: "idea" },
       });
       continue;
     }
@@ -1760,12 +1761,12 @@ function templateCanvasToElements(canvasData: any, boardId: number, createdBy: s
     if (obj.type === "template_callout") {
       elements.push({
         ...base,
-        type: "callout",
+        type: "text",
         x: Math.round(obj.left ?? 0),
         y: Math.round(obj.top ?? 0),
         width: Math.round(obj.width ?? 200),
         height: Math.round(obj.height ?? 80),
-        content: { text: obj.text || "", color: obj.color || "#fef9c3" },
+        content: { variant: "callout", text: obj.text || "", color: obj.color || "#fef9c3" },
       });
       continue;
     }
@@ -2489,12 +2490,19 @@ function templateCanvasToElements(canvasData: any, boardId: number, createdBy: s
     const project = await storage.getProject(board.projectId);
     const elements = await storage.getCanvasElements(boardId);
 
-    const colorSwatches = elements.filter((e) => e.type === "color_swatch");
+    const colorSwatches = elements.filter((e) =>
+      e.type === "color_swatch" || (e.type === "surface" && (e.content as any)?.kind === "paint")
+    );
     const hardware = elements.filter((e) => e.type === "hardware");
-    const materials = elements.filter((e) => e.type === "material");
+    const materials = elements.filter((e) =>
+      e.type === "material" || (e.type === "surface" && (e.content as any)?.kind === "material")
+    );
     const products = elements.filter((e) => e.type === "product");
     const images = elements.filter((e) => e.type === "image");
-    const notes = elements.filter((e) => e.type === "note" || e.type === "plain_text");
+    const notes = elements.filter((e) =>
+      e.type === "note" || e.type === "plain_text" || e.type === "callout" ||
+      (e.type === "text" && (e.content as any)?.variant !== "heading")
+    );
     const rooms = elements.filter((e) => e.type === "room_zone");
 
     const fmtList = (label: string, items: string[]) =>
@@ -3166,7 +3174,7 @@ Use designer language naturally. Be specific. Mention items by their actual name
       const elements = await db.select().from(canvasElements).where(
         and(
           inArray(canvasElements.boardId, boardIds),
-          inArray(canvasElements.type, ["material", "product"])
+          inArray(canvasElements.type, ["material", "product", "surface"])
         )
       );
 

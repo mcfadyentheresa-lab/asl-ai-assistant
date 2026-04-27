@@ -67,6 +67,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import CalendarPanel from "@/components/CalendarPanel";
 import { useCanvasStore, debouncedSavePositions } from "@/stores/canvas-store";
+import { isTextHeading, isPaintSurface } from "@/lib/board-element-migration";
 import { useBoardRealtime } from "@/hooks/use-board-realtime";
 import { useAuth } from "@/hooks/use-auth";
 import { useViewMode } from "@/hooks/use-view-mode";
@@ -261,23 +262,39 @@ function renderAnnotations(annotations: Stroke[] | undefined, idPrefix: string) 
   );
 }
 
+// Add-palette tokens — what the user picks. Some collapse to the same `type` with a variant.
+// `type` is what gets persisted; tokens that aren't real types (text-note, surface-paint, etc.)
+// route through a token->{type, variantPatch} mapping in createElement.
 const ELEMENT_DEFAULTS: Record<string, { width: number; height: number; content: any }> = {
-  note: { width: 240, height: 140, content: { title: "", text: "Type your note here...", plain: false } },
-  plain_text: { width: 240, height: 120, content: { title: "", text: "Type your text here...", plain: true } },
+  // Text variants
+  "text-note":    { width: 240, height: 140, content: { variant: "note",    title: "", text: "Type your note here..." } },
+  "text-clean":   { width: 240, height: 120, content: { variant: "clean",   title: "", text: "Type your text here..." } },
+  "text-callout": { width: 200, height: 80,  content: { variant: "callout", text: "Add note...", color: "#fef9c3" } },
+  "text-heading": { width: 600, height: 56,  content: { variant: "heading", title: "Section Title", tracking: "normal", align: "left", size: "lg" } },
+  // Surface variants
+  "surface-paint":    { width: 220, height: 220, content: { kind: "paint",    color: "#1e3a2f", name: "Forest Green", hex: "#1E3A2F", status: "idea" } },
+  "surface-material": { width: 220, height: 180, content: { kind: "material", name: "Material", supplier: "", code: "", imageUrl: "", notes: "", status: "idea" } },
+  // Other types
   todo: { width: 240, height: 200, content: { title: "To-do", items: [{ text: "Add a task...", checked: false }] } },
   column: { width: 240, height: 400, content: { title: "New Column", subtitle: "0 cards" } },
   board_link: { width: 180, height: 80, content: { title: "Board", targetBoardId: null } },
   link: { width: 240, height: 100, content: { title: "", url: "" } },
   image: { width: 360, height: 260, content: { url: "", caption: "" } },
-  color_swatch: { width: 220, height: 220, content: { color: "#1e3a2f", name: "Forest Green", hex: "#1E3A2F" } },
-  section_header: { width: 600, height: 56, content: { title: "Section Title", tracking: "normal", align: "left", size: "lg" } },
   draw: { width: 400, height: 300, content: { paths: [], color: "#000000", strokeWidth: 2 } },
   room_zone: { width: 500, height: 400, content: { title: "Room Name", color: "#f0ede8", opacity: 0.5 } },
-  material: { width: 220, height: 180, content: { name: "Material", supplier: "", code: "", imageUrl: "", notes: "" } },
-  callout: { width: 200, height: 80, content: { text: "Add note...", color: "#fef9c3" } },
   product: { width: 240, height: 120, content: { name: "Product", price: "", supplier: "", url: "" } },
   hardware: { width: 280, height: 200, content: { category: "pull", name: "New hardware", status: "idea", currency: "CAD" } },
   connector: { width: 0, height: 0, content: { fromId: 0, toId: 0, style: "arrow", curve: "curved" } },
+};
+
+// Map an add-palette token to the persisted element type.
+const TOKEN_TO_TYPE: Record<string, string> = {
+  "text-note": "text",
+  "text-clean": "text",
+  "text-callout": "text",
+  "text-heading": "text",
+  "surface-paint": "surface",
+  "surface-material": "surface",
 };
 
 // Status chip styling — used by hardware now; reusable for future material/color picks.
@@ -719,7 +736,8 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
 
   const createElement = async (type: string, x?: number, y?: number) => {
     if (!selectedBoardId) return;
-    const def = ELEMENT_DEFAULTS[type] || ELEMENT_DEFAULTS.note;
+    const def = ELEMENT_DEFAULTS[type] || ELEMENT_DEFAULTS["text-note"];
+    const persistedType = TOKEN_TO_TYPE[type] || type;
     const centerX = x ?? Math.round((-pan.x + (containerRef.current?.clientWidth || 800) / 2) / zoom - def.width / 2);
     const centerY = y ?? Math.round((-pan.y + (containerRef.current?.clientHeight || 600) / 2) / zoom - def.height / 2);
     const newZ = maxZ;
@@ -731,7 +749,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ type: type === "plain_text" ? "note" : type, x: centerX, y: centerY, width: def.width, height: def.height, zIndex: newZ, content: { ...def.content, plain: type === "plain_text" } }),
+        body: JSON.stringify({ type: persistedType, x: centerX, y: centerY, width: def.width, height: def.height, zIndex: newZ, content: { ...def.content } }),
       });
       const el = await res.json();
       addElement(el);
@@ -782,7 +800,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   // anchor at the current viewport center.
   const createPaletteSwatches = async (payload: PaletteAddPayload) => {
     if (!selectedBoardId) return;
-    const def = ELEMENT_DEFAULTS.color_swatch;
+    const def = ELEMENT_DEFAULTS["surface-paint"];
     const gap = 12;
     const rowSpacing = def.width + gap;
 
@@ -814,9 +832,11 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       const row = rows[i];
       const matchHex = row.match?.hex || row.hex;
       const content: any = {
+        kind: "paint",
         color: matchHex,
         hex: matchHex,
         name: row.match?.name || "Extracted color",
+        status: "idea",
       };
       if (row.match) {
         content.brand = row.match.brand;
@@ -831,7 +851,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           headers: { "Content-Type": "application/json" },
           credentials: "include",
           body: JSON.stringify({
-            type: "color_swatch",
+            type: "surface",
             x: startX + i * rowSpacing,
             y: startY,
             width: def.width,
@@ -1147,7 +1167,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       let best: CanvasElement | null = null;
       let bestZ = -Infinity;
       Object.values(elements).forEach((el) => {
-        if (el.type === "section_header" || el.type === "draw" || el.type === "room_zone" || el.type === "connector") return;
+        if (isTextHeading(el) || el.type === "draw" || el.type === "room_zone" || el.type === "connector") return;
         const w = el.width || 200;
         const h = el.height || 60;
         if (wx >= el.x && wx <= el.x + w && wy >= el.y && wy <= el.y + h) {
@@ -1487,7 +1507,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
 
   const assignToColumn = (elementId: number) => {
     const el = elements[elementId];
-    if (!el || el.type === "column" || el.type === "section_header" || el.type === "room_zone") return;
+    if (!el || el.type === "column" || isTextHeading(el) || el.type === "room_zone") return;
     const cx = el.x + (el.width / 2);
     const cy = el.y + ((el.height || 60) / 2);
     let foundColumn: number | null = null;
@@ -1544,7 +1564,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
         if (el.type === "image" && el.width > 0 && el.height && el.height > 0) {
           const aspectRatio = el.height / el.width;
           updates.height = Math.round(fitWidth * aspectRatio);
-        } else if (el.type === "color_swatch") {
+        } else if (isPaintSurface(el)) {
           updates.height = el.height;
         } else if (el.type === "link") {
           updates.height = Math.max(el.height || 100, 120);
@@ -2077,13 +2097,13 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             headers: { "Content-Type": "application/json" },
             credentials: "include",
             body: JSON.stringify({
-              type: "note",
+              type: "text",
               x: bb.minX,
               y: bb.minY - 10,
               width: noteWidth,
               height: noteHeight,
               zIndex: topMaxZ + 1,
-              content: { title: "", text: text.trim(), plain: true },
+              content: { variant: "clean", title: "", text: text.trim() },
             }),
           });
           const el = await res.json();
@@ -2144,7 +2164,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     let best: CanvasElement | null = null;
     let bestZ = -Infinity;
     Object.values(elements).forEach((el) => {
-      if (el.type === "section_header" || el.type === "draw" || el.type === "room_zone" || el.type === "connector") return;
+      if (isTextHeading(el) || el.type === "draw" || el.type === "room_zone" || el.type === "connector") return;
       const w = el.width || 200;
       const h = el.height || 60;
       if (wx >= el.x && wx <= el.x + w && wy >= el.y && wy <= el.y + h) {
@@ -2772,99 +2792,183 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       );
     }
 
-    if (el.type === "section_header") {
-      return (
-        <div
-          key={el.id}
-          className="absolute select-none"
-          style={{ left: el.x, top: el.y, width: el.width, zIndex: effectiveZ }}
-          onClick={handleClick}
-          onDoubleClick={handleDoubleClick}
-          onContextMenu={(e) => openContextMenu(e, el.id)}
-          onTouchStart={handleElementTouchStart(el.id)}
-          onTouchEnd={handleLongPressEnd}
-          onTouchCancel={handleLongPressEnd}
-          onMouseDown={(e) => startDrag(el.id, e)}
-          data-testid={`element-section-header-${el.id}`}
-        >
-          {(() => {
-            const tracking = (c.tracking as "tight" | "normal" | "wide" | undefined) || "normal";
-            const align = (c.align as "left" | "center" | undefined) || "left";
-            const size = (c.size as "sm" | "md" | "lg" | undefined) || "lg";
-            const sizeClass = size === "sm" ? "text-xl" : size === "md" ? "text-2xl" : "text-2xl md:text-3xl";
-            const alignClass = align === "center" ? "text-center" : "text-left";
-            const headerClass = `board-section-header tracking-${tracking} ${sizeClass} ${alignClass} text-foreground/85`;
-            return (
-              <>
-                {isSelected && (
-                  <div className="absolute -top-9 right-0 flex items-center gap-1 bg-card/90 backdrop-blur border border-border rounded-md shadow-sm px-1 py-0.5">
-                    <div className="flex items-center gap-0.5 px-1 text-[10px] font-mono text-muted-foreground">
-                      {(["sm","md","lg"] as const).map((s) => (
-                        <button
-                          key={s}
-                          type="button"
-                          className={`px-1.5 py-0.5 rounded hover:bg-primary/10 transition-colors ${size === s ? "bg-primary/15 text-primary" : ""}`}
-                          onClick={() => handleUpdateContent(el.id, { ...c, size: s })}
-                          data-testid={`section-size-${s}-${el.id}`}
-                        >{s.toUpperCase()}</button>
-                      ))}
-                    </div>
-                    <Separator orientation="vertical" className="h-4" />
-                    <div className="flex items-center gap-0.5 px-1 text-[10px] font-mono text-muted-foreground">
-                      {(["tight","normal","wide"] as const).map((t) => (
-                        <button
-                          key={t}
-                          type="button"
-                          className={`px-1.5 py-0.5 rounded hover:bg-primary/10 transition-colors ${tracking === t ? "bg-primary/15 text-primary" : ""}`}
-                          onClick={() => handleUpdateContent(el.id, { ...c, tracking: t })}
-                          data-testid={`section-tracking-${t}-${el.id}`}
-                        >{t}</button>
-                      ))}
-                    </div>
-                    <Separator orientation="vertical" className="h-4" />
-                    <div className="flex items-center gap-0.5 px-1">
-                      {(["left","center"] as const).map((a) => (
-                        <button
-                          key={a}
-                          type="button"
-                          className={`px-1.5 py-0.5 rounded hover:bg-primary/10 transition-colors text-[10px] font-mono ${align === a ? "bg-primary/15 text-primary" : "text-muted-foreground"}`}
-                          onClick={() => handleUpdateContent(el.id, { ...c, align: a })}
-                          data-testid={`section-align-${a}-${el.id}`}
-                        >{a === "left" ? "L" : "C"}</button>
-                      ))}
-                    </div>
-                    <Separator orientation="vertical" className="h-4" />
-                    <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleDeleteElement(el.id)} data-testid={`button-delete-${el.id}`}>
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </div>
-                )}
-                {isSelected ? (
-                  <input
-                    className={`w-full bg-transparent border-none ${headerClass} outline-none pb-1`}
-                    style={{ borderBottom: "1px solid hsl(var(--border))" }}
-                    defaultValue={c.title}
-                    onBlur={(e) => handleUpdateContent(el.id, { ...c, title: e.target.value })}
-                    autoFocus
-                    data-testid={`input-section-title-${el.id}`}
-                  />
-                ) : (
-                  <div className={`${headerClass} border-b border-border/60 pb-1 cursor-grab`} data-testid={`text-section-title-${el.id}`}>
-                    {c.title || "Section Title"}
-                  </div>
-                )}
-              </>
-            );
-          })()}
-        </div>
-      );
-    }
+    if (el.type === "text") {
+      const variant = (c.variant as "note" | "clean" | "callout" | "heading" | undefined) || "note";
 
-    if (el.type === "note") {
+      // Variant picker — shown in the right-side properties chip when selected.
+      const variantPicker = isSelected ? (
+        <div
+          className="absolute -top-8 left-0 flex items-center gap-0.5 bg-card/90 backdrop-blur border border-border rounded-md shadow-sm px-1 py-0.5"
+          onMouseDown={(e) => e.stopPropagation()}
+          data-testid={`text-variant-picker-${el.id}`}
+        >
+          {(["note","clean","callout","heading"] as const).map((v) => (
+            <button
+              key={v}
+              type="button"
+              className={`px-1.5 py-0.5 rounded text-[10px] font-mono transition-colors ${variant === v ? "bg-primary/15 text-primary" : "text-muted-foreground hover:bg-primary/10"}`}
+              onClick={() => handleUpdateContent(el.id, { ...c, variant: v })}
+              data-testid={`text-variant-${v}-${el.id}`}
+            >{v}</button>
+          ))}
+        </div>
+      ) : null;
+
+      if (variant === "heading") {
+        const tracking = (c.tracking as "tight" | "normal" | "wide" | undefined) || "normal";
+        const align = (c.align as "left" | "center" | undefined) || "left";
+        const size = (c.size as "sm" | "md" | "lg" | undefined) || "lg";
+        const sizeClass = size === "sm" ? "text-xl" : size === "md" ? "text-2xl" : "text-2xl md:text-3xl";
+        const alignClass = align === "center" ? "text-center" : "text-left";
+        const headerClass = `board-section-header tracking-${tracking} ${sizeClass} ${alignClass} text-foreground/85`;
+        return (
+          <div
+            key={el.id}
+            className="absolute select-none"
+            style={{ left: el.x, top: el.y, width: el.width, zIndex: effectiveZ }}
+            onClick={handleClick}
+            onDoubleClick={handleDoubleClick}
+            onContextMenu={(e) => openContextMenu(e, el.id)}
+            onTouchStart={handleElementTouchStart(el.id)}
+            onTouchEnd={handleLongPressEnd}
+            onTouchCancel={handleLongPressEnd}
+            onMouseDown={(e) => startDrag(el.id, e)}
+            data-testid={`element-text-heading-${el.id}`}
+          >
+            {variantPicker}
+            {isSelected && (
+              <div className="absolute -top-9 right-0 flex items-center gap-1 bg-card/90 backdrop-blur border border-border rounded-md shadow-sm px-1 py-0.5">
+                <div className="flex items-center gap-0.5 px-1 text-[10px] font-mono text-muted-foreground">
+                  {(["sm","md","lg"] as const).map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      className={`px-1.5 py-0.5 rounded hover:bg-primary/10 transition-colors ${size === s ? "bg-primary/15 text-primary" : ""}`}
+                      onClick={() => handleUpdateContent(el.id, { ...c, size: s })}
+                      data-testid={`text-heading-size-${s}-${el.id}`}
+                    >{s.toUpperCase()}</button>
+                  ))}
+                </div>
+                <Separator orientation="vertical" className="h-4" />
+                <div className="flex items-center gap-0.5 px-1 text-[10px] font-mono text-muted-foreground">
+                  {(["tight","normal","wide"] as const).map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      className={`px-1.5 py-0.5 rounded hover:bg-primary/10 transition-colors ${tracking === t ? "bg-primary/15 text-primary" : ""}`}
+                      onClick={() => handleUpdateContent(el.id, { ...c, tracking: t })}
+                      data-testid={`text-heading-tracking-${t}-${el.id}`}
+                    >{t}</button>
+                  ))}
+                </div>
+                <Separator orientation="vertical" className="h-4" />
+                <div className="flex items-center gap-0.5 px-1">
+                  {(["left","center"] as const).map((a) => (
+                    <button
+                      key={a}
+                      type="button"
+                      className={`px-1.5 py-0.5 rounded hover:bg-primary/10 transition-colors text-[10px] font-mono ${align === a ? "bg-primary/15 text-primary" : "text-muted-foreground"}`}
+                      onClick={() => handleUpdateContent(el.id, { ...c, align: a })}
+                      data-testid={`text-heading-align-${a}-${el.id}`}
+                    >{a === "left" ? "L" : "C"}</button>
+                  ))}
+                </div>
+                <Separator orientation="vertical" className="h-4" />
+                <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleDeleteElement(el.id)} data-testid={`button-delete-${el.id}`}>
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              </div>
+            )}
+            {isSelected ? (
+              <input
+                className={`w-full bg-transparent border-none ${headerClass} outline-none pb-1`}
+                style={{ borderBottom: "1px solid hsl(var(--border))" }}
+                defaultValue={c.title}
+                onBlur={(e) => handleUpdateContent(el.id, { ...c, title: e.target.value })}
+                autoFocus
+                data-testid={`input-text-heading-title-${el.id}`}
+              />
+            ) : (
+              <div className={`${headerClass} border-b border-border/60 pb-1 cursor-grab`} data-testid={`text-heading-title-${el.id}`}>
+                {c.title || "Section Title"}
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      if (variant === "callout") {
+        const calloutColor = c.color || "#fef9c3";
+        return (
+          <div
+            key={el.id}
+            className={`${cardBase} cursor-grab`}
+            style={{ left: el.x, top: el.y, width: el.width, zIndex: effectiveZ }}
+            onMouseDown={(e) => {
+              const tag = (e.target as HTMLElement).tagName.toLowerCase();
+              if (tag === "input" || tag === "textarea" || tag === "button" || (e.target as HTMLElement).closest("button")) return;
+              startDrag(el.id, e);
+            }}
+            onClick={handleClick}
+            onDoubleClick={handleDoubleClick}
+            onContextMenu={(e) => openContextMenu(e, el.id)}
+            onTouchStart={handleElementTouchStart(el.id)}
+            onTouchEnd={handleLongPressEnd}
+            onTouchCancel={handleLongPressEnd}
+            data-testid={`element-text-callout-${el.id}`}
+          >
+            {variantPicker}
+            <div className="rounded-lg shadow-sm border border-black/5 relative" style={{ backgroundColor: calloutColor }}>
+              <div className="absolute -bottom-2 left-5 w-4 h-4 rotate-45" style={{ backgroundColor: calloutColor }} />
+              <div className="p-3 relative">
+                {isSelected ? (
+                  <div className="space-y-2">
+                    <textarea
+                      className="w-full bg-transparent border-none text-xs outline-none resize-none"
+                      rows={2}
+                      defaultValue={c.text}
+                      placeholder="Add note..."
+                      onBlur={(e) => handleUpdateContent(el.id, { ...c, text: e.target.value })}
+                      autoFocus
+                      data-testid={`input-text-callout-text-${el.id}`}
+                    />
+                    <div className="flex gap-1">
+                      {["#fef9c3", "#fce7f3", "#dbeafe", "#dcfce7", "#f3e8ff", "#fff7ed"].map((clr) => (
+                        <button
+                          key={clr}
+                          className={`h-4 w-4 rounded-full border ${calloutColor === clr ? "ring-2 ring-primary ring-offset-1" : "border-black/10"}`}
+                          style={{ backgroundColor: clr }}
+                          onClick={() => handleUpdateContent(el.id, { ...c, color: clr })}
+                          data-testid={`button-text-callout-color-${clr.replace("#", "")}`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs leading-relaxed" data-testid={`text-callout-${el.id}`}>
+                    {c.text || "Add note..."}
+                  </p>
+                )}
+              </div>
+            </div>
+            {isSelected && (
+              <div className="absolute -top-8 right-0 flex gap-1">
+                {renderOpenButton()}
+                <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleDeleteElement(el.id)} data-testid={`button-delete-${el.id}`}>
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      // variant === "note" or "clean"
+      const isClean = variant === "clean";
       return (
         <div
           key={el.id}
-          className={`${cardBase} ${c.plain ? "bg-transparent border-0 shadow-none" : "bg-card border border-border"} cursor-grab`}
+          className={`${cardBase} ${isClean ? "bg-transparent border-0 shadow-none" : "bg-card border border-border"} cursor-grab`}
           style={{ left: el.x, top: el.y, width: el.width, minHeight: el.height, zIndex: effectiveZ }}
           onMouseDown={(e) => {
             const tag = (e.target as HTMLElement).tagName.toLowerCase();
@@ -2877,9 +2981,10 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           onTouchStart={handleElementTouchStart(el.id)}
           onTouchEnd={handleLongPressEnd}
           onTouchCancel={handleLongPressEnd}
-          data-testid={`element-note-${el.id}`}
+          data-testid={`element-text-${variant}-${el.id}`}
         >
-          <div className={c.plain ? "p-0" : "p-3.5"}>
+          {variantPicker}
+          <div className={isClean ? "p-0" : "p-3.5"}>
             {isSelected ? (
               <div className="space-y-2">
                 <input
@@ -2887,7 +2992,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                   defaultValue={c.title}
                   placeholder="Title (optional)"
                   onBlur={(e) => handleUpdateContent(el.id, { ...c, title: e.target.value })}
-                  data-testid={`input-note-title-${el.id}`}
+                  data-testid={`input-text-${variant}-title-${el.id}`}
                 />
                 <textarea
                   ref={(ref) => { noteTextareaRefs.current[`${el.id}-note`] = ref; }}
@@ -2895,7 +3000,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                   defaultValue={c.text}
                   placeholder="Type your note..."
                   onBlur={(e) => handleUpdateContent(el.id, { ...c, text: e.target.value })}
-                  data-testid={`input-note-text-${el.id}`}
+                  data-testid={`input-text-${variant}-text-${el.id}`}
                 />
               </div>
             ) : (
@@ -3146,133 +3251,184 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       );
     }
 
-    if (el.type === "color_swatch") {
-      return (
-        <div
-          key={el.id}
-          className={`${cardBase} bg-card border border-border overflow-hidden cursor-grab`}
-          style={{ left: el.x, top: el.y, width: el.width, zIndex: effectiveZ }}
-          onMouseDown={(e) => {
-            const tag = (e.target as HTMLElement).tagName.toLowerCase();
-            if (tag === "input" || tag === "button" || (e.target as HTMLElement).closest("button")) return;
-            startDrag(el.id, e);
-          }}
-          onClick={handleClick}
-          onDoubleClick={handleDoubleClick}
-          onContextMenu={(e) => openContextMenu(e, el.id)}
-          onTouchStart={handleElementTouchStart(el.id)}
-          onTouchEnd={handleLongPressEnd}
-          onTouchCancel={handleLongPressEnd}
-          data-testid={`element-color-swatch-${el.id}`}
-        >
-          <div className="h-[140px] relative pointer-events-none select-none" style={{ backgroundColor: c.color || "#1e3a2f" }}>
-            <span className="absolute bottom-2 left-3 text-xs text-white/80" style={{ fontFamily: "var(--font-mono)" }}>{(c.hex || c.color || "#1E3A2F").toUpperCase()}</span>
-            {typeof c.lrv === "number" && (
-              <span
-                className="absolute top-2 right-2 text-[10px] px-1.5 py-0.5 rounded-sm bg-black/35 text-white"
-                style={{ fontFamily: "var(--font-mono)" }}
-                data-testid={`chip-swatch-lrv-${el.id}`}
-              >
-                LRV {c.lrv}
-              </span>
-            )}
-          </div>
-          <div className="p-3">
-            {isSelected ? (
-              <div className="space-y-2">
-                <input
-                  className="w-full bg-transparent border-none text-sm font-medium outline-none"
-                  defaultValue={c.name}
-                  placeholder="Color name"
-                  onBlur={(e) => handleUpdateContent(el.id, { ...c, name: e.target.value })}
-                  data-testid={`input-swatch-name-${el.id}`}
-                />
-                <div className="flex gap-2 items-center">
-                  <input type="color" defaultValue={c.color} onChange={(e) => handleUpdateContent(el.id, { ...c, color: e.target.value, hex: e.target.value })} className="h-7 w-10 border rounded cursor-pointer" data-testid={`input-swatch-color-${el.id}`} />
-                  <input
-                    className="flex-1 bg-transparent border-none text-xs font-mono outline-none"
-                    defaultValue={c.hex || c.color}
-                    placeholder="#000000"
-                    onBlur={(e) => handleUpdateContent(el.id, { ...c, hex: e.target.value, color: e.target.value })}
-                    data-testid={`input-swatch-hex-${el.id}`}
-                  />
-                </div>
-                <BmColorPicker
-                  initialRoom={c.room}
-                  initialSheen={c.sheen}
-                  onSelect={(pc, extras) => handleUpdateContent(el.id, {
-                    ...c,
-                    color: pc.hex,
-                    hex: pc.hex,
-                    name: pc.name,
-                    brand: pc.brand,
-                    code: pc.code,
-                    lrv: pc.lrv ?? c.lrv,
-                    room: extras.room ?? c.room,
-                    sheen: extras.sheen ?? c.sheen,
-                  })}
-                />
-                <div className="grid grid-cols-2 gap-1.5">
-                  <input
-                    className="bg-transparent border border-border/50 rounded text-xs outline-none px-1.5 py-0.5"
-                    defaultValue={c.room || ""}
-                    placeholder="Room"
-                    onBlur={(e) => handleUpdateContent(el.id, { ...c, room: e.target.value || undefined })}
-                    data-testid={`input-swatch-room-${el.id}`}
-                  />
-                  <select
-                    className="bg-transparent border border-border/50 rounded text-xs outline-none px-1.5 py-0.5"
-                    defaultValue={c.sheen || ""}
-                    onChange={(e) => handleUpdateContent(el.id, { ...c, sheen: e.target.value || undefined })}
-                    data-testid={`select-swatch-sheen-${el.id}`}
-                  >
-                    <option value="">Sheen</option>
-                    {SHEENS.map((s) => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </div>
-              </div>
-            ) : (
-              <div>
-                <div className="text-sm font-medium">{c.name || "Color"}</div>
-                {c.code && <div className="text-[10px] text-muted-foreground" style={{ fontFamily: "var(--font-mono)" }}>{c.code}</div>}
-                {(c.room || c.sheen) && (
-                  <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                    {c.room && (
-                      <span
-                        className="text-[10px] px-1.5 py-0.5 rounded-sm bg-muted text-muted-foreground uppercase tracking-wider"
-                        style={{ fontFamily: "var(--font-mono)" }}
-                        data-testid={`chip-swatch-room-${el.id}`}
-                      >
-                        {c.room}
-                      </span>
-                    )}
-                    {c.sheen && (
-                      <span
-                        className="text-[10px] text-muted-foreground"
-                        style={{ fontFamily: "var(--font-mono)" }}
-                        data-testid={`chip-swatch-sheen-${el.id}`}
-                      >
-                        {c.sheen}
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-          {isSelected && (
-            <div className="absolute -top-8 right-0 flex gap-1">
-              {renderOpenButton()}
-              <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleDeleteElement(el.id)} data-testid={`button-delete-${el.id}`}>
-                <Trash2 className="h-3 w-3" />
-              </Button>
-            </div>
-          )}
-        </div>
-      );
-    }
+    if (el.type === "surface") {
+      const kind = (c.kind as "paint" | "material" | undefined) || "paint";
+      const status = (c.status as keyof typeof STATUS_CHIP) || "idea";
+      const statusChip = STATUS_CHIP[status] || STATUS_CHIP.idea;
 
-    if (el.type === "material") {
+      // Variant (kind) picker — switch paint <-> material in place.
+      const kindPicker = isSelected ? (
+        <div
+          className="absolute -top-8 left-0 flex items-center gap-0.5 bg-card/90 backdrop-blur border border-border rounded-md shadow-sm px-1 py-0.5"
+          onMouseDown={(e) => e.stopPropagation()}
+          data-testid={`surface-kind-picker-${el.id}`}
+        >
+          {(["paint","material"] as const).map((k) => (
+            <button
+              key={k}
+              type="button"
+              className={`px-1.5 py-0.5 rounded text-[10px] font-mono transition-colors ${kind === k ? "bg-primary/15 text-primary" : "text-muted-foreground hover:bg-primary/10"}`}
+              onClick={() => handleUpdateContent(el.id, { ...c, kind: k })}
+              data-testid={`surface-kind-${k}-${el.id}`}
+            >{k}</button>
+          ))}
+        </div>
+      ) : null;
+
+      const statusPicker = isSelected ? (
+        <div className="flex items-center gap-1 mt-1.5" onMouseDown={(e) => e.stopPropagation()}>
+          {(["idea","shortlist","selected","ordered"] as const).map((s) => (
+            <button
+              key={s}
+              type="button"
+              className={`px-1.5 py-0.5 rounded text-[9px] font-mono uppercase tracking-wider transition-colors ${status === s ? STATUS_CHIP[s].className : "text-muted-foreground hover:bg-primary/10"}`}
+              onClick={() => handleUpdateContent(el.id, { ...c, status: s })}
+              data-testid={`surface-status-${s}-${el.id}`}
+            >{STATUS_CHIP[s].label}</button>
+          ))}
+        </div>
+      ) : (
+        <span
+          className={`inline-block text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-sm ${statusChip.className}`}
+          style={{ fontFamily: "var(--font-mono)" }}
+          data-testid={`chip-surface-status-${el.id}`}
+        >
+          {statusChip.label}
+        </span>
+      );
+
+      if (kind === "paint") {
+        return (
+          <div
+            key={el.id}
+            className={`${cardBase} bg-card border border-border overflow-hidden cursor-grab`}
+            style={{ left: el.x, top: el.y, width: el.width, zIndex: effectiveZ }}
+            onMouseDown={(e) => {
+              const tag = (e.target as HTMLElement).tagName.toLowerCase();
+              if (tag === "input" || tag === "button" || (e.target as HTMLElement).closest("button")) return;
+              startDrag(el.id, e);
+            }}
+            onClick={handleClick}
+            onDoubleClick={handleDoubleClick}
+            onContextMenu={(e) => openContextMenu(e, el.id)}
+            onTouchStart={handleElementTouchStart(el.id)}
+            onTouchEnd={handleLongPressEnd}
+            onTouchCancel={handleLongPressEnd}
+            data-testid={`element-surface-paint-${el.id}`}
+          >
+            {kindPicker}
+            <div className="h-[140px] relative pointer-events-none select-none" style={{ backgroundColor: c.color || "#1e3a2f" }}>
+              <span className="absolute bottom-2 left-3 text-xs text-white/80" style={{ fontFamily: "var(--font-mono)" }}>{(c.hex || c.color || "#1E3A2F").toUpperCase()}</span>
+              {typeof c.lrv === "number" && (
+                <span
+                  className="absolute top-2 right-2 text-[10px] px-1.5 py-0.5 rounded-sm bg-black/35 text-white"
+                  style={{ fontFamily: "var(--font-mono)" }}
+                  data-testid={`chip-surface-lrv-${el.id}`}
+                >
+                  LRV {c.lrv}
+                </span>
+              )}
+            </div>
+            <div className="p-3">
+              {isSelected ? (
+                <div className="space-y-2">
+                  <input
+                    className="w-full bg-transparent border-none text-sm font-medium outline-none"
+                    defaultValue={c.name}
+                    placeholder="Color name"
+                    onBlur={(e) => handleUpdateContent(el.id, { ...c, name: e.target.value })}
+                    data-testid={`input-surface-name-${el.id}`}
+                  />
+                  <div className="flex gap-2 items-center">
+                    <input type="color" defaultValue={c.color} onChange={(e) => handleUpdateContent(el.id, { ...c, color: e.target.value, hex: e.target.value })} className="h-7 w-10 border rounded cursor-pointer" data-testid={`input-surface-color-${el.id}`} />
+                    <input
+                      className="flex-1 bg-transparent border-none text-xs font-mono outline-none"
+                      defaultValue={c.hex || c.color}
+                      placeholder="#000000"
+                      onBlur={(e) => handleUpdateContent(el.id, { ...c, hex: e.target.value, color: e.target.value })}
+                      data-testid={`input-surface-hex-${el.id}`}
+                    />
+                  </div>
+                  <BmColorPicker
+                    initialRoom={c.room}
+                    initialSheen={c.sheen}
+                    onSelect={(pc, extras) => handleUpdateContent(el.id, {
+                      ...c,
+                      color: pc.hex,
+                      hex: pc.hex,
+                      name: pc.name,
+                      brand: pc.brand,
+                      code: pc.code,
+                      lrv: pc.lrv ?? c.lrv,
+                      room: extras.room ?? c.room,
+                      sheen: extras.sheen ?? c.sheen,
+                    })}
+                  />
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <input
+                      className="bg-transparent border border-border/50 rounded text-xs outline-none px-1.5 py-0.5"
+                      defaultValue={c.room || ""}
+                      placeholder="Room"
+                      onBlur={(e) => handleUpdateContent(el.id, { ...c, room: e.target.value || undefined })}
+                      data-testid={`input-surface-room-${el.id}`}
+                    />
+                    <select
+                      className="bg-transparent border border-border/50 rounded text-xs outline-none px-1.5 py-0.5"
+                      defaultValue={c.sheen || ""}
+                      onChange={(e) => handleUpdateContent(el.id, { ...c, sheen: e.target.value || undefined })}
+                      data-testid={`select-surface-sheen-${el.id}`}
+                    >
+                      <option value="">Sheen</option>
+                      {SHEENS.map((s) => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                  {statusPicker}
+                </div>
+              ) : (
+                <div>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-sm font-medium truncate">{c.name || "Color"}</div>
+                    {statusPicker}
+                  </div>
+                  {c.code && <div className="text-[10px] text-muted-foreground" style={{ fontFamily: "var(--font-mono)" }}>{c.code}</div>}
+                  {(c.room || c.sheen) && (
+                    <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                      {c.room && (
+                        <span
+                          className="text-[10px] px-1.5 py-0.5 rounded-sm bg-muted text-muted-foreground uppercase tracking-wider"
+                          style={{ fontFamily: "var(--font-mono)" }}
+                          data-testid={`chip-surface-room-${el.id}`}
+                        >
+                          {c.room}
+                        </span>
+                      )}
+                      {c.sheen && (
+                        <span
+                          className="text-[10px] text-muted-foreground"
+                          style={{ fontFamily: "var(--font-mono)" }}
+                          data-testid={`chip-surface-sheen-${el.id}`}
+                        >
+                          {c.sheen}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            {isSelected && (
+              <div className="absolute -top-8 right-0 flex gap-1">
+                {renderOpenButton()}
+                <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleDeleteElement(el.id)} data-testid={`button-delete-${el.id}`}>
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      // kind === "material"
       return (
         <div
           key={el.id}
@@ -3289,8 +3445,9 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           onTouchStart={handleElementTouchStart(el.id)}
           onTouchEnd={handleLongPressEnd}
           onTouchCancel={handleLongPressEnd}
-          data-testid={`element-material-${el.id}`}
+          data-testid={`element-surface-material-${el.id}`}
         >
+          {kindPicker}
           {c.imageUrl && (
             <div className="h-[80px] bg-muted overflow-hidden">
               <img src={c.imageUrl} alt={c.name} className="w-full h-full object-cover pointer-events-none" />
@@ -3304,42 +3461,42 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                   defaultValue={c.name}
                   placeholder="Material name"
                   onBlur={(e) => handleUpdateContent(el.id, { ...c, name: e.target.value })}
-                  data-testid={`input-material-name-${el.id}`}
+                  data-testid={`input-surface-material-name-${el.id}`}
                 />
                 <input
                   className="w-full bg-transparent border-none text-xs text-muted-foreground outline-none"
                   defaultValue={c.supplier}
                   placeholder="Supplier / Brand"
                   onBlur={(e) => handleUpdateContent(el.id, { ...c, supplier: e.target.value })}
-                  data-testid={`input-material-supplier-${el.id}`}
+                  data-testid={`input-surface-material-supplier-${el.id}`}
                 />
                 <input
                   className="w-full bg-transparent border-none text-xs font-mono text-muted-foreground outline-none"
                   defaultValue={c.code}
                   placeholder="Product code"
                   onBlur={(e) => handleUpdateContent(el.id, { ...c, code: e.target.value })}
-                  data-testid={`input-material-code-${el.id}`}
+                  data-testid={`input-surface-material-code-${el.id}`}
                 />
                 <input
                   className="w-full bg-transparent border-none text-xs text-primary outline-none"
                   defaultValue={c.imageUrl}
                   placeholder="Image URL"
                   onBlur={(e) => handleUpdateContent(el.id, { ...c, imageUrl: e.target.value })}
-                  data-testid={`input-material-image-${el.id}`}
+                  data-testid={`input-surface-material-image-${el.id}`}
                 />
                 <input
                   className="w-full bg-transparent border-none text-xs outline-none"
                   defaultValue={c.category || ""}
                   placeholder="Category (Stone, Wood, Tile…)"
                   onBlur={(e) => handleUpdateContent(el.id, { ...c, category: e.target.value || undefined })}
-                  data-testid={`input-material-category-${el.id}`}
+                  data-testid={`input-surface-material-category-${el.id}`}
                 />
                 <input
                   className="w-full bg-transparent border-none text-xs text-primary outline-none"
                   defaultValue={c.vendorUrl || ""}
                   placeholder="Vendor URL"
                   onBlur={(e) => handleUpdateContent(el.id, { ...c, vendorUrl: e.target.value || undefined })}
-                  data-testid={`input-material-vendor-url-${el.id}`}
+                  data-testid={`input-surface-material-vendor-url-${el.id}`}
                 />
                 <textarea
                   className="w-full bg-transparent border border-border/50 rounded text-xs outline-none p-1.5 resize-none"
@@ -3347,20 +3504,24 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                   defaultValue={c.notes}
                   placeholder="Notes..."
                   onBlur={(e) => handleUpdateContent(el.id, { ...c, notes: e.target.value })}
-                  data-testid={`input-material-notes-${el.id}`}
+                  data-testid={`input-surface-material-notes-${el.id}`}
                 />
+                {statusPicker}
               </div>
             ) : (
               <div>
-                <div className="flex items-center gap-1.5">
-                  <Shapes className="h-3 w-3 text-muted-foreground shrink-0" />
-                  <span className="text-sm font-medium truncate">{c.name || "Material"}</span>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <Shapes className="h-3 w-3 text-muted-foreground shrink-0" />
+                    <span className="text-sm font-medium truncate">{c.name || "Material"}</span>
+                  </div>
+                  {statusPicker}
                 </div>
                 {c.category && (
                   <span
                     className="inline-block mt-1 text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-sm bg-muted text-muted-foreground"
                     style={{ fontFamily: "var(--font-mono)" }}
-                    data-testid={`chip-material-category-${el.id}`}
+                    data-testid={`chip-surface-material-category-${el.id}`}
                   >
                     {c.category}
                   </span>
@@ -3378,7 +3539,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
               rel="noreferrer"
               className="absolute bottom-1.5 right-1.5 p-1 rounded text-muted-foreground/70 hover:text-primary hover:bg-foreground/[0.06]"
               onClick={(e) => e.stopPropagation()}
-              data-testid={`link-material-vendor-${el.id}`}
+              data-testid={`link-surface-material-vendor-${el.id}`}
             >
               <ExternalLink className="h-3 w-3" />
             </a>
@@ -3488,71 +3649,6 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
               <ExternalLink className="h-3 w-3" />
             </a>
           )}
-          {isSelected && (
-            <div className="absolute -top-8 right-0 flex gap-1">
-              {renderOpenButton()}
-              <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleDeleteElement(el.id)} data-testid={`button-delete-${el.id}`}>
-                <Trash2 className="h-3 w-3" />
-              </Button>
-            </div>
-          )}
-        </div>
-      );
-    }
-
-    if (el.type === "callout") {
-      const calloutColor = c.color || "#fef9c3";
-      return (
-        <div
-          key={el.id}
-          className={`${cardBase} cursor-grab`}
-          style={{ left: el.x, top: el.y, width: el.width, zIndex: effectiveZ }}
-          onMouseDown={(e) => {
-            const tag = (e.target as HTMLElement).tagName.toLowerCase();
-            if (tag === "input" || tag === "textarea" || tag === "button" || (e.target as HTMLElement).closest("button")) return;
-            startDrag(el.id, e);
-          }}
-          onClick={handleClick}
-          onDoubleClick={handleDoubleClick}
-          onContextMenu={(e) => openContextMenu(e, el.id)}
-          onTouchStart={handleElementTouchStart(el.id)}
-          onTouchEnd={handleLongPressEnd}
-          onTouchCancel={handleLongPressEnd}
-          data-testid={`element-callout-${el.id}`}
-        >
-          <div className="rounded-lg shadow-sm border border-black/5 relative" style={{ backgroundColor: calloutColor }}>
-            <div className="absolute -bottom-2 left-5 w-4 h-4 rotate-45" style={{ backgroundColor: calloutColor }} />
-            <div className="p-3 relative">
-              {isSelected ? (
-                <div className="space-y-2">
-                  <textarea
-                    className="w-full bg-transparent border-none text-xs outline-none resize-none"
-                    rows={2}
-                    defaultValue={c.text}
-                    placeholder="Add note..."
-                    onBlur={(e) => handleUpdateContent(el.id, { ...c, text: e.target.value })}
-                    autoFocus
-                    data-testid={`input-callout-text-${el.id}`}
-                  />
-                  <div className="flex gap-1">
-                    {["#fef9c3", "#fce7f3", "#dbeafe", "#dcfce7", "#f3e8ff", "#fff7ed"].map((clr) => (
-                      <button
-                        key={clr}
-                        className={`h-4 w-4 rounded-full border ${calloutColor === clr ? "ring-2 ring-primary ring-offset-1" : "border-black/10"}`}
-                        style={{ backgroundColor: clr }}
-                        onClick={() => handleUpdateContent(el.id, { ...c, color: clr })}
-                        data-testid={`button-callout-color-${clr.replace("#", "")}`}
-                      />
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <p className="text-xs leading-relaxed" data-testid={`text-callout-${el.id}`}>
-                  {c.text || "Add note..."}
-                </p>
-              )}
-            </div>
-          </div>
           {isSelected && (
             <div className="absolute -top-8 right-0 flex gap-1">
               {renderOpenButton()}
@@ -3894,8 +3990,8 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     {
       label: "Content",
       tools: [
-        { type: "note", icon: StickyNote, label: "Note" },
-        { type: "plain_text", icon: FileText, label: "Plain Text" },
+        { type: "text-note", icon: StickyNote, label: "Note" },
+        { type: "text-clean", icon: FileText, label: "Plain Text" },
         { type: "link", icon: Link2, label: "Link" },
         { type: "todo", icon: CheckSquare, label: "To-do" },
         { type: "image", icon: ImagePlus, label: "Image" },
@@ -3905,17 +4001,17 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       label: "Layout",
       tools: [
         { type: "column", icon: Columns3, label: "Column" },
-        { type: "section_header", icon: Type, label: "Header" },
+        { type: "text-heading", icon: Type, label: "Header" },
         { type: "room_zone", icon: Square, label: "Zone" },
       ],
     },
     {
       label: "Design",
       tools: [
-        { type: "color_swatch", icon: Palette, label: "Color" },
-        { type: "material", icon: Shapes, label: "Material" },
+        { type: "surface-paint", icon: Palette, label: "Color" },
+        { type: "surface-material", icon: Shapes, label: "Material" },
         ...(effectiveRole === "client" ? [] : [{ type: "hardware", icon: Wrench, label: "Hardware" }]),
-        { type: "callout", icon: Sparkles, label: "Callout" },
+        { type: "text-callout", icon: Sparkles, label: "Callout" },
         { type: "product", icon: ExternalLink, label: "Product" },
       ],
     },
@@ -3952,9 +4048,10 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       tint: "bg-[#f7f1e7]/70",
       accent: "text-[#2f4a3a]",
       items: [
-        { type: "note", icon: StickyNote, label: "Note", hint: "Sticky thought with title", key: "N" },
-        { type: "plain_text", icon: FileText, label: "Text", hint: "Plain text, no card", key: "T" },
-        { type: "callout", icon: Sparkles, label: "Callout", hint: "Highlight with arrow" },
+        { type: "text-note", icon: StickyNote, label: "Note", hint: "Sticky thought with title", key: "N" },
+        { type: "text-clean", icon: FileText, label: "Clean", hint: "Plain text, no card", key: "T" },
+        { type: "text-callout", icon: Sparkles, label: "Callout", hint: "Highlight with arrow" },
+        { type: "text-heading", icon: Type, label: "Heading", hint: "Section heading band" },
       ],
     },
     {
@@ -3963,8 +4060,8 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       accent: "text-[#2f4a3a]",
       items: [
         { type: "image", icon: ImagePlus, label: "Image", hint: "Upload or paste URL", key: "I" },
-        { type: "color_swatch", icon: Palette, label: "Color", hint: "Paint swatch + LRV", key: "C" },
-        { type: "material", icon: Shapes, label: "Material", hint: "Photo + supplier code" },
+        { type: "surface-paint", icon: Palette, label: "Paint", hint: "Paint swatch + LRV", key: "C" },
+        { type: "surface-material", icon: Shapes, label: "Material", hint: "Photo + supplier code" },
         ...(effectiveRole === "client"
           ? []
           : [{ type: "palette", icon: Droplet, label: "Extract palette", hint: "Pull colors from a photo" }]),
@@ -3987,7 +4084,6 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       accent: "text-[#2f4a3a]",
       items: [
         { type: "room_zone", icon: Square, label: "Room zone", hint: "Lane background" },
-        { type: "section_header", icon: Type, label: "Section header", hint: "Heading band" },
         { type: "todo", icon: CheckSquare, label: "To-do", hint: "Task list" },
         { type: "column", icon: Columns3, label: "Column", hint: "Stacked container" },
         { type: "link", icon: Link2, label: "Board link", hint: "Jump to another board" },
@@ -5103,13 +5199,13 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                                 headers: { "Content-Type": "application/json" },
                                 credentials: "include",
                                 body: JSON.stringify({
-                                  type: "note",
+                                  type: "text",
                                   x: noteX,
                                   y: noteY,
                                   width: Math.max(240, bb.maxX - bb.minX + 40),
                                   height: Math.max(100, bb.maxY - bb.minY + 40),
                                   zIndex: newZ,
-                                  content: { title: "", text: data.text.trim() },
+                                  content: { variant: "note", title: "", text: data.text.trim() },
                                 }),
                               }).then((r) => r.json());
                               addElement(created);
