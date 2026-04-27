@@ -773,6 +773,32 @@ export const insertCinematicReviewSchema = createInsertSchema(cinematicReviews).
 export type CinematicReview = typeof cinematicReviews.$inferSelect;
 export type InsertCinematicReview = z.infer<typeof insertCinematicReviewSchema>;
 
+// Room Renders — one rendered "vision" image per room (PR-S). The cinematic
+// table from PR-N1 stays in place; this is the new headline AI feature.
+export const roomRenders = pgTable("room_renders", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  boardId: integer("board_id").references(() => planningBoards.id, { onDelete: "set null" }),
+  roomName: text("room_name").notNull(),
+  mode: text("mode").notNull(), // 'restyle' | 'imagine'
+  imageUrl: text("image_url"),
+  thumbnailUrl: text("thumbnail_url"),
+  prompt: text("prompt").notNull().default(""),
+  status: text("status").notNull().default("queued"), // queued | rendering | completed | failed
+  errorMessage: text("error_message"),
+  costEstimateCents: integer("cost_estimate_cents"),
+  createdAt: timestamp("created_at").defaultNow(),
+  createdBy: text("created_by").references(() => users.id),
+});
+
+export const insertRoomRenderSchema = createInsertSchema(roomRenders).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type RoomRender = typeof roomRenders.$inferSelect;
+export type InsertRoomRender = z.infer<typeof insertRoomRenderSchema>;
+
 // Recent Project Views (server-side per-user history)
 export const recentProjectViews = pgTable("recent_project_views", {
   id: serial("id").primaryKey(),

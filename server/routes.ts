@@ -5119,6 +5119,180 @@ Rules:
     res.status(201).json(element);
   }));
 
+  // ── Room Renders (PR-S: AI Room Render) ───────────────────────────────────
+  // Admin/crew only. Rate-limited 5/board/user/hour. Two modes — restyle (uses
+  // a per-room source photo via gpt-image-1 edit) or imagine (text-to-image).
+  const roomRenderUpload = multer({
+    storage: multer.diskStorage({
+      destination: uploadDir,
+      filename: (_req, file, cb) => {
+        const ext = path.extname(file.originalname).toLowerCase();
+        cb(null, `srcphoto-${randomUUID()}${ext}`);
+      },
+    }),
+    limits: { fileSize: 8 * 1024 * 1024 },
+    fileFilter: (_req, file, cb) => {
+      if (!new Set(["image/jpeg", "image/png", "image/webp"]).has(file.mimetype)) {
+        return cb(new Error("Source photo must be JPG, PNG, or WebP"));
+      }
+      cb(null, true);
+    },
+  });
+
+  // Source-photo upload for a room_zone element (multipart). Field name "image".
+  // Returns { url } so the client can chain into PATCH /source-photo if it wants
+  // a single-step "Add a photo" flow.
+  app.post("/api/board/element/:elementId/source-photo/upload", isAuthenticated, (req: any, res) => {
+    roomRenderUpload.single("image")(req, res, async (err: any) => {
+      if (err) {
+        const message = err instanceof multer.MulterError
+          ? (err.code === "LIMIT_FILE_SIZE" ? "File too large (max 8MB)" : err.message)
+          : err.message || "Upload failed";
+        return res.status(400).json({ message });
+      }
+      try {
+        const userId = req.user.claims.sub;
+        const dbUser = await authStorage.getUser(userId);
+        if (dbUser?.role !== "admin" && dbUser?.role !== "crew") {
+          return res.status(403).json({ message: "Only admin/crew can set source photos" });
+        }
+        if (!req.file) return res.status(400).json({ message: "No image file provided" });
+        const elementId = Number(req.params.elementId);
+        if (!Number.isFinite(elementId)) return res.status(400).json({ message: "Invalid element id" });
+        const url = `/uploads/${req.file.filename}`;
+        res.json({ url });
+      } catch (e: any) {
+        console.error("Source photo upload error:", e?.message || e);
+        res.status(500).json({ message: "Failed to upload source photo" });
+      }
+    });
+  });
+
+  // PATCH the room_zone's content.sourcePhotoUrl + optional focal point.
+  app.patch("/api/board/element/:elementId/source-photo", isAuthenticated, asyncHandler(async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const dbUser = await authStorage.getUser(userId);
+    if (dbUser?.role !== "admin" && dbUser?.role !== "crew") {
+      return res.status(403).json({ message: "Only admin/crew can set source photos" });
+    }
+    const elementId = Number(req.params.elementId);
+    if (!Number.isFinite(elementId)) return res.status(400).json({ message: "Invalid element id" });
+    const bodySchema = z.object({
+      sourcePhotoUrl: z.string().nullable(),
+      focalPoint: z.object({ x: z.number(), y: z.number() }).nullable().optional(),
+    });
+    const parsed = bodySchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: "Invalid body", errors: parsed.error.errors });
+
+    const element = await storage.getCanvasElement(elementId);
+    if (!element) return res.status(404).json({ message: "Element not found" });
+    if (element.type !== "room_zone") {
+      return res.status(400).json({ message: "Source photos can only be set on room_zone elements" });
+    }
+    const nextContent: any = { ...(element.content || {}) };
+    nextContent.sourcePhotoUrl = parsed.data.sourcePhotoUrl;
+    if (parsed.data.focalPoint !== undefined) nextContent.sourcePhotoFocalPoint = parsed.data.focalPoint;
+    const updated = await storage.updateCanvasElement(elementId, { content: nextContent });
+    res.json(updated);
+  }));
+
+  const roomRenderRateBuckets = new Map<string, { count: number; resetAt: number }>();
+  const ROOM_RENDER_LIMIT = 5;
+  const ROOM_RENDER_WINDOW_MS = 60 * 60_000;
+
+  app.post("/api/rooms/render", isAuthenticated, asyncHandler(async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const dbUser = await authStorage.getUser(userId);
+    if (dbUser?.role !== "admin" && dbUser?.role !== "crew") {
+      return res.status(403).json({ message: "Only admin/crew can request renders" });
+    }
+    const bodySchema = z.object({
+      projectId: z.number().int().positive(),
+      boardId: z.number().int().positive(),
+      roomName: z.string().min(1).max(200),
+      mode: z.enum(["restyle", "imagine"]),
+    });
+    const parsed = bodySchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: "Invalid request", errors: parsed.error.errors });
+    const { projectId, boardId, roomName, mode } = parsed.data;
+
+    const board = await storage.getPlanningBoard(boardId);
+    if (!board || board.projectId !== projectId) {
+      return res.status(404).json({ message: "Board not found for project" });
+    }
+
+    const bucketKey = `${boardId}:${userId}`;
+    const now = Date.now();
+    const bucket = roomRenderRateBuckets.get(bucketKey);
+    if (!bucket || bucket.resetAt < now) {
+      roomRenderRateBuckets.set(bucketKey, { count: 1, resetAt: now + ROOM_RENDER_WINDOW_MS });
+    } else {
+      if (bucket.count >= ROOM_RENDER_LIMIT) {
+        return res.status(429).json({ message: "Render rate limit reached (5/hour per board); try again later." });
+      }
+      bucket.count += 1;
+    }
+
+    const { createRoomRender } = await import("./room-render/db");
+    const { kickRoomRenderWorker } = await import("./room-render/worker");
+    const created = await createRoomRender({
+      projectId,
+      boardId,
+      roomName,
+      mode,
+      status: "queued",
+      prompt: "",
+      createdBy: userId,
+    });
+    kickRoomRenderWorker();
+    res.status(202).json({ jobId: created.id, status: created.status });
+  }));
+
+  app.get("/api/rooms/render/:jobId", isAuthenticated, asyncHandler(async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const dbUser = await authStorage.getUser(userId);
+    if (dbUser?.role !== "admin" && dbUser?.role !== "crew") {
+      return res.status(403).json({ message: "Only admin/crew can view renders" });
+    }
+    const jobId = Number(req.params.jobId);
+    if (!Number.isFinite(jobId)) return res.status(400).json({ message: "Invalid job id" });
+    const { getRoomRender } = await import("./room-render/db");
+    const row = await getRoomRender(jobId);
+    if (!row) return res.status(404).json({ message: "Not found" });
+    res.json(row);
+  }));
+
+  app.get("/api/projects/:projectId/room-renders", isAuthenticated, asyncHandler(async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const dbUser = await authStorage.getUser(userId);
+    if (dbUser?.role !== "admin" && dbUser?.role !== "crew") {
+      return res.status(403).json({ message: "Only admin/crew can view renders" });
+    }
+    const projectId = Number(req.params.projectId);
+    if (!Number.isFinite(projectId)) return res.status(400).json({ message: "Invalid project id" });
+    const room = typeof req.query.room === "string" ? req.query.room : undefined;
+    const { listRoomRendersForProject, listRoomRendersForRoom } = await import("./room-render/db");
+    const rows = room
+      ? await listRoomRendersForRoom(projectId, room, 20)
+      : await listRoomRendersForProject(projectId, 20);
+    res.json(rows);
+  }));
+
+  app.delete("/api/rooms/render/:jobId", isAuthenticated, asyncHandler(async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const dbUser = await authStorage.getUser(userId);
+    if (dbUser?.role !== "admin" && dbUser?.role !== "crew") {
+      return res.status(403).json({ message: "Only admin/crew can delete renders" });
+    }
+    const jobId = Number(req.params.jobId);
+    if (!Number.isFinite(jobId)) return res.status(400).json({ message: "Invalid job id" });
+    const { deleteRoomRender, getRoomRender } = await import("./room-render/db");
+    const row = await getRoomRender(jobId);
+    if (!row) return res.status(404).json({ message: "Not found" });
+    await deleteRoomRender(jobId);
+    res.json({ ok: true });
+  }));
+
   // ── Cinematic Reviews (PR-N1: Ken-Burns backend) ──────────────────────────
   // Admin/crew only. Rate-limited 3/board/user/hour. AI-cinematic format ships
   // in PR-N2; for now it returns 503.
@@ -5235,6 +5409,12 @@ Rules:
     kickCinematicWorker();
   } catch (err) {
     console.warn("[cinematic] failed to start worker on boot:", (err as Error).message);
+  }
+  try {
+    const { kickRoomRenderWorker } = await import("./room-render/worker");
+    kickRoomRenderWorker();
+  } catch (err) {
+    console.warn("[room-render] failed to start worker on boot:", (err as Error).message);
   }
 
   // Initialize seed data

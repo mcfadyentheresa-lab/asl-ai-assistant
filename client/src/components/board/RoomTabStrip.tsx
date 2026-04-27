@@ -19,7 +19,7 @@
 // iPad-first: 44pt min height, swipe-scroll horizontally.
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Plus, Pencil, Check, X as XIcon, AlertTriangle } from "lucide-react";
+import { Plus, Pencil, Check, X as XIcon, AlertTriangle, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -53,6 +53,10 @@ interface RoomTabStripProps {
   // Library-mode payload uses only `name`.
   onCreateTab: (payload: { name: string; widthFt?: number; widthIn?: number; depthFt?: number; depthIn?: number }) => void;
   onToggleStatusFilter: (s: RoomStatus) => void;
+  // PR-S — admin/crew only. When provided AND mode='project' AND a specific
+  // room is active, the budget rollup row shows a small "Render" sparkle button
+  // that calls this with the active room name.
+  onRenderRoom?: (roomName: string) => void;
 }
 
 const STATUS_PILL_CLASS: Record<RoomStatus, { dot: string; label: string }> = {
@@ -75,6 +79,7 @@ export default function RoomTabStrip({
   onRenameTab,
   onCreateTab,
   onToggleStatusFilter,
+  onRenderRoom,
 }: RoomTabStripProps) {
   const [renamingTab, setRenamingTab] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
@@ -271,8 +276,21 @@ export default function RoomTabStrip({
 
         {/* Budget rollup pill — sits at the right end of the strip. Only renders when
             there is something to say (at least one selected/ordered card OR a target budget). */}
+        {mode === "project" && activeTab !== null && onRenderRoom && (
+          <button
+            type="button"
+            onClick={() => onRenderRoom(activeTab)}
+            className="ml-auto mr-1 pb-0.5 inline-flex items-center gap-1 min-h-[32px] px-2.5 rounded-md text-[11px] uppercase tracking-wider bg-[#2f4a3a]/10 text-[#2f4a3a] hover:bg-[#2f4a3a]/15 transition-colors"
+            style={{ fontFamily: "var(--font-mono)" }}
+            data-testid="room-render-trigger"
+            title={`Render ${activeTab}`}
+          >
+            <Sparkles className="h-3.5 w-3.5" /> Render
+          </button>
+        )}
+
         {(budget.total > 0 || (activeTab !== null && totalBudget > 0)) && (
-          <div className="ml-auto pr-1 pb-0.5 flex items-center gap-1.5">
+          <div className={`${mode === "project" && activeTab !== null && onRenderRoom ? "" : "ml-auto"} pr-1 pb-0.5 flex items-center gap-1.5`}>
             {budget.hasMixedCurrency && (
               <span
                 className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-sm bg-amber-50 text-amber-700 border border-amber-200"

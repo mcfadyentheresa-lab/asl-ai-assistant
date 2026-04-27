@@ -321,6 +321,74 @@ interface RoomDrawArgs {
   pageNumRef: { n: number };
 }
 
+// Vision Renders section. Shows the most recent completed render per room as
+// a wide image with the room name beneath it. Only rendered when at least one
+// completed render exists.
+async function drawVisionRenders(
+  ctx: PdfContext,
+  renders: Array<{ roomName: string; imageUrl: string }>,
+  project: Project,
+  pageNumRef: { n: number },
+): Promise<void> {
+  if (renders.length === 0) return;
+  const { doc, contentWidth } = ctx;
+  ensureSpace(ctx, 36, project, pageNumRef);
+  doc
+    .font("Helvetica-Bold")
+    .fontSize(13)
+    .fillColor(SPRUCE)
+    .text("VISION RENDERS", PAGE_MARGIN, doc.y + 8, { characterSpacing: 1.4 });
+  doc.y += 6;
+  doc.save();
+  doc
+    .strokeColor(RULE)
+    .lineWidth(0.5)
+    .moveTo(PAGE_MARGIN, doc.y)
+    .lineTo(PAGE_MARGIN + contentWidth, doc.y)
+    .stroke();
+  doc.restore();
+  doc.fillColor(INK);
+  doc.y += 8;
+
+  const cardW = (contentWidth - COL_GAP) / 2;
+  const cardH = cardW * 1.4;
+  let col = 0;
+  for (const r of renders) {
+    ensureSpace(ctx, cardH + 24, project, pageNumRef);
+    const x = PAGE_MARGIN + col * (cardW + COL_GAP);
+    const y = doc.y;
+    const buf = await loadImageBuffer(r.imageUrl);
+    if (buf) {
+      try {
+        doc.image(buf, x, y, { fit: [cardW, cardH], align: "center", valign: "center" });
+      } catch {
+        doc.save();
+        doc.rect(x, y, cardW, cardH).fill("#e6dfce");
+        doc.restore();
+        doc.fillColor(INK);
+      }
+    } else {
+      doc.save();
+      doc.rect(x, y, cardW, cardH).fill("#e6dfce");
+      doc.restore();
+      doc.fillColor(INK);
+    }
+    doc
+      .font("Helvetica")
+      .fontSize(10)
+      .fillColor(INK)
+      .text(r.roomName, x, y + cardH + 4, { width: cardW, align: "center" });
+    if (col === 1) {
+      doc.y = y + cardH + 22;
+      col = 0;
+    } else {
+      col = 1;
+    }
+  }
+  if (col === 1) doc.y += cardH + 22;
+  doc.y += 6;
+}
+
 function drawRoomHeading(ctx: PdfContext, group: RoomGroup, project: Project, pageNumRef: { n: number }): void {
   ensureSpace(ctx, 36, project, pageNumRef);
   const { doc, contentWidth } = ctx;
@@ -639,6 +707,24 @@ export async function generateSpecSheetPdf(projectId: number, res: Response): Pr
 
   paintBackground(doc, pageWidth, pageHeight);
   drawHeader(ctx, project);
+
+  // Fetch the most recent completed render per room — added in PR-S.
+  const visionRenders: Array<{ roomName: string; imageUrl: string }> = [];
+  try {
+    const { listRoomRendersForProject } = await import("./room-render/db");
+    const rows = await listRoomRendersForProject(projectId, 50);
+    const seenRooms = new Set<string>();
+    for (const r of rows) {
+      if (r.status !== "completed" || !r.imageUrl) continue;
+      const key = (r.roomName || "").trim();
+      if (!key || seenRooms.has(key)) continue;
+      seenRooms.add(key);
+      visionRenders.push({ roomName: key, imageUrl: r.imageUrl });
+    }
+  } catch (err) {
+    console.warn("[spec-sheet] vision renders lookup failed:", (err as Error).message);
+  }
+  await drawVisionRenders(ctx, visionRenders, project, pageNumRef);
 
   if (groups.length === 0) {
     drawEmptyNotice(ctx);
