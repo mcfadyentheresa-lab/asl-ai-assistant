@@ -2104,6 +2104,73 @@ function templateCanvasToElements(canvasData: any, boardId: number, createdBy: s
   // Back-compat alias — hardware/material picker still calls this path.
   app.post("/api/board/unfurl-vendor", isAuthenticated, handleUnfurl);
 
+  // Spec sheet PDF — admin/crew only. Streams a printable PDF tearsheet of every
+  // selected/ordered hardware/surface/product across the project's boards.
+  app.post("/api/projects/:projectId/spec-sheet", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const dbUser = await authStorage.getUser(userId);
+      if (dbUser?.role !== "admin" && dbUser?.role !== "crew") {
+        return res.status(403).json({ message: "Only admin/crew can generate spec sheets" });
+      }
+      const projectId = Number(req.params.projectId);
+      if (!Number.isFinite(projectId)) {
+        return res.status(400).json({ message: "Invalid project id" });
+      }
+      const { generateSpecSheetPdf } = await import("./spec-sheet");
+      await generateSpecSheetPdf(projectId, res);
+    } catch (err: any) {
+      console.error("Spec sheet error:", err?.message || err);
+      if (!res.headersSent) {
+        res.status(500).json({ message: "Failed to generate spec sheet" });
+      } else {
+        try { res.end(); } catch { /* already broken */ }
+      }
+    }
+  });
+
+  // Manual vendor-link recheck. Admin/crew only; rate-limited 10/user/hour.
+  const recheckBuckets = new Map<string, { count: number; resetAt: number }>();
+  const RECHECK_LIMIT = 10;
+  const RECHECK_WINDOW_MS = 60 * 60_000;
+
+  app.post("/api/board/element/:elementId/recheck-link", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const dbUser = await authStorage.getUser(userId);
+      if (dbUser?.role !== "admin" && dbUser?.role !== "crew") {
+        return res.status(403).json({ message: "Only admin/crew can recheck links" });
+      }
+      const now = Date.now();
+      const bucket = recheckBuckets.get(userId);
+      if (!bucket || bucket.resetAt < now) {
+        recheckBuckets.set(userId, { count: 1, resetAt: now + RECHECK_WINDOW_MS });
+      } else {
+        if (bucket.count >= RECHECK_LIMIT) {
+          return res.status(429).json({ message: "Too many recheck requests; try again later." });
+        }
+        bucket.count += 1;
+      }
+      const elementId = Number(req.params.elementId);
+      if (!Number.isFinite(elementId)) {
+        return res.status(400).json({ message: "Invalid element id" });
+      }
+      const element = await storage.getCanvasElement(elementId);
+      if (!element) return res.status(404).json({ message: "Element not found" });
+      const board = await checkBoardAccess(req, res, element.boardId);
+      if (!board) return;
+      const { recheckElementLink } = await import("./link-health");
+      const result = await recheckElementLink(elementId);
+      if (!result) {
+        return res.status(400).json({ message: "Element has no vendor URL" });
+      }
+      res.json({ linkHealth: result });
+    } catch (err: any) {
+      console.error("Recheck link error:", err?.message || err);
+      res.status(500).json({ message: "Failed to recheck link" });
+    }
+  });
+
   // Board palette extraction — k-means cluster on a photo, snap each
   // centroid to the nearest paint color in the seeded catalogue.
   // Admin/crew only; rate-limited per user.

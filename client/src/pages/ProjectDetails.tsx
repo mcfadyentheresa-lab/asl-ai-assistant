@@ -224,6 +224,40 @@ export default function ProjectDetails() {
 
   const [heroEditing, setHeroEditing] = useState(false);
   const [heroLocal, setHeroLocal] = useState<{ focalX: number; focalY: number; zoom: number } | null>(null);
+  const [isGeneratingSpecSheet, setIsGeneratingSpecSheet] = useState(false);
+
+  const downloadSpecSheet = async (id: number, name: string) => {
+    setIsGeneratingSpecSheet(true);
+    try {
+      const res = await fetch(`/api/projects/${id}/spec-sheet`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) {
+        let msg = "Couldn't generate spec sheet.";
+        try {
+          const data = await res.json();
+          if (data?.message) msg = data.message;
+        } catch { /* ignore */ }
+        toast({ title: "Spec sheet failed", description: msg, variant: "destructive" });
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const safe = name.replace(/[^a-z0-9-_ ]/gi, "").replace(/\s+/g, "_") || "project";
+      a.download = `spec-sheet-${safe}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      toast({ title: "Spec sheet failed", description: err?.message || "Network error", variant: "destructive" });
+    } finally {
+      setIsGeneratingSpecSheet(false);
+    }
+  };
 
   const handleHeroFileChosen = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -438,6 +472,25 @@ export default function ProjectDetails() {
                   </p>
                 )}
               </div>
+              {(isAdminUser || isCrewUser) && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => downloadSpecSheet(project.id, project.name)}
+                    disabled={isGeneratingSpecSheet}
+                    className="h-8 px-3 text-[11px]"
+                    data-testid="btn-spec-sheet"
+                  >
+                    {isGeneratingSpecSheet ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                    ) : (
+                      <FileText className="h-3.5 w-3.5 mr-1.5" />
+                    )}
+                    Spec sheet
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         </div>
