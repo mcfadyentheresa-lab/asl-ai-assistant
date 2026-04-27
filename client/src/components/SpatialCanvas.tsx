@@ -53,7 +53,7 @@ import {
   ChefHat, Bath, Home, FileText, LayoutPanelLeft, LayoutGrid, Move,
   Lock, LockOpen, Hand, Wrench, Check,
   Spline, MoveRight, Slash, Droplet,
-  Play,
+  Play, Globe, Star,
 } from "lucide-react";
 import HardwarePickerDialog, { type HardwareDraft } from "@/components/board/HardwarePickerDialog";
 import PaletteExtractionDialog, { type PaletteAddPayload } from "@/components/board/PaletteExtractionDialog";
@@ -278,7 +278,7 @@ const ELEMENT_DEFAULTS: Record<string, { width: number; height: number; content:
   todo: { width: 240, height: 200, content: { title: "To-do", items: [{ text: "Add a task...", checked: false }] } },
   column: { width: 240, height: 400, content: { title: "New Column", subtitle: "0 cards" } },
   board_link: { width: 180, height: 80, content: { title: "Board", targetBoardId: null } },
-  link: { width: 240, height: 100, content: { title: "", url: "" } },
+  link: { width: 260, height: 220, content: { title: "", url: "", imageUrl: "", siteName: "", description: "" } },
   image: { width: 360, height: 260, content: { url: "", caption: "" } },
   draw: { width: 400, height: 300, content: { paths: [], color: "#000000", strokeWidth: 2 } },
   room_zone: { width: 500, height: 400, content: { title: "Room Name", color: "#f0ede8", opacity: 0.5 } },
@@ -304,6 +304,26 @@ const STATUS_CHIP: Record<string, { className: string; label: string; withCheck?
   selected:  { className: "bg-primary text-primary-foreground",    label: "Selected" },
   ordered:   { className: "bg-primary text-primary-foreground",    label: "Ordered", withCheck: true },
 };
+
+// Pull a friendly domain ("knoll.com") from any URL — used as the link card subtitle
+// and as the seed for the favicon-fallback tile.
+function getDomainFromUrl(raw: string | undefined | null): string {
+  if (!raw) return "";
+  try {
+    const u = new URL(raw);
+    return u.hostname.replace(/^www\./, "");
+  } catch {
+    return "";
+  }
+}
+
+// Google's favicon endpoint is the cheapest universal fallback when og:image is missing.
+// We size it generously so it scales up cleanly on the warm-paper tile.
+function faviconUrlFor(rawUrl: string | undefined | null): string | null {
+  const domain = getDomainFromUrl(rawUrl);
+  if (!domain) return null;
+  return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128`;
+}
 
 function getContrastColor(hex: string): string {
   const r = parseInt(hex.slice(1, 3), 16);
@@ -389,6 +409,14 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadTargetId, setUploadTargetId] = useState<number | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  // Per-link unfurl status — keyed by element id. "loading" while we're fetching og data,
+  // "error" when the server gave up. Successful unfurls drop out of this map.
+  const [linkUnfurlState, setLinkUnfurlState] = useState<Record<number, "loading" | "error">>({});
+  // Tracks element ids whose backfill unfurl has been attempted this session, so a missing
+  // imageUrl on an existing link doesn't kick off a fetch on every render.
+  const linkBackfillAttemptedRef = useRef<Set<number>>(new Set());
+  // Manual "paste image URL" fallback per link card; value is the in-progress draft.
+  const [linkImageDraft, setLinkImageDraft] = useState<Record<number, string>>({});
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; elementId: number } | null>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showImagePopup, setShowImagePopup] = useState(false);
@@ -1013,6 +1041,82 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       });
     } catch {}
   };
+
+  // Quietly merge a partial content patch into an element. Used by the link-unfurl
+  // backfill so re-renders don't push undo history or toast the user.
+  const patchElementContentSilently = useCallback(async (id: number, patch: Record<string, any>) => {
+    const el = useCanvasStore.getState().elements[id];
+    if (!el) return;
+    const next = { ...(el.content as any), ...patch };
+    updateElement(id, { content: next });
+    sendElementUpdate(id, { content: next });
+    try {
+      const url = buildUrl(api.canvasElements.update.path, { id });
+      await fetch(url, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ content: next }),
+      });
+    } catch {}
+  }, [updateElement, sendElementUpdate]);
+
+  // Fetch og:image / title / siteName / description for a link card via the server-side
+  // unfurl endpoint and merge it onto the element. Marks loading/error state so the card
+  // can render a skeleton or fallback. Always goes through the server — never fetches
+  // og:image client-side (preserves rate-limit and CORS guardrails).
+  const unfurlLink = useCallback(async (id: number, url: string) => {
+    if (!url || !/^https?:\/\//i.test(url)) return;
+    setLinkUnfurlState((s) => ({ ...s, [id]: "loading" }));
+    try {
+      const res = await fetch("/api/board/unfurl", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ url }),
+      });
+      if (!res.ok) {
+        setLinkUnfurlState((s) => ({ ...s, [id]: "error" }));
+        return;
+      }
+      const data = await res.json() as { title?: string; image?: string; siteName?: string; description?: string };
+      const el = useCanvasStore.getState().elements[id];
+      if (!el) return;
+      const c = (el.content || {}) as any;
+      const patch: Record<string, any> = {};
+      if (data.image && !c.imageUrl) patch.imageUrl = data.image;
+      if (data.siteName && !c.siteName) patch.siteName = data.siteName;
+      if (data.description && !c.description) patch.description = data.description;
+      // Backfill the title only if the user hasn't typed one.
+      if (data.title && !c.title) patch.title = data.title;
+      if (Object.keys(patch).length > 0) {
+        await patchElementContentSilently(id, patch);
+      }
+      setLinkUnfurlState((s) => {
+        const next = { ...s };
+        delete next[id];
+        return next;
+      });
+    } catch {
+      setLinkUnfurlState((s) => ({ ...s, [id]: "error" }));
+    }
+  }, [patchElementContentSilently]);
+
+  // Lazy backfill: any existing link element without imageUrl gets one unfurl attempt
+  // per session. Result is cached on the element content so the next paint stays cheap.
+  useEffect(() => {
+    for (const id in elements) {
+      const el = elements[id];
+      if (!el || el.type !== "link") continue;
+      const c = (el.content || {}) as any;
+      if (c.imageUrl) continue;
+      if (!c.url || !/^https?:\/\//i.test(c.url)) continue;
+      if (linkBackfillAttemptedRef.current.has(el.id)) continue;
+      if (linkUnfurlState[el.id]) continue;
+      linkBackfillAttemptedRef.current.add(el.id);
+      setTimeout(() => unfurlLink(el.id, c.url), 0);
+    }
+  }, [elements, linkUnfurlState, unfurlLink]);
 
   const handleUndo = useCallback(async () => {
     if (!selectedBoardId) return;
@@ -3745,10 +3849,17 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     }
 
     if (el.type === "link") {
+      const linkStatus = linkUnfurlState[el.id];
+      const isLinkLoading = linkStatus === "loading";
+      const isLinkError = linkStatus === "error";
+      const domain = getDomainFromUrl(c.url);
+      const fallbackFavicon = faviconUrlFor(c.url);
+      const draftImage = linkImageDraft[el.id] ?? "";
+
       return (
         <div
           key={el.id}
-          className={`${cardBase} bg-card border border-border cursor-grab`}
+          className={`${cardBase} bg-card border border-border overflow-hidden cursor-grab`}
           style={{ left: el.x, top: el.y, width: el.width, zIndex: effectiveZ }}
           onMouseDown={(e) => {
             const tag = (e.target as HTMLElement).tagName.toLowerCase();
@@ -3763,7 +3874,45 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           onTouchCancel={handleLongPressEnd}
           data-testid={`element-link-${el.id}`}
         >
-          <div className="p-3.5">
+          {/* Photo / skeleton / favicon-on-paper fallback. The card always feels like
+              it has a picture — never a blank rectangle. */}
+          <div
+            className="relative w-full bg-muted/40 border-b border-border"
+            style={{ height: 132 }}
+            data-testid={`link-image-${el.id}`}
+          >
+            {isLinkLoading ? (
+              <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-muted/60 to-muted/30" />
+            ) : c.imageUrl ? (
+              <img
+                src={c.imageUrl}
+                alt={c.title || domain || "Link preview"}
+                className="w-full h-full object-cover pointer-events-none select-none"
+                style={{ filter: "saturate(0.9) contrast(0.97)" }}
+                draggable={false}
+                onError={() => patchElementContentSilently(el.id, { imageUrl: "" })}
+              />
+            ) : (
+              // Warm-paper tile with the site's favicon enlarged. Never a blank card.
+              <div
+                className="w-full h-full flex items-center justify-center"
+                style={{ background: "linear-gradient(135deg, #f4ede0 0%, #ede4d3 100%)" }}
+              >
+                {fallbackFavicon ? (
+                  <img
+                    src={fallbackFavicon}
+                    alt={domain || "Link"}
+                    className="h-12 w-12 opacity-80 pointer-events-none select-none"
+                    style={{ imageRendering: "auto" }}
+                    draggable={false}
+                  />
+                ) : (
+                  <Globe className="h-10 w-10 text-foreground/30" />
+                )}
+              </div>
+            )}
+          </div>
+          <div className="p-3">
             {isSelected ? (
               <div className="space-y-2">
                 <input
@@ -3777,22 +3926,107 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                   className="w-full bg-transparent border-none text-xs text-primary outline-none"
                   defaultValue={c.url}
                   placeholder="https://..."
-                  onBlur={(e) => handleUpdateContent(el.id, { ...c, url: e.target.value })}
+                  onBlur={(e) => {
+                    const next = e.target.value.trim();
+                    handleUpdateContent(el.id, { ...c, url: next });
+                    if (next && next !== c.url) {
+                      // New URL pasted — refresh the preview from scratch.
+                      patchElementContentSilently(el.id, { imageUrl: "", siteName: "", description: "" });
+                      unfurlLink(el.id, next);
+                    }
+                  }}
                   data-testid={`input-link-url-${el.id}`}
                 />
+                {isLinkError && (
+                  <div className="space-y-1">
+                    <div
+                      className="text-[10px] text-muted-foreground/80"
+                      style={{ fontFamily: "var(--font-mono)" }}
+                      data-testid={`text-link-error-${el.id}`}
+                    >
+                      Couldn't load preview — paste an image URL or try Replace image.
+                    </div>
+                    <div className="flex gap-1.5">
+                      <input
+                        className="flex-1 bg-transparent border border-border/60 rounded px-1.5 py-0.5 text-[11px] outline-none focus:border-primary/40"
+                        placeholder="Image URL..."
+                        value={draftImage}
+                        onChange={(e) => setLinkImageDraft((s) => ({ ...s, [el.id]: e.target.value }))}
+                        data-testid={`input-link-image-url-${el.id}`}
+                      />
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 px-2 text-[11px]"
+                        disabled={!draftImage.trim()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const next = draftImage.trim();
+                          if (!next) return;
+                          handleUpdateContent(el.id, { ...c, imageUrl: next });
+                          setLinkImageDraft((s) => ({ ...s, [el.id]: "" }));
+                          setLinkUnfurlState((s) => {
+                            const out = { ...s };
+                            delete out[el.id];
+                            return out;
+                          });
+                        }}
+                        data-testid={`button-link-image-save-${el.id}`}
+                      >
+                        Save
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <>
-                <div className="flex items-center gap-2">
-                  <ExternalLink className="h-3.5 w-3.5 text-primary shrink-0" />
-                  <span className="text-sm font-medium truncate">{c.title || c.url || "Link"}</span>
+                <div className="flex items-start gap-2">
+                  <ExternalLink className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />
+                  <span className="text-sm font-medium leading-snug line-clamp-2">{c.title || c.url || "Link"}</span>
                 </div>
-                {c.url && <div className="text-[10px] text-primary truncate mt-1">{c.url}</div>}
+                {(domain || c.siteName) && (
+                  <div
+                    className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground truncate mt-1"
+                    style={{ fontFamily: "var(--font-mono)" }}
+                    data-testid={`text-link-domain-${el.id}`}
+                  >
+                    {c.siteName || domain}
+                  </div>
+                )}
+                {isLinkError && !c.imageUrl && (
+                  <div
+                    className="text-[10px] text-muted-foreground/70 mt-1"
+                    style={{ fontFamily: "var(--font-mono)" }}
+                  >
+                    couldn't load preview
+                  </div>
+                )}
               </>
             )}
           </div>
           {isSelected && (
             <div className="absolute -top-8 right-0 flex gap-1">
+              {c.url && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-6 w-6"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        unfurlLink(el.id, c.url);
+                      }}
+                      disabled={isLinkLoading || !c.url}
+                      data-testid={`button-link-replace-image-${el.id}`}
+                    >
+                      {isLinkLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <ImagePlus className="h-3 w-3" />}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="text-xs">Replace image</TooltipContent>
+                </Tooltip>
+              )}
               {c.url && (
                 <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => window.open(c.url, "_blank")} data-testid={`button-open-link-${el.id}`}>
                   <ExternalLink className="h-3 w-3" />
@@ -3834,6 +4068,16 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
               <img src={c.url} alt={c.caption || ""} className="w-full object-cover pointer-events-none select-none" style={{ height: el.height ? Math.max(el.height - ((c.caption && !isEdgeBleed) ? 32 : 0), 40) : "auto", maxHeight: el.height ? undefined : 300 }} draggable={false} />
               {isEdgeBleed && (isSelected || isUnlocked) && c.caption && (
                 <div className="absolute bottom-2 left-2 max-w-[80%] bg-card/85 backdrop-blur px-2 py-0.5 rounded text-[10px] text-foreground/80 truncate pointer-events-none">{c.caption}</div>
+              )}
+              {/* Inspiration badge — visible state on the card itself, even when not selected. */}
+              {c.inspiration && (
+                <div
+                  className="absolute top-2 left-2 inline-flex items-center justify-center h-6 w-6 rounded-full bg-card/85 backdrop-blur shadow-sm pointer-events-none"
+                  data-testid={`badge-image-inspiration-${el.id}`}
+                  title="Flagged for the presentation deck"
+                >
+                  <Star className="h-3 w-3 text-primary" fill="currentColor" strokeWidth={1.5} />
+                </div>
               )}
             </>
           ) : (
@@ -3892,6 +4136,30 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             <>
               <div className="absolute -top-8 right-0 flex gap-1">
                 {renderOpenButton()}
+                {/* Inspiration toggle — flags the image for the curated Presentation deck.
+                    Active state uses the Spruce primary so the chosen state reads at a glance. */}
+                {c.url && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className={`h-6 w-6 ${c.inspiration ? "text-primary bg-primary/10" : ""}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleUpdateContent(el.id, { ...c, inspiration: !c.inspiration });
+                        }}
+                        data-testid={`button-image-inspiration-${el.id}`}
+                        aria-pressed={!!c.inspiration}
+                      >
+                        <Star className="h-3 w-3" fill={c.inspiration ? "currentColor" : "none"} strokeWidth={1.75} />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="text-xs">
+                      {c.inspiration ? "In presentation deck" : "Add to presentation deck"}
+                    </TooltipContent>
+                  </Tooltip>
+                )}
                 {effectiveRole !== "client" && c.url && (
                   <Tooltip>
                     <TooltipTrigger asChild>
