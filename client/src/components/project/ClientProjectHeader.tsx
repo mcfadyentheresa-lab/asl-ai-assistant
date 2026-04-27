@@ -107,6 +107,35 @@ export function ClientProjectHeader({
   // Calendar events are not currently fetched in ProjectDetails. Wire up in a follow-up PR.
   const nextWalkthrough = "—";
 
+  const isRealValue = (v: string | null | undefined): v is string =>
+    typeof v === "string" && v.trim() !== "" && v.trim() !== "—";
+
+  const dlItems: Array<{
+    key: string;
+    label: string;
+    value: string;
+    testId: string;
+  }> = [
+    { key: "phase", label: "Phase", value: phase, testId: "text-phase" },
+    { key: "schedule", label: "Schedule", value: schedule, testId: "text-schedule" },
+    { key: "lastVisit", label: "Last visit", value: lastVisit, testId: "text-last-visit" },
+    {
+      key: "nextWalkthrough",
+      label: "Next walkthrough",
+      value: nextWalkthrough,
+      testId: "text-next-walkthrough",
+    },
+  ].filter((item) => isRealValue(item.value));
+
+  const dlGridCols =
+    dlItems.length >= 4
+      ? "grid-cols-2 md:grid-cols-4"
+      : dlItems.length === 3
+        ? "grid-cols-1 sm:grid-cols-3"
+        : dlItems.length === 2
+          ? "grid-cols-2"
+          : "grid-cols-1";
+
   const creditText = project.address
     ? `${project.name} · ${project.address}`
     : project.name;
@@ -230,56 +259,38 @@ export function ClientProjectHeader({
             <span data-testid="text-project-status">{statusLabel}</span>
           </div>
 
-          {/* 4-col dl row */}
-          <dl
-            className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mt-6 pt-5 border-t border-border/60"
-            data-testid="project-header-row"
+          {/* Project title */}
+          <h1
+            className="mt-4 mb-2 font-semibold text-3xl md:text-4xl tracking-tight text-foreground"
+            data-testid="text-project-title"
           >
-            <div className="flex flex-col gap-1">
-              <dt
-                className="text-[11px] tracking-[0.1em] uppercase text-muted-foreground/80"
-                style={{ fontFamily: "var(--font-mono)" }}
-              >
-                Phase
-              </dt>
-              <dd className="text-base font-semibold text-foreground tabular-nums" data-testid="text-phase">
-                {phase}
-              </dd>
-            </div>
-            <div className="flex flex-col gap-1">
-              <dt
-                className="text-[11px] tracking-[0.1em] uppercase text-muted-foreground/80"
-                style={{ fontFamily: "var(--font-mono)" }}
-              >
-                Schedule
-              </dt>
-              <dd className="text-base font-semibold text-foreground tabular-nums" data-testid="text-schedule">
-                {schedule}
-              </dd>
-            </div>
-            <div className="flex flex-col gap-1">
-              <dt
-                className="text-[11px] tracking-[0.1em] uppercase text-muted-foreground/80"
-                style={{ fontFamily: "var(--font-mono)" }}
-              >
-                Last visit
-              </dt>
-              <dd className="text-base font-semibold text-foreground tabular-nums" data-testid="text-last-visit">
-                {lastVisit}
-              </dd>
-            </div>
-            <div className="flex flex-col gap-1">
-              <dt
-                className="text-[11px] tracking-[0.1em] uppercase text-muted-foreground/80"
-                style={{ fontFamily: "var(--font-mono)" }}
-              >
-                Next walkthrough
-              </dt>
-              <dd className="text-base font-semibold text-foreground tabular-nums" data-testid="text-next-walkthrough">
-                {nextWalkthrough}
-              </dd>
-            </div>
-          </dl>
+            {project.name}
+          </h1>
+
+          {/* dl row — only items with real values */}
+          {dlItems.length > 0 && (
+            <dl
+              className={`grid ${dlGridCols} gap-4 md:gap-6 mt-6 pt-5 border-t border-border/60`}
+              data-testid="project-header-row"
+            >
+              {dlItems.map((item) => (
+                <div key={item.key} className="flex flex-col gap-1">
+                  <dt
+                    className="text-[11px] tracking-[0.1em] uppercase text-muted-foreground/80"
+                    style={{ fontFamily: "var(--font-mono)" }}
+                  >
+                    {item.label}
+                  </dt>
+                  <dd
+                    className="text-base font-semibold text-foreground tabular-nums"
+                    data-testid={item.testId}
+                  >
+                    {item.value}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          )}
         </div>
       </div>
     </>
