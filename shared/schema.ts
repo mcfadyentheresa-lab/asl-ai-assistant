@@ -749,6 +749,30 @@ export type InsertTableRedesignPlan = z.infer<typeof insertTableRedesignPlanSche
 export type TableRedesignMaterial = typeof tableRedesignMaterials.$inferSelect;
 export type InsertTableRedesignMaterial = z.infer<typeof insertTableRedesignMaterialSchema>;
 
+// Cinematic Reviews — short Ken-Burns / AI-cinematic videos rendered for a room
+export const cinematicReviews = pgTable("cinematic_reviews", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  boardId: integer("board_id").references(() => planningBoards.id, { onDelete: "set null" }),
+  roomName: text("room_name").notNull(),
+  format: text("format").notNull(), // 'ken-burns' | 'ai-cinematic'
+  status: text("status").notNull().default("queued"), // queued | rendering | completed | failed
+  videoUrl: text("video_url"),
+  thumbnailUrl: text("thumbnail_url"),
+  durationSec: real("duration_sec"),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").defaultNow(),
+  createdBy: text("created_by").references(() => users.id),
+});
+
+export const insertCinematicReviewSchema = createInsertSchema(cinematicReviews).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type CinematicReview = typeof cinematicReviews.$inferSelect;
+export type InsertCinematicReview = z.infer<typeof insertCinematicReviewSchema>;
+
 // Recent Project Views (server-side per-user history)
 export const recentProjectViews = pgTable("recent_project_views", {
   id: serial("id").primaryKey(),
