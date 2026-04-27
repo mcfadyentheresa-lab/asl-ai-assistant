@@ -54,7 +54,7 @@ import {
   ChefHat, Bath, Home, FileText, LayoutPanelLeft, LayoutGrid, Move,
   Lock, LockOpen, Hand, Wrench, Check,
   Spline, MoveRight, Slash, Droplet,
-  Play, Globe, Star, History,
+  Play, Globe, Star, History, AlertTriangle,
 } from "lucide-react";
 import HardwarePickerDialog, { type HardwareDraft } from "@/components/board/HardwarePickerDialog";
 import PaletteExtractionDialog, { type PaletteAddPayload } from "@/components/board/PaletteExtractionDialog";
@@ -431,6 +431,8 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   const linkBackfillAttemptedRef = useRef<Set<number>>(new Set());
   // Manual "paste image URL" fallback per link card; value is the in-progress draft.
   const [linkImageDraft, setLinkImageDraft] = useState<Record<number, string>>({});
+  // Per-element link recheck status — "loading" during the manual recheck request.
+  const [linkRecheckState, setLinkRecheckState] = useState<Record<number, "loading">>({});
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; elementId: number } | null>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showImagePopup, setShowImagePopup] = useState(false);
@@ -1137,6 +1139,44 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       });
     } catch {}
   };
+
+  // Manually re-check a vendor URL's health for one element. Hits the server-side
+  // recheck endpoint (admin/crew + rate-limited there) and merges the result onto
+  // the element so the broken-link chip refreshes.
+  const recheckElementLink = useCallback(async (id: number) => {
+    setLinkRecheckState((s) => ({ ...s, [id]: "loading" }));
+    try {
+      const res = await fetch(`/api/board/element/${id}/recheck-link`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) {
+        toast({
+          title: "Couldn't recheck link",
+          description: res.status === 429 ? "Too many requests — try again later." : "Try again in a moment.",
+          variant: "destructive",
+        });
+        return;
+      }
+      const data = await res.json() as { linkHealth?: { status: string; checkedAt: string; code?: number } };
+      const el = useCanvasStore.getState().elements[id];
+      if (!el || !data.linkHealth) return;
+      const next = { ...((el.content as any) || {}), linkHealth: data.linkHealth };
+      updateElement(id, { content: next });
+      sendElementUpdate(id, { content: next });
+      if (data.linkHealth.status === "healthy") {
+        toast({ title: "Link is healthy" });
+      }
+    } catch {
+      toast({ title: "Couldn't recheck link", variant: "destructive" });
+    } finally {
+      setLinkRecheckState((s) => {
+        const out = { ...s };
+        delete out[id];
+        return out;
+      });
+    }
+  }, [toast, updateElement, sendElementUpdate]);
 
   // Quietly merge a partial content patch into an element. Used by the link-unfurl
   // backfill so re-renders don't push undo history or toast the user.
@@ -2953,6 +2993,93 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     );
   };
 
+  // Vendor-link health chip. Shows a warm-amber pill when a link has been
+  // checked and found broken/unreachable. The "Recheck" action calls the
+  // server endpoint to re-test the URL and updates the element in place.
+  const renderLinkHealthChip = (el: CanvasElement) => {
+    const c = (el.content || {}) as any;
+    const lh = c.linkHealth as { status?: string; checkedAt?: string } | undefined;
+    if (!lh || (lh.status !== "unhealthy" && lh.status !== "unreachable")) return null;
+    const label = lh.status === "unhealthy" ? "Link broken" : "Link unreachable";
+    const isLoading = linkRecheckState[el.id] === "loading";
+    return (
+      <div
+        className="flex items-center gap-1 mt-1.5"
+        onMouseDown={(e) => e.stopPropagation()}
+        data-testid={`chip-link-health-${el.id}`}
+      >
+        <span
+          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-sm text-[10px] font-mono uppercase tracking-wider"
+          style={{ backgroundColor: "rgba(168, 99, 43, 0.14)", color: "#a8632b" }}
+        >
+          <AlertTriangle className="h-2.5 w-2.5" strokeWidth={2.5} />
+          {label}
+        </span>
+        <button
+          type="button"
+          className="text-[10px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded-sm text-muted-foreground hover:bg-primary/10 hover:text-primary disabled:opacity-50"
+          onClick={(e) => { e.stopPropagation(); recheckElementLink(el.id); }}
+          disabled={isLoading}
+          data-testid={`button-link-recheck-${el.id}`}
+        >
+          {isLoading ? "…" : "Recheck"}
+        </button>
+      </div>
+    );
+  };
+
+  // Quantity stepper for hardware/surface/product. Default 1; renders a small
+  // 44pt-friendly row when the card is selected so price math + the spec-sheet
+  // line totals can multiply correctly. Stored on element.content.quantity.
+  const renderQuantityStepper = (el: CanvasElement) => {
+    const c = (el.content || {}) as any;
+    const q = Number.isFinite(Number(c.quantity)) && Number(c.quantity) > 0 ? Math.floor(Number(c.quantity)) : 1;
+    const setQ = (next: number) => {
+      const clamped = Math.max(1, Math.min(999, Math.floor(next)));
+      handleUpdateContent(el.id, { ...c, quantity: clamped });
+    };
+    return (
+      <div
+        className="flex items-center gap-1.5 mt-1.5"
+        onMouseDown={(e) => e.stopPropagation()}
+        data-testid={`stepper-quantity-${el.id}`}
+      >
+        <span
+          className="text-[10px] uppercase tracking-wider text-muted-foreground"
+          style={{ fontFamily: "var(--font-mono)" }}
+        >
+          Qty
+        </span>
+        <button
+          type="button"
+          className="h-6 w-6 inline-flex items-center justify-center rounded border border-border/60 text-muted-foreground hover:bg-primary/10 hover:text-primary disabled:opacity-50"
+          onClick={(e) => { e.stopPropagation(); setQ(q - 1); }}
+          disabled={q <= 1}
+          aria-label="Decrease quantity"
+          data-testid={`button-quantity-decrease-${el.id}`}
+        >
+          <span className="text-sm leading-none">−</span>
+        </button>
+        <span
+          className="min-w-[28px] text-center text-xs font-medium"
+          style={{ fontFamily: "var(--font-mono)" }}
+          data-testid={`text-quantity-${el.id}`}
+        >
+          {q}
+        </span>
+        <button
+          type="button"
+          className="h-6 w-6 inline-flex items-center justify-center rounded border border-border/60 text-muted-foreground hover:bg-primary/10 hover:text-primary"
+          onClick={(e) => { e.stopPropagation(); setQ(q + 1); }}
+          aria-label="Increase quantity"
+          data-testid={`button-quantity-increase-${el.id}`}
+        >
+          <span className="text-sm leading-none">+</span>
+        </button>
+      </div>
+    );
+  };
+
   // Card renderers
   const renderElement = (el: CanvasElement) => {
     const isSelected = editingId === el.id;
@@ -3800,6 +3927,8 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                   )}
                 </div>
               )}
+              {renderLinkHealthChip(el)}
+              {isSelected && renderQuantityStepper(el)}
             </div>
             {isSelected && (
               <div className="absolute -top-8 right-0 flex items-center gap-1">
@@ -3918,6 +4047,8 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                 {c.notes && <div className="text-[10px] text-muted-foreground mt-1 line-clamp-2">{c.notes}</div>}
               </div>
             )}
+            {renderLinkHealthChip(el)}
+            {isSelected && renderQuantityStepper(el)}
           </div>
           {c.vendorUrl && (
             <a
@@ -4025,6 +4156,10 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             {c.notes && (
               <div className="text-[11px] text-muted-foreground line-clamp-2">{c.notes}</div>
             )}
+            <div className="pointer-events-auto">
+              {renderLinkHealthChip(el)}
+              {isSelected && renderQuantityStepper(el)}
+            </div>
           </div>
           {c.vendorUrl && (
             <a
@@ -4148,6 +4283,8 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                 )}
               </div>
             )}
+            {renderLinkHealthChip(el)}
+            {isSelected && renderQuantityStepper(el)}
           </div>
           {isSelected && (
             <div className="absolute -top-8 right-0 flex items-center gap-1">
@@ -4322,6 +4459,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                 )}
               </>
             )}
+            {renderLinkHealthChip(el)}
           </div>
           {isSelected && (
             <div className="absolute -top-8 right-0 flex gap-1">

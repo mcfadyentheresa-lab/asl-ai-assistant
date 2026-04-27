@@ -25,6 +25,7 @@ import { createServer } from "http";
 import { setupWebSocket } from "./websocket";
 import { startSmsQueueProcessor } from "./sms";
 import { bootstrapAdminFromEnv } from "./bootstrap-admin";
+import { startLinkHealthJob } from "./link-health";
 
 const app = express();
 const httpServer = createServer(app);
@@ -129,6 +130,7 @@ app.use((req, res, next) => {
       log(`serving on port ${port}`);
 
       startSmsQueueProcessor();
+      startLinkHealthJob();
 
       storage.cleanupOldActivity(7).then((count) => {
         if (count > 0) log(`Cleaned up ${count} activity entries older than 7 days`);
