@@ -86,6 +86,23 @@ export function useProjects() {
   });
 }
 
+// Suggested category list for a project — frequency-sorted union of every
+// `category` value across cards on every board on the project. Powers the
+// autocomplete in card editors and the +Category dialog. Server caches for 30s.
+export function useSuggestedCategories(projectId: number | undefined | null) {
+  return useQuery<string[]>({
+    queryKey: ["/api/projects", projectId, "suggested-categories"],
+    queryFn: async () => {
+      if (!projectId) return [];
+      const res = await fetch(`/api/projects/${projectId}/suggested-categories`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!projectId,
+    staleTime: 30_000,
+  });
+}
+
 export function useProject(id: number) {
   return useQuery({
     queryKey: [api.projects.get.path, id],
@@ -586,12 +603,16 @@ export function usePlanningBoard(id: number | null) {
 export function useCreatePlanningBoard() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ projectId, name, templateId }: { projectId: number; name?: string; templateId?: string }) => {
+    mutationFn: async ({ projectId, name, templateId, mode }: { projectId: number; name?: string; templateId?: string; mode?: "project" | "library" }) => {
       const url = buildUrl(api.planningBoards.create.path, { projectId });
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name || "Untitled Board", ...(templateId ? { templateId } : {}) }),
+        body: JSON.stringify({
+          name: name || "Untitled Board",
+          ...(mode ? { mode } : {}),
+          ...(templateId ? { templateId } : {}),
+        }),
         credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to create planning board");
@@ -608,7 +629,7 @@ export function useCreatePlanningBoard() {
 export function useUpdatePlanningBoard() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, ...updates }: { id: number; name?: string; linkedMilestoneId?: number | null; linkedChecklistItemId?: number | null; linkedCalendarEventId?: number | null; linkedUserIds?: string[]; linkedProjectIds?: number[]; notifyUsers?: boolean }) => {
+    mutationFn: async ({ id, ...updates }: { id: number; name?: string; mode?: "project" | "library"; linkedMilestoneId?: number | null; linkedChecklistItemId?: number | null; linkedCalendarEventId?: number | null; linkedUserIds?: string[]; linkedProjectIds?: number[]; notifyUsers?: boolean }) => {
       const url = buildUrl(api.planningBoards.update.path, { id });
       const res = await fetch(url, {
         method: "PATCH",

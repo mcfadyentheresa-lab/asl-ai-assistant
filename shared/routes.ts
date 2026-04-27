@@ -296,7 +296,7 @@ export const api = {
     create: {
       method: 'POST' as const,
       path: '/api/projects/:projectId/planning-boards' as const,
-      input: insertPlanningBoardSchema.pick({ name: true, linkedMilestoneId: true, linkedChecklistItemId: true, linkedCalendarEventId: true, linkedUserIds: true, linkedProjectIds: true }).partial().extend({ templateId: z.string().optional() }),
+      input: insertPlanningBoardSchema.pick({ name: true, mode: true, linkedMilestoneId: true, linkedChecklistItemId: true, linkedCalendarEventId: true, linkedUserIds: true, linkedProjectIds: true }).partial().extend({ templateId: z.string().optional() }),
       responses: {
         201: z.custom<typeof planningBoards.$inferSelect>(),
       },
@@ -304,7 +304,7 @@ export const api = {
     update: {
       method: 'PATCH' as const,
       path: '/api/planning-boards/:id' as const,
-      input: insertPlanningBoardSchema.pick({ name: true, linkedMilestoneId: true, linkedChecklistItemId: true, linkedCalendarEventId: true, linkedUserIds: true, linkedProjectIds: true }).partial(),
+      input: insertPlanningBoardSchema.pick({ name: true, mode: true, linkedMilestoneId: true, linkedChecklistItemId: true, linkedCalendarEventId: true, linkedUserIds: true, linkedProjectIds: true }).partial(),
       responses: {
         200: z.custom<typeof planningBoards.$inferSelect>(),
       },

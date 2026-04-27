@@ -54,21 +54,27 @@ import {
   ChefHat, Bath, Home, FileText, LayoutPanelLeft, LayoutGrid, Move,
   Lock, LockOpen, Hand, Wrench, Check,
   Spline, MoveRight, Slash, Droplet,
-  Play, Globe, Star, History, AlertTriangle,
+  Play, Globe, Star, History, AlertTriangle, Settings,
 } from "lucide-react";
 import HardwarePickerDialog, { type HardwareDraft } from "@/components/board/HardwarePickerDialog";
 import PaletteExtractionDialog, { type PaletteAddPayload } from "@/components/board/PaletteExtractionDialog";
 import CanvasConnectors, { CONNECTOR_DEFAULT_COLOR, anchorDots, type ConnectorContent, type ConnectorStyle, type ConnectorCurve } from "@/components/board/CanvasConnectors";
 import PresentationMode from "@/components/board/PresentationMode";
 import AIPartnerPanel from "@/components/board/AIPartnerPanel";
-import RoomTabStrip from "@/components/board/RoomTabStrip";
+import RoomTabStrip, { type BoardMode } from "@/components/board/RoomTabStrip";
+import SecondaryAxisChips from "@/components/board/SecondaryAxisChips";
 import VersionsPopover from "@/components/board/VersionsPopover";
 import VersionsCompareDialog from "@/components/board/VersionsCompareDialog";
 import {
   ROOM_STATUSES,
   STATUS_EDGE_COLOR,
   type RoomStatus,
+  countByCategory,
+  countByRoom,
+  deriveCategories,
   deriveRooms,
+  explicitCategory,
+  isCategorizable,
   isRoomable,
   nextStatus,
   orderRooms,
@@ -76,7 +82,7 @@ import {
   roomZoneName,
 } from "@/lib/board-rooms";
 import { useToast } from "@/hooks/use-toast";
-import { usePlanningBoards, useCreatePlanningBoard, useDeletePlanningBoard, useUpdatePlanningBoard, useUploadImage, useUsers, useProjects, useMilestones, useChecklistItems, useCalendarEvents, useUpdateCalendarEvent, useDeleteCalendarEvent, useCreateCalendarEvent, useCreateMilestone, useCreateChecklistItem } from "@/hooks/use-projects";
+import { usePlanningBoards, useCreatePlanningBoard, useDeletePlanningBoard, useUpdatePlanningBoard, useUploadImage, useUsers, useProjects, useMilestones, useChecklistItems, useCalendarEvents, useUpdateCalendarEvent, useDeleteCalendarEvent, useCreateCalendarEvent, useCreateMilestone, useCreateChecklistItem, useSuggestedCategories } from "@/hooks/use-projects";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -406,7 +412,9 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   const [newCalendarDate, setNewCalendarDate] = useState("");
   const [renameName, setRenameName] = useState("");
   const [newBoardName, setNewBoardName] = useState("");
+  const [newBoardMode, setNewBoardMode] = useState<BoardMode>("project");
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [showBoardSettings, setShowBoardSettings] = useState(false);
   const [compareSnapshotId, setCompareSnapshotId] = useState<number | null>(null);
 
   const [draggingId, setDraggingId] = useState<number | null>(null);
@@ -499,14 +507,20 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     });
   }, [lockLayoutKey]);
 
-  // Room spine — active room tab and saved order, persisted per-board in localStorage.
-  // `activeRoomKey` keeps the user where they left off when revisiting the board.
+  // Board spine — primary axis (rooms in 'project' mode, categories in 'library'
+  // mode), saved tab order, status filters, and the secondary-axis chip
+  // selection. All persisted per-board in localStorage so the user lands where
+  // they left off when revisiting the board.
   const activeRoomKey = selectedBoardId ? `asl:board:${selectedBoardId}:activeRoom` : null;
   const roomOrderKey = selectedBoardId ? `asl:board:${selectedBoardId}:roomOrder` : null;
+  const categoryOrderKey = selectedBoardId ? `asl:board:${selectedBoardId}:categoryOrder` : null;
   const statusFilterKey = selectedBoardId ? `asl:board:${selectedBoardId}:statusFilter` : null;
+  const chipSelectionKey = selectedBoardId ? `asl:board:${selectedBoardId}:secondaryChips` : null;
   const [activeRoom, setActiveRoom] = useState<string | null>(null);
   const [savedRoomOrder, setSavedRoomOrder] = useState<string[]>([]);
+  const [savedCategoryOrder, setSavedCategoryOrder] = useState<string[]>([]);
   const [statusFilters, setStatusFilters] = useState<Set<RoomStatus>>(() => new Set());
+  const [secondaryChips, setSecondaryChips] = useState<Set<string>>(() => new Set());
   useEffect(() => {
     if (!selectedBoardId) return;
     if (activeRoomKey) {
@@ -522,6 +536,15 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
         setSavedRoomOrder([]);
       }
     }
+    if (categoryOrderKey) {
+      try {
+        const raw = localStorage.getItem(categoryOrderKey);
+        const parsed = raw ? JSON.parse(raw) : [];
+        setSavedCategoryOrder(Array.isArray(parsed) ? parsed.filter((s) => typeof s === "string") : []);
+      } catch {
+        setSavedCategoryOrder([]);
+      }
+    }
     if (statusFilterKey) {
       try {
         const raw = localStorage.getItem(statusFilterKey);
@@ -535,7 +558,18 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
         setStatusFilters(new Set());
       }
     }
-  }, [selectedBoardId, activeRoomKey, roomOrderKey, statusFilterKey]);
+    if (chipSelectionKey) {
+      try {
+        const raw = localStorage.getItem(chipSelectionKey);
+        const parsed = raw ? JSON.parse(raw) : [];
+        setSecondaryChips(new Set(
+          (Array.isArray(parsed) ? parsed : []).filter((v): v is string => typeof v === "string"),
+        ));
+      } catch {
+        setSecondaryChips(new Set());
+      }
+    }
+  }, [selectedBoardId, activeRoomKey, roomOrderKey, categoryOrderKey, statusFilterKey, chipSelectionKey]);
   const persistActiveRoom = useCallback(
     (room: string | null) => {
       setActiveRoom(room);
@@ -554,6 +588,35 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     },
     [roomOrderKey],
   );
+  const persistCategoryOrder = useCallback(
+    (order: string[]) => {
+      setSavedCategoryOrder(order);
+      if (categoryOrderKey) {
+        try { localStorage.setItem(categoryOrderKey, JSON.stringify(order)); } catch {}
+      }
+    },
+    [categoryOrderKey],
+  );
+  const toggleSecondaryChip = useCallback(
+    (value: string) => {
+      setSecondaryChips((prev) => {
+        const next = new Set(prev);
+        if (next.has(value)) next.delete(value);
+        else next.add(value);
+        if (chipSelectionKey) {
+          try { localStorage.setItem(chipSelectionKey, JSON.stringify(Array.from(next))); } catch {}
+        }
+        return next;
+      });
+    },
+    [chipSelectionKey],
+  );
+  const clearSecondaryChips = useCallback(() => {
+    setSecondaryChips(new Set());
+    if (chipSelectionKey) {
+      try { localStorage.setItem(chipSelectionKey, JSON.stringify([])); } catch {}
+    }
+  }, [chipSelectionKey]);
   const toggleStatusFilter = useCallback(
     (s: RoomStatus) => {
       setStatusFilters((prev) => {
@@ -641,6 +704,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   const { data: milestones = [] } = useMilestones(projectId);
   const { data: checklistItems = [] } = useChecklistItems(projectId);
   const { data: calendarEvents = [] } = useCalendarEvents(projectId);
+  const { data: suggestedCategories = [] } = useSuggestedCategories(projectId);
   const refreshCanvasFromServer = useCallback(async () => {
     if (!selectedBoardId) return;
     const url = buildUrl(api.canvasElements.list.path, { boardId: selectedBoardId });
@@ -687,6 +751,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   const closeNewBoardDialog = () => {
     setShowNewBoardDialog(false);
     setNewBoardName("");
+    setNewBoardMode("project");
     setSelectedTemplateId(null);
   };
 
@@ -697,6 +762,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       const boardResult = await createBoard({
         projectId,
         name: boardName,
+        mode: newBoardMode,
         ...(selectedTemplateId ? { templateId: selectedTemplateId } : {}),
       });
       const board = boardResult && typeof boardResult === "object" && "id" in boardResult ? boardResult : null;
@@ -860,11 +926,18 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     const newZ = maxZ;
     setMaxZ((z) => z + 1);
 
-    // Auto-tag the new card with the active room when one is focused — keeps room
-    // membership in lockstep with the user's mental model of "where am I working?".
+    // Auto-tag the new card with the active primary tab when one is focused —
+    // keeps tab membership in lockstep with the user's mental model of "where
+    // am I working?". On project boards the active tab is a room; on library
+    // boards it's a category. Cards already auto-pick up the secondary axis
+    // from chips because chips are filters, not write-ops.
     const baseContent: any = { ...def.content };
-    if (activeRoom && (persistedType === "hardware" || persistedType === "surface" || persistedType === "product")) {
-      baseContent.room = activeRoom;
+    if (activeRoom) {
+      const targetField = (selectedBoard as any)?.mode === "library" ? "category" : "room";
+      const allowsRoom = persistedType === "hardware" || persistedType === "surface" || persistedType === "product";
+      const allowsCategory = allowsRoom || persistedType === "image" || persistedType === "link";
+      if (targetField === "room" && allowsRoom) baseContent.room = activeRoom;
+      else if (targetField === "category" && allowsCategory) baseContent.category = activeRoom;
     }
 
     try {
@@ -896,7 +969,9 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     try {
       const url = buildUrl(api.canvasElements.create.path, { boardId: selectedBoardId });
       const hardwareContent: any = { ...draft };
-      if (activeRoom && !hardwareContent.room) hardwareContent.room = activeRoom;
+      const isLibrary = (selectedBoard as any)?.mode === "library";
+      if (activeRoom && isLibrary && !hardwareContent.category) hardwareContent.category = activeRoom;
+      if (activeRoom && !isLibrary && !hardwareContent.room) hardwareContent.room = activeRoom;
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -2810,6 +2885,29 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   const elementsList = Object.values(elements);
   const rawRoomNames = deriveRooms(elementsList);
   const roomNames = orderRooms(rawRoomNames, savedRoomOrder);
+  const rawCategoryNames = deriveCategories(elementsList);
+  const categoryNames = orderRooms(rawCategoryNames, savedCategoryOrder);
+
+  // Board mode — 'project' (rooms primary) or 'library' (categories primary).
+  // Existing rows lack the column until db:push runs, so coalesce to 'project'.
+  const boardMode: BoardMode = ((selectedBoard as any)?.mode === "library" ? "library" : "project");
+  const primaryTabs = boardMode === "library" ? categoryNames : roomNames;
+  // The active "tab" from the tab strip's perspective. In project mode it's a
+  // room name; in library mode it's a category name. We keep one piece of
+  // state (`activeRoom`) and reinterpret it based on mode — saves a second
+  // localStorage key and means switching modes preserves intent (the tab
+  // string carries over if it happens to match a tab in the new mode).
+  const activeTab = activeRoom;
+  // Secondary axis: chips pick the *other* axis. Counts always honor the
+  // active primary tab so the user sees what's visible under that lane.
+  const secondaryAxis: "category" | "room" = boardMode === "library" ? "room" : "category";
+  const secondaryOptions = secondaryAxis === "category" ? categoryNames : roomNames;
+  const secondaryCounts = secondaryAxis === "category"
+    ? countByCategory(elementsList, activeTab)
+    : countByRoom(elementsList, activeTab);
+  // Library-mode rule: hide the secondary chip row entirely if no card has a
+  // `room` set yet — library boards rarely tag to a single room.
+  const showSecondaryAxis = secondaryOptions.length > 0;
 
   // Resolve which room each element belongs to. Lookup table avoids re-scanning
   // the canvas for every render call. Floating cards (no explicit room, no
@@ -2822,19 +2920,39 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     return out;
   })();
 
-  // Visibility for the active room tab + status filter. Hides via opacity 0
-  // (and disables pointer events), never deletes — switching back restores everything.
-  const isElementHiddenByRoom = (el: CanvasElement): boolean => {
-    if (activeRoom == null) return false;
+  // Visibility for the active primary tab + secondary chips + status filter.
+  // Hides via opacity 0 (and disables pointer events), never deletes — switching
+  // back restores everything.
+  const isElementHiddenByPrimary = (el: CanvasElement): boolean => {
+    if (activeTab == null) return false;
     if (el.type === "connector") return false; // connectors follow their endpoints
     if (el.type === "draw") return false; // freehand strokes always show
+    if (boardMode === "library") {
+      // Primary axis = category. Cards without a category live only under "All".
+      const cat = explicitCategory(el);
+      // room_zone elements stay visible — they're scaffolding, not tagged content.
+      if (el.type === "room_zone") return false;
+      return cat !== activeTab;
+    }
+    // Project mode: primary axis = room.
     if (el.type === "room_zone") {
-      // Show only the active room zone(s); other zones hidden under their tab.
       const name = roomZoneName(el);
-      return !!name && name !== activeRoom;
+      return !!name && name !== activeTab;
     }
     const room = elementRoomById[el.id];
-    return room !== activeRoom;
+    return room !== activeTab;
+  };
+
+  const isElementHiddenBySecondaryChips = (el: CanvasElement): boolean => {
+    if (secondaryChips.size === 0) return false;
+    if (el.type === "connector" || el.type === "draw" || el.type === "room_zone") return false;
+    if (secondaryAxis === "category") {
+      const cat = explicitCategory(el);
+      return !cat || !secondaryChips.has(cat);
+    }
+    // axis === 'room'
+    const room = elementRoomById[el.id];
+    return !room || !secondaryChips.has(room);
   };
 
   const isElementHiddenByStatus = (el: CanvasElement): boolean => {
@@ -2845,7 +2963,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   };
 
   const isElementHidden = (el: CanvasElement): boolean =>
-    isElementHiddenByRoom(el) || isElementHiddenByStatus(el);
+    isElementHiddenByPrimary(el) || isElementHiddenBySecondaryChips(el) || isElementHiddenByStatus(el);
 
   // Status quick-cycle — used by the contextual chip on roomable cards.
   const cycleStatusForElement = (id: number) => {
@@ -2933,6 +3051,44 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     }
   };
 
+  // Library-mode equivalents. Categories are metadata-only — no scaffolding
+  // element gets dropped on the canvas. "Create" just selects the new name as
+  // the active tab and pins it in saved order so it shows up immediately.
+  const createCategoryFromTabStrip = (payload: { name: string }) => {
+    persistActiveRoom(payload.name);
+    if (!savedCategoryOrder.includes(payload.name)) {
+      persistCategoryOrder([...savedCategoryOrder, payload.name]);
+    }
+  };
+
+  const renameCategoryEverywhere = async (oldName: string, newName: string) => {
+    if (!selectedBoardId) return;
+    const updates: { id: number; nextContent: any }[] = [];
+    for (const el of elementsList) {
+      const c = (el.content || {}) as any;
+      if (isCategorizable(el) && typeof c.category === "string" && c.category === oldName) {
+        updates.push({ id: el.id, nextContent: { ...c, category: newName } });
+      }
+    }
+    for (const u of updates) {
+      updateElement(u.id, { content: u.nextContent });
+      sendElementUpdate(u.id, { content: u.nextContent });
+      try {
+        const url = buildUrl(api.canvasElements.update.path, { id: u.id });
+        await fetch(url, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ content: u.nextContent }),
+        });
+      } catch {}
+    }
+    if (activeRoom === oldName) persistActiveRoom(newName);
+    if (savedCategoryOrder.length > 0) {
+      persistCategoryOrder(savedCategoryOrder.map((r) => (r === oldName ? newName : r)));
+    }
+  };
+
   // Quick-cycle status chip — shown in the selected card's action row. Tap
   // cycles idea → shortlist → selected → ordered → idea. Identical signal to
   // the picker, just one tap deep so the user can advance a card without
@@ -2990,6 +3146,37 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           </div>
         )}
       </>
+    );
+  };
+
+  // Inline Category field with datalist autocomplete from the project's
+  // suggested-categories list. Used on hardware/surface/product/image/link cards.
+  // Library boards make this required for new cards (we don't block on save —
+  // a missing value just shows a warm hint until the user fills it).
+  const renderCategoryField = (el: CanvasElement) => {
+    if (!isCategorizable(el)) return null;
+    const c = (el.content || {}) as any;
+    const isLibrary = (selectedBoard as any)?.mode === "library";
+    const placeholder = isLibrary ? "Category (required)" : "Category";
+    return (
+      <div onMouseDown={(e) => e.stopPropagation()}>
+        <input
+          className={`w-full bg-transparent border rounded text-xs outline-none px-1.5 py-0.5 ${
+            isLibrary && !c.category ? "border-amber-400/60" : "border-border/50"
+          }`}
+          defaultValue={c.category || ""}
+          list={`category-suggestions-${el.id}`}
+          placeholder={placeholder}
+          onBlur={(e) => handleUpdateContent(el.id, { ...c, category: e.target.value.trim() || undefined })}
+          data-testid={`input-category-${el.id}`}
+          aria-required={isLibrary || undefined}
+        />
+        <datalist id={`category-suggestions-${el.id}`}>
+          {suggestedCategories.map((s) => (
+            <option key={s} value={s} />
+          ))}
+        </datalist>
+      </div>
     );
   };
 
@@ -3894,6 +4081,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                       {SHEENS.map((s) => <option key={s} value={s}>{s}</option>)}
                     </select>
                   </div>
+                  {renderCategoryField(el)}
                   {statusPicker}
                 </div>
               ) : (
@@ -4000,13 +4188,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                   onBlur={(e) => handleUpdateContent(el.id, { ...c, imageUrl: e.target.value })}
                   data-testid={`input-surface-material-image-${el.id}`}
                 />
-                <input
-                  className="w-full bg-transparent border-none text-xs outline-none"
-                  defaultValue={c.category || ""}
-                  placeholder="Category (Stone, Wood, Tile…)"
-                  onBlur={(e) => handleUpdateContent(el.id, { ...c, category: e.target.value || undefined })}
-                  data-testid={`input-surface-material-category-${el.id}`}
-                />
+                {renderCategoryField(el)}
                 <input
                   className="w-full bg-transparent border-none text-xs text-primary outline-none"
                   defaultValue={c.vendorUrl || ""}
@@ -4159,6 +4341,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             <div className="pointer-events-auto">
               {renderLinkHealthChip(el)}
               {isSelected && renderQuantityStepper(el)}
+              {isSelected && renderCategoryField(el)}
             </div>
           </div>
           {c.vendorUrl && (
@@ -4244,6 +4427,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                   onBlur={(e) => handleUpdateContent(el.id, { ...c, room: e.target.value || undefined })}
                   data-testid={`input-product-room-${el.id}`}
                 />
+                {renderCategoryField(el)}
                 <div className="flex items-center gap-1 mt-1.5" onMouseDown={(e) => e.stopPropagation()}>
                   {(["idea","shortlist","selected","ordered"] as const).map((s) => {
                     const cur = (c.status as RoomStatus) || "idea";
@@ -4433,6 +4617,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                     </div>
                   </div>
                 )}
+                {renderCategoryField(el)}
               </div>
             ) : (
               <>
@@ -4582,6 +4767,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                     onBlur={(e) => handleUpdateContent(el.id, { ...c, caption: e.target.value })}
                     data-testid={`input-image-caption-${el.id}`}
                   />
+                  {renderCategoryField(el)}
                 </div>
               ) : (
                 c.caption && <div className="text-xs text-muted-foreground">{c.caption}</div>
@@ -4871,6 +5057,9 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                 <DropdownMenuItem onClick={() => { setRenameName(selectedBoard?.name || ""); setShowRenameDialog(true); }} data-testid="menu-rename-board">
                   <Edit3 className="h-4 w-4 mr-2" /> Rename
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setShowBoardSettings(true)} data-testid="menu-board-settings">
+                  <Settings className="h-4 w-4 mr-2" /> Board settings
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => { setLinkCreateMode({ milestone: false, checklist: false, calendar: false }); setShowLinkDialog(true); }} data-testid="menu-link-board">
                   <Link2 className="h-4 w-4 mr-2" /> Link to...
                 </DropdownMenuItem>
@@ -5153,19 +5342,32 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
       )}
 
       {boards.length > 0 && selectedBoardId && (
-        <RoomTabStrip
-          rooms={roomNames}
-          activeRoom={activeRoom}
-          statusFilters={statusFilters}
-          elements={elementsList}
-          project={clientProject as any}
-          isLocked={lockLayout}
-          onSelectRoom={persistActiveRoom}
-          onReorderRooms={persistRoomOrder}
-          onRenameRoom={renameRoomEverywhere}
-          onCreateRoom={createRoomFromTabStrip}
-          onToggleStatusFilter={toggleStatusFilter}
-        />
+        <>
+          <RoomTabStrip
+            mode={boardMode}
+            tabs={primaryTabs}
+            activeTab={activeTab}
+            statusFilters={statusFilters}
+            elements={elementsList}
+            project={clientProject as any}
+            isLocked={lockLayout}
+            onSelectTab={persistActiveRoom}
+            onReorderTabs={boardMode === "library" ? persistCategoryOrder : persistRoomOrder}
+            onRenameTab={boardMode === "library" ? renameCategoryEverywhere : renameRoomEverywhere}
+            onCreateTab={boardMode === "library" ? createCategoryFromTabStrip : createRoomFromTabStrip}
+            onToggleStatusFilter={toggleStatusFilter}
+          />
+          {showSecondaryAxis && (
+            <SecondaryAxisChips
+              axis={secondaryAxis}
+              options={secondaryOptions}
+              counts={secondaryCounts}
+              selected={secondaryChips}
+              onToggle={toggleSecondaryChip}
+              onClear={clearSecondaryChips}
+            />
+          )}
+        </>
       )}
 
       {boards.length > 0 && selectedBoardId && (
@@ -6125,6 +6327,31 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             <DialogDescription>Create a new board or start from a template.</DialogDescription>
           </DialogHeader>
           <Input placeholder="Board name" value={newBoardName} onChange={(e) => setNewBoardName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") handleCreateBoard(); }} data-testid="input-new-board-name" autoFocus />
+          {/* Mode picker — sets the primary axis for the tab strip. Switching
+              later doesn't lose data, just reorganizes the tabs. */}
+          <div className="space-y-2" data-testid="new-board-mode-picker">
+            <Label className="text-xs uppercase tracking-wider text-muted-foreground">Board type</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setNewBoardMode("project")}
+                className={`text-left rounded-lg border p-3 transition-colors ${newBoardMode === "project" ? "border-primary ring-1 ring-primary bg-primary/5" : "border-border/70 hover:border-primary/40"}`}
+                data-testid="new-board-mode-project"
+              >
+                <div className="text-sm font-semibold">Project board</div>
+                <div className="text-[11px] text-muted-foreground mt-0.5">Tabs are rooms — Kitchen, Powder…</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setNewBoardMode("library")}
+                className={`text-left rounded-lg border p-3 transition-colors ${newBoardMode === "library" ? "border-primary ring-1 ring-primary bg-primary/5" : "border-border/70 hover:border-primary/40"}`}
+                data-testid="new-board-mode-library"
+              >
+                <div className="text-sm font-semibold">Library board</div>
+                <div className="text-[11px] text-muted-foreground mt-0.5">Tabs are categories — Fabric, Stone…</div>
+              </button>
+            </div>
+          </div>
           {isAdmin && templateCatalogue.length > 0 && (
             <div className="space-y-2">
               <Label className="text-xs uppercase tracking-wider text-muted-foreground">Start from Template</Label>
@@ -6204,6 +6431,54 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowRenameDialog(false)}>Cancel</Button>
             <Button onClick={handleRename} data-testid="button-confirm-rename">Rename</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Board settings — Mode toggle (Project ↔ Library) plus a hint that
+          switching reorganizes tabs without losing data. */}
+      <Dialog open={showBoardSettings} onOpenChange={setShowBoardSettings}>
+        <DialogContent data-testid="board-settings-dialog">
+          <DialogHeader>
+            <DialogTitle>Board settings</DialogTitle>
+            <DialogDescription>Choose how this board is organized.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 mt-2">
+            <Label className="text-xs uppercase tracking-wider text-muted-foreground">Mode</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!selectedBoardId || boardMode === "project") return;
+                  await updateBoard({ id: selectedBoardId, mode: "project" } as any);
+                  queryClient.invalidateQueries({ queryKey: [api.planningBoards.list.path, projectId] });
+                }}
+                className={`text-left rounded-lg border p-3 transition-colors ${boardMode === "project" ? "border-primary ring-1 ring-primary bg-primary/5" : "border-border/70 hover:border-primary/40"}`}
+                data-testid="board-settings-mode-project"
+              >
+                <div className="text-sm font-semibold">Project board</div>
+                <div className="text-[11px] text-muted-foreground mt-0.5">Tabs are rooms — Kitchen, Powder…</div>
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!selectedBoardId || boardMode === "library") return;
+                  await updateBoard({ id: selectedBoardId, mode: "library" } as any);
+                  queryClient.invalidateQueries({ queryKey: [api.planningBoards.list.path, projectId] });
+                }}
+                className={`text-left rounded-lg border p-3 transition-colors ${boardMode === "library" ? "border-primary ring-1 ring-primary bg-primary/5" : "border-border/70 hover:border-primary/40"}`}
+                data-testid="board-settings-mode-library"
+              >
+                <div className="text-sm font-semibold">Library board</div>
+                <div className="text-[11px] text-muted-foreground mt-0.5">Tabs are categories — Fabric, Stone…</div>
+              </button>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Switching modes doesn't lose data. Cards keep both <span className="font-medium">Room</span> and <span className="font-medium">Category</span> values; tabs just reorganize.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowBoardSettings(false)} data-testid="button-board-settings-close">Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -201,6 +201,9 @@ export const planningBoards = pgTable("planning_boards", {
   id: serial("id").primaryKey(),
   projectId: integer("project_id").notNull().references(() => projects.id),
   name: text("name").notNull().default("Untitled Board"),
+  // 'project' = organized by room (Kitchen, Powder); 'library' = organized by
+  // category (Fabric, Stone, Hardware). Existing rows stay 'project'.
+  mode: text("mode").notNull().default("project"),
   canvasData: jsonb("canvas_data"),
   linkedMilestoneId: integer("linked_milestone_id").references(() => milestones.id),
   linkedChecklistItemId: integer("linked_checklist_item_id").references(() => checklistItems.id),

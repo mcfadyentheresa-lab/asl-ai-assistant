@@ -29,6 +29,76 @@ export function isRoomable(el: CanvasElement): boolean {
   return el.type === "hardware" || el.type === "surface" || el.type === "product";
 }
 
+// Cards that can carry a free-form `category` field (the WHAT axis on library
+// boards; an optional secondary chip on project boards). A superset of the
+// roomable types — image and link cards can also be categorized (Fabric, etc.).
+export function isCategorizable(el: CanvasElement): boolean {
+  return (
+    el.type === "hardware" ||
+    el.type === "surface" ||
+    el.type === "product" ||
+    el.type === "image" ||
+    el.type === "link"
+  );
+}
+
+// Read the explicit `category` field on a card; empty string treated as missing.
+export function explicitCategory(el: CanvasElement): string | undefined {
+  if (!isCategorizable(el)) return undefined;
+  const c = (el.content as any) || {};
+  const raw = typeof c.category === "string" ? c.category.trim() : "";
+  return raw || undefined;
+}
+
+// Union of category values referenced on the board, frequency-sorted.
+export function deriveCategories(elements: CanvasElement[]): string[] {
+  const counts = new Map<string, number>();
+  for (const el of elements) {
+    const cat = explicitCategory(el);
+    if (!cat) continue;
+    counts.set(cat, (counts.get(cat) || 0) + 1);
+  }
+  return Array.from(counts.entries())
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([name]) => name);
+}
+
+// Category counts for chip labels ("Hardware • 4"). Optionally scoped to an
+// active room so chip labels reflect what's visible under that tab.
+export function countByCategory(
+  elements: CanvasElement[],
+  activeRoom: string | null,
+): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const el of elements) {
+    const cat = explicitCategory(el);
+    if (!cat) continue;
+    if (activeRoom != null) {
+      const room = resolveRoomFor(el, elements);
+      if (room !== activeRoom) continue;
+    }
+    out[cat] = (out[cat] || 0) + 1;
+  }
+  return out;
+}
+
+// Room counts (used for the secondary axis chips on library boards).
+export function countByRoom(
+  elements: CanvasElement[],
+  activeCategory: string | null,
+): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const el of elements) {
+    if (activeCategory != null && activeCategory !== "__all__") {
+      if (explicitCategory(el) !== activeCategory) continue;
+    }
+    const room = resolveRoomFor(el, elements);
+    if (!room) continue;
+    out[room] = (out[room] || 0) + 1;
+  }
+  return out;
+}
+
 // Read the explicit `room` field on a card (hardware/surface/product); empty when missing.
 export function explicitRoom(el: CanvasElement): string | undefined {
   if (!isRoomable(el)) return undefined;
