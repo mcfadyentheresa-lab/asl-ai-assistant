@@ -1663,6 +1663,8 @@ function OpenItemsDrawer({ projectId, open, onOpenChange }: { projectId: number;
   );
 }
 
+// TODO: _BoardTab + the `boardItems` table are legacy moodboard code, superseded by SpatialCanvas.
+// Retire alongside a future cleanup of the planningBoards/canvasElements schema split.
 function _BoardTab({ projectId }: { projectId: number }) {
   const { toast } = useToast();
   const { data: items, isLoading } = useBoardItems(projectId);
