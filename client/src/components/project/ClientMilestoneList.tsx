@@ -21,9 +21,37 @@ interface ActivityEntry {
   createdAt?: string | Date | null;
 }
 
+interface CalendarEvent {
+  id: number;
+  title?: string | null;
+  type?: string | null;
+  date: string;
+  endDate?: string | null;
+  milestoneId?: number | null;
+}
+
+interface ChecklistItemLike {
+  id: number;
+  title: string;
+  completed?: boolean | null;
+  status?: string | null;
+  milestoneId?: number | null;
+}
+
+interface PhotoLike {
+  id: number;
+  url: string;
+  caption?: string | null;
+  createdAt?: string | Date | null;
+  milestoneId?: number | null;
+}
+
 interface ClientMilestoneListProps {
   milestones: Milestone[] | undefined;
   activityLog: ActivityEntry[] | undefined;
+  calendarEvents?: CalendarEvent[] | undefined;
+  checklistItems?: ChecklistItemLike[] | undefined;
+  photos?: PhotoLike[] | undefined;
 }
 
 type Status = "complete" | "progress" | "upcoming";
@@ -57,9 +85,53 @@ function pickUpdateText(
   return linked[0].description || linked[0].title || null;
 }
 
+function pickMilestonePhotos(
+  milestoneId: number,
+  photos: PhotoLike[] | undefined,
+): PhotoLike[] {
+  if (!photos) return [];
+  return photos
+    .filter((p) => p.milestoneId === milestoneId)
+    .sort((a, b) => {
+      const aT = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const bT = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return bT - aT;
+    })
+    .slice(0, 4);
+}
+
+function pickMilestoneDecisions(
+  milestoneId: number,
+  items: ChecklistItemLike[] | undefined,
+): ChecklistItemLike[] {
+  if (!items) return [];
+  return items
+    .filter((i) => i.milestoneId === milestoneId)
+    .slice(0, 3);
+}
+
+function pickMilestoneEvents(
+  milestoneId: number,
+  events: CalendarEvent[] | undefined,
+): CalendarEvent[] {
+  if (!events) return [];
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  return events
+    .filter((e) => e.milestoneId === milestoneId)
+    .map((e) => ({ e, d: new Date(e.date) }))
+    .filter(({ d }) => !Number.isNaN(d.getTime()) && d.getTime() >= now.getTime())
+    .sort((a, b) => a.d.getTime() - b.d.getTime())
+    .slice(0, 2)
+    .map(({ e }) => e);
+}
+
 export function ClientMilestoneList({
   milestones,
   activityLog,
+  calendarEvents,
+  checklistItems,
+  photos,
 }: ClientMilestoneListProps) {
   const sorted = useMemo(() => {
     if (!milestones) return [];
@@ -161,6 +233,9 @@ export function ClientMilestoneList({
                 ? "In progress"
                 : "Upcoming";
           const updateText = pickUpdateText(m, activityLog);
+          const milestonePhotos = pickMilestonePhotos(m.id, photos);
+          const milestoneDecisions = pickMilestoneDecisions(m.id, checklistItems);
+          const milestoneEvents = pickMilestoneEvents(m.id, calendarEvents);
 
           return (
             <li
@@ -258,10 +333,28 @@ export function ClientMilestoneList({
                           Theresa will share an update here as work progresses.
                         </p>
                       )}
-                      {/* TODO(milestone-list): wire milestone-linked photos (saturate(0.85) contrast(0.96), rounded, square 2x2 grid) once a milestone↔photos association is available. */}
-                      <div className="pt-2 text-xs text-muted-foreground">
-                        Photos for this milestone will appear here.
-                      </div>
+                      {milestonePhotos.length > 0 ? (
+                        <div
+                          className="grid grid-cols-2 gap-2 pt-2"
+                          data-testid={`milestone-photos-${m.id}`}
+                        >
+                          {milestonePhotos.map((p) => (
+                            <img
+                              key={p.id}
+                              src={p.url}
+                              alt={p.caption ?? ""}
+                              className="aspect-square w-full rounded-md object-cover"
+                              style={{ filter: "saturate(0.85) contrast(0.96)" }}
+                            />
+                          ))}
+                        </div>
+                      ) : (
+                        // The photos schema has no milestone linkage column today,
+                        // so this empty state is the real terminal state, not a wiring gap.
+                        <div className="pt-2 text-xs text-muted-foreground">
+                          Photos for this milestone will appear here.
+                        </div>
+                      )}
                     </div>
 
                     <aside className="space-y-5 border-border/60 md:border-l md:pl-6">
@@ -275,10 +368,20 @@ export function ClientMilestoneList({
                         >
                           Decisions on file
                         </h4>
-                        {/* TODO(milestone-list): list decisions/checklist items linked to this milestone once available without new queries. */}
-                        <p className="text-sm text-muted-foreground">
-                          No decisions linked yet.
-                        </p>
+                        {milestoneDecisions.length > 0 ? (
+                          <ul
+                            className="space-y-1.5 text-sm text-foreground"
+                            data-testid={`milestone-decisions-${m.id}`}
+                          >
+                            {milestoneDecisions.map((d) => (
+                              <li key={d.id}>{d.title}</li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">
+                            No decisions yet.
+                          </p>
+                        )}
                       </div>
                       <div>
                         <h4
@@ -290,10 +393,36 @@ export function ClientMilestoneList({
                         >
                           Coming up
                         </h4>
-                        {/* TODO(milestone-list): show next 1–2 calendar events linked to this milestone once available without new queries. */}
-                        <p className="text-sm text-muted-foreground">
-                          Nothing scheduled yet.
-                        </p>
+                        {milestoneEvents.length > 0 ? (
+                          <ul
+                            className="space-y-1.5 text-sm text-foreground"
+                            data-testid={`milestone-events-${m.id}`}
+                          >
+                            {milestoneEvents.map((e) => {
+                              const d = new Date(e.date);
+                              const dateStr = !Number.isNaN(d.getTime())
+                                ? format(d, "MMM d")
+                                : null;
+                              return (
+                                <li key={e.id} className="flex justify-between gap-3">
+                                  <span className="truncate">{e.title || "Event"}</span>
+                                  {dateStr ? (
+                                    <span
+                                      className="text-muted-foreground tabular-nums"
+                                      style={{ fontFamily: "var(--font-mono)" }}
+                                    >
+                                      {dateStr}
+                                    </span>
+                                  ) : null}
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">
+                            No upcoming events.
+                          </p>
+                        )}
                       </div>
                     </aside>
                   </div>

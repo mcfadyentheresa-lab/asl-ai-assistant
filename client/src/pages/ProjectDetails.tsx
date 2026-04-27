@@ -4,7 +4,7 @@ import {
   useProject, useMilestones, useTasks, useMessages, useSendMessage,
   useChecklistItems, useCreateChecklistItem, useUpdateChecklistItem, useDeleteChecklistItem,
   useBoardItems, useCreateBoardItem, useDeleteBoardItem,
-  useCreateCalendarEvent,
+  useCalendarEvents, useCreateCalendarEvent,
   useDocuments, useUploadDocument, useDeleteDocument,
   usePhotos, useCreatePhoto, useDeletePhoto, useUploadImage,
   useUsers, useUpdateProject, usePlanningBoards, useUpdateUserPhone, useNotifyTeam,
@@ -81,6 +81,10 @@ export default function ProjectDetails() {
   const { data: sections } = useSections(projectId);
   const { data: tasks } = useTasks(projectId);
   const { data: activityLog } = useActivityLog(projectId);
+  const { data: calendarEvents } = useCalendarEvents(projectId);
+  const { data: checklistItems } = useChecklistItems(projectId);
+  const { data: photos } = usePhotos(projectId);
+  const { data: documents } = useDocuments(projectId);
   const { user } = useAuth();
   const { data: users } = useUsers();
   const { mutate: updateProject } = useUpdateProject();
@@ -260,6 +264,7 @@ export default function ProjectDetails() {
             project={project}
             milestones={milestones}
             activityLog={activityLog}
+            calendarEvents={calendarEvents}
             isAdminUser={isAdminUser}
             isUploadingHero={isUploadingHero}
             onHeroFileChosen={handleHeroFileChosen}
@@ -270,6 +275,9 @@ export default function ProjectDetails() {
             milestones={milestones}
             activityLog={activityLog}
             users={users}
+            calendarEvents={calendarEvents}
+            checklistItems={checklistItems}
+            photos={photos}
           />
         </>
       )}
@@ -411,8 +419,18 @@ export default function ProjectDetails() {
                 <ClientMilestoneList
                   milestones={milestones}
                   activityLog={activityLog}
+                  calendarEvents={calendarEvents}
+                  checklistItems={checklistItems}
+                  photos={photos}
                 />
-                <ClientReferenceCards project={project} users={users} />
+                <ClientReferenceCards
+                  project={project}
+                  users={users}
+                  checklistItems={checklistItems}
+                  documents={documents}
+                  onDecisionsClick={() => setShowOpenItemsDrawer(true)}
+                  onDocumentsClick={() => setActiveTab("docs")}
+                />
                 <button
                   onClick={() => setShowOpenItemsDrawer(true)}
                   className="text-xs text-primary hover:underline cursor-pointer -mt-1 block"

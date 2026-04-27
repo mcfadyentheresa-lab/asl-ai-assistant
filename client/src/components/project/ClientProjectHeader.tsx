@@ -12,7 +12,16 @@ interface Milestone {
 
 interface ActivityEntry {
   id: number;
+  type?: string;
+  userId?: string | null;
   createdAt?: string | Date | null;
+}
+
+interface CalendarEvent {
+  id: number;
+  title?: string | null;
+  type?: string | null;
+  date: string;
 }
 
 interface ProjectLike {
@@ -29,6 +38,7 @@ interface ClientProjectHeaderProps {
   project: ProjectLike;
   milestones: Milestone[] | undefined;
   activityLog: ActivityEntry[] | undefined;
+  calendarEvents: CalendarEvent[] | undefined;
   isAdminUser: boolean;
   isUploadingHero: boolean;
   onHeroFileChosen: (e: React.ChangeEvent<HTMLInputElement>) => void;
@@ -87,10 +97,27 @@ function deriveLastVisit(activityLog: ActivityEntry[] | undefined): string {
   return format(withDates[0], "MMM d");
 }
 
+function deriveNextWalkthrough(events: CalendarEvent[] | undefined): string {
+  if (!events || events.length === 0) return "—";
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const matches = events
+    .filter((e) => {
+      const haystack = `${e.type ?? ""} ${e.title ?? ""}`.toLowerCase();
+      return haystack.includes("meeting") || haystack.includes("walkthrough");
+    })
+    .map((e) => ({ e, d: new Date(e.date) }))
+    .filter(({ d }) => !Number.isNaN(d.getTime()) && d.getTime() >= now.getTime())
+    .sort((a, b) => a.d.getTime() - b.d.getTime());
+  if (matches.length === 0) return "—";
+  return format(matches[0].d, "MMM d");
+}
+
 export function ClientProjectHeader({
   project,
   milestones,
   activityLog,
+  calendarEvents,
   isAdminUser,
   isUploadingHero,
   onHeroFileChosen,
@@ -103,9 +130,7 @@ export function ClientProjectHeader({
   const phase = derivePhase(milestones, project.status);
   const schedule = deriveSchedule(project.startDate, project.endDate);
   const lastVisit = deriveLastVisit(activityLog);
-  // TODO: Next walkthrough requires querying calendar events for type "meeting"/"walkthrough".
-  // Calendar events are not currently fetched in ProjectDetails. Wire up in a follow-up PR.
-  const nextWalkthrough = "—";
+  const nextWalkthrough = deriveNextWalkthrough(calendarEvents);
 
   const isRealValue = (v: string | null | undefined): v is string =>
     typeof v === "string" && v.trim() !== "" && v.trim() !== "—";

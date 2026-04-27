@@ -23,9 +23,28 @@ interface BudgetSummaryResponse {
   budgetVisibleToClient?: boolean;
 }
 
+interface ChecklistItemLike {
+  id: number;
+  title: string;
+  completed?: boolean | null;
+  status?: string | null;
+  createdAt?: string | Date | null;
+}
+
+interface DocumentLike {
+  id: number;
+  title: string;
+  createdAt?: string | Date | null;
+}
+
 interface ClientReferenceCardsProps {
   project: ProjectLike;
   users: UserLike[] | undefined;
+  checklistItems?: ChecklistItemLike[] | undefined;
+  documents?: DocumentLike[] | undefined;
+  onDecisionsClick?: () => void;
+  onDocumentsClick?: () => void;
+  onTeamClick?: () => void;
 }
 
 const MONO_LABEL_STYLE: CSSProperties = {
@@ -45,17 +64,39 @@ function CardShell({
   sub,
   bar,
   testId,
+  onClick,
 }: {
   label: string;
   value: ReactNode;
   sub?: ReactNode;
   bar?: ReactNode;
   testId: string;
+  onClick?: () => void;
 }) {
+  const interactive = typeof onClick === "function";
+  const interactiveProps = interactive
+    ? {
+        role: "button" as const,
+        tabIndex: 0,
+        onClick,
+        onKeyDown: (e: React.KeyboardEvent<HTMLDivElement>) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onClick?.();
+          }
+        },
+      }
+    : {};
   return (
     <div
-      className="flex flex-col gap-2 rounded-lg border border-border/60 bg-card p-5 min-h-[140px]"
+      className={
+        "flex flex-col gap-2 rounded-lg border border-border/60 bg-card p-5 min-h-[140px]" +
+        (interactive
+          ? " cursor-pointer transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          : "")
+      }
       data-testid={testId}
+      {...interactiveProps}
     >
       <div
         className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground"
@@ -74,7 +115,21 @@ function CardShell({
   );
 }
 
-export function ClientReferenceCards({ project, users }: ClientReferenceCardsProps) {
+function isOpenItem(item: ChecklistItemLike): boolean {
+  if (item.completed) return false;
+  if (item.status && item.status === "done") return false;
+  return true;
+}
+
+export function ClientReferenceCards({
+  project,
+  users,
+  checklistItems,
+  documents,
+  onDecisionsClick,
+  onDocumentsClick,
+  onTeamClick,
+}: ClientReferenceCardsProps) {
   // Reuses the same endpoint as BudgetSnapshot so numbers agree. No new query types.
   const { data: budget } = useQuery<BudgetSummaryResponse>({
     queryKey: ["/api/projects", project.id, "budget-summary"],
@@ -95,16 +150,20 @@ export function ClientReferenceCards({ project, users }: ClientReferenceCardsPro
   const isOverBudget = budgetPercent > 100;
   const showBudgetCard = budgetVisibleToClient && budgetAmount > 0;
 
-  // TODO(reference-cards): wire to checklist/decision data once exposed at the
-  // page level. ProjectDetails currently only loads decisions inside nested
-  // tab components, so the parent doesn't have the count to pass down.
-  const decisionsAwaiting = null as number | null;
-  const nextDecisionLabel = null as string | null;
+  const openItems = checklistItems ? checklistItems.filter(isOpenItem) : null;
+  const decisionsAwaiting = openItems ? openItems.length : null;
+  const nextOpenItem = openItems && openItems.length > 0 ? openItems[0] : null;
+  const nextDecisionLabel = nextOpenItem ? nextOpenItem.title : null;
 
-  // TODO(reference-cards): wire to documents query once exposed at the page
-  // level. ProjectDetails only loads documents inside the Documents tab.
-  const documentsCount = null as number | null;
-  const latestDocumentName = null as string | null;
+  const documentsCount = documents ? documents.length : null;
+  const sortedDocs = documents
+    ? [...documents].sort((a, b) => {
+        const aT = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const bT = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return bT - aT;
+      })
+    : [];
+  const latestDocumentName = sortedDocs[0]?.title ?? null;
 
   const team: UserLike[] = (() => {
     if (!users) return [];
@@ -144,6 +203,7 @@ export function ClientReferenceCards({ project, users }: ClientReferenceCardsPro
         label="Decisions awaiting"
         value={decisionsAwaiting !== null ? String(decisionsAwaiting) : "—"}
         sub={nextDecisionLabel}
+        onClick={onDecisionsClick}
       />
 
       {showBudgetCard ? (
@@ -184,6 +244,7 @@ export function ClientReferenceCards({ project, users }: ClientReferenceCardsPro
             ? `Latest: ${latestDocumentName.length > 28 ? latestDocumentName.slice(0, 27) + "…" : latestDocumentName}`
             : null
         }
+        onClick={onDocumentsClick}
       />
 
       <CardShell
@@ -191,6 +252,7 @@ export function ClientReferenceCards({ project, users }: ClientReferenceCardsPro
         label="Your team"
         value={formatNamesList(teamFirstNames)}
         sub={primaryContactSub}
+        onClick={onTeamClick}
       />
     </section>
   );
