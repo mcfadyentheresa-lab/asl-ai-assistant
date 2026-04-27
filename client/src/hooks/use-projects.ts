@@ -946,3 +946,15 @@ export function useDeleteBoardSnapshot() {
     },
   });
 }
+
+export function useRenameBoardSnapshot() {
+  return useMutation({
+    mutationFn: async (variables: { id: number; boardId: number; name: string }) => {
+      const res = await apiRequest("PATCH", `/api/board-snapshots/${variables.id}`, { name: variables.name });
+      return res.json();
+    },
+    onSuccess: (_data: any, variables: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/planning-boards', variables.boardId, 'snapshots'] });
+    },
+  });
+}

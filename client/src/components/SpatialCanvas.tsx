@@ -54,7 +54,7 @@ import {
   ChefHat, Bath, Home, FileText, LayoutPanelLeft, LayoutGrid, Move,
   Lock, LockOpen, Hand, Wrench, Check,
   Spline, MoveRight, Slash, Droplet,
-  Play, Globe, Star,
+  Play, Globe, Star, History,
 } from "lucide-react";
 import HardwarePickerDialog, { type HardwareDraft } from "@/components/board/HardwarePickerDialog";
 import PaletteExtractionDialog, { type PaletteAddPayload } from "@/components/board/PaletteExtractionDialog";
@@ -62,6 +62,8 @@ import CanvasConnectors, { CONNECTOR_DEFAULT_COLOR, anchorDots, type ConnectorCo
 import PresentationMode from "@/components/board/PresentationMode";
 import AIPartnerPanel from "@/components/board/AIPartnerPanel";
 import RoomTabStrip from "@/components/board/RoomTabStrip";
+import VersionsPopover from "@/components/board/VersionsPopover";
+import VersionsCompareDialog from "@/components/board/VersionsCompareDialog";
 import {
   ROOM_STATUSES,
   STATUS_EDGE_COLOR,
@@ -74,7 +76,7 @@ import {
   roomZoneName,
 } from "@/lib/board-rooms";
 import { useToast } from "@/hooks/use-toast";
-import { usePlanningBoards, useCreatePlanningBoard, useDeletePlanningBoard, useUpdatePlanningBoard, useUploadImage, useUsers, useProjects, useMilestones, useChecklistItems, useCalendarEvents, useUpdateCalendarEvent, useDeleteCalendarEvent, useCreateCalendarEvent, useCreateMilestone, useCreateChecklistItem, useBoardSnapshots, useCreateBoardSnapshot, useRestoreBoardSnapshot, useDeleteBoardSnapshot } from "@/hooks/use-projects";
+import { usePlanningBoards, useCreatePlanningBoard, useDeletePlanningBoard, useUpdatePlanningBoard, useUploadImage, useUsers, useProjects, useMilestones, useChecklistItems, useCalendarEvents, useUpdateCalendarEvent, useDeleteCalendarEvent, useCreateCalendarEvent, useCreateMilestone, useCreateChecklistItem } from "@/hooks/use-projects";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -405,8 +407,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   const [renameName, setRenameName] = useState("");
   const [newBoardName, setNewBoardName] = useState("");
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
-  const [showSnapshotDialog, setShowSnapshotDialog] = useState(false);
-  const [newSnapshotName, setNewSnapshotName] = useState("");
+  const [compareSnapshotId, setCompareSnapshotId] = useState<number | null>(null);
 
   const [draggingId, setDraggingId] = useState<number | null>(null);
   const dragStartRef = useRef<{ x: number; y: number; elX: number; elY: number } | null>(null);
@@ -638,10 +639,13 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   const { data: milestones = [] } = useMilestones(projectId);
   const { data: checklistItems = [] } = useChecklistItems(projectId);
   const { data: calendarEvents = [] } = useCalendarEvents(projectId);
-  const { data: snapshots = [] } = useBoardSnapshots(selectedBoardId);
-  const { mutateAsync: createSnapshot, isPending: isCreatingSnapshot } = useCreateBoardSnapshot();
-  const { mutateAsync: restoreSnapshot, isPending: isRestoringSnapshot } = useRestoreBoardSnapshot();
-  const { mutateAsync: deleteSnapshot } = useDeleteBoardSnapshot();
+  const refreshCanvasFromServer = useCallback(async () => {
+    if (!selectedBoardId) return;
+    const url = buildUrl(api.canvasElements.list.path, { boardId: selectedBoardId });
+    const res = await fetch(url, { credentials: "include" });
+    const els = await res.json();
+    setElements(els);
+  }, [selectedBoardId, setElements]);
 
   useEffect(() => {
     const timers = droppingTimersRef.current;
@@ -4734,9 +4738,6 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                 <DropdownMenuItem onClick={() => setShowCalendarSheet(true)} data-testid="menu-view-calendar">
                   <CalendarDays className="h-4 w-4 mr-2" /> View Calendar
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => { setNewSnapshotName(""); setShowSnapshotDialog(true); }} data-testid="menu-snapshots">
-                  <Save className="h-4 w-4 mr-2" /> Versions
-                </DropdownMenuItem>
                 <DropdownMenuItem className="text-destructive" onClick={() => setShowDeleteConfirm(true)} data-testid="menu-delete-board">
                   <Trash2 className="h-4 w-4 mr-2" /> Delete Board
                 </DropdownMenuItem>
@@ -4916,6 +4917,33 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                   {Object.keys(elements).length < 3 ? "Add a few items first" : "Present"}
                 </TooltipContent>
               </Tooltip>
+              {selectedBoardId !== null && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span>
+                      <VersionsPopover
+                        boardId={selectedBoardId}
+                        activeRoom={activeRoom}
+                        liveElements={Object.values(elements) as CanvasElement[]}
+                        onAfterRestore={refreshCanvasFromServer}
+                        onCompare={(snapshotId) => setCompareSnapshotId(snapshotId)}
+                        trigger={
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            data-testid="button-versions"
+                            aria-label="Versions"
+                            className="h-8 w-8 hover:bg-primary/10 hover:text-primary"
+                          >
+                            <History className="h-4 w-4" />
+                          </Button>
+                        }
+                      />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="text-xs">Versions</TooltipContent>
+                </Tooltip>
+              )}
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -6116,103 +6144,16 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showSnapshotDialog} onOpenChange={setShowSnapshotDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Board Versions</DialogTitle>
-            <DialogDescription>Save or restore a snapshot of your board layout.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="flex gap-2">
-              <Input
-                value={newSnapshotName}
-                onChange={(e) => setNewSnapshotName(e.target.value)}
-                placeholder="Version name (e.g. Initial concept)"
-                className="flex-1 text-sm"
-                data-testid="input-snapshot-name"
-              />
-              <Button
-                size="sm"
-                disabled={!newSnapshotName.trim() || isCreatingSnapshot}
-                onClick={async () => {
-                  if (!selectedBoardId || !newSnapshotName.trim()) return;
-                  try {
-                    await createSnapshot({ boardId: selectedBoardId, name: newSnapshotName.trim() });
-                    setNewSnapshotName("");
-                    toast({ title: "Version saved" });
-                  } catch {
-                    toast({ title: "Error", description: "Failed to save version", variant: "destructive" });
-                  }
-                }}
-                data-testid="button-save-snapshot"
-              >
-                {isCreatingSnapshot ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5 mr-1" />}
-                Save
-              </Button>
-            </div>
-            {snapshots.length === 0 ? (
-              <p className="text-xs text-muted-foreground text-center py-4">No saved versions yet.</p>
-            ) : (
-              <div className="space-y-1 max-h-60 overflow-y-auto">
-                {snapshots.map((snap: any) => (
-                  <div key={snap.id} className="flex items-center justify-between gap-2 p-2 rounded-md hover:bg-muted/50 group" data-testid={`snapshot-${snap.id}`}>
-                    <div className="min-w-0">
-                      <div className="text-sm font-medium truncate">{snap.name}</div>
-                      <div className="text-[10px] text-muted-foreground">
-                        {snap.createdAt ? new Date(snap.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : ""}
-                      </div>
-                    </div>
-                    <div className="flex gap-1 shrink-0">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 text-xs"
-                        disabled={isRestoringSnapshot}
-                        onClick={async () => {
-                          if (!selectedBoardId) return;
-                          try {
-                            await restoreSnapshot({ id: snap.id, boardId: selectedBoardId });
-                            setElements([]);
-                            const url = buildUrl(api.canvasElements.list.path, { boardId: selectedBoardId });
-                            const res = await fetch(url, { credentials: "include" });
-                            const els = await res.json();
-                            setElements(els);
-                            toast({ title: "Version restored" });
-                            setShowSnapshotDialog(false);
-                          } catch {
-                            toast({ title: "Error", description: "Failed to restore version", variant: "destructive" });
-                          }
-                        }}
-                        data-testid={`button-restore-snapshot-${snap.id}`}
-                      >
-                        {isRestoringSnapshot ? <Loader2 className="h-3 w-3 animate-spin" /> : <Undo2 className="h-3 w-3 mr-1" />}
-                        Restore
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 opacity-0 group-hover:opacity-100"
-                        onClick={async () => {
-                          if (!selectedBoardId) return;
-                          try {
-                            await deleteSnapshot({ id: snap.id, boardId: selectedBoardId });
-                            toast({ title: "Version deleted" });
-                          } catch {
-                            toast({ title: "Error", description: "Failed to delete version", variant: "destructive" });
-                          }
-                        }}
-                        data-testid={`button-delete-snapshot-${snap.id}`}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      {selectedBoardId !== null && (actualRole === "admin" || actualRole === "crew") && (
+        <VersionsCompareDialog
+          open={compareSnapshotId !== null}
+          onOpenChange={(v) => !v && setCompareSnapshotId(null)}
+          boardId={selectedBoardId}
+          snapshotId={compareSnapshotId}
+          liveElements={Object.values(elements) as CanvasElement[]}
+          onAfterRestore={refreshCanvasFromServer}
+        />
+      )}
 
       <Dialog open={showLinkDialog} onOpenChange={setShowLinkDialog}>
         <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-md">
