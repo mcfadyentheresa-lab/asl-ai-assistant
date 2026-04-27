@@ -54,10 +54,13 @@ import {
   Lock, LockOpen, Hand, Wrench, Check,
   Spline, MoveRight, Slash, Droplet,
   ChevronDown, ChevronRight,
+  Play, MessageSquareQuote,
 } from "lucide-react";
 import HardwarePickerDialog, { type HardwareDraft } from "@/components/board/HardwarePickerDialog";
 import PaletteExtractionDialog, { type PaletteAddPayload } from "@/components/board/PaletteExtractionDialog";
 import CanvasConnectors, { CONNECTOR_DEFAULT_COLOR, anchorDots, type ConnectorContent, type ConnectorStyle, type ConnectorCurve } from "@/components/board/CanvasConnectors";
+import PresentationMode from "@/components/board/PresentationMode";
+import DesignCritiquePanel from "@/components/board/DesignCritiquePanel";
 import { useToast } from "@/hooks/use-toast";
 import { usePlanningBoards, useCreatePlanningBoard, useDeletePlanningBoard, useUpdatePlanningBoard, useUploadImage, useUsers, useProjects, useMilestones, useChecklistItems, useCalendarEvents, useUpdateCalendarEvent, useDeleteCalendarEvent, useCreateCalendarEvent, useCreateMilestone, useCreateChecklistItem, useBoardSnapshots, useCreateBoardSnapshot, useRestoreBoardSnapshot, useDeleteBoardSnapshot } from "@/hooks/use-projects";
 import { Badge } from "@/components/ui/badge";
@@ -331,6 +334,8 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   const [showRenameDialog, setShowRenameDialog] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showManageBoards, setShowManageBoards] = useState(false);
+  const [showPresentation, setShowPresentation] = useState(false);
+  const [showCritique, setShowCritique] = useState(false);
   const [boardsToDelete, setBoardsToDelete] = useState<Set<number>>(new Set());
   const [showNewBoardDialog, setShowNewBoardDialog] = useState(false);
   const [showLinkDialog, setShowLinkDialog] = useState(false);
@@ -4057,6 +4062,46 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             </TooltipTrigger>
             <TooltipContent side="bottom" className="text-xs">Zoom In</TooltipContent>
           </Tooltip>
+          {(actualRole === "admin" || actualRole === "crew") && (
+            <>
+              <Separator orientation="vertical" className="h-4 mx-1" />
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => setShowCritique(true)}
+                    data-testid="button-design-critique"
+                    aria-label="Design critique"
+                    className="h-8 w-8 hover:bg-primary/10 hover:text-primary"
+                  >
+                    <MessageSquareQuote className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">Design critique</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => setShowPresentation(true)}
+                      disabled={Object.keys(elements).length < 3}
+                      data-testid="button-presentation"
+                      aria-label="Present"
+                      className="h-8 w-8 hover:bg-primary/10 hover:text-primary"
+                    >
+                      <Play className="h-4 w-4" />
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">
+                  {Object.keys(elements).length < 3 ? "Add a few items first" : "Present"}
+                </TooltipContent>
+              </Tooltip>
+            </>
+          )}
           <Tooltip>
             <TooltipTrigger asChild>
               <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-primary/10 hover:text-primary" onClick={fitToScreen} data-testid="button-fit-screen">
@@ -5737,6 +5782,27 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           </div>
         </SheetContent>
       </Sheet>
+
+      {showPresentation && selectedBoardId !== null && (
+        <PresentationMode
+          open={showPresentation}
+          onClose={() => setShowPresentation(false)}
+          projectId={projectId}
+          boardId={selectedBoardId}
+          boardName={selectedBoard?.name}
+          elements={Object.values(elements)}
+        />
+      )}
+      {showCritique && selectedBoardId !== null && (
+        <DesignCritiquePanel
+          open={showCritique}
+          onClose={() => setShowCritique(false)}
+          projectId={projectId}
+          boardId={selectedBoardId}
+          elements={Object.values(elements)}
+          hasClient={Boolean(allProjects.find((p: any) => p.id === projectId)?.clientId)}
+        />
+      )}
     </div>
   );
 }

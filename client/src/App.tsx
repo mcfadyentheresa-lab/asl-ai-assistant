@@ -41,6 +41,7 @@ import ResetPassword from "@/pages/ResetPassword";
 import AcceptInvite from "@/pages/AcceptInvite";
 import Welcome from "@/pages/Welcome";
 import LandingPage from "@/pages/LandingPage";
+import PublicPresentation from "@/pages/PublicPresentation";
 import NotFound from "@/pages/not-found";
 
 function PresenceTracker() {
@@ -96,6 +97,7 @@ function Router() {
         <Route path="/reset-password/:token" component={ResetPassword} />
         <Route path="/accept-invite/:token" component={AcceptInvite} />
         <Route path="/invite/:token" component={InviteAccept} />
+        <Route path="/p/:token" component={PublicPresentation} />
         <Route component={LandingPage} />
       </Switch>
     );
@@ -112,6 +114,7 @@ function Router() {
         <Route path="/accept-invite/:token" component={AcceptInvite} />
         <Route path="/reset-password/:token" component={ResetPassword} />
         <Route path="/invite/:token" component={InviteAccept} />
+        <Route path="/p/:token" component={PublicPresentation} />
         <Route>
           {() => (
             <AppShell>

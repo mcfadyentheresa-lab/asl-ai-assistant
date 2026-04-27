@@ -2395,6 +2395,194 @@ function templateCanvasToElements(canvasData: any, boardId: number, createdBy: s
     }
   });
 
+  // ────────────────────────────────────────────────────────────────────────
+  // Presentation Mode: share-link + public read-only endpoint.
+  // Token is stored inside planning_boards.canvasData JSONB under `shareToken`,
+  // so no schema migration is required. Lookup is O(n) over boards but the
+  // board count is small.
+  // ────────────────────────────────────────────────────────────────────────
+  app.post("/api/board/presentation-link", isAuthenticated, asyncHandler(async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const dbUser = await authStorage.getUser(userId);
+    if (!dbUser || (dbUser.role !== "admin" && dbUser.role !== "crew")) {
+      return res.status(403).json({ error: "Admins and crew only" });
+    }
+    const { boardId } = req.body || {};
+    if (!boardId || typeof boardId !== "number") {
+      return res.status(400).json({ error: "boardId required" });
+    }
+    const board = await storage.getPlanningBoard(boardId);
+    if (!board) return res.status(404).json({ error: "Board not found" });
+
+    const existing = (board.canvasData as any) || {};
+    let token: string = existing.shareToken;
+    if (!token || typeof token !== "string") {
+      token = randomUUID();
+      const nextCanvas = { ...existing, shareToken: token };
+      await storage.savePlanningBoardCanvas(board.id, nextCanvas, userId);
+    }
+    res.json({ url: `/p/${token}`, token });
+  }));
+
+  app.get("/api/board/presentation/:token", asyncHandler(async (req: any, res) => {
+    const { token } = req.params;
+    if (!token) return res.status(400).json({ error: "Token required" });
+
+    // Find a board whose canvasData.shareToken matches.
+    // We don't have a direct query helper, so scan via the underlying drizzle handle.
+    const allBoards = await (storage as any).getAllPlanningBoardsForShareLookup?.() ?? null;
+    let board: any = null;
+    if (Array.isArray(allBoards)) {
+      board = allBoards.find((b: any) => (b.canvasData as any)?.shareToken === token);
+    } else {
+      // Fallback: scan all projects' boards. Less efficient but acceptable for small datasets.
+      const projects = await storage.getProjects();
+      for (const proj of projects) {
+        const boards = await storage.getPlanningBoards(proj.id);
+        const match = boards.find((b: any) => (b.canvasData as any)?.shareToken === token);
+        if (match) { board = match; break; }
+      }
+    }
+    if (!board) return res.status(404).json({ error: "Not found" });
+
+    const elements = await storage.getCanvasElements(board.id);
+    res.json({
+      projectId: board.projectId,
+      boardId: board.id,
+      boardName: board.name,
+      elements,
+    });
+  }));
+
+  // ────────────────────────────────────────────────────────────────────────
+  // AI Design Critique: senior-designer-voice take on the current board.
+  // ────────────────────────────────────────────────────────────────────────
+  const critiqueLimits = new Map<string, number[]>(); // key: `${boardId}:${userId}` → [timestamps]
+  const CRITIQUE_LIMIT = 5;
+  const CRITIQUE_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+
+  app.post("/api/ai/design-critique", isAuthenticated, asyncHandler(async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const dbUser = await authStorage.getUser(userId);
+    if (!dbUser || (dbUser.role !== "admin" && dbUser.role !== "crew")) {
+      return res.status(403).json({ error: "Admins and crew only" });
+    }
+
+    const { boardId, focus } = req.body || {};
+    if (!boardId || typeof boardId !== "number") {
+      return res.status(400).json({ error: "boardId required" });
+    }
+
+    // Rate limit.
+    const key = `${boardId}:${userId}`;
+    const now = Date.now();
+    const stamps = (critiqueLimits.get(key) || []).filter((t) => now - t < CRITIQUE_WINDOW_MS);
+    if (stamps.length >= CRITIQUE_LIMIT) {
+      return res.status(429).json({ error: "Critique limit reached. Try again later." });
+    }
+    stamps.push(now);
+    critiqueLimits.set(key, stamps);
+
+    const board = await storage.getPlanningBoard(boardId);
+    if (!board) return res.status(404).json({ error: "Board not found" });
+
+    const project = await storage.getProject(board.projectId);
+    const elements = await storage.getCanvasElements(boardId);
+
+    const colorSwatches = elements.filter((e) => e.type === "color_swatch");
+    const hardware = elements.filter((e) => e.type === "hardware");
+    const materials = elements.filter((e) => e.type === "material");
+    const products = elements.filter((e) => e.type === "product");
+    const images = elements.filter((e) => e.type === "image");
+    const notes = elements.filter((e) => e.type === "note" || e.type === "plain_text");
+    const rooms = elements.filter((e) => e.type === "room_zone");
+
+    const fmtList = (label: string, items: string[]) =>
+      items.length ? `${label}:\n${items.map((s) => `  - ${s}`).join("\n")}` : "";
+
+    const digestParts: string[] = [];
+    digestParts.push(`Project: ${project?.name || "Untitled"}${project?.address ? ` (${project.address})` : ""}`);
+    if (rooms.length) {
+      const roomNames = rooms.map((r) => (r.content as any)?.name || (r.content as any)?.label).filter(Boolean) as string[];
+      if (roomNames.length) digestParts.push(`Rooms: ${roomNames.join(", ")}`);
+    }
+    digestParts.push(fmtList(
+      "Color palette",
+      colorSwatches.map((s) => {
+        const c: any = s.content || {};
+        return [c.name || "Untitled color", c.brand, c.code, c.hex, typeof c.lrv === "number" ? `LRV ${c.lrv}` : null, c.sheen, c.room]
+          .filter(Boolean).join(" · ");
+      })
+    ));
+    digestParts.push(fmtList(
+      "Hardware",
+      hardware.map((h) => {
+        const c: any = h.content || {};
+        return [c.name || "Untitled", c.category, c.brand, c.finish, c.room, c.status]
+          .filter(Boolean).join(" · ");
+      })
+    ));
+    digestParts.push(fmtList(
+      "Materials",
+      materials.map((m) => {
+        const c: any = m.content || {};
+        return [c.name || "Untitled", c.supplier, c.category, c.code]
+          .filter(Boolean).join(" · ");
+      })
+    ));
+    digestParts.push(fmtList(
+      "Products",
+      products.map((p) => {
+        const c: any = p.content || {};
+        return [c.name || "Untitled", c.brand, c.category, c.sku]
+          .filter(Boolean).join(" · ");
+      })
+    ));
+    digestParts.push(`Inspiration images: ${images.length} on the board`);
+
+    if (notes.length) {
+      const noteText = notes.map((n) => (n.content as any)?.text || (n.content as any)?.content || "")
+        .filter((s: string) => s.trim().length).join("\n").slice(0, 500);
+      if (noteText) digestParts.push(`Notes (excerpts):\n${noteText}`);
+    }
+
+    const digest = digestParts.filter(Boolean).join("\n\n");
+
+    const systemPrompt = `You are a senior interior designer giving honest, warm, specific feedback to a designer-collaborator on a working moodboard. You have 25 years experience working in residential interiors with a sensibility like Heidi Caillier or Athena Calderone. Your feedback is direct but never harsh, and always points to a specific element by name when making a critique.
+
+Given this board, write a critique in 4 short sections:
+1. The vibe — 1-2 sentences naming the mood and what's working
+2. Tensions — 1-3 specific tensions, each naming the element by name
+3. Missing — 1-2 things the board lacks that would round it out
+4. Next move — 1 sentence, the single most leveraged next decision
+
+Use designer language naturally. Be specific. Mention items by their actual names. Avoid generic statements. No bullet lists in your response — write in flowing paragraphs with bold section headings (Markdown). Use **The vibe**, **Tensions**, **Missing**, and **Next move** as bold headings on their own lines.`;
+
+    const userMessage = `Focus: ${focus || "all"}\n\nBoard summary:\n\n${digest}`;
+
+    try {
+      const OpenAI = (await import("openai")).default;
+      const client = new OpenAI({
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+      });
+
+      const response = await client.chat.completions.create({
+        model: "gpt-5-mini",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userMessage },
+        ],
+      } as any);
+
+      const critique = response.choices[0]?.message?.content?.trim() || "Could not generate a critique. Try again.";
+      res.json({ critique, generatedAt: new Date().toISOString() });
+    } catch (error: any) {
+      console.error("Design critique error:", error);
+      res.status(500).json({ error: "Failed to generate critique" });
+    }
+  }));
+
   app.post("/api/presence/heartbeat", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub;
     const dbUser = await authStorage.getUser(userId);
