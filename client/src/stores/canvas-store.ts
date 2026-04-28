@@ -11,12 +11,40 @@ type UndoAction =
 
 const MAX_UNDO = 50;
 
+export const COMPARE_MAX = 4;
+
+const compareKeyFor = (boardId: number | null) =>
+  boardId == null ? null : `asl:board:${boardId}:compareIds`;
+
+const readPersistedCompareIds = (boardId: number | null): number[] => {
+  const key = compareKeyFor(boardId);
+  if (!key) return [];
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((n) => typeof n === "number").slice(0, COMPARE_MAX);
+  } catch {
+    return [];
+  }
+};
+
+const writePersistedCompareIds = (boardId: number | null, ids: number[]) => {
+  const key = compareKeyFor(boardId);
+  if (!key) return;
+  try {
+    localStorage.setItem(key, JSON.stringify(ids.slice(0, COMPARE_MAX)));
+  } catch {}
+};
+
 interface CanvasStore {
   elements: Record<number, CanvasElement>;
   dirtyIds: Set<number>;
   boardId: number | null;
   loading: boolean;
   undoStack: UndoAction[];
+  compareIds: number[];
 
   setElements: (elements: CanvasElement[]) => void;
   setBoardId: (id: number | null) => void;
@@ -34,6 +62,11 @@ interface CanvasStore {
   markDirty: (id: number) => void;
   clearDirty: () => void;
   getDirtyUpdates: () => { id: number; x: number; y: number; width: number; height: number; zIndex: number; parentColumnId: number | null }[];
+
+  addToCompare: (id: number) => "added" | "already" | "full";
+  removeFromCompare: (id: number) => void;
+  toggleCompare: (id: number) => "added" | "removed" | "full";
+  clearCompare: () => void;
 }
 
 export const useCanvasStore = create<CanvasStore>((set, get) => ({
@@ -42,13 +75,21 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   boardId: null,
   loading: false,
   undoStack: [],
+  compareIds: [],
 
   setElements: (elements) => {
     const map: Record<number, CanvasElement> = {};
     migrateElements(elements).forEach((e) => { map[e.id] = e; });
-    set({ elements: map, dirtyIds: new Set() });
+    set((s) => ({
+      elements: map,
+      dirtyIds: new Set(),
+      compareIds: s.compareIds.filter((id) => map[id] != null),
+    }));
   },
-  setBoardId: (id) => set({ boardId: id, undoStack: [] }),
+  setBoardId: (id) => {
+    const compareIds = readPersistedCompareIds(id);
+    set({ boardId: id, undoStack: [], compareIds });
+  },
   setLoading: (loading) => set({ loading }),
 
   addElement: (element) => {
@@ -70,7 +111,11 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       const { [id]: _, ...rest } = s.elements;
       const dirty = new Set(Array.from(s.dirtyIds));
       dirty.delete(id);
-      return { elements: rest, dirtyIds: dirty };
+      const nextCompare = s.compareIds.filter((cid) => cid !== id);
+      if (nextCompare.length !== s.compareIds.length) {
+        writePersistedCompareIds(s.boardId, nextCompare);
+      }
+      return { elements: rest, dirtyIds: dirty, compareIds: nextCompare };
     });
   },
   moveElement: (id, x, y) => {
@@ -97,6 +142,42 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     return action;
   },
   clearUndo: () => set({ undoStack: [] }),
+
+  addToCompare: (id) => {
+    const s = get();
+    if (s.compareIds.includes(id)) return "already";
+    if (s.compareIds.length >= COMPARE_MAX) return "full";
+    const next = [...s.compareIds, id];
+    writePersistedCompareIds(s.boardId, next);
+    set({ compareIds: next });
+    return "added";
+  },
+  removeFromCompare: (id) => {
+    const s = get();
+    if (!s.compareIds.includes(id)) return;
+    const next = s.compareIds.filter((cid) => cid !== id);
+    writePersistedCompareIds(s.boardId, next);
+    set({ compareIds: next });
+  },
+  toggleCompare: (id) => {
+    const s = get();
+    if (s.compareIds.includes(id)) {
+      const next = s.compareIds.filter((cid) => cid !== id);
+      writePersistedCompareIds(s.boardId, next);
+      set({ compareIds: next });
+      return "removed";
+    }
+    if (s.compareIds.length >= COMPARE_MAX) return "full";
+    const next = [...s.compareIds, id];
+    writePersistedCompareIds(s.boardId, next);
+    set({ compareIds: next });
+    return "added";
+  },
+  clearCompare: () => {
+    const s = get();
+    writePersistedCompareIds(s.boardId, []);
+    set({ compareIds: [] });
+  },
 
   markDirty: (id) => {
     set((s) => ({ dirtyIds: new Set(Array.from(s.dirtyIds).concat([id])) }));
