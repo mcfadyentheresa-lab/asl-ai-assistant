@@ -74,9 +74,10 @@ import { Crop } from "lucide-react";
 import { ProjectNowCard } from "@/components/project/ProjectNowCard";
 import { ClientMilestoneList } from "@/components/project/ClientMilestoneList";
 import { ClientReferenceCards } from "@/components/project/ClientReferenceCards";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import type { ChecklistItem, BoardItem } from "@shared/schema";
 
-export default function ProjectDetails() {
+function ProjectDetailsInner() {
   const { id } = useParams();
   const projectId = Number(id);
   const { data: project, isLoading: loadingProject } = useProject(projectId);
@@ -141,6 +142,16 @@ export default function ProjectDetails() {
   const userRole = actualRole === "admin" ? viewMode : actualRole;
 
   const [seenLocally, setSeenLocally] = useState<Set<number>>(new Set());
+  // NOTE: these three useState hooks were previously declared *after* the
+  // early-return guards below for `loadingProject` / `!project`. That violated
+  // the rules of hooks: on the first render `project` is undefined so the
+  // component returned early and these hooks never ran; once `project` loaded
+  // the hook count jumped, and React threw "Rendered more hooks than during the
+  // previous render" — the page went blank with no UI to surface the error.
+  // Keep all hooks above the early returns.
+  const [heroEditing, setHeroEditing] = useState(false);
+  const [heroLocal, setHeroLocal] = useState<{ focalX: number; focalY: number; zoom: number } | null>(null);
+  const [isGeneratingSpecSheet, setIsGeneratingSpecSheet] = useState(false);
 
   useEffect(() => {
     if (activeTab !== "overview" || !activityLog || !user?.id) return;
@@ -222,10 +233,6 @@ export default function ProjectDetails() {
 
   const isAdminUser = user?.role === "admin";
   const isCrewUser = user?.role === "crew";
-
-  const [heroEditing, setHeroEditing] = useState(false);
-  const [heroLocal, setHeroLocal] = useState<{ focalX: number; focalY: number; zoom: number } | null>(null);
-  const [isGeneratingSpecSheet, setIsGeneratingSpecSheet] = useState(false);
 
   const downloadSpecSheet = async (id: number, name: string) => {
     setIsGeneratingSpecSheet(true);
@@ -1020,6 +1027,14 @@ export default function ProjectDetails() {
         />
       )}
     </div>
+  );
+}
+
+export default function ProjectDetails() {
+  return (
+    <ErrorBoundary label="the project page">
+      <ProjectDetailsInner />
+    </ErrorBoundary>
   );
 }
 
