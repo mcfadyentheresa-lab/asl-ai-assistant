@@ -55,6 +55,7 @@ import {
   Lock, LockOpen, Hand, Wrench, Check,
   Spline, MoveRight, Slash, Droplet,
   Play, Globe, Star, History, AlertTriangle, Settings,
+  Pin, Layers,
 } from "lucide-react";
 import HardwarePickerDialog, { type HardwareDraft } from "@/components/board/HardwarePickerDialog";
 import PaletteExtractionDialog, { type PaletteAddPayload } from "@/components/board/PaletteExtractionDialog";
@@ -66,6 +67,7 @@ import RoomTabStrip, { type BoardMode } from "@/components/board/RoomTabStrip";
 import SecondaryAxisChips from "@/components/board/SecondaryAxisChips";
 import VersionsPopover from "@/components/board/VersionsPopover";
 import VersionsCompareDialog from "@/components/board/VersionsCompareDialog";
+import CompareDrawer, { isComparable as isCompareEligible } from "@/components/board/CompareDrawer";
 import {
   ROOM_STATUSES,
   STATUS_EDGE_COLOR,
@@ -683,6 +685,14 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   const loading = useCanvasStore((s) => s.loading);
   const { setElements, addElement, updateElement, removeElement, moveElement, setLoading, setBoardId, pushUndo, popUndo } = useCanvasStore.getState();
   const undoStack = useCanvasStore((s) => s.undoStack);
+  // Compare drawer state — `compareIds` is reactive, the actions are pulled
+  // from the static store (they're stable references).
+  const compareIds = useCanvasStore((s) => s.compareIds);
+  const addToCompare = useCanvasStore((s) => s.addToCompare);
+  const removeFromCompare = useCanvasStore((s) => s.removeFromCompare);
+  const toggleCompare = useCanvasStore((s) => s.toggleCompare);
+  const clearCompare = useCanvasStore((s) => s.clearCompare);
+  const [compareDrawerOpen, setCompareDrawerOpen] = useState(false);
 
   const {
     collaborators,
@@ -1217,6 +1227,88 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     } catch {}
   };
 
+  // Toggle the "Add to compare" action for a card from the contextual chip menu.
+  // Capacity is enforced at the store layer so we can show a friendly toast here.
+  const handleToggleCompare = (id: number) => {
+    const result = toggleCompare(id);
+    if (result === "full") {
+      toast({
+        title: "Compare holds up to 4 cards. Remove one first.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (result === "added") {
+      const next = useCanvasStore.getState().compareIds.length;
+      toast({ title: `Added to Compare (${next}/4)` });
+    }
+  };
+
+  // Drop a small `text` callout near the top-right of the visible viewport.
+  // Captures the winner + also-considered list and the local time. The element
+  // is created via the standard create endpoint so it persists & syncs like
+  // anything else on the board.
+  const handleSaveComparison = async (winnerId: number, alsoIds: number[]) => {
+    if (!selectedBoardId) return { ok: false };
+    const winner = elements[winnerId];
+    if (!winner) return { ok: false };
+    const winnerName = ((winner.content as any)?.name)
+      || ((winner.content as any)?.title)
+      || "Selected card";
+    const alsoNames = alsoIds
+      .map((id) => elements[id])
+      .filter(Boolean)
+      .map((el) => ((el!.content as any)?.name) || ((el!.content as any)?.title) || "")
+      .filter(Boolean);
+    const now = new Date();
+    const hh = String(now.getHours()).padStart(2, "0");
+    const mm = String(now.getMinutes()).padStart(2, "0");
+    const lines = [`Compared at ${hh}:${mm} — Winner: ${winnerName}`];
+    if (alsoNames.length > 0) {
+      lines.push("Also considered:");
+      for (const n of alsoNames) lines.push(`• ${n}`);
+    }
+    const text = lines.join("\n");
+
+    // Place near the top-right of the current viewport. We use the same
+    // visible-canvas-coords math the rest of the placement code uses.
+    const viewW = containerRef.current?.clientWidth || 800;
+    const calloutW = 240;
+    const calloutH = Math.max(80, 28 + lines.length * 18);
+    const rightPadding = 32;
+    const topPadding = 32;
+    const x = Math.round((-pan.x + viewW - calloutW - rightPadding) / zoom);
+    const y = Math.round((-pan.y + topPadding) / zoom);
+    const newZ = maxZ;
+    setMaxZ((z) => z + 1);
+
+    try {
+      const url = buildUrl(api.canvasElements.create.path, { boardId: selectedBoardId });
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          type: "text",
+          x,
+          y,
+          width: calloutW,
+          height: calloutH,
+          zIndex: newZ,
+          content: { variant: "callout", text, color: "#fef9c3" },
+        }),
+      });
+      if (!res.ok) return { ok: false };
+      const el = await res.json();
+      addElement(el);
+      sendElementAdd(el);
+      pushUndo({ type: "create", elementId: el.id });
+      return { ok: true };
+    } catch {
+      return { ok: false };
+    }
+  };
+
   // Manually re-check a vendor URL's health for one element. Hits the server-side
   // recheck endpoint (admin/crew + rate-limited there) and merges the result onto
   // the element so the broken-link chip refreshes.
@@ -1446,6 +1538,17 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
         const tag = t?.tagName?.toLowerCase();
         const isEditable = tag === "input" || tag === "textarea" || (t && t.isContentEditable);
         if (!isEditable) {
+          // Shift+C toggles the Compare drawer. We use Shift+C rather than
+          // bare "c" because lower-case c already opens the color palette,
+          // and we shouldn't change the existing add-palette letter.
+          if (e.shiftKey && e.key === "C") {
+            e.preventDefault();
+            setCompareDrawerOpen((prev) => !prev);
+            return;
+          }
+          // Skip the add-palette map when Shift is held — uppercase letters
+          // are reserved for non-add-palette actions.
+          if (e.shiftKey) return;
           const map: Record<string, string> = {
             n: "note",
             t: "plain_text",
@@ -3095,6 +3198,37 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   // cycles idea → shortlist → selected → ordered → idea. Identical signal to
   // the picker, just one tap deep so the user can advance a card without
   // opening the property panel.
+  // "Add to compare" / "In compare" toggle — rendered on the chip action row
+  // of every comparable card (hardware/surface/product/link) when selected.
+  // The action is a stack/pin glyph + label; tapping toggles the element in the
+  // store. The long-press 300ms move gesture is unchanged because this lives on
+  // the selected-state chip row, not on raw long-press.
+  const renderCompareChip = (el: CanvasElement) => {
+    if (!isCompareEligible(el)) return null;
+    const inCompare = compareIds.includes(el.id);
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            size="icon"
+            variant="ghost"
+            className={`h-11 w-11 md:h-6 md:w-6 hover:bg-primary/10 hover:text-primary ${inCompare ? "text-primary" : ""}`}
+            onClick={(e) => { e.stopPropagation(); handleToggleCompare(el.id); }}
+            onMouseDown={(e) => e.stopPropagation()}
+            aria-label={inCompare ? "Remove from compare" : "Add to compare"}
+            aria-pressed={inCompare}
+            data-testid={`compare-chip-${el.id}`}
+          >
+            <Pin className="h-3 w-3" strokeWidth={inCompare ? 2.5 : 2} />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="text-xs">
+          {inCompare ? "In compare — tap to remove" : "Add to compare"}
+        </TooltipContent>
+      </Tooltip>
+    );
+  };
+
   const renderStatusCycleChip = (el: CanvasElement) => {
     if (!isRoomable(el)) return null;
     const status = (((el.content as any)?.status) as RoomStatus | undefined) || "idea";
@@ -4122,6 +4256,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             </div>
             {isSelected && (
               <div className="absolute -top-8 right-0 flex items-center gap-1">
+                {renderCompareChip(el)}
                 {renderStatusCycleChip(el)}
                 {renderOpenButton()}
                 <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleDeleteElement(el.id)} data-testid={`button-delete-${el.id}`}>
@@ -4248,6 +4383,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           )}
           {isSelected && (
             <div className="absolute -top-8 right-0 flex items-center gap-1">
+              {renderCompareChip(el)}
               {renderStatusCycleChip(el)}
               {renderOpenButton()}
               <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleDeleteElement(el.id)} data-testid={`button-delete-${el.id}`}>
@@ -4360,6 +4496,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           )}
           {isSelected && (
             <div className="absolute -top-8 right-0 flex items-center gap-1">
+              {renderCompareChip(el)}
               {renderStatusCycleChip(el)}
               {renderOpenButton()}
               <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleDeleteElement(el.id)} data-testid={`button-delete-${el.id}`}>
@@ -4474,6 +4611,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           </div>
           {isSelected && (
             <div className="absolute -top-8 right-0 flex items-center gap-1">
+              {renderCompareChip(el)}
               {renderStatusCycleChip(el)}
               {c.url && (
                 <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => window.open(c.url, "_blank")} data-testid={`button-open-product-${el.id}`}>
@@ -4650,6 +4788,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           </div>
           {isSelected && (
             <div className="absolute -top-8 right-0 flex gap-1">
+              {renderCompareChip(el)}
               {c.url && (
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -6307,6 +6446,16 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                 <Upload className="h-3.5 w-3.5" /> Upload Image
               </button>
             )}
+            {isCompareEligible(elements[contextMenu.elementId]) && (
+              <button
+                className="w-full px-3 py-1.5 text-left text-sm flex items-center gap-2 hover:bg-muted transition-colors"
+                onClick={() => { handleToggleCompare(contextMenu.elementId); setContextMenu(null); }}
+                data-testid="context-menu-compare"
+              >
+                <Pin className="h-3.5 w-3.5" />
+                {compareIds.includes(contextMenu.elementId) ? "In compare" : "Add to compare"}
+              </button>
+            )}
             <button
               className="w-full px-3 py-1.5 text-left text-sm flex items-center gap-2 hover:bg-muted transition-colors"
               onClick={() => { setEditingId(contextMenu.elementId); setContextMenu(null); }}
@@ -7131,6 +7280,38 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
           hasClient={Boolean(allProjects.find((p: any) => p.id === projectId)?.clientId)}
         />
       )}
+
+      {/* Floating "Compare (N)" pill — bottom-center, appears when compareIds
+          has anything pinned. Tap toggles the drawer. */}
+      {compareIds.length > 0 && !compareDrawerOpen && (
+        <button
+          type="button"
+          onClick={() => setCompareDrawerOpen(true)}
+          className="fixed left-1/2 -translate-x-1/2 bottom-5 z-[55] inline-flex items-center gap-2 h-11 px-4 rounded-full bg-[#2f4a3a] text-white shadow-lg hover:bg-[#264033] transition-colors"
+          aria-label={`Open compare drawer with ${compareIds.length} card${compareIds.length === 1 ? "" : "s"}`}
+          data-testid="compare-floating-pill"
+        >
+          <Layers className="h-4 w-4" />
+          <span className="text-sm font-medium">Compare</span>
+          <span
+            className="text-xs px-1.5 py-0.5 rounded-full bg-white/20"
+            style={{ fontFamily: "var(--font-mono)" }}
+          >
+            {compareIds.length}
+          </span>
+        </button>
+      )}
+
+      <CompareDrawer
+        open={compareDrawerOpen}
+        onClose={() => setCompareDrawerOpen(false)}
+        compareIds={compareIds}
+        elements={elements}
+        removeFromCompare={removeFromCompare}
+        clearCompare={clearCompare}
+        onUpdateContent={handleUpdateContent}
+        onSaveComparison={handleSaveComparison}
+      />
     </div>
   );
 }
