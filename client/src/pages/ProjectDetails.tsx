@@ -2631,13 +2631,29 @@ function ChatTab({ projectId }: { projectId: number }) {
 }
 
 const docTypeLabels: Record<string, string> = {
+  drawings: "Drawings",
+  finishes: "Finishes",
+  permit: "Permit",
+  warranty: "Warranty",
   contract: "Contract",
   invoice: "Invoice",
   plan: "Plan",
   change_order: "Change Order",
-  permit: "Permit",
   other: "Other",
 };
+
+// Display order for the documents shelf
+const docCategoryOrder: string[] = [
+  "drawings",
+  "finishes",
+  "permit",
+  "warranty",
+  "contract",
+  "invoice",
+  "plan",
+  "change_order",
+  "other",
+];
 
 function DocumentsTab({ projectId }: { projectId: number }) {
   const { data: documents, isLoading } = useDocuments(projectId);
@@ -2688,19 +2704,25 @@ function DocumentsTab({ projectId }: { projectId: number }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <h3 className="font-serif text-lg font-semibold" data-testid="text-docs-heading">Documents</h3>
+      <div className="flex items-start justify-between flex-wrap gap-3">
+        <div className="space-y-1">
+          <h3 className="text-xl font-semibold tracking-tight" data-testid="text-docs-heading">Documents</h3>
+          <p className="text-sm text-muted-foreground">Drawings, finishes, permits, warranties, and contracts grouped by category.</p>
+        </div>
         <div className="flex items-center gap-2 flex-wrap">
           <Select value={docType} onValueChange={setDocType}>
             <SelectTrigger className="w-36" data-testid="select-doc-type">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="drawings">Drawings</SelectItem>
+              <SelectItem value="finishes">Finishes</SelectItem>
+              <SelectItem value="permit">Permit</SelectItem>
+              <SelectItem value="warranty">Warranty</SelectItem>
               <SelectItem value="contract">Contract</SelectItem>
               <SelectItem value="invoice">Invoice</SelectItem>
               <SelectItem value="plan">Plan</SelectItem>
               <SelectItem value="change_order">Change Order</SelectItem>
-              <SelectItem value="permit">Permit</SelectItem>
               <SelectItem value="other">Other</SelectItem>
             </SelectContent>
           </Select>
@@ -2729,45 +2751,80 @@ function DocumentsTab({ projectId }: { projectId: number }) {
           No documents yet. Upload files to share with your team.
         </div>
       ) : (
-        <div className="flex flex-col gap-2">
-          {documents.map((doc) => (
-            <Card key={doc.id} className="flex items-center justify-between gap-3 p-4" data-testid={`doc-item-${doc.id}`}>
-              <div className="flex items-center gap-3 min-w-0 flex-1">
-                <FileText className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                <div className="min-w-0">
-                  <p className="font-medium text-sm truncate" data-testid={`text-doc-title-${doc.id}`}>{doc.title}</p>
-                  <Badge variant="secondary" className="text-xs mt-1" data-testid={`badge-doc-type-${doc.id}`}>
-                    {docTypeLabels[doc.type] || doc.type}
-                  </Badge>
-                </div>
-              </div>
-              <div className="flex items-center gap-1 flex-shrink-0">
-                {doc.url && doc.url !== "#" && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleDownload(doc.url, doc.title)}
-                    data-testid={`button-download-${doc.id}`}
-                  >
-                    <Download className="h-4 w-4" />
-                  </Button>
-                )}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => {
-                    deleteDoc(doc.id, {
-                      onSuccess: () => toast({ title: "Deleted", description: "Document removed." }),
-                      onError: () => toast({ title: "Error", description: "Failed to delete document.", variant: "destructive" }),
-                    });
-                  }}
-                  data-testid={`button-delete-doc-${doc.id}`}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            </Card>
-          ))}
+        <div className="space-y-6">
+          {(() => {
+            const grouped = documents.reduce<Record<string, typeof documents>>((acc, doc) => {
+              const key = doc.type && docTypeLabels[doc.type] ? doc.type : "other";
+              (acc[key] = acc[key] || []).push(doc);
+              return acc;
+            }, {});
+            const knownKeys = new Set(docCategoryOrder);
+            const unknownKeys = Object.keys(grouped).filter((k) => !knownKeys.has(k)).sort();
+            const orderedKeys = [...docCategoryOrder, ...unknownKeys].filter((k) => grouped[k]?.length);
+            return orderedKeys.map((key) => {
+              const docs = grouped[key];
+              return (
+                <section key={key} data-testid={`doc-section-${key}`} className="space-y-2">
+                  <div className="flex items-baseline justify-between">
+                    <h4 className="font-mono text-[10px] tracking-[0.14em] uppercase text-muted-foreground">
+                      {docTypeLabels[key] || key}
+                    </h4>
+                    <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
+                      {docs.length}
+                    </span>
+                  </div>
+                  <Card className="divide-y">
+                    {docs.map((doc) => (
+                      <div
+                        key={doc.id}
+                        className="flex items-center justify-between gap-3 p-3"
+                        data-testid={`doc-item-${doc.id}`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <FileText className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                          <div className="min-w-0">
+                            <p className="font-medium text-sm truncate" data-testid={`text-doc-title-${doc.id}`}>
+                              {doc.title}
+                            </p>
+                            {doc.createdAt && (
+                              <p className="font-mono text-[10px] tabular-nums text-muted-foreground mt-0.5">
+                                {new Date(doc.createdAt).toLocaleDateString()}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          {doc.url && doc.url !== "#" && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDownload(doc.url, doc.title)}
+                              data-testid={`button-download-${doc.id}`}
+                            >
+                              <Download className="h-4 w-4" />
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              deleteDoc(doc.id, {
+                                onSuccess: () => toast({ title: "Deleted", description: "Document removed." }),
+                                onError: () => toast({ title: "Error", description: "Failed to delete document.", variant: "destructive" }),
+                              });
+                            }}
+                            data-testid={`button-delete-doc-${doc.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </Card>
+                </section>
+              );
+            });
+          })()}
         </div>
       )}
     </div>
