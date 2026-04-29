@@ -1692,6 +1692,68 @@ Respond with valid JSON only:
     broadcastProjectChange(updated.projectId, ["changeOrders", "budget"], "updated", updated.id, userId);
   }));
 
+  // Site visits
+  // Read: any authenticated user with project access. Clients see only
+  //   non-archived rows.
+  // Create / Update: crew/admin only. Server fills projectId from URL and
+  //   createdBy from session.
+  app.get(api.siteVisits.list.path, isAuthenticated, asyncHandler(async (req: any, res) => {
+    const projectId = Number(req.params.projectId);
+    const userId = req.user.claims.sub;
+    const project = await storage.getProject(projectId);
+    if (!project) return res.status(404).json({ message: "Project not found" });
+    const dbUser = await authStorage.getUser(userId);
+    const isClient = dbUser?.role === "client";
+    if (isClient && project.clientId !== userId) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    // Crew/admin can opt in to archived rows; clients never see them.
+    const includeArchived = !isClient && req.query.includeArchived === "1";
+    const list = await storage.getSiteVisits(projectId, includeArchived);
+    res.json(list);
+  }));
+
+  app.post(api.siteVisits.create.path, isAuthenticated, asyncHandler(async (req: any, res) => {
+    const projectId = Number(req.params.projectId);
+    const userId = req.user.claims.sub;
+    const dbUser = await authStorage.getUser(userId);
+    if (dbUser?.role !== "admin" && dbUser?.role !== "crew") {
+      return res.status(403).json({ message: "Only crew or admin can log site visits" });
+    }
+    const project = await storage.getProject(projectId);
+    if (!project) return res.status(404).json({ message: "Project not found" });
+    const input = api.siteVisits.create.input.parse(req.body);
+    const visit = await storage.createSiteVisit({
+      ...input,
+      projectId,
+      createdBy: userId,
+    });
+    res.status(201).json(visit);
+    broadcastProjectChange(projectId, ["siteVisits"], "created", visit.id, userId);
+    storage.createActivityLog({
+      projectId,
+      userId,
+      type: "site_visit_logged",
+      title: `Site visit on ${visit.visitedOn}`,
+      description: (visit.summary || "").slice(0, 140),
+    }).catch(() => {});
+  }));
+
+  app.patch(api.siteVisits.update.path, isAuthenticated, asyncHandler(async (req: any, res) => {
+    const id = Number(req.params.id);
+    const userId = req.user.claims.sub;
+    const dbUser = await authStorage.getUser(userId);
+    if (dbUser?.role !== "admin" && dbUser?.role !== "crew") {
+      return res.status(403).json({ message: "Only crew or admin can edit site visits" });
+    }
+    const existing = await storage.getSiteVisit(id);
+    if (!existing) return res.status(404).json({ message: "Site visit not found" });
+    const input = api.siteVisits.update.input.parse(req.body);
+    const updated = await storage.updateSiteVisit(id, input);
+    res.json(updated);
+    broadcastProjectChange(updated.projectId, ["siteVisits"], "updated", updated.id, userId);
+  }));
+
   // Time Entries
   app.get(api.timeEntries.list.path, isAuthenticated, asyncHandler(async (req, res) => {
     const entries = await storage.getTimeEntries(Number(req.params.projectId));

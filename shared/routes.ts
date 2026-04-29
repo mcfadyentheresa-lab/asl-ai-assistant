@@ -1,9 +1,9 @@
 import { z } from 'zod';
 import { 
   insertProjectSchema, insertMilestoneSchema, insertTaskSchema, 
-  insertPhotoSchema, insertDocumentSchema, insertTimeEntrySchema, insertMessageSchema, insertDecisionSchema, insertSelectionSchema, insertChangeOrderSchema,
+  insertPhotoSchema, insertDocumentSchema, insertTimeEntrySchema, insertMessageSchema, insertDecisionSchema, insertSelectionSchema, insertChangeOrderSchema, insertSiteVisitSchema,
   insertChecklistItemSchema, insertBoardItemSchema, insertCalendarEventSchema, insertPlanningBoardSchema, insertCanvasElementSchema,
-  projects, milestones, tasks, photos, documents, timeEntries, messages, decisions, selections, changeOrders, users, checklistItems, boardItems, calendarEvents, planningBoards, canvasElements, boardSnapshots
+  projects, milestones, tasks, photos, documents, timeEntries, messages, decisions, selections, changeOrders, siteVisits, users, checklistItems, boardItems, calendarEvents, planningBoards, canvasElements, boardSnapshots
 } from './schema';
 
 export const errorSchemas = {
@@ -251,6 +251,34 @@ export const api = {
       input: insertChangeOrderSchema.omit({ projectId: true, createdBy: true, number: true }).partial(),
       responses: {
         200: z.custom<typeof changeOrders.$inferSelect>(),
+      },
+    },
+  },
+
+  // Site visits
+  siteVisits: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/projects/:projectId/site-visits' as const,
+      responses: {
+        200: z.array(z.custom<typeof siteVisits.$inferSelect & { creator?: typeof users.$inferSelect }>()),
+      },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/projects/:projectId/site-visits' as const,
+      // server fills projectId from URL and createdBy from session
+      input: insertSiteVisitSchema.omit({ projectId: true, createdBy: true }),
+      responses: {
+        201: z.custom<typeof siteVisits.$inferSelect>(),
+      },
+    },
+    update: {
+      method: 'PATCH' as const,
+      path: '/api/site-visits/:id' as const,
+      input: insertSiteVisitSchema.omit({ projectId: true, createdBy: true }).partial(),
+      responses: {
+        200: z.custom<typeof siteVisits.$inferSelect>(),
       },
     },
   },

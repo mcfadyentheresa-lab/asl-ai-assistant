@@ -1,10 +1,10 @@
 import { db } from "./db";
 import { 
-  users, projects, milestones, subMilestones, sections, tasks, photos, documents, timeEntries, messages, decisions, selections, changeOrders, checklistItems, boardItems, calendarEvents, planningBoards, canvasElements, activityLog, activityViews, paintColors, boardSnapshots, costCategories, marketRates, projectEstimates, estimateItems, receipts, estimateWarnings, crewRates, subcontractors, suppliers, supplierPrices, clientInvites, socialPosts, tableRedesignPlans, tableRedesignMaterials, recentProjectViews,
-  type Project, type Milestone, type SubMilestone, type Section, type Task, type Photo, type Document, type TimeEntry, type Message, type Decision, type Selection, type ChangeOrder,
+  users, projects, milestones, subMilestones, sections, tasks, photos, documents, timeEntries, messages, decisions, selections, changeOrders, siteVisits, checklistItems, boardItems, calendarEvents, planningBoards, canvasElements, activityLog, activityViews, paintColors, boardSnapshots, costCategories, marketRates, projectEstimates, estimateItems, receipts, estimateWarnings, crewRates, subcontractors, suppliers, supplierPrices, clientInvites, socialPosts, tableRedesignPlans, tableRedesignMaterials, recentProjectViews,
+  type Project, type Milestone, type SubMilestone, type Section, type Task, type Photo, type Document, type TimeEntry, type Message, type Decision, type Selection, type ChangeOrder, type SiteVisit,
   type ChecklistItem, type BoardItem, type CalendarEvent, type PlanningBoard, type CanvasElement, type ActivityLog, type PaintColor, type BoardSnapshot, type CostCategory, type MarketRate, type ProjectEstimate, type EstimateItem, type Receipt, type EstimateWarning, type CrewRate, type Subcontractor,
   type InsertProject, type InsertMilestone, type InsertSubMilestone, type InsertSection, type InsertTask, type InsertPhoto, type InsertDocument, 
-  type InsertTimeEntry, type InsertMessage, type InsertDecision, type InsertSelection, type InsertChangeOrder, type InsertChecklistItem, type InsertBoardItem, type InsertCalendarEvent, type InsertPlanningBoard, type InsertCanvasElement, type InsertActivityLog, type InsertBoardSnapshot, type InsertCostCategory, type InsertMarketRate, type InsertProjectEstimate, type InsertEstimateItem, type InsertReceipt, type InsertEstimateWarning, type InsertCrewRate, type InsertSubcontractor, type Supplier, type SupplierPrice, type InsertSupplier, type InsertSupplierPrice,
+  type InsertTimeEntry, type InsertMessage, type InsertDecision, type InsertSelection, type InsertChangeOrder, type InsertSiteVisit, type InsertChecklistItem, type InsertBoardItem, type InsertCalendarEvent, type InsertPlanningBoard, type InsertCanvasElement, type InsertActivityLog, type InsertBoardSnapshot, type InsertCostCategory, type InsertMarketRate, type InsertProjectEstimate, type InsertEstimateItem, type InsertReceipt, type InsertEstimateWarning, type InsertCrewRate, type InsertSubcontractor, type Supplier, type SupplierPrice, type InsertSupplier, type InsertSupplierPrice,
   type ClientInvite, type InsertClientInvite,
   type SocialPost, type InsertSocialPost,
   type TableRedesignPlan, type InsertTableRedesignPlan,
@@ -81,6 +81,12 @@ export interface IStorage {
   getNextChangeOrderNumber(projectId: number): Promise<number>;
   createChangeOrder(co: InsertChangeOrder): Promise<ChangeOrder>;
   updateChangeOrder(id: number, updates: Partial<InsertChangeOrder>): Promise<ChangeOrder>;
+
+  // Site visits
+  getSiteVisits(projectId: number, includeArchived?: boolean): Promise<(SiteVisit & { creator: User | null })[]>;
+  getSiteVisit(id: number): Promise<SiteVisit | undefined>;
+  createSiteVisit(visit: InsertSiteVisit): Promise<SiteVisit>;
+  updateSiteVisit(id: number, updates: Partial<InsertSiteVisit>): Promise<SiteVisit>;
 
   // Time Entries / Timesheets
   getTimeEntries(projectId: number): Promise<TimeEntry[]>;
@@ -527,6 +533,37 @@ export class DatabaseStorage implements IStorage {
     const [updated] = await db.update(changeOrders)
       .set({ ...updates, updatedAt: new Date() })
       .where(eq(changeOrders.id, id))
+      .returning();
+    return updated;
+  }
+
+  // Site visits
+  async getSiteVisits(projectId: number, includeArchived = false): Promise<(SiteVisit & { creator: User | null })[]> {
+    const whereClause = includeArchived
+      ? eq(siteVisits.projectId, projectId)
+      : and(eq(siteVisits.projectId, projectId), eq(siteVisits.archived, false));
+    const results = await db.select({
+      visit: siteVisits,
+      creator: users,
+    })
+      .from(siteVisits)
+      .leftJoin(users, eq(siteVisits.createdBy, users.id))
+      .where(whereClause)
+      .orderBy(desc(siteVisits.visitedOn), desc(siteVisits.id));
+    return results.map(r => ({ ...r.visit, creator: r.creator }));
+  }
+  async getSiteVisit(id: number): Promise<SiteVisit | undefined> {
+    const [v] = await db.select().from(siteVisits).where(eq(siteVisits.id, id));
+    return v;
+  }
+  async createSiteVisit(visit: InsertSiteVisit): Promise<SiteVisit> {
+    const [created] = await db.insert(siteVisits).values(visit).returning();
+    return created;
+  }
+  async updateSiteVisit(id: number, updates: Partial<InsertSiteVisit>): Promise<SiteVisit> {
+    const [updated] = await db.update(siteVisits)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(siteVisits.id, id))
       .returning();
     return updated;
   }
