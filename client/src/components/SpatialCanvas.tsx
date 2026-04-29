@@ -5203,22 +5203,25 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                 </div>
               )}
             </>
-          ) : isSelected || isUploading || isUnlocked ? (
+          ) : (
+            // Empty state — always visible (not gated on selection) so template
+            // boards and freshly-dropped image cards present as tidy placeholders
+            // instead of empty rectangles with floating caption text.
             <div
-              className="bg-muted/50 flex flex-col items-center justify-center gap-2 border border-dashed border-border/50 rounded-sm"
-              style={{ height: el.height ? Math.max(el.height, 60) : 120 }}
+              className="bg-muted/40 flex flex-col items-center justify-center gap-2 border border-dashed border-border/60 rounded-sm"
+              style={{ height: el.height ? Math.max(el.height - (c.caption ? 32 : 0), 60) : 120 }}
               data-testid={`image-upload-area-${el.id}`}
             >
               {isUploading && uploadTargetId === el.id ? (
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               ) : (
                 <>
-                  <Upload className="h-6 w-6 text-muted-foreground/50" />
-                  <span className="text-[10px] text-muted-foreground/60">Tap to upload</span>
+                  <Upload className="h-6 w-6 text-muted-foreground/40" />
+                  <span className="text-[10px] text-muted-foreground/50">Tap to upload</span>
                 </>
               )}
             </div>
-          ) : null}
+          )}
           {!isEdgeBleed && (
             <div className="p-3">
               {isSelected ? (
