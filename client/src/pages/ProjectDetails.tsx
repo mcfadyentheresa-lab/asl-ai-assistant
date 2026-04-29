@@ -292,14 +292,29 @@ function ProjectDetailsInner() {
     }
     try {
       const { url } = await uploadHeroImage(file);
+      // Reset framing to defaults whenever the image itself changes.
+      // Otherwise the new photo inherits the previous image's focal point
+      // and zoom and shows up cropped weirdly until the admin manually
+      // re-frames it.
       updateProject(
-        { id: project.id, data: { thumbnailUrl: url } },
+        {
+          id: project.id,
+          data: {
+            thumbnailUrl: url,
+            heroFocalX: 0.5,
+            heroFocalY: 0.5,
+            heroZoom: 1.0,
+          },
+        },
         {
           onSuccess: () => toast({ title: "Main image updated" }),
           onError: (err: any) =>
             toast({ title: "Couldn't save image", description: err.message, variant: "destructive" }),
         },
       );
+      // Clear any optimistic local framing so the UI immediately reflects
+      // the centered defaults rather than lingering on the old crop.
+      setHeroLocal(null);
     } catch (err: any) {
       toast({ title: "Upload failed", description: err.message, variant: "destructive" });
     }
