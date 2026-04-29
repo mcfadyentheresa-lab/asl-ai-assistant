@@ -531,6 +531,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; elementId: number } | null>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showImagePopup, setShowImagePopup] = useState(false);
+  const [imagePopupDragOver, setImagePopupDragOver] = useState(false);
   // Add palette popover — persisted open/closed across sessions for power users.
   const [addPaletteOpen, setAddPaletteOpen] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
@@ -1844,7 +1845,11 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
     });
   }, [elements, selectedBoardId, removeElement]);
 
-  const handleFileUpload = async (file: File, targetElementId?: number) => {
+  const handleFileUpload = async (
+    file: File,
+    targetElementId?: number,
+    pos?: { x: number; y: number },
+  ) => {
     if (!selectedBoardId) return;
     setIsUploading(true);
     try {
@@ -1858,8 +1863,12 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
       } else {
         const newZ = maxZ;
         setMaxZ((z: number) => z + 1);
-        const centerX = Math.round((-pan.x + (containerRef.current?.clientWidth || 800) / 2) / zoom - 120);
-        const centerY = Math.round((-pan.y + (containerRef.current?.clientHeight || 600) / 2) / zoom - 100);
+        const centerX =
+          pos?.x ??
+          Math.round((-pan.x + (containerRef.current?.clientWidth || 800) / 2) / zoom - 120);
+        const centerY =
+          pos?.y ??
+          Math.round((-pan.y + (containerRef.current?.clientHeight || 600) / 2) / zoom - 100);
         const url = buildUrl(api.canvasElements.create.path, { boardId: selectedBoardId });
         const res = await fetch(url, {
           method: "POST",
@@ -2290,12 +2299,19 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
     </Popover>
   );
 
-  const handleAddImageByUrl = async (url: string) => {
+  const handleAddImageByUrl = async (
+    url: string,
+    pos?: { x: number; y: number },
+  ) => {
     if (!selectedBoardId || !url.trim()) return;
     const newZ = maxZ;
     setMaxZ((z: number) => z + 1);
-    const centerX = Math.round((-pan.x + (containerRef.current?.clientWidth || 800) / 2) / zoom - 120);
-    const centerY = Math.round((-pan.y + (containerRef.current?.clientHeight || 600) / 2) / zoom - 100);
+    const centerX =
+      pos?.x ??
+      Math.round((-pan.x + (containerRef.current?.clientWidth || 800) / 2) / zoom - 120);
+    const centerY =
+      pos?.y ??
+      Math.round((-pan.y + (containerRef.current?.clientHeight || 600) / 2) / zoom - 100);
     try {
       const apiUrl = buildUrl(api.canvasElements.create.path, { boardId: selectedBoardId });
       const res = await fetch(apiUrl, {
@@ -5942,12 +5958,43 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                 <div>
                   <div className="text-xs font-medium text-muted-foreground mb-1.5">Upload</div>
                   <div
-                    className="border-2 border-dashed border-border rounded-md p-4 flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-muted/30 transition-colors"
+                    className={`border-2 border-dashed rounded-md p-4 flex flex-col items-center justify-center gap-2 cursor-pointer transition-colors ${
+                      imagePopupDragOver
+                        ? "border-[#2f4a3a] bg-[#2f4a3a]/5"
+                        : "border-border hover:bg-muted/30"
+                    }`}
                     onClick={() => { triggerImageUpload(); setShowImagePopup(false); }}
+                    onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = "copy"; setImagePopupDragOver(true); }}
+                    onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); setImagePopupDragOver(true); }}
+                    onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setImagePopupDragOver(false); }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setImagePopupDragOver(false);
+                      const files = Array.from(e.dataTransfer.files || []);
+                      const imageFiles = files.filter((f) => f.type.startsWith("image/"));
+                      if (imageFiles.length > 0) {
+                        imageFiles.forEach((file) => handleFileUpload(file));
+                        setShowImagePopup(false);
+                        return;
+                      }
+                      const uriList = e.dataTransfer.getData("text/uri-list");
+                      const textPlain = e.dataTransfer.getData("text/plain");
+                      const droppedUrl = (uriList || textPlain || "")
+                        .split(/\r?\n/)
+                        .map((s) => s.trim())
+                        .find((s) => /^https?:\/\//i.test(s));
+                      if (droppedUrl) {
+                        handleAddImageByUrl(droppedUrl);
+                        setShowImagePopup(false);
+                      }
+                    }}
                     data-testid="image-popup-upload-area"
                   >
                     <Upload className="h-6 w-6 text-muted-foreground/50" />
-                    <span className="text-xs text-muted-foreground">Click to upload from device</span>
+                    <span className="text-xs text-muted-foreground text-center">
+                      {imagePopupDragOver ? "Drop image here" : "Click or drop image / URL"}
+                    </span>
                   </div>
                 </div>
                 <div>
@@ -5993,11 +6040,40 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
             onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; }}
             onDrop={(e) => {
               e.preventDefault();
-              const toolType = e.dataTransfer.getData("tool-type");
-              if (!toolType || !containerRef.current) return;
+              if (!containerRef.current) return;
               const rect = containerRef.current.getBoundingClientRect();
               const canvasX = Math.round(((e.clientX - rect.left - pan.x) / zoom) / GRID_SIZE) * GRID_SIZE;
               const canvasY = Math.round(((e.clientY - rect.top - pan.y) / zoom) / GRID_SIZE) * GRID_SIZE;
+
+              // 1) OS file drops — accept image files and place at cursor.
+              const files = Array.from(e.dataTransfer.files || []);
+              const imageFiles = files.filter((f) => f.type.startsWith("image/"));
+              if (imageFiles.length > 0) {
+                imageFiles.forEach((file, i) => {
+                  // Stagger multiple drops so they don't stack exactly on top.
+                  handleFileUpload(file, undefined, {
+                    x: canvasX + i * GRID_SIZE * 2,
+                    y: canvasY + i * GRID_SIZE * 2,
+                  });
+                });
+                return;
+              }
+
+              // 2) URL drops from the web (drag an <img> from another tab).
+              const uriList = e.dataTransfer.getData("text/uri-list");
+              const textPlain = e.dataTransfer.getData("text/plain");
+              const droppedUrl = (uriList || textPlain || "")
+                .split(/\r?\n/)
+                .map((s) => s.trim())
+                .find((s) => /^https?:\/\//i.test(s));
+              if (droppedUrl) {
+                handleAddImageByUrl(droppedUrl, { x: canvasX, y: canvasY });
+                return;
+              }
+
+              // 3) Internal tool palette drops (existing behaviour).
+              const toolType = e.dataTransfer.getData("tool-type");
+              if (!toolType) return;
               if (toolType === "image") {
                 triggerImageUpload();
               } else if (toolType === "draw") {
