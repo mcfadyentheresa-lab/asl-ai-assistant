@@ -6,6 +6,7 @@ import { ProjectHeaderStrip } from "@/components/client/ProjectHeaderStrip";
 import { ThisWeekCard } from "@/components/client/ThisWeekCard";
 import { MilestoneStrip } from "@/components/client/MilestoneStrip";
 import { ReferenceCardGrid } from "@/components/client/ReferenceCardGrid";
+import { RecentDecisionsCard } from "@/components/client/RecentDecisionsCard";
 
 interface Project {
   id: number;
@@ -43,6 +44,14 @@ interface Photo {
   caption?: string | null;
   isShowcase?: boolean | null;
   createdAt?: string | null;
+}
+
+interface Decision {
+  id: number;
+  title: string;
+  decision: string;
+  decidedOn: string;
+  category: string | null;
 }
 
 interface CalendarEvent {
@@ -83,6 +92,16 @@ export function ClientDashboardView({ project, isAdminPreview = false }: ClientD
     queryKey: ["client-events", project.id],
     queryFn: async () => {
       const res = await fetch(`/api/projects/${project.id}/calendar-events`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!project.id,
+  });
+
+  const { data: decisions } = useQuery<Decision[]>({
+    queryKey: ["/api/projects", project.id, "decisions"],
+    queryFn: async () => {
+      const res = await fetch(`/api/projects/${project.id}/decisions`, { credentials: "include" });
       if (!res.ok) return [];
       return res.json();
     },
@@ -193,6 +212,8 @@ export function ClientDashboardView({ project, isAdminPreview = false }: ClientD
       />
 
       {sortedMilestones.length > 0 && <MilestoneStrip milestones={sortedMilestones} />}
+
+      <RecentDecisionsCard projectId={project.id} decisions={decisions || []} />
 
       <ReferenceCardGrid cards={referenceCards} />
 
