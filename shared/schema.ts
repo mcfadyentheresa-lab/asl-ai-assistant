@@ -244,6 +244,39 @@ export const decisions = pgTable("decisions", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Selections ledger
+// Operational record of what's being specified, ordered, and installed on a project.
+// Distinct from boardItems (inspiration/notes) and decisions (permanent choices).
+// Visible to client; managed by crew/admin.
+export const selections = pgTable("selections", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => projects.id),
+  room: text("room"), // e.g. "Kitchen", "Primary bath", "Powder"
+  category: text("category"), // e.g. "Plumbing", "Hardware", "Tile", "Lighting", "Appliances"
+  item: text("item").notNull(), // e.g. "Cabinet pulls", "Kitchen faucet"
+  product: text("product"), // e.g. "Emtek Stock pull, 4 in. matte black"
+  vendor: text("vendor"), // e.g. "Robinson Lighting & Bath"
+  sku: text("sku"), // optional product code
+  quantity: text("quantity"), // free-form ("24", "~12 lf", "as required")
+  // status drives the client-visible label and ordering
+  // proposed: still being considered
+  // approved: client has signed off
+  // ordered: PO placed
+  // installed: fully installed on site
+  status: text("status").notNull().default("proposed"),
+  leadTimeDays: integer("lead_time_days"), // estimated/actual lead time
+  orderedOn: date("ordered_on"),
+  expectedOn: date("expected_on"),
+  installedOn: date("installed_on"),
+  notes: text("notes"),
+  attachmentPhotoId: integer("attachment_photo_id"), // optional photo (FK to photos.id, no .references to avoid circular dep)
+  relatedDecisionId: integer("related_decision_id").references(() => decisions.id),
+  archived: boolean("archived").default(false), // soft-hide without deleting
+  createdBy: text("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Messages (Chat)
 export const messages = pgTable("messages", {
   id: serial("id").primaryKey(),
@@ -328,6 +361,21 @@ export const boardItemsRelations = relations(boardItems, ({ one }) => ({
   creator: one(users, {
     fields: [boardItems.createdBy],
     references: [users.id],
+  }),
+}));
+
+export const selectionsRelations = relations(selections, ({ one }) => ({
+  project: one(projects, {
+    fields: [selections.projectId],
+    references: [projects.id],
+  }),
+  creator: one(users, {
+    fields: [selections.createdBy],
+    references: [users.id],
+  }),
+  relatedDecision: one(decisions, {
+    fields: [selections.relatedDecisionId],
+    references: [decisions.id],
   }),
 }));
 
@@ -704,6 +752,7 @@ export const insertDocumentSchema = createInsertSchema(documents).omit({ id: tru
 export const insertTimeEntrySchema = createInsertSchema(timeEntries).omit({ id: true, createdAt: true });
 export const insertMessageSchema = createInsertSchema(messages).omit({ id: true, createdAt: true });
 export const insertDecisionSchema = createInsertSchema(decisions).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertSelectionSchema = createInsertSchema(selections).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertChecklistItemSchema = createInsertSchema(checklistItems).omit({ id: true, createdAt: true });
 export const insertBoardItemSchema = createInsertSchema(boardItems).omit({ id: true, createdAt: true });
 export const insertCanvasElementSchema = createInsertSchema(canvasElements).omit({ id: true, createdAt: true, updatedAt: true });
@@ -745,6 +794,8 @@ export type InsertTimeEntry = z.infer<typeof insertTimeEntrySchema>;
 export type InsertMessage = z.infer<typeof insertMessageSchema>;
 export type Decision = typeof decisions.$inferSelect;
 export type InsertDecision = z.infer<typeof insertDecisionSchema>;
+export type Selection = typeof selections.$inferSelect;
+export type InsertSelection = z.infer<typeof insertSelectionSchema>;
 export type ChecklistItem = typeof checklistItems.$inferSelect;
 export type BoardItem = typeof boardItems.$inferSelect;
 export type CalendarEvent = typeof calendarEvents.$inferSelect;
