@@ -847,21 +847,53 @@ export function useDeletePhoto() {
   });
 }
 
+// Image upload via the presigned URL flow against object storage.
+//
+// Why not /api/upload? On Railway the legacy multer endpoint wrote files to a
+// local disk path that (a) was wiped on every redeploy and (b) was shadowed by
+// the SPA catch-all route, so /uploads/<uuid>.png returned the index.html
+// shell instead of the image. Result: image cards looked broken even right
+// after a successful upload.
+//
+// The object-storage flow:
+//   1. POST /api/uploads/request-url  -> { uploadURL, objectPath }
+//   2. PUT <uploadURL> with the raw file body
+//   3. Render /objects/<objectPath> via the public-objects GET route
 export function useUploadImage() {
   return useMutation({
     mutationFn: async (file: File) => {
-      const formData = new FormData();
-      formData.append("image", file);
-      const res = await fetch("/api/upload", {
+      // Step 1 — ask the server for a presigned PUT URL.
+      const reqRes = await fetch("/api/uploads/request-url", {
         method: "POST",
-        body: formData,
+        headers: { "Content-Type": "application/json" },
         credentials: "include",
+        body: JSON.stringify({
+          name: file.name,
+          size: file.size,
+          contentType: file.type || "application/octet-stream",
+        }),
       });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ message: "Upload failed" }));
-        throw new Error(err.message);
+      if (!reqRes.ok) {
+        const err = await reqRes.json().catch(() => ({ error: "Failed to start upload" }));
+        throw new Error(err.error || err.message || "Failed to start upload");
       }
-      return res.json() as Promise<{ url: string }>;
+      const { uploadURL, objectPath } = (await reqRes.json()) as {
+        uploadURL: string;
+        objectPath: string;
+      };
+
+      // Step 2 — stream the file straight to the bucket.
+      const putRes = await fetch(uploadURL, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": file.type || "application/octet-stream" },
+      });
+      if (!putRes.ok) {
+        throw new Error("Failed to upload to storage");
+      }
+
+      // Step 3 — the canvas <img> just needs the served path.
+      return { url: objectPath };
     },
   });
 }
