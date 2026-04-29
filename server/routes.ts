@@ -155,6 +155,13 @@ export async function registerRoutes(
         message: "That looks like a Pinterest board, not a single pin. Open the pin and copy its URL (it should contain '/pin/...').",
       });
     }
+    // Normalize to the canonical pin URL: pinterest's oEmbed rejects share-flow
+    // suffixes like /sent/?invite_code=... and country subdomains can also fail.
+    // Reduce to https://www.pinterest.com/pin/<id>/ which oEmbed always accepts.
+    const pinIdMatch = pinUrl.match(/pinterest\.[a-z.]+\/pin\/(\d+)/i);
+    if (pinIdMatch) {
+      pinUrl = `https://www.pinterest.com/pin/${pinIdMatch[1]}/`;
+    }
     try {
       const oembed = await fetch(`https://www.pinterest.com/oembed.json?url=${encodeURIComponent(pinUrl)}`, {
         headers: { "User-Agent": "Mozilla/5.0" },
