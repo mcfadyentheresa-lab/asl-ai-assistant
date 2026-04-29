@@ -185,24 +185,29 @@ export default function Welcome() {
               </p>
             )}
 
-            <div className="text-center">
-              <button
-                onClick={() => {
-                  apiRequest("POST", "/api/auth/complete-onboarding", {
-                    firstName: user?.firstName || "Client",
-                    lastName: user?.lastName || "User",
-                  }).then(() => {
-                    queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-                    navigate("/");
-                  }).catch(() => navigate("/"));
-                }}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1"
-                data-testid="button-skip-onboarding"
-              >
-                <Home className="h-3.5 w-3.5" />
-                Skip for now
-              </button>
-            </div>
+            {/* Skip for now: only offered if the invite already pre-filled a real
+                name. Otherwise we keep the user here so admins never see a
+                phantom "Client User" in their dashboard. */}
+            {user?.firstName && user?.lastName && (
+              <div className="text-center">
+                <button
+                  onClick={() => {
+                    apiRequest("POST", "/api/auth/complete-onboarding", {
+                      firstName: user.firstName!,
+                      lastName: user.lastName!,
+                    }).then(() => {
+                      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+                      navigate("/");
+                    }).catch(() => navigate("/"));
+                  }}
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1"
+                  data-testid="button-skip-onboarding"
+                >
+                  <Home className="h-3.5 w-3.5" />
+                  Skip for now
+                </button>
+              </div>
+            )}
           </CardContent>
         </Card>
       </motion.div>
