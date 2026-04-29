@@ -534,6 +534,8 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
   const [showImagePopup, setShowImagePopup] = useState(false);
   const [imagePopupDragOver, setImagePopupDragOver] = useState(false);
   const [cropTargetId, setCropTargetId] = useState<number | null>(null);
+  const [addCollectionOpen, setAddCollectionOpen] = useState(false);
+  const [addCollectionName, setAddCollectionName] = useState("");
   // Add palette popover — persisted open/closed across sessions for power users.
   const [addPaletteOpen, setAddPaletteOpen] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
@@ -5981,10 +5983,8 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
             setEditingId(id);
           }}
           onCreateCollection={() => {
-            const name = window.prompt("New collection name");
-            if (name && name.trim()) {
-              createCategoryFromTabStrip({ name: name.trim() });
-            }
+            setAddCollectionName("");
+            setAddCollectionOpen(true);
           }}
           onReorderItems={(orderedIds) => {
             // Persist by zIndex on each affected element; ascending starting at 1.
@@ -7537,6 +7537,50 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
           />
         );
       })()}
+
+      <Dialog open={addCollectionOpen} onOpenChange={(o) => { if (!o) { setAddCollectionOpen(false); setAddCollectionName(""); } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>New collection</DialogTitle>
+            <DialogDescription>Collections group related items — e.g. Fabric, Stone, Lighting. Create one and it shows up as a tab on this Library board.</DialogDescription>
+          </DialogHeader>
+          {(() => {
+            const trimmed = addCollectionName.trim();
+            const isDuplicate = !!trimmed && savedCategoryOrder.some((n) => n.toLowerCase() === trimmed.toLowerCase());
+            const submit = () => {
+              if (!trimmed || isDuplicate) return;
+              createCategoryFromTabStrip({ name: trimmed });
+              setAddCollectionOpen(false);
+              setAddCollectionName("");
+              toast({ title: `Collection “${trimmed}” created` });
+            };
+            return (
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="new-collection-name" className="text-xs uppercase tracking-wider text-muted-foreground">Collection name</Label>
+                  <Input
+                    id="new-collection-name"
+                    value={addCollectionName}
+                    onChange={(e) => setAddCollectionName(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
+                    placeholder="e.g. Fabric, Stone, Lighting"
+                    autoFocus
+                    maxLength={48}
+                    data-testid="input-new-collection-name"
+                  />
+                  {isDuplicate && (
+                    <div className="text-[11px] text-destructive" data-testid="new-collection-duplicate">A collection with this name already exists on this board.</div>
+                  )}
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" size="sm" onClick={() => { setAddCollectionOpen(false); setAddCollectionName(""); }} data-testid="button-cancel-new-collection">Cancel</Button>
+                  <Button size="sm" onClick={submit} disabled={!trimmed || isDuplicate} data-testid="button-confirm-new-collection">Create collection</Button>
+                </DialogFooter>
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
 
       <ImageCropDialog
         open={cropTargetId !== null && !!(elements[cropTargetId!]?.content as any)?.url}
