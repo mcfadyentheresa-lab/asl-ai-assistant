@@ -34,7 +34,8 @@ const CREW_ITEMS: BottomNavItem[] = [
 const CLIENT_ITEMS: BottomNavItem[] = [
   {
     label: "Plan",
-    resolve: () => "/",
+    // Deep-link to the project root if we know which project we're on, else /.
+    resolve: (id) => (id ? `/project/${id}` : "/"),
     icon: LayoutDashboard,
     isActiveFor: (l) =>
       l === "/" ||
@@ -65,12 +66,23 @@ interface ProjectStub {
   status?: string | null;
 }
 
+function projectIdFromLocation(location: string): number | null {
+  const m = location.match(/^\/project\/(\d+)/);
+  if (!m) return null;
+  const n = Number(m[1]);
+  return Number.isFinite(n) ? n : null;
+}
+
 export function MobileBottomNav() {
   const [location] = useLocation();
   const { user } = useAuth();
 
-  // Resolve client's primary project for deep-linking the client tabs.
-  // We always run the hook (even for non-clients) to keep hook order stable.
+  // Prefer the project from the current URL (works for clients on a project
+  // page and for admins using Client Preview on a specific project). Only fall
+  // back to the user's primary project list when we don't already know which
+  // project they're viewing.
+  const currentProjectId = projectIdFromLocation(location);
+
   const { data: projects } = useQuery<ProjectStub[]>({
     queryKey: ["/api/projects"],
     queryFn: async () => {
@@ -78,7 +90,7 @@ export function MobileBottomNav() {
       if (!res.ok) return [];
       return res.json();
     },
-    enabled: user?.role === "client",
+    enabled: user?.role === "client" && currentProjectId === null,
     staleTime: 60_000,
   });
 
@@ -88,7 +100,7 @@ export function MobileBottomNav() {
   const items = user.role === "client" ? CLIENT_ITEMS : CREW_ITEMS;
   const primaryProject =
     (projects || []).find((p) => p.status !== "archived") || null;
-  const projectId = primaryProject?.id ?? null;
+  const projectId = currentProjectId ?? primaryProject?.id ?? null;
 
   return (
     <nav

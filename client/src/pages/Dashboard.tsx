@@ -509,7 +509,7 @@ function CreateProjectDialog({ externalOpen, onExternalChange }: { externalOpen?
             <div className="border-t pt-4">
               <button type="button" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors" onClick={() => setShowInviteForm(!showInviteForm)} data-testid="button-toggle-invite-form">
                 <UserPlus className="h-4 w-4" />
-                {showInviteForm ? "Hide invite form" : "Invite a new client via SMS"}
+                {showInviteForm ? "Hide invite form" : "Invite a new client by email"}
               </button>
               {showInviteForm && (
                 <div className="mt-3 space-y-3 p-3 bg-muted/30 rounded-lg border">
@@ -531,7 +531,7 @@ function CreateProjectDialog({ externalOpen, onExternalChange }: { externalOpen?
                     <Label htmlFor="create-invite-phone" className="text-xs">Phone</Label>
                     <Input id="create-invite-phone" value={inviteForm.phone} onChange={(e) => setInviteForm(f => ({ ...f, phone: e.target.value }))} placeholder="(705) 555-0123" data-testid="input-create-invite-phone" />
                   </div>
-                  <p className="text-[11px] text-muted-foreground">Client will receive an SMS with a link to access their portal after the project is created.</p>
+                  <p className="text-[11px] text-muted-foreground">Client will receive an email with a link to access their portal after the project is created.</p>
                 </div>
               )}
             </div>

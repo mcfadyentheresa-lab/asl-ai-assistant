@@ -508,11 +508,24 @@ export async function registerRoutes(
   }));
 
   // Client Invites
+  // NOTE: phone is genuinely optional — the invite UI labels the field
+  // "Phone Number (optional)". Previously the schema required min(7) which
+  // 400'd whenever an admin left the field blank, contradicting the label.
+  // We accept empty strings (treating them as missing) and otherwise require
+  // at least 7 characters so we don't store obviously-bad values.
   const inviteClientSchema = z.object({
     firstName: z.string().min(1).max(100),
     lastName: z.string().min(1).max(100),
     email: z.string().email().max(255),
-    phone: z.string().min(7).max(30),
+    phone: z
+      .string()
+      .max(30)
+      .optional()
+      .or(z.literal(""))
+      .transform((v) => (v && v.trim().length > 0 ? v.trim() : undefined))
+      .refine((v) => v === undefined || v.length >= 7, {
+        message: "Phone must be at least 7 characters",
+      }),
   });
 
   app.post("/api/projects/:id/invite-client", isAuthenticated, async (req: any, res) => {

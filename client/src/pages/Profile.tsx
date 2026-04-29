@@ -222,7 +222,7 @@ export default function Profile() {
                   data-testid="input-profile-phone"
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Used for SMS notifications about project updates
+                  Optional secondary contact for your project team.
                 </p>
               </div>
               <div className="flex justify-end pt-2">
