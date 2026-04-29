@@ -7,6 +7,7 @@ import { ThisWeekCard } from "@/components/client/ThisWeekCard";
 import { MilestoneStrip } from "@/components/client/MilestoneStrip";
 import { ReferenceCardGrid } from "@/components/client/ReferenceCardGrid";
 import { RecentDecisionsCard } from "@/components/client/RecentDecisionsCard";
+import { SelectionsCard } from "@/components/client/SelectionsCard";
 import { YourActionItemsCard } from "@/components/client/YourActionItemsCard";
 
 interface Project {
@@ -63,6 +64,17 @@ interface ChecklistItem {
   status: string | null;
   requiresClient: boolean | null;
   priority: string | null;
+}
+
+interface SelectionItem {
+  id: number;
+  room: string | null;
+  category: string | null;
+  item: string;
+  product: string | null;
+  vendor: string | null;
+  status: string;
+  expectedOn: string | null;
 }
 
 interface CalendarEvent {
@@ -123,6 +135,16 @@ export function ClientDashboardView({ project, isAdminPreview = false }: ClientD
     queryKey: ["/api/projects", project.id, "checklist"],
     queryFn: async () => {
       const res = await fetch(`/api/projects/${project.id}/checklist`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!project.id,
+  });
+
+  const { data: selections } = useQuery<SelectionItem[]>({
+    queryKey: ["/api/projects", project.id, "selections"],
+    queryFn: async () => {
+      const res = await fetch(`/api/projects/${project.id}/selections`, { credentials: "include" });
       if (!res.ok) return [];
       return res.json();
     },
@@ -237,6 +259,8 @@ export function ClientDashboardView({ project, isAdminPreview = false }: ClientD
       {sortedMilestones.length > 0 && <MilestoneStrip milestones={sortedMilestones} />}
 
       <RecentDecisionsCard projectId={project.id} decisions={decisions || []} />
+
+      <SelectionsCard projectId={project.id} selections={selections || []} />
 
       <ReferenceCardGrid cards={referenceCards} />
 
