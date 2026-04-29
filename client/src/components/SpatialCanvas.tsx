@@ -5554,25 +5554,39 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
               chip-row + spatial canvas as a fallback. */}
           {boardMode === "library" && (
             <>
-              <div className="flex items-center bg-muted/50 rounded-md p-0.5 mr-1.5" data-testid="library-view-toggle">
-                <button
-                  type="button"
-                  onClick={() => persistLibraryView("covers")}
-                  aria-pressed={libraryView === "covers"}
-                  className={`h-7 px-2.5 text-[11px] font-mono uppercase tracking-[0.12em] rounded transition-colors ${libraryView === "covers" ? "bg-card text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
-                  data-testid="library-view-covers"
-                >
-                  Covers
-                </button>
-                <button
-                  type="button"
-                  onClick={() => persistLibraryView("chips")}
-                  aria-pressed={libraryView === "chips"}
-                  className={`h-7 px-2.5 text-[11px] font-mono uppercase tracking-[0.12em] rounded transition-colors ${libraryView === "chips" ? "bg-card text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
-                  data-testid="library-view-chips"
-                >
-                  Chips
-                </button>
+              <div className="flex items-center bg-muted/50 rounded-md p-0.5 mr-1.5" data-testid="library-view-toggle" role="group" aria-label="Library view">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={() => persistLibraryView("covers")}
+                      aria-pressed={libraryView === "covers"}
+                      aria-label="Grid view"
+                      className={`h-7 px-2.5 text-[11px] font-mono uppercase tracking-[0.12em] rounded transition-colors flex items-center gap-1 ${libraryView === "covers" ? "bg-card text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                      data-testid="library-view-covers"
+                    >
+                      <LayoutGrid className="h-3 w-3" />
+                      Grid
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="text-xs">Browse collections as a curated cover grid</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={() => persistLibraryView("chips")}
+                      aria-pressed={libraryView === "chips"}
+                      aria-label="List view"
+                      className={`h-7 px-2.5 text-[11px] font-mono uppercase tracking-[0.12em] rounded transition-colors flex items-center gap-1 ${libraryView === "chips" ? "bg-card text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                      data-testid="library-view-chips"
+                    >
+                      <List className="h-3 w-3" />
+                      List
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="text-xs">Flat chip row plus the spatial canvas</TooltipContent>
+                </Tooltip>
               </div>
               <Separator orientation="vertical" className="h-4 mx-1" />
             </>
