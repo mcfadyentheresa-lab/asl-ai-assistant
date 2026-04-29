@@ -143,6 +143,11 @@ export const checklistItems = pgTable("checklist_items", {
   group: text("group").default("General"),
   status: text("status").default("todo"),
   color: text("color"),
+  // When true, this item is something the CLIENT needs to decide or do
+  // (e.g. "approve hardware finish"). Surfaced on the client's Plan home
+  // as 'Your action items'. Defaults false so existing items don't all
+  // suddenly appear in the client's face.
+  requiresClient: boolean("requires_client").default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
