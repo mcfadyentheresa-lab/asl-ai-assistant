@@ -244,6 +244,36 @@ export const decisions = pgTable("decisions", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Change orders
+// A signed financial/scope change to the contract. Distinct from
+// decisions (no money movement), selections (item-level tracking),
+// and the base budget. Visible to client when status != 'draft'.
+export const changeOrders = pgTable("change_orders", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => projects.id),
+  number: integer("number").notNull(), // CO-1, CO-2, etc — sequential per project
+  title: text("title").notNull(), // e.g. "Add powder room vanity"
+  description: text("description"), // scope of work / what changed
+  // amount stored as text to preserve exact dollars/cents like other money fields.
+  // Positive = increase to contract, negative = credit/deduction.
+  amount: text("amount").notNull(),
+  // status drives client visibility and the budget pulse aggregation
+  // draft: internal; not visible to client
+  // sent: awaiting client decision
+  // approved: signed off, rolls into the contract total
+  // declined: client said no, kept on record but not in totals
+  status: text("status").notNull().default("draft"),
+  sentOn: date("sent_on"),
+  decidedOn: date("decided_on"), // approved/declined date
+  decidedBy: text("decided_by").references(() => users.id), // who clicked approve/decline
+  notes: text("notes"),
+  attachmentDocumentId: integer("attachment_document_id"), // optional doc (FK to documents.id, no .references to avoid circular dep)
+  archived: boolean("archived").default(false),
+  createdBy: text("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Selections ledger
 // Operational record of what's being specified, ordered, and installed on a project.
 // Distinct from boardItems (inspiration/notes) and decisions (permanent choices).
@@ -360,6 +390,21 @@ export const boardItemsRelations = relations(boardItems, ({ one }) => ({
   }),
   creator: one(users, {
     fields: [boardItems.createdBy],
+    references: [users.id],
+  }),
+}));
+
+export const changeOrdersRelations = relations(changeOrders, ({ one }) => ({
+  project: one(projects, {
+    fields: [changeOrders.projectId],
+    references: [projects.id],
+  }),
+  creator: one(users, {
+    fields: [changeOrders.createdBy],
+    references: [users.id],
+  }),
+  decider: one(users, {
+    fields: [changeOrders.decidedBy],
     references: [users.id],
   }),
 }));
@@ -753,6 +798,7 @@ export const insertTimeEntrySchema = createInsertSchema(timeEntries).omit({ id: 
 export const insertMessageSchema = createInsertSchema(messages).omit({ id: true, createdAt: true });
 export const insertDecisionSchema = createInsertSchema(decisions).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertSelectionSchema = createInsertSchema(selections).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertChangeOrderSchema = createInsertSchema(changeOrders).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertChecklistItemSchema = createInsertSchema(checklistItems).omit({ id: true, createdAt: true });
 export const insertBoardItemSchema = createInsertSchema(boardItems).omit({ id: true, createdAt: true });
 export const insertCanvasElementSchema = createInsertSchema(canvasElements).omit({ id: true, createdAt: true, updatedAt: true });
@@ -796,6 +842,8 @@ export type Decision = typeof decisions.$inferSelect;
 export type InsertDecision = z.infer<typeof insertDecisionSchema>;
 export type Selection = typeof selections.$inferSelect;
 export type InsertSelection = z.infer<typeof insertSelectionSchema>;
+export type ChangeOrder = typeof changeOrders.$inferSelect;
+export type InsertChangeOrder = z.infer<typeof insertChangeOrderSchema>;
 export type ChecklistItem = typeof checklistItems.$inferSelect;
 export type BoardItem = typeof boardItems.$inferSelect;
 export type CalendarEvent = typeof calendarEvents.$inferSelect;
