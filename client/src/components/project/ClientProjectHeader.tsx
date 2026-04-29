@@ -133,6 +133,14 @@ export function ClientProjectHeader({
   // parent re-fetches the project.
   const [localHero, setLocalHero] = useState<{ focalX: number; focalY: number; zoom: number } | null>(null);
 
+  // When the user picks a new hero image, drop any local framing override so
+  // the new image starts from the centered defaults the parent just saved
+  // rather than briefly inheriting the previous image's crop.
+  const handleHeroFileChosenInternal = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setLocalHero(null);
+    onHeroFileChosen(e);
+  };
+
   const focalX = localHero?.focalX ?? project.heroFocalX ?? 0.5;
   const focalY = localHero?.focalY ?? project.heroFocalY ?? 0.5;
   const zoom = localHero?.zoom ?? project.heroZoom ?? 1.0;
@@ -292,7 +300,7 @@ export function ClientProjectHeader({
               ref={heroFileInputRef}
               type="file"
               accept="image/jpeg,image/png,image/gif,image/webp"
-              onChange={onHeroFileChosen}
+              onChange={handleHeroFileChosenInternal}
               className="hidden"
               data-testid="input-hero-file"
             />
