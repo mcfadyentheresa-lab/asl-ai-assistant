@@ -19,7 +19,7 @@
 // iPad-first: 44pt min height, swipe-scroll horizontally.
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Plus, Pencil, Check, X as XIcon, AlertTriangle, Sparkles } from "lucide-react";
+import { Plus, Pencil, Check, X as XIcon, AlertTriangle, Sparkles, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -52,6 +52,10 @@ interface RoomTabStripProps {
   // Project-mode payload includes optional dimensions for the new room_zone.
   // Library-mode payload uses only `name`.
   onCreateTab: (payload: { name: string; widthFt?: number; widthIn?: number; depthFt?: number; depthIn?: number }) => void;
+  // Delete a tab (room or category). Implementations should remove the
+  // scaffolding element on project boards and clear the saved order/active
+  // selection. Items previously assigned to the tab become unassigned.
+  onDeleteTab?: (tabName: string) => void;
   onToggleStatusFilter: (s: RoomStatus) => void;
   // PR-S — admin/crew only. When provided AND mode='project' AND a specific
   // room is active, the budget rollup row shows a small "Render" sparkle button
@@ -78,6 +82,7 @@ export default function RoomTabStrip({
   onReorderTabs,
   onRenameTab,
   onCreateTab,
+  onDeleteTab,
   onToggleStatusFilter,
   onRenderRoom,
 }: RoomTabStripProps) {
@@ -86,6 +91,7 @@ export default function RoomTabStrip({
   const [dragTab, setDragTab] = useState<string | null>(null);
   const [dragOverTab, setDragOverTab] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [deletingTab, setDeletingTab] = useState<string | null>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -236,25 +242,49 @@ export default function RoomTabStrip({
                 >
                   {tab}
                   {isActive && !isLocked && (
-                    <span
-                      role="button"
-                      tabIndex={0}
-                      className="ml-1 inline-flex items-center justify-center h-5 w-5 rounded hover:bg-white/15"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        beginRename(tab);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
+                    <>
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        className="ml-1 inline-flex items-center justify-center h-5 w-5 rounded hover:bg-white/15"
+                        onClick={(e) => {
                           e.stopPropagation();
                           beginRename(tab);
-                        }
-                      }}
-                      aria-label={`Rename ${tab}`}
-                      data-testid={`room-tab-rename-${tab}`}
-                    >
-                      <Pencil className="h-3 w-3" />
-                    </span>
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.stopPropagation();
+                            beginRename(tab);
+                          }
+                        }}
+                        aria-label={`Rename ${tab}`}
+                        data-testid={`room-tab-rename-${tab}`}
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </span>
+                      {onDeleteTab && (
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          className="inline-flex items-center justify-center h-5 w-5 rounded hover:bg-white/15"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeletingTab(tab);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.stopPropagation();
+                              setDeletingTab(tab);
+                            }
+                          }}
+                          aria-label={`Delete ${tab}`}
+                          data-testid={`room-tab-delete-${tab}`}
+                          title={`Delete ${tab}`}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </span>
+                      )}
+                    </>
                   )}
                 </button>
               )}
@@ -384,6 +414,36 @@ export default function RoomTabStrip({
         onOpenChange={setDialogOpen}
         onCreate={onCreateTab}
       />
+
+      <Dialog open={!!deletingTab} onOpenChange={(v) => !v && setDeletingTab(null)}>
+        <DialogContent className="sm:max-w-md" data-testid="delete-tab-dialog">
+          <DialogHeader>
+            <DialogTitle className="font-serif">
+              Delete {mode === "library" ? "collection" : "room"} “{deletingTab}”?
+            </DialogTitle>
+            <DialogDescription>
+              {mode === "library"
+                ? "Items tagged with this collection will become uncategorised — they won’t be deleted."
+                : "The room lane will be removed from the canvas. Items previously assigned to this room will become unassigned — they won’t be deleted."}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4">
+            <Button variant="ghost" onClick={() => setDeletingTab(null)} data-testid="delete-tab-cancel">
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (deletingTab && onDeleteTab) onDeleteTab(deletingTab);
+                setDeletingTab(null);
+              }}
+              data-testid="delete-tab-confirm"
+            >
+              <Trash2 className="h-4 w-4 mr-1" /> Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

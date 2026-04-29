@@ -3403,6 +3403,94 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
     }
   };
 
+  // Delete a project-mode room tab. Removes the on-canvas room_zone scaffold,
+  // strips the `room` field from any items previously assigned to it (items
+  // become unassigned, not deleted), drops the name from saved order, and
+  // clears active selection if the deleted tab was active.
+  const deleteRoomEverywhere = async (name: string) => {
+    if (!selectedBoardId) return;
+    const target = (name || "").trim();
+    if (!target) return;
+
+    const idsToDelete: number[] = [];
+    const updates: { id: number; nextContent: any }[] = [];
+    for (const el of elementsList) {
+      const c = (el.content || {}) as any;
+      if (el.type === "room_zone" && typeof c.title === "string" && c.title.trim() === target) {
+        idsToDelete.push(el.id);
+      } else if (isRoomable(el) && typeof c.room === "string" && c.room === target) {
+        const next = { ...c };
+        delete next.room;
+        updates.push({ id: el.id, nextContent: next });
+      }
+    }
+
+    for (const u of updates) {
+      updateElement(u.id, { content: u.nextContent });
+      sendElementUpdate(u.id, { content: u.nextContent });
+      try {
+        const url = buildUrl(api.canvasElements.update.path, { id: u.id });
+        await fetch(url, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ content: u.nextContent }),
+        });
+      } catch {}
+    }
+
+    for (const id of idsToDelete) {
+      removeElement(id);
+      try {
+        const url = buildUrl(api.canvasElements.delete.path, { id });
+        await fetch(url, { method: "DELETE", credentials: "include" });
+      } catch {}
+    }
+
+    if (savedRoomOrder.length > 0) {
+      persistRoomOrder(savedRoomOrder.filter((r) => r !== target));
+    }
+    if (activeRoom === target) persistActiveRoom(null);
+  };
+
+  // Delete a library-mode category tab. Categories are metadata-only — strip
+  // the `category` field from items that referenced it, drop the name from
+  // saved order, and clear active selection if it was active.
+  const deleteCategoryEverywhere = async (name: string) => {
+    if (!selectedBoardId) return;
+    const target = (name || "").trim();
+    if (!target) return;
+
+    const updates: { id: number; nextContent: any }[] = [];
+    for (const el of elementsList) {
+      const c = (el.content || {}) as any;
+      if (isCategorizable(el) && typeof c.category === "string" && c.category === target) {
+        const next = { ...c };
+        delete next.category;
+        updates.push({ id: el.id, nextContent: next });
+      }
+    }
+
+    for (const u of updates) {
+      updateElement(u.id, { content: u.nextContent });
+      sendElementUpdate(u.id, { content: u.nextContent });
+      try {
+        const url = buildUrl(api.canvasElements.update.path, { id: u.id });
+        await fetch(url, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ content: u.nextContent }),
+        });
+      } catch {}
+    }
+
+    if (savedCategoryOrder.length > 0) {
+      persistCategoryOrder(savedCategoryOrder.filter((r) => r !== target));
+    }
+    if (activeRoom === target) persistActiveRoom(null);
+  };
+
   // Quick-cycle status chip — shown in the selected card's action row. Tap
   // cycles idea → shortlist → selected → ordered → idea. Identical signal to
   // the picker, just one tap deep so the user can advance a card without
@@ -5951,6 +6039,13 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
             onReorderTabs={boardMode === "library" ? persistCategoryOrder : persistRoomOrder}
             onRenameTab={boardMode === "library" ? renameCategoryEverywhere : renameRoomEverywhere}
             onCreateTab={boardMode === "library" ? createCategoryFromTabStrip : createRoomFromTabStrip}
+            onDeleteTab={
+              lockLayout
+                ? undefined
+                : boardMode === "library"
+                ? deleteCategoryEverywhere
+                : deleteRoomEverywhere
+            }
             onToggleStatusFilter={toggleStatusFilter}
             onRenderRoom={
               boardMode === "project" && (effectiveRole === "admin" || effectiveRole === "crew")
