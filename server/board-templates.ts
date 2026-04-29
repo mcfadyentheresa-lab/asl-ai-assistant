@@ -167,261 +167,350 @@ function wrap(objects: any[]) {
 
 const IMG = "/api/public-assets/images/templates";
 
-const kitchenRenovation = wrap([
-  makeSectionHeader(40, 20, "Kitchen Renovation"),
-
-  makeRoomZone(30, 60, 520, 380, "Cabinetry & Surfaces", "#eae6df", 0.4),
-  makeRoomZone(570, 60, 480, 340, "Lighting & Backsplash", "#e8ebe6", 0.35),
-  makeRoomZone(30, 480, 700, 280, "Specifications", "#e6e3dc", 0.3),
-
-  makeImage(50, 80, `${IMG}/kitchen-cabinets.png`, "Shaker-style maple uppers in BM White Dove OC-17", 380, 290),
-  makeImage(300, 200, `${IMG}/kitchen-countertop.png`, "Caesarstone Calacatta Nuvo 5131 — 3cm waterfall island", 240, 180),
-
-  makeColorSwatch(60, 310, "White Dove", "#f3efe6", "#F3EFE6", "OC-17", "Benjamin Moore", 140),
-  makeColorSwatch(180, 340, "Edgecomb Gray", "#d5cec4", "#D5CEC4", "HC-173", "Benjamin Moore", 130),
-  makeColorSwatch(410, 330, "Chantilly Lace", "#f5f2ed", "#F5F2ED", "OC-65", "Benjamin Moore", 130),
-
-  makeImage(590, 80, `${IMG}/kitchen-range.png`, "Wolf 48\" dual-fuel range w/ Zephyr Cypress hood", 300, 230),
-  makeImage(620, 220, `${IMG}/kitchen-tile.png`, "Cle Tile zellige 2×6\" in Weathered White, running bond", 240, 160),
-  makeImage(870, 180, `${IMG}/kitchen-pendants.png`, "3× Schoolhouse Otis pendants — aged brass, 10\" globes", 170, 170),
-
-  makeCallout(870, 100, "Aged brass throughout", "#fef9c3", 160, 60),
-
-  makeProduct(50, 500, "Caesarstone Calacatta Nuvo", "$85/sq ft", "Caesarstone", "https://caesarstone.ca"),
-  makeProduct(290, 500, "Emtek Morris Cup Pull 3\"", "$32 each", "Emtek"),
-  makeProduct(50, 640, "Sub-Zero 36\" French Door", "$12,400", "Sub-Zero"),
-
-  makeMaterial(500, 500, "White Oak Hardwood", "Local mill", "5\" plank", `${IMG}/mood-oak-floor.png`, "Wire-brushed, matte poly. Run continuous to dining."),
-
-  makeSticky(290, 640, "Soft-close hinges throughout.\nBrass cup pulls on all lowers.\nLower bases: walnut stain.", "#fef9c3", 200, 80),
-  makeSticky(510, 700, "Budget note: Island is focal\npoint — allocate 40% of\ncabinetry budget here.", "#fef9c3", 200, 80),
-  makeSticky(750, 500, "Lead times: cabinets 12 wks,\ncountertops 6 wks. Order\nbefore framing complete.", "#fef9c3", 220, 80),
-
-  makeCallout(750, 600, "WAC LED tape — 3000K\nunder all uppers. Dimmable.", "#f3e8ff", 210, 60),
-
-  makeSticky(750, 680, "Mapei Keracolor U grout in\nFrost #77. Sealed finish.\nExtend tile to ceiling\nbehind range.", "#fce7f3", 220, 90),
-  makeSticky(510, 800, "Perimeter counters: eased\nedge. Colour-matched caulk.\nIntegrated drainboard area.", "#fce7f3", 220, 90),
-]);
-
-const bathroomRenovation = wrap([
-  makeSectionHeader(40, 20, "Bathroom Renovation"),
-
-  makeRoomZone(30, 60, 500, 400, "Fixtures & Bathing", "#e6e9ec", 0.4),
-  makeRoomZone(550, 60, 470, 360, "Finishes & Lighting", "#ece8e3", 0.35),
-  makeRoomZone(30, 490, 700, 320, "Materials & Notes", "#e3e6e1", 0.3),
-
-  makeImage(50, 80, `${IMG}/bath-tub.png`, "Victoria + Albert Napoli freestanding — matte white, 65×29\"", 360, 280),
-  makeImage(280, 220, `${IMG}/bath-vanity.png`, "60\" double vanity — white oak floating, quartz top", 240, 190),
-
-  makeCallout(50, 380, "Heated floors mandatory", "#dbeafe", 190, 55),
-
-  makeImage(570, 80, `${IMG}/bath-sconce.png`, "Cedar & Moss Alto sconces — brushed brass, 3000K", 260, 220),
-  makeImage(610, 230, `${IMG}/bath-hex-tile.png`, "Heated 2\" Carrara hex mosaic w/ Schluter Ditra-Heat", 240, 170),
-
-  makeColorSwatch(860, 80, "Pale Oak", "#e8e0d4", "#E8E0D4", "OC-20", "Benjamin Moore", 140),
-  makeColorSwatch(880, 240, "White Heron", "#f0ede6", "#F0EDE6", "OC-57", "Benjamin Moore", 130),
-
-  makeCallout(870, 370, "4\" IC-rated wet cans\nin shower — dimmable", "#f3e8ff", 150, 55),
-
-  makeProduct(570, 430, "Brizo Litze Widespread", "$680", "Brizo", "https://brizo.com"),
-  makeProduct(780, 430, "Toto Drake II ADA", "$520", "Toto"),
-
-  makeMaterial(50, 510, "Carrara Marble Hex", "Stone Source", "2\" mosaic", `${IMG}/bath-hex-tile.png`, "Heated w/ Schluter Ditra-Heat mat under all tile."),
-  makeMaterial(290, 510, "Large-Format Porcelain", "Cle Tile", "24×48\" Calacatta", "", "Shower walls. Niche in accent stone."),
-
-  makeSticky(530, 550, "Thermostatic valve —\n2-function diverter.\nRough-in at 48\" centre.", "#dbeafe", 220, 80),
-  makeSticky(530, 650, "Recessed medicine cabinet\nw/ LED surround. Full-\nlength linen tower beside.", "#f3e8ff", 200, 80),
-
-  makeSticky(50, 710, "Brizo Litze luxe gold finish.\nMatching tub filler with\nhand shower attachment.", "#fef9c3", 220, 80),
-  makeSticky(290, 710, "Toto Drake II elongated —\nADA height. Concealed\ntrapway, SoftClose seat.", "#fef9c3", 220, 80),
-]);
-
-const fullCottageBuild = wrap([
-  makeSectionHeader(40, 20, "Full Cottage Build"),
-
-  makeRoomZone(30, 60, 560, 420, "Exterior & Structure", "#e4e1db", 0.4),
-  makeRoomZone(610, 60, 440, 380, "Lakefront & Dock", "#dce5e8", 0.35),
-  makeRoomZone(30, 510, 520, 370, "Interior & Living", "#e8e5df", 0.3),
-  makeRoomZone(570, 480, 490, 400, "Mechanical & Systems", "#e1e4df", 0.3),
-
-  makeImage(50, 80, `${IMG}/cottage-exterior.png`, "Board-and-batten cedar siding — semi-transparent Driftwood Grey", 400, 300),
-  makeImage(320, 250, `${IMG}/cottage-trusses.png`, "Vaulted great room w/ exposed timber trusses, lake view", 260, 200),
-
-  makeColorSwatch(60, 340, "Driftwood Grey", "#9e9689", "#9E9689", "Semi-transparent", "Siding stain", 140),
-  makeColorSwatch(180, 370, "Matte Black", "#2a2a2a", "#2A2A2A", "Metal roof", "Standing seam", 130),
-
-  makeImage(630, 80, `${IMG}/cottage-dock.png`, "Permanent dock — steel frame, cedar decking, boat lift", 340, 260),
-
-  makeCallout(640, 290, "Confirm dock permit\nw/ township first", "#fef9c3", 180, 55),
-  makeCallout(850, 290, "Steel cable rail\nalong all decks", "#dcfce7", 160, 55),
-
-  makeProduct(830, 80, "Loewen Douglas Fir Triple-Glaze", "$2,800/unit", "Loewen"),
-  makeProduct(830, 210, "TimberTech Composite Decking", "$14/sq ft", "TimberTech", "https://timbertech.com"),
-
-  makeImage(50, 530, `${IMG}/cottage-fireplace.png`, "Muskoka granite fieldstone fireplace surround", 300, 240),
-  makeImage(240, 660, `${IMG}/mood-sofa.png`, "Performance linen in oatmeal — great room seating", 250, 190),
-
-  makeCallout(360, 550, "Primary suite: lake side\nwalk-in + ensuite", "#dbeafe", 180, 55),
-
-  makeMaterial(50, 790, "Cedar Board & Batten", "Local sawmill", "1×10 + 1×3 battens", "", "Semi-transparent stain in Driftwood Grey. Re-stain every 5 yrs."),
-
-  makeSticky(290, 870, "Loewen Douglas fir triple-\nglaze windows. 8' sliding\ndoor to screened porch.", "#dcfce7", 220, 80),
-
-  makeProduct(590, 500, "Mitsubishi Hyper-Heat Mini-Split", "$8,200", "Mitsubishi"),
-
-  makeSticky(590, 640, "200A panel — whole-home\nsurge. Pre-wire for EV\ncharger in carport.", "#fef9c3", 220, 80),
-  makeSticky(830, 500, "PEX manifold system.\nRinnai tankless water\nheater — recirculating.", "#fce7f3", 220, 80),
-  makeSticky(830, 600, "Mitsubishi Hyper-Heat\nmini-split — 4 zones.\nIn-floor radiant backup.", "#fce7f3", 220, 80),
-
-  makeSticky(590, 740, "3 guest bunkie rooms on\nlower level. Shared bath\nw/ double vanity.", "#dbeafe", 220, 80),
-  makeSticky(830, 710, "Engineered septic bed —\nClass 4 system. Drilled\nwell, UV filter.", "#fce7f3", 220, 80),
-
-  makeSticky(590, 840, "Native Muskoka plantings:\nwhite birch, ferns, juniper.\nLow-maintenance beds.", "#fef9c3", 220, 80),
-  makeSticky(830, 810, "Path lighting: Kichler LED\nbollards along walkway.\nDeck rail strip lighting.", "#fef9c3", 220, 80),
-
-  makeCallout(300, 560, "Open kitchen to dining —\n14' live-edge harvest table", "#dbeafe", 200, 55),
-]);
-
-const moodboard = wrap([
-  makeSectionHeader(40, 20, "Moodboard"),
-
-  makeRoomZone(30, 60, 560, 420, "Inspiration & Palette", "#ece8e3", 0.4),
-  makeRoomZone(610, 60, 420, 380, "Colour Story", "#e5e8e3", 0.35),
-  makeRoomZone(30, 510, 500, 350, "Materials & Textures", "#e3e0da", 0.3),
-  makeRoomZone(550, 480, 490, 380, "Details & Notes", "#e8e5df", 0.3),
-
-  makeImage(50, 80, `${IMG}/mood-sofa.png`, "Performance linen sofa — oatmeal. Wool bouclé accents.", 400, 300),
-  makeImage(330, 260, `${IMG}/mood-oak-floor.png`, "Wire-brushed white oak 5\" planks — matte poly finish", 250, 190),
-
-  makeImage(50, 340, `${IMG}/cottage-fireplace.png`, "Muskoka granite fieldstone for fireplace surround", 240, 180),
-
-  makeCallout(310, 80, "Client loves warm minimal\nNo farmhouse or rustic", "#fef9c3", 200, 55),
-
-  makeColorSwatch(630, 80, "White Dove", "#f3efe6", "#F3EFE6", "OC-17", "Benjamin Moore", 140),
-  makeColorSwatch(790, 80, "Salamander", "#1e3a2f", "#1E3A2F", "2050-10", "Benjamin Moore", 140),
-  makeColorSwatch(630, 260, "Alabaster", "#f0ede5", "#F0EDE5", "SW 7008", "Sherwin-Williams", 140),
-  makeColorSwatch(790, 260, "Chantilly Lace", "#f5f2ed", "#F5F2ED", "OC-65", "Benjamin Moore", 140),
-
-  makeCallout(650, 200, "Max 3–4 colours.\nLet wood tones do the work.", "#f3e8ff", 190, 55),
-
-  makeImage(930, 150, `${IMG}/kitchen-cabinets.png`, "White oak + aged brass hardware throughout", 200, 170),
-  makeImage(930, 300, `${IMG}/bath-sconce.png`, "Cedar & Moss sconce — aged brass, 3000K", 180, 150),
-
-  makeMaterial(50, 530, "White Oak", "Local mill", "Wire-brushed natural", `${IMG}/mood-oak-floor.png`, "Floors, vanity, shelving. Matte poly finish."),
-  makeMaterial(290, 530, "Muskoka Granite", "Local quarry", "Fieldstone", `${IMG}/cottage-fireplace.png`, "Fireplace surround. Honed Carrara in baths."),
-
-  makeProduct(50, 730, "Aged Brass Cup Pulls", "$32 each", "Emtek"),
-  makeProduct(290, 730, "Performance Linen Fabric", "$95/yd", "Kravet"),
-
-  makeCallout(50, 860, "Lake Joseph cottage —\nArchitectural Digest inspo", "#dbeafe", 210, 55),
-  makeCallout(280, 860, "Studio McGee living room\nvaulted cedar + linen", "#dbeafe", 210, 55),
-
-  makeProduct(570, 500, "Wool Bouclé Accent Chair", "$2,400", "Restoration Hardware"),
-
-  makeSticky(570, 640, "Budget: $450K reno +\n$80K furnishings.\nPrioritise kitchen & baths.", "#fef9c3", 220, 80),
-  makeSticky(810, 500, "Aged brass hardware\nthroughout. Matte black\non exterior doors only.", "#fed7aa", 220, 80),
-  makeSticky(810, 600, "Trim: BM Chantilly Lace\nOC-65. Ceiling: flat.\nAll trim semi-gloss.", "#f3e8ff", 220, 80),
-  makeSticky(570, 740, "Target: break ground May.\nCabinets 12-wk lead time\n— order by Feb 15.", "#fef9c3", 220, 80),
-  makeSticky(810, 710, "Keep palette to 3-4 colours\nmax. Let natural wood\ntones do the work.", "#f3e8ff", 220, 80),
-  makeSticky(570, 840, "Confirm dock permit w/\ntownship. Check setback\nrules for screened porch.", "#fef9c3", 220, 80),
-]);
-
-const furnitureRefinishingConceptBoardWorking = wrap([
-  makeSectionHeader(40, 20, "Furniture Refinishing Concept Board"),
-  makeText(40, 54, "PROJECT NAME", 13, "600", "#6b7280"),
-  makeText(40, 76, "Working Board", 18, "bold", "#1e3a2f"),
-
-  makeRoomZone(30, 110, 320, 520, "Before + Client Ideas", "#f3efe8", 0.42),
-  makeRoomZone(370, 110, 360, 520, "Proposed Direction", "#ede8e1", 0.42),
-  makeRoomZone(750, 110, 210, 230, "Swatches", "#f4f0ea", 0.42),
-  makeRoomZone(750, 360, 210, 310, "Materials + Notes", "#ece7df", 0.42),
-  makeRoomZone(30, 650, 930, 170, "Planning Notes", "#f7f4ef", 0.35),
-
-  makeImage(50, 140, `${IMG}/cottage-exterior.png`, "Before", 270, 170),
-  makeImage(50, 335, `${IMG}/mood-sofa.png`, "Client Inspiration", 270, 200),
-  makeImage(390, 140, `${IMG}/cottage-fireplace.png`, "Proposed Direction", 300, 230),
-  makeCallout(420, 390, "Add one clean arrow callout if needed", "#f7f4ef", 180, 45),
-
-  makeColorSwatch(770, 140, "Paint Colour", "#f3efe6", "#F3EFE6", "Placeholder", "", 160),
-  makeColorSwatch(770, 220, "Stain Colour", "#b58a63", "#B58A63", "Placeholder", "", 160),
-  makeColorSwatch(770, 300, "Finish Sample", "#d9d4cb", "#D9D4CB", "Placeholder", "", 160),
-
-  makeMaterial(770, 380, "Wood Grain", "", "", "", "Use for grain direction, edges, and repair notes."),
-  makeMaterial(770, 485, "Texture Reference", "", "", "", "Secondary materials, hardware, or finish close-ups."),
-
-  makeSticky(50, 675, "Visible grain to remain.\nReduce orange/red undertone.", "#f7f4ef", 210, 70),
-  makeSticky(280, 675, "Matte protective topcoat.\nSample approval before final.", "#f7f4ef", 210, 70),
-  makeSticky(510, 675, "Durability for high-use piece.\nKeep notes short and clear.", "#f7f4ef", 210, 70),
-]);
-
-const collageConceptBoard = wrap([
-  makeSectionHeader(40, 20, "Concept Board"),
-
-  makeRoomZone(30, 60, 200, 540, "Renovation", "#f6f3ee", 0.48),
-  makeRoomZone(250, 60, 220, 260, "Design & construction", "#f6f3ee", 0.48),
-  makeRoomZone(490, 60, 390, 540, "Floor Plan", "#f6f3ee", 0.48),
-  makeRoomZone(900, 60, 220, 220, "Feature Desk", "#f6f3ee", 0.48),
-  makeRoomZone(900, 300, 220, 220, "Swatches", "#f6f3ee", 0.48),
-  makeRoomZone(900, 540, 220, 180, "Display Shelf", "#f6f3ee", 0.48),
-
-  makeImage(40, 80, `${IMG}/cottage-exterior.png`, "Renovation", 180, 140),
-  makeText(55, 238, "Objectives", 16, "bold", "#1e1e1e"),
-  makeSticky(50, 275, "Emphasise the home’s existing architectural character.\nUse soft, warm materials.\nKeep the palette calm and timeless.", "#ffffff", 160, 95),
-
-  makeText(270, 86, "1. Livngroom Moodboard", 14, "bold", "#1e1e1e"),
-  makeText(270, 138, "2. Study Moodboard", 14, "bold", "#1e1e1e"),
-  makeText(270, 190, "3. Kitchen moodboard", 14, "bold", "#1e1e1e"),
-  makeText(270, 235, "Things to buy", 16, "bold", "#1e1e1e"),
-  makeSticky(270, 280, "Materials checklist\nAdd product references\nMark anything still to source.", "#ffffff", 180, 88),
-
-  makeImage(520, 80, `${IMG}/cottage-trusses.png`, "House floorplan", 340, 420),
-  makeCallout(560, 510, "Use a clean plan with a few highlighted zones", "#ffffff", 240, 54),
-
-  makeImage(920, 80, `${IMG}/mood-sofa.png`, "Bright feature desk", 180, 120),
-  makeColorSwatch(920, 330, "Horizon", "#6fa7b4", "#6FA7B4", "", "", 90),
-  makeColorSwatch(1015, 330, "Birchwood", "#e5d3b4", "#E5D3B4", "", "", 90),
-  makeImage(920, 570, `${IMG}/mood-oak-floor.png`, "Floating display unit", 180, 110),
-
-  makeSticky(40, 590, "Add client notes and approvals here.", "#ffffff", 170, 70),
-  makeSticky(250, 590, "Keep the board airy and presentation-ready.", "#ffffff", 170, 70),
-  makeSticky(490, 590, "Reserve room for arrows and callouts.", "#ffffff", 250, 70),
-]);
-
-const materialInspirationBoard = wrap([
-  makeSectionHeader(40, 20, "Material Inspiration Board"),
-
-  makeRoomZone(140, 60, 260, 360, "Fabric Samples", "#f5f3ef", 0.45),
-  makeRoomZone(420, 60, 220, 220, "Stone / Pattern", "#f5f3ef", 0.45),
-  makeRoomZone(650, 60, 220, 180, "Dark Wood", "#f5f3ef", 0.45),
-  makeRoomZone(650, 260, 220, 140, "Label", "#f5f3ef", 0.45),
-  makeRoomZone(890, 170, 240, 290, "Oak Veneer", "#f5f3ef", 0.45),
-  makeRoomZone(420, 300, 240, 250, "Lighting + Objects", "#f5f3ef", 0.45),
-  makeRoomZone(680, 430, 180, 120, "Colour Chip", "#f5f3ef", 0.45),
-  makeRoomZone(885, 470, 220, 170, "Door Handles", "#f5f3ef", 0.45),
-
-  makeImage(150, 80, `${IMG}/bath-vanity.png`, "European fabric samples", 220, 180),
-  makeCallout(80, 110, "European fabric\nsamples", "#5a443d", 90, 80),
-
-  makeImage(430, 70, `${IMG}/bath-hex-tile.png`, "Herringbone pattern", 210, 180),
-  makeText(500, 220, "Herringbone pattern", 18, "bold", "#2f2a28"),
-
-  makeImage(660, 70, `${IMG}/mood-oak-floor.png`, "Dark wood grain", 180, 120),
-  makeText(715, 165, "Wenge spruce", 14, "400", "#1f1f1f"),
-
-  makeImage(430, 220, `${IMG}/kitchen-pendants.png`, "Textured lamp", 240, 230),
-  makeCallout(470, 330, "Hemlock", "#556b3f", 120, 60),
-
-  makeImage(650, 290, `${IMG}/kitchen-cabinets.png`, "Oak veneer finish", 210, 190),
-  makeCallout(920, 370, "Bar top oak veneer finish", "#f5f3ef", 170, 55),
-
-  makeImage(900, 180, `${IMG}/kitchen-tile.png`, "Oak veneer finish", 200, 220),
-  makeImage(910, 490, `${IMG}/bath-sconce.png`, "Door handles", 190, 120),
-  makeCallout(900, 500, "Entry door handles", "#f5f3ef", 150, 55),
-
-  makeSticky(430, 500, "Oak side tables", "#ffffff", 150, 60),
-  makeSticky(650, 540, "Keep the palette grounded.", "#ffffff", 150, 60),
-  makeSticky(920, 610, "Use a single dark accent piece.", "#ffffff", 150, 60),
-]);
+// ---------------------------------------------------------------------------
+// Layout grid
+// ---------------------------------------------------------------------------
+// Every template uses the same predictable canvas grid so users see an
+// "obvious example layout" the moment a board is created — clean horizontal
+// rows, tidy 3-column image grids, no overlapping zones or scattered notes.
+//
+//   [ Title row              ]  y=20..70
+//   [ Section A (zone)       ]  y=80..480   (3-column image grid inside)
+//   [ Section B (zone)       ]  y=500..820  (swatches + materials + notes)
+//
+// Helpers below build those rows so each template definition stays short
+// and visually consistent.
+// ---------------------------------------------------------------------------
+
+const TITLE_X = 40;
+const TITLE_Y = 24;
+
+const SECTION_A_TOP = 80;
+const SECTION_A_HEIGHT = 400;
+const SECTION_B_TOP = 500;
+const SECTION_B_HEIGHT = 320;
+
+const CANVAS_LEFT = 30;
+const CANVAS_WIDTH = 1100;
+
+// 3-column image grid inside Section A.
+function imageGrid(top: number, items: { url: string; caption: string }[]) {
+  const cols = 3;
+  const gutter = 24;
+  const sectionInsetX = 60;
+  const sectionInsetTop = 56; // leaves room below the zone title
+  const cellW = Math.floor((CANVAS_WIDTH - sectionInsetX * 2 - gutter * (cols - 1)) / cols);
+  const cellH = 220;
+  const rowGap = 60;
+  return items.map((it, i) => {
+    const r = Math.floor(i / cols);
+    const c = i % cols;
+    const x = CANVAS_LEFT + sectionInsetX + c * (cellW + gutter);
+    const y = top + sectionInsetTop + r * (cellH + rowGap);
+    return makeImage(x, y, it.url, it.caption, cellW, cellH);
+  });
+}
+
+// Row of swatches inside Section B (left half).
+function swatchRow(top: number, items: { name: string; hex: string; code?: string; brand?: string }[]) {
+  const swatchW = 130;
+  const gap = 16;
+  const startX = CANVAS_LEFT + 60;
+  const swatchTop = top + 56;
+  return items.map((it, i) => {
+    const x = startX + i * (swatchW + gap);
+    return makeColorSwatch(x, swatchTop, it.name, it.hex, it.hex, it.code || "", it.brand || "", swatchW);
+  });
+}
+
+// Row of materials below swatches in Section B.
+function materialRow(top: number, items: { name: string; supplier?: string; code?: string; imageUrl?: string; notes?: string }[]) {
+  const w = 220;
+  const gap = 24;
+  const startX = CANVAS_LEFT + 60;
+  const matTop = top + 56;
+  return items.map((it, i) => {
+    const x = startX + i * (w + gap);
+    return makeMaterial(x, matTop, it.name, it.supplier || "", it.code || "", it.imageUrl || "", it.notes || "");
+  });
+}
+
+// Row of notes (sticky) in the right half of Section B.
+function noteRow(top: number, leftOffset: number, items: { text: string; color?: string }[]) {
+  const w = 200;
+  const h = 90;
+  const gap = 16;
+  const startX = CANVAS_LEFT + leftOffset;
+  const noteTop = top + 100;
+  return items.map((it, i) => {
+    const x = startX + i * (w + gap);
+    return makeSticky(x, noteTop, it.text, it.color || "#fef9c3", w, h);
+  });
+}
+
+// Build a clean two-section template with a Title row, an image grid in
+// Section A, and swatches/materials/notes in Section B.
+interface SimpleTemplateInput {
+  title: string;
+  sectionA: string;
+  sectionB: string;
+  images: { url: string; caption: string }[]; // up to 6
+  swatches?: { name: string; hex: string; code?: string; brand?: string }[];
+  materials?: { name: string; supplier?: string; code?: string; imageUrl?: string; notes?: string }[];
+  notes?: { text: string; color?: string }[];
+  zoneColorA?: string;
+  zoneColorB?: string;
+}
+
+function buildSimpleTemplate(input: SimpleTemplateInput) {
+  const objects: any[] = [];
+  objects.push(makeSectionHeader(TITLE_X, TITLE_Y, input.title));
+
+  // Section A — image grid
+  objects.push(makeRoomZone(CANVAS_LEFT, SECTION_A_TOP, CANVAS_WIDTH, SECTION_A_HEIGHT, input.sectionA, input.zoneColorA || "#ece8e1", 0.4));
+  objects.push(makeText(CANVAS_LEFT + 24, SECTION_A_TOP + 18, input.sectionA.toUpperCase(), 12, "600", "#1e3a2f"));
+  objects.push(...imageGrid(SECTION_A_TOP, input.images.slice(0, 6)));
+
+  // Section B — swatches + materials + notes
+  objects.push(makeRoomZone(CANVAS_LEFT, SECTION_B_TOP, CANVAS_WIDTH, SECTION_B_HEIGHT, input.sectionB, input.zoneColorB || "#e8ebe6", 0.35));
+  objects.push(makeText(CANVAS_LEFT + 24, SECTION_B_TOP + 18, input.sectionB.toUpperCase(), 12, "600", "#1e3a2f"));
+
+  if (input.swatches && input.swatches.length > 0) {
+    objects.push(makeText(CANVAS_LEFT + 60, SECTION_B_TOP + 36, "PALETTE", 11, "600", "#6b7280"));
+    objects.push(...swatchRow(SECTION_B_TOP, input.swatches.slice(0, 4)));
+  }
+  if (input.materials && input.materials.length > 0) {
+    const matTop = SECTION_B_TOP + (input.swatches && input.swatches.length ? 200 : 0);
+    objects.push(makeText(CANVAS_LEFT + 60, matTop + 36, "MATERIALS", 11, "600", "#6b7280"));
+    objects.push(...materialRow(matTop, input.materials.slice(0, 3)));
+  }
+  if (input.notes && input.notes.length > 0) {
+    const notesLeftOffset = 720;
+    objects.push(makeText(CANVAS_LEFT + notesLeftOffset, SECTION_B_TOP + 36, "NOTES", 11, "600", "#6b7280"));
+    objects.push(...noteRow(SECTION_B_TOP, notesLeftOffset, input.notes.slice(0, 2)));
+  }
+
+  return wrap(objects);
+}
+
+// ---------------------------------------------------------------------------
+// Templates
+// ---------------------------------------------------------------------------
+
+const kitchenRenovation = buildSimpleTemplate({
+  title: "Kitchen Renovation",
+  sectionA: "Cabinetry, Surfaces & Lighting",
+  sectionB: "Palette, Materials & Notes",
+  images: [
+    { url: `${IMG}/kitchen-cabinets.png`, caption: "Shaker maple uppers — BM White Dove OC-17" },
+    { url: `${IMG}/kitchen-countertop.png`, caption: "Calacatta Nuvo 5131 — 3cm waterfall island" },
+    { url: `${IMG}/kitchen-range.png`, caption: "Wolf 48\" range w/ Zephyr Cypress hood" },
+    { url: `${IMG}/kitchen-tile.png`, caption: "Cle zellige 2×6\" backsplash — running bond" },
+    { url: `${IMG}/kitchen-pendants.png`, caption: "Schoolhouse Otis pendants — aged brass" },
+    { url: `${IMG}/mood-oak-floor.png`, caption: "5\" white oak hardwood — wire-brushed matte" },
+  ],
+  swatches: [
+    { name: "White Dove", hex: "#F3EFE6", code: "OC-17", brand: "Benjamin Moore" },
+    { name: "Edgecomb Gray", hex: "#D5CEC4", code: "HC-173", brand: "Benjamin Moore" },
+    { name: "Chantilly Lace", hex: "#F5F2ED", code: "OC-65", brand: "Benjamin Moore" },
+    { name: "Aged Brass", hex: "#A8895C", code: "Hardware", brand: "Emtek" },
+  ],
+  materials: [
+    { name: "White Oak Hardwood", supplier: "Local mill", code: "5\" plank", imageUrl: `${IMG}/mood-oak-floor.png`, notes: "Wire-brushed, matte poly. Continuous to dining." },
+    { name: "Calacatta Nuvo Quartz", supplier: "Caesarstone", code: "5131", imageUrl: `${IMG}/kitchen-countertop.png`, notes: "Waterfall island. Eased edge perimeter." },
+    { name: "Zellige Backsplash", supplier: "Cle Tile", code: "2×6 Weathered White", imageUrl: `${IMG}/kitchen-tile.png`, notes: "Running bond. Extend to ceiling behind range." },
+  ],
+  notes: [
+    { text: "Lead times: cabinets 12 wks, countertops 6 wks. Order before framing.", color: "#fef9c3" },
+    { text: "Aged brass hardware throughout. Soft-close hinges on all lowers.", color: "#dcfce7" },
+  ],
+});
+
+const bathroomRenovation = buildSimpleTemplate({
+  title: "Bathroom Renovation",
+  sectionA: "Fixtures, Finishes & Lighting",
+  sectionB: "Palette, Materials & Notes",
+  zoneColorA: "#e6e9ec",
+  zoneColorB: "#ece8e3",
+  images: [
+    { url: `${IMG}/bath-tub.png`, caption: "V+A Napoli freestanding — matte white, 65×29\"" },
+    { url: `${IMG}/bath-vanity.png`, caption: "60\" double vanity — white oak floating" },
+    { url: `${IMG}/bath-sconce.png`, caption: "Cedar & Moss Alto sconces — brushed brass" },
+    { url: `${IMG}/bath-hex-tile.png`, caption: "2\" Carrara hex mosaic — heated" },
+    { url: `${IMG}/kitchen-tile.png`, caption: "Large-format Calacatta porcelain — shower" },
+    { url: `${IMG}/mood-oak-floor.png`, caption: "Heated white oak threshold transitions" },
+  ],
+  swatches: [
+    { name: "Pale Oak", hex: "#E8E0D4", code: "OC-20", brand: "Benjamin Moore" },
+    { name: "White Heron", hex: "#F0EDE6", code: "OC-57", brand: "Benjamin Moore" },
+    { name: "Brushed Brass", hex: "#B69672", code: "Fixtures", brand: "Brizo Litze" },
+    { name: "Carrara White", hex: "#EDEAE3", code: "Mosaic", brand: "Stone Source" },
+  ],
+  materials: [
+    { name: "Carrara Marble Hex", supplier: "Stone Source", code: "2\" mosaic", imageUrl: `${IMG}/bath-hex-tile.png`, notes: "Heated w/ Schluter Ditra-Heat under all tile." },
+    { name: "Calacatta Porcelain", supplier: "Cle Tile", code: "24×48\"", imageUrl: "", notes: "Shower walls. Niche in accent stone." },
+    { name: "White Oak Vanity", supplier: "Custom mill", code: "Floating, 60\"", imageUrl: `${IMG}/bath-vanity.png`, notes: "Quartz top, undermount basins." },
+  ],
+  notes: [
+    { text: "Heated floors mandatory. Schluter Ditra-Heat under all tile.", color: "#dbeafe" },
+    { text: "Thermostatic valve, 2-function diverter. Rough-in at 48\" centre.", color: "#fef9c3" },
+  ],
+});
+
+const fullCottageBuild = buildSimpleTemplate({
+  title: "Full Cottage Build",
+  sectionA: "Exterior, Lakefront & Interior",
+  sectionB: "Palette, Materials & Mechanical Notes",
+  zoneColorA: "#e4e1db",
+  zoneColorB: "#dce5e8",
+  images: [
+    { url: `${IMG}/cottage-exterior.png`, caption: "Board-and-batten cedar — Driftwood Grey stain" },
+    { url: `${IMG}/cottage-trusses.png`, caption: "Vaulted great room — exposed timber trusses" },
+    { url: `${IMG}/cottage-dock.png`, caption: "Permanent dock — steel frame, cedar decking" },
+    { url: `${IMG}/cottage-fireplace.png`, caption: "Muskoka granite fieldstone fireplace surround" },
+    { url: `${IMG}/mood-sofa.png`, caption: "Performance linen great-room seating" },
+    { url: `${IMG}/mood-oak-floor.png`, caption: "5\" white oak floors — continuous main level" },
+  ],
+  swatches: [
+    { name: "Driftwood Grey", hex: "#9E9689", code: "Semi-trans.", brand: "Cabot Stain" },
+    { name: "Matte Black", hex: "#2A2A2A", code: "Standing seam", brand: "Metal roof" },
+    { name: "White Dove", hex: "#F3EFE6", code: "OC-17", brand: "Benjamin Moore" },
+    { name: "Salamander", hex: "#1E3A2F", code: "2050-10", brand: "Benjamin Moore" },
+  ],
+  materials: [
+    { name: "Cedar Board & Batten", supplier: "Local sawmill", code: "1×10 + 1×3", imageUrl: `${IMG}/cottage-exterior.png`, notes: "Semi-transparent stain. Re-stain every 5 yrs." },
+    { name: "Loewen Triple-Glaze", supplier: "Loewen", code: "Douglas fir", imageUrl: "", notes: "8' sliding door to screened porch." },
+    { name: "TimberTech Decking", supplier: "TimberTech", code: "Composite", imageUrl: "", notes: "Steel cable rail along all decks." },
+  ],
+  notes: [
+    { text: "Confirm dock permit w/ township. Check setback for screened porch.", color: "#fef9c3" },
+    { text: "200A panel, EV pre-wire. Mitsubishi Hyper-Heat 4 zones + radiant.", color: "#fce7f3" },
+  ],
+});
+
+const moodboard = buildSimpleTemplate({
+  title: "Moodboard",
+  sectionA: "Inspiration & References",
+  sectionB: "Palette, Materials & Direction",
+  zoneColorA: "#ece8e3",
+  zoneColorB: "#e5e8e3",
+  images: [
+    { url: `${IMG}/mood-sofa.png`, caption: "Performance linen sofa — oatmeal, wool bouclé accents" },
+    { url: `${IMG}/mood-oak-floor.png`, caption: "Wire-brushed white oak — matte poly" },
+    { url: `${IMG}/cottage-fireplace.png`, caption: "Muskoka granite fieldstone fireplace" },
+    { url: `${IMG}/kitchen-cabinets.png`, caption: "White oak + aged brass hardware" },
+    { url: `${IMG}/bath-sconce.png`, caption: "Cedar & Moss sconce — aged brass, 3000K" },
+    { url: `${IMG}/kitchen-pendants.png`, caption: "Schoolhouse globe pendants" },
+  ],
+  swatches: [
+    { name: "White Dove", hex: "#F3EFE6", code: "OC-17", brand: "Benjamin Moore" },
+    { name: "Salamander", hex: "#1E3A2F", code: "2050-10", brand: "Benjamin Moore" },
+    { name: "Alabaster", hex: "#F0EDE5", code: "SW 7008", brand: "Sherwin-Williams" },
+    { name: "Chantilly Lace", hex: "#F5F2ED", code: "OC-65", brand: "Benjamin Moore" },
+  ],
+  materials: [
+    { name: "White Oak", supplier: "Local mill", code: "Wire-brushed", imageUrl: `${IMG}/mood-oak-floor.png`, notes: "Floors, vanity, shelving. Matte poly." },
+    { name: "Muskoka Granite", supplier: "Local quarry", code: "Fieldstone", imageUrl: `${IMG}/cottage-fireplace.png`, notes: "Fireplace surround. Honed Carrara in baths." },
+    { name: "Performance Linen", supplier: "Kravet", code: "Oatmeal", imageUrl: `${IMG}/mood-sofa.png`, notes: "Sofa + drapery. Wool bouclé on accent chair." },
+  ],
+  notes: [
+    { text: "Client loves warm minimal. No farmhouse or rustic. Max 3-4 colours.", color: "#fef9c3" },
+    { text: "Aged brass hardware throughout. Matte black on exterior doors only.", color: "#fed7aa" },
+  ],
+});
+
+const furnitureRefinishingConceptBoardWorking = buildSimpleTemplate({
+  title: "Furniture Refinishing",
+  sectionA: "Before & Proposed Direction",
+  sectionB: "Swatches, Materials & Approval Notes",
+  zoneColorA: "#f3efe8",
+  zoneColorB: "#ede8e1",
+  images: [
+    { url: `${IMG}/cottage-exterior.png`, caption: "Before — current piece, full view" },
+    { url: `${IMG}/mood-sofa.png`, caption: "Client inspiration reference" },
+    { url: `${IMG}/cottage-fireplace.png`, caption: "Proposed direction — finish goal" },
+    { url: `${IMG}/mood-oak-floor.png`, caption: "Wood grain reference — matching tone" },
+    { url: `${IMG}/kitchen-cabinets.png`, caption: "Hardware close-up reference" },
+    { url: `${IMG}/bath-vanity.png`, caption: "Edge profile + repair detail" },
+  ],
+  swatches: [
+    { name: "Paint Colour", hex: "#F3EFE6", code: "Sample", brand: "TBD" },
+    { name: "Stain Colour", hex: "#B58A63", code: "Sample", brand: "TBD" },
+    { name: "Topcoat Sheen", hex: "#D9D4CB", code: "Matte", brand: "TBD" },
+    { name: "Hardware Tone", hex: "#A8895C", code: "Aged brass", brand: "TBD" },
+  ],
+  materials: [
+    { name: "Wood Grain Note", supplier: "", code: "Direction", imageUrl: "", notes: "Visible grain to remain. Reduce orange undertone." },
+    { name: "Edge Profile", supplier: "", code: "Eased", imageUrl: "", notes: "Sand to 220. Dust off twice before finish." },
+    { name: "Topcoat", supplier: "Rubio Monocoat", code: "Pure", imageUrl: "", notes: "Matte. Sample approval before final." },
+  ],
+  notes: [
+    { text: "Sample approval required before final finish. Photo client reply.", color: "#fef9c3" },
+    { text: "Durability for high-use piece. Confirm finish with client.", color: "#dcfce7" },
+  ],
+});
+
+const collageConceptBoard = buildSimpleTemplate({
+  title: "Concept Board",
+  sectionA: "Renovation, Design & Floor Plan",
+  sectionB: "Palette, Features & Objectives",
+  zoneColorA: "#f6f3ee",
+  zoneColorB: "#ede8e1",
+  images: [
+    { url: `${IMG}/cottage-exterior.png`, caption: "Renovation overview" },
+    { url: `${IMG}/cottage-trusses.png`, caption: "House floor plan" },
+    { url: `${IMG}/mood-sofa.png`, caption: "Feature desk inspiration" },
+    { url: `${IMG}/kitchen-cabinets.png`, caption: "Kitchen moodboard" },
+    { url: `${IMG}/cottage-fireplace.png`, caption: "Living room moodboard" },
+    { url: `${IMG}/mood-oak-floor.png`, caption: "Floating display unit" },
+  ],
+  swatches: [
+    { name: "Horizon", hex: "#6FA7B4", code: "", brand: "" },
+    { name: "Birchwood", hex: "#E5D3B4", code: "", brand: "" },
+    { name: "White Dove", hex: "#F3EFE6", code: "OC-17", brand: "Benjamin Moore" },
+    { name: "Charcoal", hex: "#3A3A3A", code: "", brand: "" },
+  ],
+  materials: [
+    { name: "Renovation", supplier: "", code: "Existing", imageUrl: "", notes: "Emphasise the home's existing architectural character." },
+    { name: "Materials List", supplier: "", code: "Source", imageUrl: "", notes: "Add product references. Mark anything still to source." },
+    { name: "Display Shelf", supplier: "", code: "Floating", imageUrl: "", notes: "Reserve room for arrows and callouts on plan." },
+  ],
+  notes: [
+    { text: "Calm, timeless palette. Use warm materials. Keep airy and presentation-ready.", color: "#ffffff" },
+    { text: "Three moodboards: Living, Study, Kitchen. Things to buy section.", color: "#ffffff" },
+  ],
+});
+
+const materialInspirationBoard = buildSimpleTemplate({
+  title: "Material Inspiration",
+  sectionA: "Fabrics, Finishes & Wood Tones",
+  sectionB: "Palette, Materials & Detail Notes",
+  zoneColorA: "#f5f3ef",
+  zoneColorB: "#ece8e3",
+  images: [
+    { url: `${IMG}/bath-vanity.png`, caption: "European fabric samples" },
+    { url: `${IMG}/bath-hex-tile.png`, caption: "Herringbone pattern" },
+    { url: `${IMG}/mood-oak-floor.png`, caption: "Wenge spruce — dark wood grain" },
+    { url: `${IMG}/kitchen-pendants.png`, caption: "Textured lamp + objects" },
+    { url: `${IMG}/kitchen-cabinets.png`, caption: "Bar top oak veneer finish" },
+    { url: `${IMG}/bath-sconce.png`, caption: "Entry door handles" },
+  ],
+  swatches: [
+    { name: "Hemlock", hex: "#556B3F", code: "Accent", brand: "" },
+    { name: "Espresso", hex: "#5A443D", code: "Wood", brand: "" },
+    { name: "Birchwood", hex: "#E5D3B4", code: "Light", brand: "" },
+    { name: "Linen", hex: "#E8E0D4", code: "Neutral", brand: "" },
+  ],
+  materials: [
+    { name: "Oak Veneer", supplier: "Local mill", code: "Bar top", imageUrl: `${IMG}/kitchen-cabinets.png`, notes: "Bar top + display shelving." },
+    { name: "Herringbone Stone", supplier: "Stone Source", code: "Pattern", imageUrl: `${IMG}/bath-hex-tile.png`, notes: "Feature wall in entry." },
+    { name: "European Fabric", supplier: "Kravet", code: "Sample", imageUrl: `${IMG}/bath-vanity.png`, notes: "Drapery + accent pillows." },
+  ],
+  notes: [
+    { text: "Keep the palette grounded. Use a single dark accent piece.", color: "#ffffff" },
+    { text: "Oak side tables. Door handles in aged brass to tie everything.", color: "#ffffff" },
+  ],
+});
 
 export interface BoardTemplate {
   id: string;
@@ -436,7 +525,7 @@ export const boardTemplates: BoardTemplate[] = [
   {
     id: "kitchen",
     name: "Kitchen Renovation",
-    description: "Cabinetry, surfaces, lighting, and specs \u2014 prefilled with example imagery",
+    description: "Cabinetry, surfaces, lighting, palette \u2014 prefilled in a clean grid",
     icon: "ChefHat",
     image: "/assets/images/template-kitchen-faux.png",
     canvasData: kitchenRenovation,
@@ -444,7 +533,7 @@ export const boardTemplates: BoardTemplate[] = [
   {
     id: "bathroom",
     name: "Bathroom Renovation",
-    description: "Fixtures, finishes, lighting, and tile spec \u2014 prefilled with example imagery",
+    description: "Fixtures, finishes, lighting, tile spec \u2014 prefilled in a clean grid",
     icon: "Bath",
     image: "/assets/images/template-bathroom-faux.png",
     canvasData: bathroomRenovation,
@@ -452,7 +541,7 @@ export const boardTemplates: BoardTemplate[] = [
   {
     id: "cottage",
     name: "Full Cottage Build",
-    description: "Exterior, lakefront, interior, and mechanical zones \u2014 prefilled with example imagery",
+    description: "Exterior, lakefront, interior, mechanical \u2014 prefilled in a clean grid",
     icon: "Home",
     image: "/assets/images/template-cottage-faux.png",
     canvasData: fullCottageBuild,
@@ -460,7 +549,7 @@ export const boardTemplates: BoardTemplate[] = [
   {
     id: "moodboard",
     name: "Moodboard",
-    description: "Inspiration, palette, and material zones \u2014 prefilled with example imagery",
+    description: "Inspiration, palette, materials \u2014 prefilled in a clean grid",
     icon: "Palette",
     image: "/assets/images/Screenshot_2026-04-08_at_12.56.52_PM_1775667416114.png",
     canvasData: moodboard,
@@ -468,7 +557,7 @@ export const boardTemplates: BoardTemplate[] = [
   {
     id: "furniture-refinishing-working",
     name: "Furniture Refinishing",
-    description: "Before, proposed direction, swatches, and material notes",
+    description: "Before, proposed direction, swatches, approval notes",
     icon: "LayoutPanelLeft",
     image: "/assets/images/Screenshot_2026-04-08_at_12.56.52_PM_1775667416114.png",
     canvasData: furnitureRefinishingConceptBoardWorking,
@@ -476,7 +565,7 @@ export const boardTemplates: BoardTemplate[] = [
   {
     id: "collage-concept",
     name: "Collage Concept Board",
-    description: "Multi-column presentation board with plan, notes, swatches, and feature images",
+    description: "Multi-section presentation board with plan, palette, and features",
     icon: "LayoutPanelLeft",
     image: "/assets/images/Screenshot_2026-04-09_at_10.54.53_AM_1775746499391.png",
     canvasData: collageConceptBoard,
@@ -484,7 +573,7 @@ export const boardTemplates: BoardTemplate[] = [
   {
     id: "material-inspiration",
     name: "Material Inspiration Board",
-    description: "Layered collage board for fabrics, finishes, wood tones, and product inspiration",
+    description: "Fabrics, finishes, wood tones, and palette laid out clearly",
     icon: "Palette",
     image: "/assets/images/Screenshot_2026-04-09_at_10.57.06_AM_1775746631248.png",
     canvasData: materialInspirationBoard,
