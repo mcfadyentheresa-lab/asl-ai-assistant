@@ -9,6 +9,7 @@ import { useEffect, useRef } from "react";
 import { Loader2 } from "lucide-react";
 import { ThemeProvider } from "next-themes";
 import { AppShell } from "@/components/layout/AppShell";
+import { useBodyPointerEventsCleanup } from "@/hooks/use-body-pointer-events-cleanup";
 
 function RoleGuard({ component: Component, allowedRoles }: { component: React.ComponentType; allowedRoles: string[] }) {
   const { user } = useAuth();
@@ -184,11 +185,17 @@ function Router() {
   );
 }
 
+function GlobalEffects() {
+  useBodyPointerEventsCleanup();
+  return null;
+}
+
 function App() {
   return (
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
+          <GlobalEffects />
           <PresenceTracker />
           <Toaster />
           <Router />

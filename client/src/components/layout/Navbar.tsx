@@ -119,7 +119,7 @@ export function NavbarShell({ onMenuToggle }: NavbarShellProps) {
                   <MoreHorizontal className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuContent align="end" className="w-44 z-[60]">
                 <p className="px-2 py-1.5 text-xs text-muted-foreground font-medium">Switch View</p>
                 {(["admin", "crew", "client"] as const).map((role) => {
                   const label =
