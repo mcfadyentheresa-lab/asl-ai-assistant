@@ -7,6 +7,7 @@ import { ThisWeekCard } from "@/components/client/ThisWeekCard";
 import { MilestoneStrip } from "@/components/client/MilestoneStrip";
 import { ReferenceCardGrid } from "@/components/client/ReferenceCardGrid";
 import { RecentDecisionsCard } from "@/components/client/RecentDecisionsCard";
+import { YourActionItemsCard } from "@/components/client/YourActionItemsCard";
 
 interface Project {
   id: number;
@@ -52,6 +53,16 @@ interface Decision {
   decision: string;
   decidedOn: string;
   category: string | null;
+}
+
+interface ChecklistItem {
+  id: number;
+  title: string;
+  notes: string | null;
+  completed: boolean | null;
+  status: string | null;
+  requiresClient: boolean | null;
+  priority: string | null;
 }
 
 interface CalendarEvent {
@@ -102,6 +113,16 @@ export function ClientDashboardView({ project, isAdminPreview = false }: ClientD
     queryKey: ["/api/projects", project.id, "decisions"],
     queryFn: async () => {
       const res = await fetch(`/api/projects/${project.id}/decisions`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!project.id,
+  });
+
+  const { data: checklistItems } = useQuery<ChecklistItem[]>({
+    queryKey: ["/api/projects", project.id, "checklist"],
+    queryFn: async () => {
+      const res = await fetch(`/api/projects/${project.id}/checklist`, { credentials: "include" });
       if (!res.ok) return [];
       return res.json();
     },
@@ -199,6 +220,8 @@ export function ClientDashboardView({ project, isAdminPreview = false }: ClientD
         lastVisit={lastVisit}
         nextWalkthrough={nextWalkthrough}
       />
+
+      <YourActionItemsCard projectId={project.id} items={checklistItems || []} />
 
       <ThisWeekCard
         focusText={project.currentFocusText}

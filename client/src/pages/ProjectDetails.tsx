@@ -1084,7 +1084,7 @@ function ChecklistTab({ projectId, compact = false }: { projectId: number; compa
   const [newStatus, setNewStatus] = useState("todo");
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
   const [editItem, setEditItem] = useState<ChecklistItem | null>(null);
-  const [editForm, setEditForm] = useState({ title: "", group: "", priority: "normal", status: "todo", notes: "", priceEstimate: "" });
+  const [editForm, setEditForm] = useState({ title: "", group: "", priority: "normal", status: "todo", notes: "", priceEstimate: "", requiresClient: false });
 
   const { mutate: createMilestone, isPending: isCreatingMilestone } = useCreateMilestone();
   const { mutate: createTask, isPending: isCreatingTask } = useCreateTask();
@@ -1234,6 +1234,7 @@ function ChecklistTab({ projectId, compact = false }: { projectId: number; compa
       status: item.status || "todo",
       notes: item.notes || "",
       priceEstimate: item.priceEstimate != null ? String(item.priceEstimate) : "",
+      requiresClient: !!(item as any).requiresClient,
     });
     setEditItem(item);
   };
@@ -1250,8 +1251,9 @@ function ChecklistTab({ projectId, compact = false }: { projectId: number; compa
         completed: editForm.status === "done",
         notes: editForm.notes || null,
         priceEstimate: editForm.priceEstimate ? parseInt(editForm.priceEstimate, 10) : null,
+        requiresClient: editForm.requiresClient,
         color: EDITED_TEXT_COLOR,
-      },
+      } as any,
       {
         onSuccess: () => {
           toast({ title: "Updated", description: "Checklist item updated." });
@@ -1698,6 +1700,20 @@ function ChecklistTab({ projectId, compact = false }: { projectId: number; compa
                 placeholder="0"
                 data-testid="input-edit-price"
               />
+            </div>
+            <div className="flex items-start gap-2 pt-1">
+              <Checkbox
+                id="edit-requires-client"
+                checked={editForm.requiresClient}
+                onCheckedChange={(v) => setEditForm({ ...editForm, requiresClient: v === true })}
+                data-testid="checkbox-edit-requires-client"
+              />
+              <label htmlFor="edit-requires-client" className="text-sm leading-tight">
+                Client action item
+                <span className="block text-xs text-muted-foreground mt-0.5">
+                  Surface on the client's Plan home as something they need to decide or do.
+                </span>
+              </label>
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setEditItem(null)} data-testid="button-edit-cancel">Cancel</Button>
