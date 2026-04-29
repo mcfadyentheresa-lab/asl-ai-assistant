@@ -5,6 +5,7 @@ import { DesktopSidebar, SidebarNav } from "@/components/layout/Sidebar";
 import { Link } from "wouter";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { useAuth } from "@/hooks/use-auth";
+import { useViewMode } from "@/hooks/use-view-mode";
 import {
   Sheet,
   SheetContent,
@@ -19,20 +20,29 @@ interface AppShellProps {
 export function AppShell({ children }: AppShellProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const { user } = useAuth();
-  const isClient = user?.role === "client";
+  const { viewMode } = useViewMode();
+  const isAdmin = user?.role === "admin";
+  const effectiveRole = isAdmin ? viewMode : user?.role;
+  const isClientView = effectiveRole === "client";
 
   return (
     <AppShellContext.Provider value={true}>
-      <div className="flex flex-col h-screen bg-background">
+      <div
+        className="flex flex-col h-screen bg-background"
+        data-role={isClientView ? "client" : effectiveRole}
+      >
         <PreviewBanner />
         <NavbarShell
-          onMenuToggle={isClient ? undefined : () => setDrawerOpen(true)}
+          onMenuToggle={isClientView ? undefined : () => setDrawerOpen(true)}
         />
 
         <div className="flex flex-1 overflow-hidden">
-          {!isClient && <DesktopSidebar />}
+          {!isClientView && <DesktopSidebar />}
 
-          <main className="flex-1 overflow-y-auto pb-16 md:pb-0" data-testid="app-main-content">
+          <main
+            className="flex-1 overflow-y-auto pb-16 md:pb-0"
+            data-testid="app-main-content"
+          >
             {children}
           </main>
         </div>
@@ -40,7 +50,7 @@ export function AppShell({ children }: AppShellProps) {
         <MobileBottomNav />
       </div>
 
-      {!isClient && (
+      {!isClientView && (
         <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
           <SheetContent side="left" className="w-64 p-0 bg-sidebar border-sidebar-border">
             <SheetHeader className="px-5 py-4 border-b border-sidebar-border/50">

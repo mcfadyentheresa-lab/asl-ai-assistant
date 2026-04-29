@@ -173,6 +173,19 @@ export default function Dashboard() {
         ? "Client view — this is what clients see when they log in."
         : `${activeProjects.length} active ${activeProjects.length === 1 ? "project" : "projects"}${completedProjects.length > 0 ? ` · ${completedProjects.length} completed` : ""}${onlineCrew.length > 0 ? ` · ${onlineCrew.length} online` : ""}`;
 
+  // Client view gets a flush, edge-to-edge layout — no container, no greeting block.
+  // The ClientDashboardView component handles its own padding and structure.
+  if (isClientView && clientProject) {
+    return (
+      <div className="min-h-screen bg-background" data-role="client">
+        <Navbar />
+        <main>
+          <ClientDashboardView project={clientProject} isAdminPreview={isAdmin} />
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
