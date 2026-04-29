@@ -262,14 +262,17 @@ export default function RoomTabStrip({
           );
         })}
 
+        {/* Compact icon-only "+" affordance — matches tab height but reads as
+            an action, not a tab. Tooltip-style hover label keeps discoverability. */}
         <button
           type="button"
-          className={`${tabBase} bg-transparent text-muted-foreground hover:text-[#2f4a3a] hover:bg-[#f0e8d6]/60 border border-dashed border-border/60`}
-          style={{ fontFamily: "Inter Tight, Inter, sans-serif" }}
+          className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-[#2f4a3a] hover:bg-[#f0e8d6]/60 transition-colors"
           onClick={() => setDialogOpen(true)}
           data-testid="room-tab-add"
+          aria-label={`Add ${addLabel}`}
+          title={`Add ${addLabel.toLowerCase()}`}
         >
-          <Plus className="h-4 w-4" /> {addLabel}
+          <Plus className="h-4 w-4" />
         </button>
 
         <div className="flex-1" />
@@ -327,48 +330,53 @@ export default function RoomTabStrip({
         )}
       </div>
 
-      {/* Status filter pills — multi-select, with counts. Hidden when the active scope
-          has no status-bearing cards (hardware / surface / product) — a row of zero counts
-          plus a "Clear" button is just noise on an empty board or a non-product tab. */}
-      {hasStatusBearingElements && (
-      <div className="flex items-center gap-1.5 px-3 py-1.5 overflow-x-auto" data-testid="status-filter-row">
-        {ROOM_STATUSES.map((s) => {
-          const count = counts[s] || 0;
-          const active = statusFilters.has(s);
-          const meta = STATUS_PILL_CLASS[s];
-          return (
-            <button
-              key={s}
-              type="button"
-              onClick={() => onToggleStatusFilter(s)}
-              className={`min-h-[32px] inline-flex items-center gap-1.5 px-2.5 rounded-full text-[11px] uppercase tracking-wider border transition-colors ${
-                active
-                  ? "bg-[#2f4a3a] text-white border-[#2f4a3a]"
-                  : "bg-card text-muted-foreground border-border hover:text-foreground hover:border-[#2f4a3a]/40"
-              }`}
-              style={{ fontFamily: "var(--font-mono)" }}
-              data-testid={`status-filter-${s}`}
-              aria-pressed={active}
-            >
-              <span className={`h-1.5 w-1.5 rounded-full ${active ? "bg-white" : meta.dot}`} />
-              {meta.label}
-              <span className={`text-[10px] ${active ? "text-white/80" : "text-foreground/40"}`}>{count}</span>
-            </button>
-          );
-        })}
-        {statusFilters.size > 0 && (
-          <button
-            type="button"
-            onClick={() => ROOM_STATUSES.forEach((s) => statusFilters.has(s) && onToggleStatusFilter(s))}
-            className="ml-1 inline-flex items-center gap-1 text-[10px] px-2 py-1 text-muted-foreground hover:text-foreground"
-            style={{ fontFamily: "var(--font-mono)" }}
-            data-testid="status-filter-clear"
-          >
-            <XIcon className="h-3 w-3" /> Clear
-          </button>
-        )}
-      </div>
-      )}
+      {/* Status filter pills — multi-select, with counts. Only renders pills whose
+          count > 0 (or that are currently active so the user can still toggle off).
+          The whole row is hidden when no scope card has any status — a row of zero
+          counts plus a "Clear" button is just noise on an empty board. */}
+      {hasStatusBearingElements && (() => {
+        const visibleStatuses = ROOM_STATUSES.filter((s) => (counts[s] || 0) > 0 || statusFilters.has(s));
+        if (visibleStatuses.length === 0 && statusFilters.size === 0) return null;
+        return (
+          <div className="flex items-center gap-1.5 px-3 py-1.5 overflow-x-auto" data-testid="status-filter-row">
+            {visibleStatuses.map((s) => {
+              const count = counts[s] || 0;
+              const active = statusFilters.has(s);
+              const meta = STATUS_PILL_CLASS[s];
+              return (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => onToggleStatusFilter(s)}
+                  className={`min-h-[32px] inline-flex items-center gap-1.5 px-2.5 rounded-full text-[11px] uppercase tracking-wider border transition-colors ${
+                    active
+                      ? "bg-[#2f4a3a] text-white border-[#2f4a3a]"
+                      : "bg-card text-muted-foreground border-border hover:text-foreground hover:border-[#2f4a3a]/40"
+                  }`}
+                  style={{ fontFamily: "var(--font-mono)" }}
+                  data-testid={`status-filter-${s}`}
+                  aria-pressed={active}
+                >
+                  <span className={`h-1.5 w-1.5 rounded-full ${active ? "bg-white" : meta.dot}`} />
+                  {meta.label}
+                  <span className={`text-[10px] ${active ? "text-white/80" : "text-foreground/40"}`}>{count}</span>
+                </button>
+              );
+            })}
+            {statusFilters.size > 0 && (
+              <button
+                type="button"
+                onClick={() => ROOM_STATUSES.forEach((s) => statusFilters.has(s) && onToggleStatusFilter(s))}
+                className="ml-1 inline-flex items-center gap-1 text-[10px] px-2 py-1 text-muted-foreground hover:text-foreground"
+                style={{ fontFamily: "var(--font-mono)" }}
+                data-testid="status-filter-clear"
+              >
+                <XIcon className="h-3 w-3" /> Clear
+              </button>
+            )}
+          </div>
+        );
+      })()}
 
       <NewTabDialog
         mode={mode}
