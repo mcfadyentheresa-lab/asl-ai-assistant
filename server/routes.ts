@@ -1459,6 +1459,66 @@ Respond with valid JSON only:
     }
   }));
 
+  // Decisions log
+  // Read: any authenticated user with access to the project (clients see only their projects)
+  // Write/update: crew or admin only
+  app.get(api.decisions.list.path, isAuthenticated, asyncHandler(async (req: any, res) => {
+    const projectId = Number(req.params.projectId);
+    const userId = req.user.claims.sub;
+    const project = await storage.getProject(projectId);
+    if (!project) return res.status(404).json({ message: "Project not found" });
+    const dbUser = await authStorage.getUser(userId);
+    if (dbUser?.role === "client" && project.clientId !== userId) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    // Clients never see archived decisions; crew/admin see them via ?includeArchived=1
+    const includeArchived =
+      dbUser?.role !== "client" && req.query.includeArchived === "1";
+    const list = await storage.getDecisions(projectId, includeArchived);
+    res.json(list);
+  }));
+
+  app.post(api.decisions.create.path, isAuthenticated, asyncHandler(async (req: any, res) => {
+    const projectId = Number(req.params.projectId);
+    const userId = req.user.claims.sub;
+    const dbUser = await authStorage.getUser(userId);
+    if (dbUser?.role !== "admin" && dbUser?.role !== "crew") {
+      return res.status(403).json({ message: "Only crew or admin can record decisions" });
+    }
+    const project = await storage.getProject(projectId);
+    if (!project) return res.status(404).json({ message: "Project not found" });
+    const input = api.decisions.create.input.parse(req.body);
+    const decision = await storage.createDecision({
+      ...input,
+      projectId,
+      decidedBy: userId,
+    });
+    res.status(201).json(decision);
+    broadcastProjectChange(projectId, ["decisions"], "created", decision.id, userId);
+    storage.createActivityLog({
+      projectId,
+      userId,
+      type: "decision_recorded",
+      title: `Decision: ${decision.title}`,
+      description: decision.decision.slice(0, 140),
+    }).catch(() => {});
+  }));
+
+  app.patch(api.decisions.update.path, isAuthenticated, asyncHandler(async (req: any, res) => {
+    const id = Number(req.params.id);
+    const userId = req.user.claims.sub;
+    const dbUser = await authStorage.getUser(userId);
+    if (dbUser?.role !== "admin" && dbUser?.role !== "crew") {
+      return res.status(403).json({ message: "Only crew or admin can update decisions" });
+    }
+    const existing = await storage.getDecision(id);
+    if (!existing) return res.status(404).json({ message: "Decision not found" });
+    const input = api.decisions.update.input.parse(req.body);
+    const updated = await storage.updateDecision(id, input);
+    res.json(updated);
+    broadcastProjectChange(updated.projectId, ["decisions"], "updated", updated.id, userId);
+  }));
+
   // Time Entries
   app.get(api.timeEntries.list.path, isAuthenticated, asyncHandler(async (req, res) => {
     const entries = await storage.getTimeEntries(Number(req.params.projectId));

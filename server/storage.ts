@@ -1,10 +1,10 @@
 import { db } from "./db";
 import { 
-  users, projects, milestones, subMilestones, sections, tasks, photos, documents, timeEntries, messages, checklistItems, boardItems, calendarEvents, planningBoards, canvasElements, activityLog, activityViews, paintColors, boardSnapshots, costCategories, marketRates, projectEstimates, estimateItems, receipts, estimateWarnings, crewRates, subcontractors, suppliers, supplierPrices, clientInvites, socialPosts, tableRedesignPlans, tableRedesignMaterials, recentProjectViews,
-  type Project, type Milestone, type SubMilestone, type Section, type Task, type Photo, type Document, type TimeEntry, type Message,
+  users, projects, milestones, subMilestones, sections, tasks, photos, documents, timeEntries, messages, decisions, checklistItems, boardItems, calendarEvents, planningBoards, canvasElements, activityLog, activityViews, paintColors, boardSnapshots, costCategories, marketRates, projectEstimates, estimateItems, receipts, estimateWarnings, crewRates, subcontractors, suppliers, supplierPrices, clientInvites, socialPosts, tableRedesignPlans, tableRedesignMaterials, recentProjectViews,
+  type Project, type Milestone, type SubMilestone, type Section, type Task, type Photo, type Document, type TimeEntry, type Message, type Decision,
   type ChecklistItem, type BoardItem, type CalendarEvent, type PlanningBoard, type CanvasElement, type ActivityLog, type PaintColor, type BoardSnapshot, type CostCategory, type MarketRate, type ProjectEstimate, type EstimateItem, type Receipt, type EstimateWarning, type CrewRate, type Subcontractor,
   type InsertProject, type InsertMilestone, type InsertSubMilestone, type InsertSection, type InsertTask, type InsertPhoto, type InsertDocument, 
-  type InsertTimeEntry, type InsertMessage, type InsertChecklistItem, type InsertBoardItem, type InsertCalendarEvent, type InsertPlanningBoard, type InsertCanvasElement, type InsertActivityLog, type InsertBoardSnapshot, type InsertCostCategory, type InsertMarketRate, type InsertProjectEstimate, type InsertEstimateItem, type InsertReceipt, type InsertEstimateWarning, type InsertCrewRate, type InsertSubcontractor, type Supplier, type SupplierPrice, type InsertSupplier, type InsertSupplierPrice,
+  type InsertTimeEntry, type InsertMessage, type InsertDecision, type InsertChecklistItem, type InsertBoardItem, type InsertCalendarEvent, type InsertPlanningBoard, type InsertCanvasElement, type InsertActivityLog, type InsertBoardSnapshot, type InsertCostCategory, type InsertMarketRate, type InsertProjectEstimate, type InsertEstimateItem, type InsertReceipt, type InsertEstimateWarning, type InsertCrewRate, type InsertSubcontractor, type Supplier, type SupplierPrice, type InsertSupplier, type InsertSupplierPrice,
   type ClientInvite, type InsertClientInvite,
   type SocialPost, type InsertSocialPost,
   type TableRedesignPlan, type InsertTableRedesignPlan,
@@ -63,6 +63,12 @@ export interface IStorage {
   // Messages
   getMessages(projectId: number): Promise<(Message & { sender: User | null })[]>;
   createMessage(message: InsertMessage): Promise<Message>;
+
+  // Decisions
+  getDecisions(projectId: number, includeArchived?: boolean): Promise<(Decision & { decidedByUser: User | null })[]>;
+  getDecision(id: number): Promise<Decision | undefined>;
+  createDecision(decision: InsertDecision): Promise<Decision>;
+  updateDecision(id: number, updates: Partial<InsertDecision>): Promise<Decision>;
 
   // Time Entries / Timesheets
   getTimeEntries(projectId: number): Promise<TimeEntry[]>;
@@ -406,6 +412,37 @@ export class DatabaseStorage implements IStorage {
   async createMessage(message: InsertMessage): Promise<Message> {
     const [newMessage] = await db.insert(messages).values(message).returning();
     return newMessage;
+  }
+
+  // Decisions
+  async getDecisions(projectId: number, includeArchived = false): Promise<(Decision & { decidedByUser: User | null })[]> {
+    const whereClause = includeArchived
+      ? eq(decisions.projectId, projectId)
+      : and(eq(decisions.projectId, projectId), eq(decisions.archived, false));
+    const results = await db.select({
+      decision: decisions,
+      decidedByUser: users,
+    })
+      .from(decisions)
+      .leftJoin(users, eq(decisions.decidedBy, users.id))
+      .where(whereClause)
+      .orderBy(desc(decisions.decidedOn), desc(decisions.id));
+    return results.map(r => ({ ...r.decision, decidedByUser: r.decidedByUser }));
+  }
+  async getDecision(id: number): Promise<Decision | undefined> {
+    const [d] = await db.select().from(decisions).where(eq(decisions.id, id));
+    return d;
+  }
+  async createDecision(decision: InsertDecision): Promise<Decision> {
+    const [created] = await db.insert(decisions).values(decision).returning();
+    return created;
+  }
+  async updateDecision(id: number, updates: Partial<InsertDecision>): Promise<Decision> {
+    const [updated] = await db.update(decisions)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(decisions.id, id))
+      .returning();
+    return updated;
   }
 
   // Time Entries
