@@ -55,13 +55,14 @@ import {
   Lock, LockOpen, Hand, Wrench, Check,
   Spline, MoveRight, Slash, Droplet,
   Play, Globe, Star, History, AlertTriangle, Settings,
-  Pin, Layers, Armchair, Image as ImageIcon, Grid3x3,
+  Pin, Layers, Armchair, Image as ImageIcon, Grid3x3, Crop as CropIcon, RotateCcw,
 } from "lucide-react";
 import LibraryCollectionsView from "@/components/board/LibraryCollectionsView";
 import { PhotosDrawer } from "@/components/board/PhotosDrawer";
 import { FurnitureDrawer } from "@/components/board/FurnitureDrawer";
 import { MaterialsDrawer } from "@/components/board/MaterialsDrawer";
 import HardwarePickerDialog, { type HardwareDraft } from "@/components/board/HardwarePickerDialog";
+import { ImageCropDialog } from "@/components/ImageCropDialog";
 import PaletteExtractionDialog, { type PaletteAddPayload } from "@/components/board/PaletteExtractionDialog";
 import RoomRenderDialog from "@/components/board/RoomRenderDialog";
 import CanvasConnectors, { CONNECTOR_DEFAULT_COLOR, anchorDots, type ConnectorContent, type ConnectorStyle, type ConnectorCurve } from "@/components/board/CanvasConnectors";
@@ -532,6 +533,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showImagePopup, setShowImagePopup] = useState(false);
   const [imagePopupDragOver, setImagePopupDragOver] = useState(false);
+  const [cropTargetId, setCropTargetId] = useState<number | null>(null);
   // Add palette popover — persisted open/closed across sessions for power users.
   const [addPaletteOpen, setAddPaletteOpen] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
@@ -5052,7 +5054,51 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
         >
           {c.url ? (
             <>
-              <img src={c.url} alt={c.caption || ""} className="w-full object-cover pointer-events-none select-none" style={{ height: el.height ? Math.max(el.height - ((c.caption && !isEdgeBleed) ? 32 : 0), 40) : "auto", maxHeight: el.height ? undefined : 300 }} draggable={false} />
+              {(() => {
+                const containerH = el.height ? Math.max(el.height - ((c.caption && !isEdgeBleed) ? 32 : 0), 40) : undefined;
+                const crop = (c.crop && c.crop.w > 0 && c.crop.h > 0) ? c.crop : null;
+                if (!crop) {
+                  return (
+                    <img
+                      src={c.url}
+                      alt={c.caption || ""}
+                      className="w-full object-cover pointer-events-none select-none"
+                      style={{ height: containerH ?? "auto", maxHeight: containerH ? undefined : 300 }}
+                      draggable={false}
+                    />
+                  );
+                }
+                // Render only the cropped region by oversizing the img and offsetting it.
+                // Width/height of inner img relative to the visible window:
+                //   imgW% = 100 / crop.w, imgH% = 100 / crop.h (in percent)
+                //   leftOffset% = -crop.x / crop.w * 100
+                //   topOffset%  = -crop.y / crop.h * 100
+                const imgWPct = 100 / crop.w;
+                const imgHPct = 100 / crop.h;
+                const leftPct = -(crop.x / crop.w) * 100;
+                const topPct = -(crop.y / crop.h) * 100;
+                return (
+                  <div
+                    className="w-full overflow-hidden pointer-events-none"
+                    style={{ height: containerH ?? 200, position: "relative" }}
+                    data-testid={`element-image-cropframe-${el.id}`}
+                  >
+                    <img
+                      src={c.url}
+                      alt={c.caption || ""}
+                      className="absolute select-none"
+                      style={{
+                        left: `${leftPct}%`,
+                        top: `${topPct}%`,
+                        width: `${imgWPct}%`,
+                        height: `${imgHPct}%`,
+                        objectFit: "cover",
+                      }}
+                      draggable={false}
+                    />
+                  </div>
+                );
+              })()}
               {isEdgeBleed && (isSelected || isUnlocked) && c.caption && (
                 <div className="absolute bottom-2 left-2 max-w-[80%] bg-card/85 backdrop-blur px-2 py-0.5 rounded text-[10px] text-foreground/80 truncate pointer-events-none">{c.caption}</div>
               )}
@@ -6870,6 +6916,34 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                 <Upload className="h-3.5 w-3.5" /> Upload Image
               </button>
             )}
+            {elements[contextMenu.elementId]?.type === "image" && (elements[contextMenu.elementId]?.content as any)?.url && (
+              <button
+                className="w-full px-3 py-1.5 text-left text-sm flex items-center gap-2 hover:bg-muted transition-colors"
+                onClick={() => { setCropTargetId(contextMenu.elementId); setContextMenu(null); }}
+                data-testid="context-menu-crop-image"
+              >
+                <CropIcon className="h-3.5 w-3.5" /> Crop Image
+              </button>
+            )}
+            {elements[contextMenu.elementId]?.type === "image" && (elements[contextMenu.elementId]?.content as any)?.crop && (
+              <button
+                className="w-full px-3 py-1.5 text-left text-sm flex items-center gap-2 hover:bg-muted transition-colors"
+                onClick={() => {
+                  const id = contextMenu.elementId;
+                  const el = elements[id];
+                  if (el) {
+                    const c = (el.content || {}) as any;
+                    const next = { ...c };
+                    delete next.crop;
+                    handleUpdateContent(id, next);
+                  }
+                  setContextMenu(null);
+                }}
+                data-testid="context-menu-clear-crop"
+              >
+                <RotateCcw className="h-3.5 w-3.5" /> Clear Crop
+              </button>
+            )}
             {isCompareEligible(elements[contextMenu.elementId]) && (
               <button
                 className="w-full px-3 py-1.5 text-left text-sm flex items-center gap-2 hover:bg-muted transition-colors"
@@ -7449,6 +7523,30 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
           />
         );
       })()}
+
+      <ImageCropDialog
+        open={cropTargetId !== null && !!(elements[cropTargetId!]?.content as any)?.url}
+        imageUrl={cropTargetId !== null ? ((elements[cropTargetId!]?.content as any)?.url || "") : ""}
+        initialCrop={cropTargetId !== null ? ((elements[cropTargetId!]?.content as any)?.crop ?? null) : null}
+        onCancel={() => setCropTargetId(null)}
+        onApply={(crop) => {
+          const id = cropTargetId;
+          if (id !== null) {
+            const el = elements[id];
+            if (el) {
+              const c = (el.content || {}) as any;
+              const next = { ...c };
+              if (crop) {
+                next.crop = crop;
+              } else {
+                delete next.crop;
+              }
+              handleUpdateContent(id, next);
+            }
+          }
+          setCropTargetId(null);
+        }}
+      />
 
       <PaletteExtractionDialog
         open={showPaletteDialog}
