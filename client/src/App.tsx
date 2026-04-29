@@ -34,6 +34,7 @@ import MasterCalendar from "@/pages/MasterCalendar";
 import SocialMediaGenerator from "@/pages/SocialMediaGenerator";
 import TableRedesignPlanner from "@/pages/TableRedesignPlanner";
 import CostEstimator from "@/pages/CostEstimator";
+import ProjectSettings from "@/pages/ProjectSettings";
 import InviteAccept from "@/pages/InviteAccept";
 import Login from "@/pages/Login";
 import ForgotPassword from "@/pages/ForgotPassword";
@@ -123,6 +124,7 @@ function Router() {
                 <Route path="/profile" component={Profile} />
                 <Route path="/project/:id" component={ProjectDetails} />
                 <Route path="/project/:id/estimate" component={CostEstimator} />
+                <Route path="/project/:id/settings" component={ProjectSettings} />
                 <Route path="/colors">
                   {() => <RoleGuard component={ColorPortfolio} allowedRoles={["admin", "crew"]} />}
                 </Route>
