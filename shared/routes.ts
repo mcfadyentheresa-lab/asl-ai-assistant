@@ -1,9 +1,9 @@
 import { z } from 'zod';
 import { 
   insertProjectSchema, insertMilestoneSchema, insertTaskSchema, 
-  insertPhotoSchema, insertDocumentSchema, insertTimeEntrySchema, insertMessageSchema, insertDecisionSchema,
+  insertPhotoSchema, insertDocumentSchema, insertTimeEntrySchema, insertMessageSchema, insertDecisionSchema, insertSelectionSchema,
   insertChecklistItemSchema, insertBoardItemSchema, insertCalendarEventSchema, insertPlanningBoardSchema, insertCanvasElementSchema,
-  projects, milestones, tasks, photos, documents, timeEntries, messages, decisions, users, checklistItems, boardItems, calendarEvents, planningBoards, canvasElements, boardSnapshots
+  projects, milestones, tasks, photos, documents, timeEntries, messages, decisions, selections, users, checklistItems, boardItems, calendarEvents, planningBoards, canvasElements, boardSnapshots
 } from './schema';
 
 export const errorSchemas = {
@@ -195,6 +195,34 @@ export const api = {
       input: insertDecisionSchema.omit({ projectId: true, decidedBy: true }).partial(),
       responses: {
         200: z.custom<typeof decisions.$inferSelect>(),
+      },
+    },
+  },
+
+  // Selections ledger
+  selections: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/projects/:projectId/selections' as const,
+      responses: {
+        200: z.array(z.custom<typeof selections.$inferSelect & { creator?: typeof users.$inferSelect }>()),
+      },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/projects/:projectId/selections' as const,
+      // server fills projectId from URL and createdBy from session
+      input: insertSelectionSchema.omit({ projectId: true, createdBy: true }),
+      responses: {
+        201: z.custom<typeof selections.$inferSelect>(),
+      },
+    },
+    update: {
+      method: 'PATCH' as const,
+      path: '/api/selections/:id' as const,
+      input: insertSelectionSchema.omit({ projectId: true, createdBy: true }).partial(),
+      responses: {
+        200: z.custom<typeof selections.$inferSelect>(),
       },
     },
   },
