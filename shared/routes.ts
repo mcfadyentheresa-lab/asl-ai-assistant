@@ -1,9 +1,9 @@
 import { z } from 'zod';
 import { 
   insertProjectSchema, insertMilestoneSchema, insertTaskSchema, 
-  insertPhotoSchema, insertDocumentSchema, insertTimeEntrySchema, insertMessageSchema,
+  insertPhotoSchema, insertDocumentSchema, insertTimeEntrySchema, insertMessageSchema, insertDecisionSchema,
   insertChecklistItemSchema, insertBoardItemSchema, insertCalendarEventSchema, insertPlanningBoardSchema, insertCanvasElementSchema,
-  projects, milestones, tasks, photos, documents, timeEntries, messages, users, checklistItems, boardItems, calendarEvents, planningBoards, canvasElements, boardSnapshots
+  projects, milestones, tasks, photos, documents, timeEntries, messages, decisions, users, checklistItems, boardItems, calendarEvents, planningBoards, canvasElements, boardSnapshots
 } from './schema';
 
 export const errorSchemas = {
@@ -167,6 +167,34 @@ export const api = {
       input: insertMessageSchema.omit({ projectId: true, senderId: true }),
       responses: {
         201: z.custom<typeof messages.$inferSelect>(),
+      },
+    },
+  },
+
+  // Decisions log
+  decisions: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/projects/:projectId/decisions' as const,
+      responses: {
+        200: z.array(z.custom<typeof decisions.$inferSelect & { decidedByUser?: typeof users.$inferSelect }>()),
+      },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/projects/:projectId/decisions' as const,
+      // server fills projectId from URL and decidedBy from session
+      input: insertDecisionSchema.omit({ projectId: true, decidedBy: true }),
+      responses: {
+        201: z.custom<typeof decisions.$inferSelect>(),
+      },
+    },
+    update: {
+      method: 'PATCH' as const,
+      path: '/api/decisions/:id' as const,
+      input: insertDecisionSchema.omit({ projectId: true, decidedBy: true }).partial(),
+      responses: {
+        200: z.custom<typeof decisions.$inferSelect>(),
       },
     },
   },
