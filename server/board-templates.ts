@@ -337,9 +337,9 @@ const furnitureRefinishingConceptBoardWorking = wrap([
   makeRoomZone(750, 360, 210, 310, "Materials + Notes", "#ece7df", 0.42),
   makeRoomZone(30, 650, 930, 170, "Planning Notes", "#f7f4ef", 0.35),
 
-  makeImage(50, 140, "", "Before", 270, 170),
-  makeImage(50, 335, "", "Client Inspiration", 270, 200),
-  makeImage(390, 140, "", "Proposed Direction", 300, 230),
+  makeImage(50, 140, `${IMG}/cottage-exterior.png`, "Before", 270, 170),
+  makeImage(50, 335, `${IMG}/mood-sofa.png`, "Client Inspiration", 270, 200),
+  makeImage(390, 140, `${IMG}/cottage-fireplace.png`, "Proposed Direction", 300, 230),
   makeCallout(420, 390, "Add one clean arrow callout if needed", "#f7f4ef", 180, 45),
 
   makeColorSwatch(770, 140, "Paint Colour", "#f3efe6", "#F3EFE6", "Placeholder", "", 160),
@@ -364,7 +364,7 @@ const collageConceptBoard = wrap([
   makeRoomZone(900, 300, 220, 220, "Swatches", "#f6f3ee", 0.48),
   makeRoomZone(900, 540, 220, 180, "Display Shelf", "#f6f3ee", 0.48),
 
-  makeImage(40, 80, "", "Renovation", 180, 140),
+  makeImage(40, 80, `${IMG}/cottage-exterior.png`, "Renovation", 180, 140),
   makeText(55, 238, "Objectives", 16, "bold", "#1e1e1e"),
   makeSticky(50, 275, "Emphasise the home’s existing architectural character.\nUse soft, warm materials.\nKeep the palette calm and timeless.", "#ffffff", 160, 95),
 
@@ -374,13 +374,13 @@ const collageConceptBoard = wrap([
   makeText(270, 235, "Things to buy", 16, "bold", "#1e1e1e"),
   makeSticky(270, 280, "Materials checklist\nAdd product references\nMark anything still to source.", "#ffffff", 180, 88),
 
-  makeImage(520, 80, "", "House floorplan", 340, 420),
+  makeImage(520, 80, `${IMG}/cottage-trusses.png`, "House floorplan", 340, 420),
   makeCallout(560, 510, "Use a clean plan with a few highlighted zones", "#ffffff", 240, 54),
 
-  makeImage(920, 80, "", "Bright feature desk", 180, 120),
+  makeImage(920, 80, `${IMG}/mood-sofa.png`, "Bright feature desk", 180, 120),
   makeColorSwatch(920, 330, "Horizon", "#6fa7b4", "#6FA7B4", "", "", 90),
   makeColorSwatch(1015, 330, "Birchwood", "#e5d3b4", "#E5D3B4", "", "", 90),
-  makeImage(920, 570, "", "Floating display unit", 180, 110),
+  makeImage(920, 570, `${IMG}/mood-oak-floor.png`, "Floating display unit", 180, 110),
 
   makeSticky(40, 590, "Add client notes and approvals here.", "#ffffff", 170, 70),
   makeSticky(250, 590, "Keep the board airy and presentation-ready.", "#ffffff", 170, 70),
@@ -399,23 +399,23 @@ const materialInspirationBoard = wrap([
   makeRoomZone(680, 430, 180, 120, "Colour Chip", "#f5f3ef", 0.45),
   makeRoomZone(885, 470, 220, 170, "Door Handles", "#f5f3ef", 0.45),
 
-  makeImage(150, 80, "", "European fabric samples", 220, 180),
+  makeImage(150, 80, `${IMG}/bath-vanity.png`, "European fabric samples", 220, 180),
   makeCallout(80, 110, "European fabric\nsamples", "#5a443d", 90, 80),
 
-  makeImage(430, 70, "", "Herringbone pattern", 210, 180),
+  makeImage(430, 70, `${IMG}/bath-hex-tile.png`, "Herringbone pattern", 210, 180),
   makeText(500, 220, "Herringbone pattern", 18, "bold", "#2f2a28"),
 
-  makeImage(660, 70, "", "Dark wood grain", 180, 120),
+  makeImage(660, 70, `${IMG}/mood-oak-floor.png`, "Dark wood grain", 180, 120),
   makeText(715, 165, "Wenge spruce", 14, "400", "#1f1f1f"),
 
-  makeImage(430, 220, "", "Textured lamp", 240, 230),
+  makeImage(430, 220, `${IMG}/kitchen-pendants.png`, "Textured lamp", 240, 230),
   makeCallout(470, 330, "Hemlock", "#556b3f", 120, 60),
 
-  makeImage(650, 290, "", "Oak veneer finish", 210, 190),
+  makeImage(650, 290, `${IMG}/kitchen-cabinets.png`, "Oak veneer finish", 210, 190),
   makeCallout(920, 370, "Bar top oak veneer finish", "#f5f3ef", 170, 55),
 
-  makeImage(900, 180, "", "Oak veneer finish", 200, 220),
-  makeImage(910, 490, "", "Door handles", 190, 120),
+  makeImage(900, 180, `${IMG}/kitchen-tile.png`, "Oak veneer finish", 200, 220),
+  makeImage(910, 490, `${IMG}/bath-sconce.png`, "Door handles", 190, 120),
   makeCallout(900, 500, "Entry door handles", "#f5f3ef", 150, 55),
 
   makeSticky(430, 500, "Oak side tables", "#ffffff", 150, 60),
@@ -433,6 +433,46 @@ export interface BoardTemplate {
 }
 
 export const boardTemplates: BoardTemplate[] = [
+  {
+    id: "kitchen",
+    name: "Kitchen Renovation",
+    description: "Cabinetry, surfaces, lighting, and specs \u2014 prefilled with example imagery",
+    icon: "ChefHat",
+    image: "/assets/images/template-kitchen-faux.png",
+    canvasData: kitchenRenovation,
+  },
+  {
+    id: "bathroom",
+    name: "Bathroom Renovation",
+    description: "Fixtures, finishes, lighting, and tile spec \u2014 prefilled with example imagery",
+    icon: "Bath",
+    image: "/assets/images/template-bathroom-faux.png",
+    canvasData: bathroomRenovation,
+  },
+  {
+    id: "cottage",
+    name: "Full Cottage Build",
+    description: "Exterior, lakefront, interior, and mechanical zones \u2014 prefilled with example imagery",
+    icon: "Home",
+    image: "/assets/images/template-cottage-faux.png",
+    canvasData: fullCottageBuild,
+  },
+  {
+    id: "moodboard",
+    name: "Moodboard",
+    description: "Inspiration, palette, and material zones \u2014 prefilled with example imagery",
+    icon: "Palette",
+    image: "/assets/images/Screenshot_2026-04-08_at_12.56.52_PM_1775667416114.png",
+    canvasData: moodboard,
+  },
+  {
+    id: "furniture-refinishing-working",
+    name: "Furniture Refinishing",
+    description: "Before, proposed direction, swatches, and material notes",
+    icon: "LayoutPanelLeft",
+    image: "/assets/images/Screenshot_2026-04-08_at_12.56.52_PM_1775667416114.png",
+    canvasData: furnitureRefinishingConceptBoardWorking,
+  },
   {
     id: "collage-concept",
     name: "Collage Concept Board",
