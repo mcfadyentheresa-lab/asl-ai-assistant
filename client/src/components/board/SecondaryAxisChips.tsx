@@ -33,7 +33,11 @@ export default function SecondaryAxisChips({
   onToggle,
   onClear,
 }: SecondaryAxisChipsProps) {
-  if (options.length === 0) return null;
+  // Only render chips whose count > 0 (or that are currently active so the user
+  // can still toggle them off). Empty options array → render nothing.
+  const visibleOptions = options.filter((opt) => (counts[opt] || 0) > 0 || selected.has(opt));
+  if (visibleOptions.length === 0) return null;
+  const allActive = selected.size === 0;
   return (
     <div
       className="flex items-center gap-1.5 px-3 py-1.5 overflow-x-auto bg-card border-b border-border/40 hide-scrollbar"
@@ -41,7 +45,21 @@ export default function SecondaryAxisChips({
       data-testid="secondary-axis-chips"
       data-axis={axis}
     >
-      {options.map((opt) => {
+      <button
+        type="button"
+        onClick={onClear}
+        className={`min-h-[44px] inline-flex items-center gap-1.5 px-3 rounded-full text-[11px] uppercase tracking-wider border transition-colors whitespace-nowrap ${
+          allActive
+            ? "bg-[#2f4a3a] text-white border-[#2f4a3a]"
+            : "bg-[#f7f1e7] text-foreground/80 border-transparent hover:border-[#2f4a3a]/40"
+        }`}
+        style={{ fontFamily: "var(--font-mono)" }}
+        data-testid="secondary-chip-all"
+        aria-pressed={allActive}
+      >
+        <span className={allActive ? "" : "text-foreground"}>All</span>
+      </button>
+      {visibleOptions.map((opt) => {
         const active = selected.has(opt);
         const count = counts[opt] || 0;
         return (

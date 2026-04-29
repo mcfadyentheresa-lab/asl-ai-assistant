@@ -40,6 +40,10 @@ export interface VersionsPopoverProps {
   onAfterRestore: () => Promise<void> | void;
   onCompare: (snapshotId: number) => void;
   trigger: React.ReactNode;
+  // Optional controlled open state — used when the popover is opened from a
+  // sibling control (e.g., the toolbar "More" menu) rather than its own trigger.
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 interface SnapshotRow {
@@ -102,9 +106,16 @@ export default function VersionsPopover({
   onAfterRestore,
   onCompare,
   trigger,
+  open: controlledOpen,
+  onOpenChange: controlledOnOpenChange,
 }: VersionsPopoverProps) {
   const { toast } = useToast();
-  const [open, setOpen] = useState(false);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const open = controlledOpen ?? uncontrolledOpen;
+  const setOpen = (next: boolean) => {
+    if (controlledOnOpenChange) controlledOnOpenChange(next);
+    if (controlledOpen === undefined) setUncontrolledOpen(next);
+  };
   const [naming, setNaming] = useState(false);
   const [draftName, setDraftName] = useState("");
   const nameInputRef = useRef<HTMLInputElement>(null);

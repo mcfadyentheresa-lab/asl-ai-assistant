@@ -294,7 +294,7 @@ const ELEMENT_DEFAULTS: Record<string, { width: number; height: number; content:
   "text-note":    { width: 240, height: 140, content: { variant: "note",    title: "", text: "Type your note here..." } },
   "text-clean":   { width: 240, height: 120, content: { variant: "clean",   title: "", text: "Type your text here..." } },
   "text-callout": { width: 200, height: 80,  content: { variant: "callout", text: "Add note...", color: "#fef9c3" } },
-  "text-heading": { width: 600, height: 56,  content: { variant: "heading", title: "Section Title", tracking: "normal", align: "left", size: "lg" } },
+  "text-heading": { width: 360, height: 44,  content: { variant: "heading", title: "Section Title", tracking: "normal", align: "left", size: "md" } },
   // Surface variants
   "surface-paint":    { width: 220, height: 220, content: { kind: "paint",    color: "#1e3a2f", name: "Forest Green", hex: "#1E3A2F", status: "idea" } },
   "surface-material": { width: 220, height: 180, content: { kind: "material", name: "Material", supplier: "", code: "", imageUrl: "", notes: "", status: "idea" } },
@@ -310,6 +310,53 @@ const ELEMENT_DEFAULTS: Record<string, { width: number; height: number; content:
   hardware: { width: 280, height: 200, content: { category: "pull", name: "New hardware", status: "idea", currency: "CAD" } },
   connector: { width: 0, height: 0, content: { fromId: 0, toId: 0, style: "arrow", curve: "curved" } },
 };
+
+// Quick-start templates shown on a fresh, empty board. Each pre-populates a
+// curated set of canvas tokens — kept simple and non-configurable for now.
+type QuickStartTemplate = {
+  id: "concept" | "moodboard" | "spec";
+  label: string;
+  hint: string;
+  // Each step is a token from the Add palette ("text-heading", "image", ...)
+  // plus an x/y offset relative to the centered anchor.
+  steps: { token: string; dx: number; dy: number; patch?: any }[];
+};
+
+const QUICK_START_TEMPLATES: QuickStartTemplate[] = [
+  {
+    id: "concept",
+    label: "Concept",
+    hint: "Heading + 3 image slots",
+    steps: [
+      { token: "text-heading", dx: 0, dy: -200, patch: { title: "Concept" } },
+      { token: "image", dx: -380, dy: -100 },
+      { token: "image", dx: 0,    dy: -100 },
+      { token: "image", dx: 380,  dy: -100 },
+    ],
+  },
+  {
+    id: "moodboard",
+    label: "Moodboard",
+    hint: "Heading + grid of 4",
+    steps: [
+      { token: "text-heading", dx: 0, dy: -260, patch: { title: "Moodboard" } },
+      { token: "image", dx: -200, dy: -160 },
+      { token: "image", dx: 200,  dy: -160 },
+      { token: "image", dx: -200, dy: 140 },
+      { token: "image", dx: 200,  dy: 140 },
+    ],
+  },
+  {
+    id: "spec",
+    label: "Spec Sheet",
+    hint: "Heading, note, image",
+    steps: [
+      { token: "text-heading", dx: 0,    dy: -220, patch: { title: "Spec Sheet" } },
+      { token: "text-note",    dx: -260, dy: -100, patch: { title: "Notes", text: "Spec details, dimensions, finishes..." } },
+      { token: "image",        dx: 80,   dy: -100 },
+    ],
+  },
+];
 
 // Map an add-palette token to the persisted element type.
 const TOKEN_TO_TYPE: Record<string, string> = {
@@ -396,6 +443,9 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   const [showManageBoards, setShowManageBoards] = useState(false);
   const [showPresentation, setShowPresentation] = useState(false);
   const [showCritique, setShowCritique] = useState(false);
+  // Controlled open state for the Versions popover so it can be opened from the
+  // toolbar's "More" overflow menu rather than its own trigger.
+  const [versionsPopoverOpen, setVersionsPopoverOpen] = useState(false);
   const [boardsToDelete, setBoardsToDelete] = useState<Set<number>>(new Set());
   const [showNewBoardDialog, setShowNewBoardDialog] = useState(false);
   const [showLinkDialog, setShowLinkDialog] = useState(false);
@@ -929,12 +979,89 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     handleLinkUpdate("linkedProjectIds", next);
   };
 
+  // Apply one of the empty-board quick-start templates. Each step picks a token
+  // from the palette and places it at an offset relative to the canvas center.
+  const applyQuickStartTemplate = async (id: QuickStartTemplate["id"]) => {
+    const template = QUICK_START_TEMPLATES.find((t) => t.id === id);
+    if (!template || !selectedBoardId) return;
+    const cw = containerRef.current?.clientWidth || 800;
+    const ch = containerRef.current?.clientHeight || 600;
+    const centerX = Math.round((-pan.x + cw / 2) / zoom);
+    const centerY = Math.round((-pan.y + ch / 2) / zoom);
+    for (const step of template.steps) {
+      const def = ELEMENT_DEFAULTS[step.token] || ELEMENT_DEFAULTS["text-note"];
+      const persistedType = TOKEN_TO_TYPE[step.token] || step.token;
+      const x = Math.round((centerX + step.dx - def.width / 2) / GRID_SIZE) * GRID_SIZE;
+      const y = Math.round((centerY + step.dy - def.height / 2) / GRID_SIZE) * GRID_SIZE;
+      const baseContent: any = { ...def.content, ...(step.patch || {}) };
+      try {
+        const url = buildUrl(api.canvasElements.create.path, { boardId: selectedBoardId });
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ type: persistedType, x, y, width: def.width, height: def.height, zIndex: maxZ, content: baseContent }),
+        });
+        const el = await res.json();
+        addElement(el);
+        sendElementAdd(el);
+        pushUndo({ type: "create", elementId: el.id });
+        setMaxZ((z) => z + 1);
+      } catch {
+        toast({ title: "Error", description: "Failed to apply template", variant: "destructive" });
+        return;
+      }
+    }
+  };
+
+  // Finds a non-overlapping grid-snapped position for a newly added element.
+  // Walks a column grid (col = def.width + GUTTER, row = def.height + GUTTER),
+  // scanning left-to-right then top-to-bottom from the desired anchor. Falls
+  // back to the desired position if nothing free is found within the search
+  // window (so we never block element creation).
+  const findFreeSlot = (desiredX: number, desiredY: number, w: number, h: number): { x: number; y: number } => {
+    const GUTTER = 24;
+    const colStride = Math.max(GRID_SIZE, Math.ceil((w + GUTTER) / GRID_SIZE) * GRID_SIZE);
+    const rowStride = Math.max(GRID_SIZE, Math.ceil((h + GUTTER) / GRID_SIZE) * GRID_SIZE);
+    const baseX = Math.round(desiredX / GRID_SIZE) * GRID_SIZE;
+    const baseY = Math.round(desiredY / GRID_SIZE) * GRID_SIZE;
+    const existing = Object.values(elements).filter((el) => el.type !== "connector" && el.type !== "draw");
+    const overlaps = (cx: number, cy: number) => existing.some((el) => {
+      const ew = el.width || 200;
+      const eh = el.height || 60;
+      return cx < el.x + ew && cx + w > el.x && cy < el.y + eh && cy + h > el.y;
+    });
+    if (!overlaps(baseX, baseY)) return { x: baseX, y: baseY };
+    // Spiral outward in a column-major sweep — try the same column first,
+    // then nearby columns. 6 cols × 8 rows window covers most boards.
+    for (let row = 0; row < 8; row++) {
+      for (let col = 0; col < 6; col++) {
+        for (const dir of [1, -1]) {
+          const cx = baseX + dir * col * colStride;
+          const cy = baseY + row * rowStride;
+          if (col === 0 && dir === -1) continue;
+          if (!overlaps(cx, cy)) return { x: cx, y: cy };
+        }
+      }
+    }
+    return { x: baseX, y: baseY };
+  };
+
   const createElement = async (type: string, x?: number, y?: number) => {
     if (!selectedBoardId) return;
     const def = ELEMENT_DEFAULTS[type] || ELEMENT_DEFAULTS["text-note"];
     const persistedType = TOKEN_TO_TYPE[type] || type;
-    const centerX = x ?? Math.round((-pan.x + (containerRef.current?.clientWidth || 800) / 2) / zoom - def.width / 2);
-    const centerY = y ?? Math.round((-pan.y + (containerRef.current?.clientHeight || 600) / 2) / zoom - def.height / 2);
+    const desiredX = x ?? Math.round((-pan.x + (containerRef.current?.clientWidth || 800) / 2) / zoom - def.width / 2);
+    const desiredY = y ?? Math.round((-pan.y + (containerRef.current?.clientHeight || 600) / 2) / zoom - def.height / 2);
+    // Auto-grid snap for newly added elements (no explicit drop coords). Finds a
+    // column-aligned empty slot near the requested position so new cards don't
+    // pile on top of existing ones. Existing positions are preserved — only
+    // brand-new additions auto-place. Long-press drag still allows free move.
+    const { x: placedX, y: placedY } = (x === undefined && y === undefined)
+      ? findFreeSlot(desiredX, desiredY, def.width, def.height)
+      : { x: desiredX, y: desiredY };
+    const centerX = placedX;
+    const centerY = placedY;
     const newZ = maxZ;
     setMaxZ((z) => z + 1);
 
@@ -3652,7 +3779,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
         const tracking = (c.tracking as "tight" | "normal" | "wide" | undefined) || "normal";
         const align = (c.align as "left" | "center" | undefined) || "left";
         const size = (c.size as "sm" | "md" | "lg" | undefined) || "lg";
-        const sizeClass = size === "sm" ? "text-xl" : size === "md" ? "text-2xl" : "text-2xl md:text-3xl";
+        const sizeClass = size === "sm" ? "text-base" : size === "md" ? "text-lg" : "text-xl md:text-2xl";
         const alignClass = align === "center" ? "text-center" : "text-left";
         const headerClass = `board-section-header tracking-${tracking} ${sizeClass} ${alignClass} text-foreground/85`;
         return (
@@ -4862,9 +4989,9 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
                 </div>
               )}
             </>
-          ) : (
+          ) : isSelected || isUploading || isUnlocked ? (
             <div
-              className="bg-muted flex flex-col items-center justify-center gap-2"
+              className="bg-muted/50 flex flex-col items-center justify-center gap-2 border border-dashed border-border/50 rounded-sm"
               style={{ height: el.height ? Math.max(el.height, 60) : 120 }}
               data-testid={`image-upload-area-${el.id}`}
             >
@@ -4873,11 +5000,11 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
               ) : (
                 <>
                   <Upload className="h-6 w-6 text-muted-foreground/50" />
-                  <span className="text-[10px] text-muted-foreground/60">Double-tap to upload</span>
+                  <span className="text-[10px] text-muted-foreground/60">Tap to upload</span>
                 </>
               )}
             </div>
-          )}
+          ) : null}
           {!isEdgeBleed && (
             <div className="p-3">
               {isSelected ? (
@@ -5298,6 +5425,107 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
         <div className="flex-1" />
         {/* Right cluster — canvas controls */}
         <div className="flex items-center gap-0.5">
+          {/* Docked Add palette — replaces the floating left-rail Add button.
+              Same Popover content (Words / Visual / Selections / Layout / Draw)
+              with the same kbd hints; just lives in the toolbar now so it can't
+              collide with the first column on the canvas. */}
+          <Popover open={addPaletteOpen} onOpenChange={setAddPaletteOpen}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <PopoverTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className={`h-8 px-2 gap-1 ${addPaletteOpen ? "bg-[#2f4a3a] text-white hover:bg-[#2f4a3a]" : "hover:bg-primary/10 hover:text-primary"}`}
+                    aria-label="Add to board"
+                    aria-expanded={addPaletteOpen}
+                    data-testid="add-palette-trigger"
+                  >
+                    <Plus className="h-4 w-4" strokeWidth={2} />
+                    <span
+                      className="text-[10px] font-semibold uppercase tracking-[0.14em]"
+                      style={{ fontFamily: "var(--font-mono)" }}
+                    >
+                      Add
+                    </span>
+                  </Button>
+                </PopoverTrigger>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">Add to board</TooltipContent>
+            </Tooltip>
+            <PopoverContent
+              side="bottom"
+              align="start"
+              sideOffset={8}
+              className="w-[320px] p-0 border-border/60 shadow-xl bg-[#fbf8f1]"
+              onMouseDown={(e) => e.stopPropagation()}
+              data-testid="add-palette-popover"
+            >
+              <div
+                className="px-4 pt-3 pb-2 border-b border-border/40 flex items-center justify-between"
+                style={{ fontFamily: "Inter Tight, Inter, sans-serif" }}
+              >
+                <span className="text-sm font-semibold text-[#2f4a3a]">Add to board</span>
+                <span
+                  className="text-[10px] uppercase text-muted-foreground tracking-[0.2em]"
+                  style={{ fontFamily: "var(--font-mono)" }}
+                >
+                  Tap once
+                </span>
+              </div>
+              <div className="max-h-[70vh] overflow-y-auto py-1">
+                {addPaletteGroups.map((group) => (
+                  <div key={group.label} className={`${group.tint} px-2 py-2 my-0.5`}>
+                    <div
+                      className={`px-2 pb-1 text-[10px] font-semibold uppercase tracking-[0.18em] ${group.accent}`}
+                      style={{ fontFamily: "var(--font-mono)" }}
+                    >
+                      {group.label}
+                    </div>
+                    <div className="flex flex-col gap-0.5">
+                      {group.items.map((it) => {
+                        const isActive = it.type === "connect" && connectMode;
+                        return (
+                          <button
+                            key={it.type}
+                            type="button"
+                            draggable
+                            onDragStart={(e) => {
+                              e.dataTransfer.setData("tool-type", it.type);
+                              e.dataTransfer.effectAllowed = "copy";
+                            }}
+                            onClick={() => {
+                              runTool(it.type);
+                              if (it.type !== "connect") setAddPaletteOpen(false);
+                            }}
+                            className={`w-full flex items-center gap-3 px-2 py-2 rounded-md text-left transition-colors min-h-[44px] ${isActive ? "bg-[#2f4a3a]/10 text-[#2f4a3a]" : "hover:bg-white/70 text-foreground"}`}
+                            data-testid={`add-palette-${it.type}`}
+                          >
+                            <span className={`flex h-9 w-9 items-center justify-center rounded-md bg-white/80 border border-border/40 shrink-0 ${isActive ? "text-[#2f4a3a]" : "text-foreground/70"}`}>
+                              <it.icon className="h-4 w-4" strokeWidth={1.75} />
+                            </span>
+                            <span className="flex-1 min-w-0">
+                              <span className="block text-sm font-medium leading-tight" style={{ fontFamily: "Inter Tight, Inter, sans-serif" }}>{it.label}</span>
+                              <span className="block text-[11px] text-muted-foreground leading-tight mt-0.5">{it.hint}</span>
+                            </span>
+                            {it.key && (
+                              <kbd
+                                className="text-[10px] px-1.5 py-0.5 rounded bg-white/70 border border-border/40 text-muted-foreground shrink-0"
+                                style={{ fontFamily: "var(--font-mono)" }}
+                              >
+                                {it.key}
+                              </kbd>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
+          <Separator orientation="vertical" className="h-4 mx-1" />
           <Tooltip>
             <TooltipTrigger asChild>
               <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-primary/10 hover:text-primary" onClick={handleUndo} disabled={undoStack.length === 0} data-testid="button-undo">
@@ -5324,24 +5552,6 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
               {lockLayout ? "Layout locked — tap to unlock" : "Lock layout"}
             </TooltipContent>
           </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={toggleFingerDrawing}
-                aria-pressed={fingerDrawing}
-                aria-label="Finger drawing"
-                data-testid="button-finger-drawing"
-                className={`h-8 w-8 ${fingerDrawing ? "bg-primary/15 text-primary" : "hover:bg-primary/10 hover:text-primary"}`}
-              >
-                <Hand className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" className="text-xs">
-              {fingerDrawing ? "Finger drawing on (Pencil always draws)" : "Finger drawing off — fingers pan"}
-            </TooltipContent>
-          </Tooltip>
           <div className="hidden md:flex items-center gap-0.5">
           <Separator orientation="vertical" className="h-4 mx-1" />
           <Tooltip>
@@ -5363,73 +5573,6 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             </TooltipTrigger>
             <TooltipContent side="bottom" className="text-xs">Zoom In</TooltipContent>
           </Tooltip>
-          {(actualRole === "admin" || actualRole === "crew") && (
-            <>
-              <Separator orientation="vertical" className="h-4 mx-1" />
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => setShowPresentation(true)}
-                      disabled={Object.keys(elements).length < 3}
-                      data-testid="button-presentation"
-                      aria-label="Present"
-                      className="h-8 w-8 hover:bg-primary/10 hover:text-primary"
-                    >
-                      <Play className="h-4 w-4" />
-                    </Button>
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="text-xs">
-                  {Object.keys(elements).length < 3 ? "Add a few items first" : "Present"}
-                </TooltipContent>
-              </Tooltip>
-              {selectedBoardId !== null && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span>
-                      <VersionsPopover
-                        boardId={selectedBoardId}
-                        activeRoom={activeRoom}
-                        liveElements={Object.values(elements) as CanvasElement[]}
-                        onAfterRestore={refreshCanvasFromServer}
-                        onCompare={(snapshotId) => setCompareSnapshotId(snapshotId)}
-                        trigger={
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            data-testid="button-versions"
-                            aria-label="Versions"
-                            className="h-8 w-8 hover:bg-primary/10 hover:text-primary"
-                          >
-                            <History className="h-4 w-4" />
-                          </Button>
-                        }
-                      />
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" className="text-xs">Versions</TooltipContent>
-                </Tooltip>
-              )}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => setShowCritique((v) => !v)}
-                    data-testid="button-design-critique"
-                    aria-label="AI partner"
-                    className="h-8 w-8 hover:bg-primary/10 hover:text-primary"
-                  >
-                    <Sparkles className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="text-xs">AI partner</TooltipContent>
-              </Tooltip>
-            </>
-          )}
           <Tooltip>
             <TooltipTrigger asChild>
               <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-primary/10 hover:text-primary" onClick={fitToScreen} data-testid="button-fit-screen">
@@ -5438,6 +5581,86 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             </TooltipTrigger>
             <TooltipContent side="bottom" className="text-xs">Fit to Screen</TooltipContent>
           </Tooltip>
+          {/* "More" overflow menu — keeps Hand (finger drawing), Play
+              (presentation), Sparkles (AI), History (versions) accessible without
+              cluttering the toolbar. Keyboard shortcuts continue to work. */}
+          <Separator orientation="vertical" className="h-4 mx-1" />
+          <DropdownMenu>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8 hover:bg-primary/10 hover:text-primary"
+                    data-testid="button-toolbar-more"
+                    aria-label="More canvas tools"
+                  >
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">More</TooltipContent>
+            </Tooltip>
+            <DropdownMenuContent align="end" className="min-w-[200px]">
+              <DropdownMenuItem
+                onClick={toggleFingerDrawing}
+                data-testid="menu-finger-drawing"
+              >
+                <Hand className={`h-4 w-4 mr-2 ${fingerDrawing ? "text-primary" : ""}`} />
+                {fingerDrawing ? "Finger drawing: On" : "Finger drawing: Off"}
+              </DropdownMenuItem>
+              {(actualRole === "admin" || actualRole === "crew") && (
+                <>
+                  <DropdownMenuItem
+                    onClick={() => setShowPresentation(true)}
+                    disabled={Object.keys(elements).length < 3}
+                    data-testid="menu-presentation"
+                  >
+                    <Play className="h-4 w-4 mr-2" />
+                    Present
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => setShowCritique((v) => !v)}
+                    data-testid="menu-design-critique"
+                  >
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    AI partner
+                  </DropdownMenuItem>
+                  {selectedBoardId !== null && (
+                    <DropdownMenuItem
+                      onClick={() => setVersionsPopoverOpen(true)}
+                      data-testid="menu-versions"
+                    >
+                      <History className="h-4 w-4 mr-2" />
+                      Versions
+                    </DropdownMenuItem>
+                  )}
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          {/* VersionsPopover anchor — kept mounted (and visually empty) so the
+              "Versions" menu item above can imperatively open it. The trigger
+              span is sized so Radix has a real anchor point for the popover. */}
+          {(actualRole === "admin" || actualRole === "crew") && selectedBoardId !== null && (
+            <VersionsPopover
+              boardId={selectedBoardId}
+              activeRoom={activeRoom}
+              liveElements={Object.values(elements) as CanvasElement[]}
+              onAfterRestore={refreshCanvasFromServer}
+              onCompare={(snapshotId) => setCompareSnapshotId(snapshotId)}
+              open={versionsPopoverOpen}
+              onOpenChange={setVersionsPopoverOpen}
+              trigger={
+                <span
+                  data-testid="button-versions"
+                  aria-hidden
+                  className="block h-0 w-0 overflow-hidden"
+                />
+              }
+            />
+          )}
 
           {collaborators.length > 0 && (
             <div className="flex items-center gap-1.5 ml-2 pl-2 border-l" data-testid="board-collaborators">
@@ -5518,127 +5741,9 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
 
       {boards.length > 0 && selectedBoardId && (
         <div className="flex flex-1 gap-0 min-h-0">
-          {/* Left rail — desktop only — strictly "what to add". A single Add button
-              opens a tactile, color-keyed palette of categories. View/canvas controls
-              live in the top toolbar's right cluster — not duplicated here. */}
-          <div className="hidden md:flex w-[64px] shrink-0 border-r border-border/25 flex-col items-center py-3 gap-2 bg-card/40" data-testid="canvas-sidebar">
-            {/* Tooltip wraps the PopoverTrigger so the inner button is a direct child of
-                both Slot.asChild calls — radix's `asChild` pattern can't merge through a
-                Tooltip Root provider, which silently dropped the popover trigger handlers
-                and made the Add button do nothing. Both Slots now compose onto the button. */}
-            <Popover open={addPaletteOpen} onOpenChange={setAddPaletteOpen}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <PopoverTrigger asChild>
-                    <button
-                      type="button"
-                      className={`w-12 h-12 flex flex-col items-center justify-center rounded-xl shrink-0 transition-all border ${addPaletteOpen ? "bg-[#2f4a3a] text-white border-[#2f4a3a]" : "bg-card text-foreground/80 border-border hover:border-[#2f4a3a]/40 hover:text-[#2f4a3a]"}`}
-                      aria-label="Add to board"
-                      aria-expanded={addPaletteOpen}
-                      data-testid="add-palette-trigger"
-                    >
-                      <Plus className="h-5 w-5" strokeWidth={1.75} />
-                      <span
-                        className="text-[8px] font-semibold uppercase tracking-[0.14em] mt-0.5"
-                        style={{ fontFamily: "var(--font-mono)" }}
-                      >
-                        Add
-                      </span>
-                    </button>
-                  </PopoverTrigger>
-                </TooltipTrigger>
-                <TooltipContent side="right" sideOffset={6} className="text-xs font-medium tracking-wide">
-                  Add to board
-                </TooltipContent>
-              </Tooltip>
-              <PopoverContent
-                side="right"
-                align="start"
-                sideOffset={8}
-                className="w-[320px] p-0 border-border/60 shadow-xl bg-[#fbf8f1]"
-                onMouseDown={(e) => e.stopPropagation()}
-                data-testid="add-palette-popover"
-              >
-                <div
-                  className="px-4 pt-3 pb-2 border-b border-border/40 flex items-center justify-between"
-                  style={{ fontFamily: "Inter Tight, Inter, sans-serif" }}
-                >
-                  <span className="text-sm font-semibold text-[#2f4a3a]">Add to board</span>
-                  <span
-                    className="text-[10px] uppercase text-muted-foreground tracking-[0.2em]"
-                    style={{ fontFamily: "var(--font-mono)" }}
-                  >
-                    Tap once
-                  </span>
-                </div>
-                <div className="max-h-[70vh] overflow-y-auto py-1">
-                  {addPaletteGroups.map((group) => (
-                    <div key={group.label} className={`${group.tint} px-2 py-2 my-0.5`}>
-                      <div
-                        className={`px-2 pb-1 text-[10px] font-semibold uppercase tracking-[0.18em] ${group.accent}`}
-                        style={{ fontFamily: "var(--font-mono)" }}
-                      >
-                        {group.label}
-                      </div>
-                      <div className="flex flex-col gap-0.5">
-                        {group.items.map((it) => {
-                          const isActive = it.type === "connect" && connectMode;
-                          return (
-                            <button
-                              key={it.type}
-                              type="button"
-                              draggable
-                              onDragStart={(e) => {
-                                e.dataTransfer.setData("tool-type", it.type);
-                                e.dataTransfer.effectAllowed = "copy";
-                              }}
-                              onClick={() => {
-                                runTool(it.type);
-                                if (it.type !== "connect") setAddPaletteOpen(false);
-                              }}
-                              className={`w-full flex items-center gap-3 px-2 py-2 rounded-md text-left transition-colors min-h-[44px] ${isActive ? "bg-[#2f4a3a]/10 text-[#2f4a3a]" : "hover:bg-white/70 text-foreground"}`}
-                              data-testid={`add-palette-${it.type}`}
-                            >
-                              <span className={`flex h-9 w-9 items-center justify-center rounded-md bg-white/80 border border-border/40 shrink-0 ${isActive ? "text-[#2f4a3a]" : "text-foreground/70"}`}>
-                                <it.icon className="h-4 w-4" strokeWidth={1.75} />
-                              </span>
-                              <span className="flex-1 min-w-0">
-                                <span className="block text-sm font-medium leading-tight" style={{ fontFamily: "Inter Tight, Inter, sans-serif" }}>{it.label}</span>
-                                <span className="block text-[11px] text-muted-foreground leading-tight mt-0.5">{it.hint}</span>
-                              </span>
-                              {it.key && (
-                                <kbd
-                                  className="text-[10px] px-1.5 py-0.5 rounded bg-white/70 border border-border/40 text-muted-foreground shrink-0"
-                                  style={{ fontFamily: "var(--font-mono)" }}
-                                >
-                                  {it.key}
-                                </kbd>
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </PopoverContent>
-            </Popover>
-            {editingId && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    className="w-10 h-10 flex items-center justify-center rounded-md text-foreground/40 hover:text-destructive hover:bg-destructive/[0.06] transition-all duration-200 shrink-0"
-                    onClick={() => { if (editingId) handleDeleteElement(editingId); }}
-                    data-testid="sidebar-tool-delete"
-                    aria-label="Delete selected"
-                  >
-                    <Trash2 className="h-[18px] w-[18px]" strokeWidth={1.5} />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="right" sideOffset={6} className="text-xs font-medium tracking-wide">Delete Selected</TooltipContent>
-              </Tooltip>
-            )}
-          </div>
+          {/* Left rail removed — Add palette docked into the top toolbar so it
+              can't collide with the canvas's first column. Delete affordance for
+              the selected element lives on the element's own toolbar chip. */}
 
           {showImagePopup && (
             <div className="absolute left-[56px] top-1/3 z-50 bg-card border border-border rounded-md shadow-lg w-64" data-testid="image-popup-panel">
@@ -5732,6 +5837,58 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             {loading && (
               <div className="absolute inset-0 flex items-center justify-center z-50">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            )}
+
+            {/* Empty-board template chooser. Centered card with three quick-start
+                templates that pre-populate a curated set of elements. Hidden as
+                soon as the user adds anything. Drop hint below points new users
+                to the simpler "drop or add" path. */}
+            {!loading && elementsList.length === 0 && !drawingMode && (
+              <div
+                className="absolute inset-0 flex items-center justify-center z-30 pointer-events-none"
+                data-testid="empty-board-template-panel"
+              >
+                <div
+                  className="pointer-events-auto bg-card/95 backdrop-blur border border-border/60 rounded-2xl shadow-sm px-6 py-5 max-w-md w-[min(92vw,460px)]"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onTouchStart={(e) => e.stopPropagation()}
+                >
+                  <div
+                    className="text-[10px] uppercase tracking-[0.18em] text-[#2f4a3a]/70 mb-1"
+                    style={{ fontFamily: "var(--font-mono)" }}
+                  >
+                    Start from a template
+                  </div>
+                  <div
+                    className="text-lg text-foreground/85 mb-4"
+                    style={{ fontFamily: "Inter Tight, Inter, sans-serif", fontWeight: 600 }}
+                  >
+                    Pick a starter, or drop images to begin.
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 mb-3">
+                    {QUICK_START_TEMPLATES.map((tpl) => (
+                      <button
+                        key={tpl.id}
+                        type="button"
+                        onClick={() => applyQuickStartTemplate(tpl.id)}
+                        className="flex flex-col items-start gap-1 rounded-xl border border-border/60 bg-[#fbf8f1] hover:border-[#2f4a3a]/40 hover:bg-white transition-colors px-3 py-3 min-h-[88px] text-left"
+                        data-testid={`quick-start-${tpl.id}`}
+                      >
+                        <span
+                          className="text-[10px] uppercase tracking-[0.16em] text-[#2f4a3a]/70"
+                          style={{ fontFamily: "var(--font-mono)" }}
+                        >
+                          {tpl.label}
+                        </span>
+                        <span className="text-[11px] text-muted-foreground leading-snug">{tpl.hint}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <div className="text-[11px] text-muted-foreground/80 text-center">
+                    Drop images here, or use <span className="font-medium text-foreground/80">+ Add</span> in the toolbar.
+                  </div>
+                </div>
               </div>
             )}
 
