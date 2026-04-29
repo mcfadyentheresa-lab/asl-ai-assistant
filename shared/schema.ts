@@ -274,6 +274,30 @@ export const changeOrders = pgTable("change_orders", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Site visit log
+// Operational record of what happened on site on a given day.
+// Captures who walked through, what was reviewed, photos taken,
+// and any follow-ups generated. Visible to client; managed by crew/admin.
+export const siteVisits = pgTable("site_visits", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => projects.id),
+  visitedOn: date("visited_on").notNull(), // the day the visit happened
+  // type drives the client-visible label and ordering by importance
+  // walkthrough: client/crew tour of the space
+  // inspection: a formal inspection (city, trade)
+  // milestone: framing complete, drywall done, etc.
+  // routine: regular check-in
+  visitType: text("visit_type").notNull().default("routine"),
+  attendees: text("attendees"), // free-form list — client + crew + trades
+  summary: text("summary").notNull(), // what we covered, what we noticed
+  followUps: text("follow_ups"), // action items emerging from the visit
+  weather: text("weather"), // optional, useful for exterior days
+  archived: boolean("archived").default(false), // soft-hide without deleting
+  createdBy: text("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Selections ledger
 // Operational record of what's being specified, ordered, and installed on a project.
 // Distinct from boardItems (inspiration/notes) and decisions (permanent choices).
@@ -405,6 +429,17 @@ export const changeOrdersRelations = relations(changeOrders, ({ one }) => ({
   }),
   decider: one(users, {
     fields: [changeOrders.decidedBy],
+    references: [users.id],
+  }),
+}));
+
+export const siteVisitsRelations = relations(siteVisits, ({ one }) => ({
+  project: one(projects, {
+    fields: [siteVisits.projectId],
+    references: [projects.id],
+  }),
+  creator: one(users, {
+    fields: [siteVisits.createdBy],
     references: [users.id],
   }),
 }));
@@ -799,6 +834,7 @@ export const insertMessageSchema = createInsertSchema(messages).omit({ id: true,
 export const insertDecisionSchema = createInsertSchema(decisions).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertSelectionSchema = createInsertSchema(selections).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertChangeOrderSchema = createInsertSchema(changeOrders).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertSiteVisitSchema = createInsertSchema(siteVisits).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertChecklistItemSchema = createInsertSchema(checklistItems).omit({ id: true, createdAt: true });
 export const insertBoardItemSchema = createInsertSchema(boardItems).omit({ id: true, createdAt: true });
 export const insertCanvasElementSchema = createInsertSchema(canvasElements).omit({ id: true, createdAt: true, updatedAt: true });
@@ -844,6 +880,8 @@ export type Selection = typeof selections.$inferSelect;
 export type InsertSelection = z.infer<typeof insertSelectionSchema>;
 export type ChangeOrder = typeof changeOrders.$inferSelect;
 export type InsertChangeOrder = z.infer<typeof insertChangeOrderSchema>;
+export type SiteVisit = typeof siteVisits.$inferSelect;
+export type InsertSiteVisit = z.infer<typeof insertSiteVisitSchema>;
 export type ChecklistItem = typeof checklistItems.$inferSelect;
 export type BoardItem = typeof boardItems.$inferSelect;
 export type CalendarEvent = typeof calendarEvents.$inferSelect;
