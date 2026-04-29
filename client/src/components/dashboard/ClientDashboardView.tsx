@@ -9,6 +9,7 @@ import { ReferenceCardGrid } from "@/components/client/ReferenceCardGrid";
 import { RecentDecisionsCard } from "@/components/client/RecentDecisionsCard";
 import { SelectionsCard } from "@/components/client/SelectionsCard";
 import { YourActionItemsCard } from "@/components/client/YourActionItemsCard";
+import { BudgetPulseCard } from "@/components/client/BudgetPulseCard";
 
 interface Project {
   id: number;
@@ -261,6 +262,8 @@ export function ClientDashboardView({ project, isAdminPreview = false }: ClientD
       <RecentDecisionsCard projectId={project.id} decisions={decisions || []} />
 
       <SelectionsCard projectId={project.id} selections={selections || []} />
+
+      <BudgetPulseCard projectId={project.id} />
 
       <ReferenceCardGrid cards={referenceCards} />
 
