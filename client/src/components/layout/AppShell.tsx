@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { AppShellContext } from "@/contexts/app-shell-context";
-import { NavbarShell } from "@/components/layout/Navbar";
+import { NavbarShell, PreviewBanner } from "@/components/layout/Navbar";
 import { DesktopSidebar, SidebarNav } from "@/components/layout/Sidebar";
 import { Link } from "wouter";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
@@ -24,6 +24,7 @@ export function AppShell({ children }: AppShellProps) {
   return (
     <AppShellContext.Provider value={true}>
       <div className="flex flex-col h-screen bg-background">
+        <PreviewBanner />
         <NavbarShell
           onMenuToggle={isClient ? undefined : () => setDrawerOpen(true)}
         />

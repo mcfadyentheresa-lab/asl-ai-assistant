@@ -72,12 +72,6 @@ const BUILDING_COLORS = [
   "#8B3F2F", "#4E6B8A", "#C49A6C", "#5B4B8A", "#7C9A5A",
 ];
 
-const TRADE_PRESETS = [
-  "Painting", "Electrical", "Plumbing", "Framing", "Drywall",
-  "Flooring", "Cabinetry", "Trim", "HVAC", "Roofing",
-  "Demolition", "Insulation", "Tiling", "Countertops",
-];
-
 type DrillLevel = "buildings" | "tasks";
 
 interface BuildingInfo {
@@ -1110,31 +1104,17 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
       )}
 
       {addingRoomFor !== null && isAdmin && (
-        <div className="space-y-2 p-3 border border-border/60 rounded-sm bg-muted/20" data-testid="form-add-room-inline">
-          <div className="flex flex-col sm:flex-row gap-2">
-            <Input placeholder="Room or space name (e.g., Kitchen, Primary Suite, Deck)" value={newRoomTitle} onChange={e => setNewRoomTitle(e.target.value)} className="flex-1" autoFocus data-testid="input-room-title" onKeyDown={e => { if (e.key === "Enter") handleAddRoom(addingRoomFor); }} />
-            <DateField label="Start" value={newRoomStart} onChange={setNewRoomStart} placeholder="Start" testId="button-room-start-date" />
-            <DateField label="End" value={newRoomEnd} onChange={setNewRoomEnd} placeholder="End" testId="button-room-end-date" />
-            <div className="flex gap-1">
-              <Button size="sm" onClick={() => handleAddRoom(addingRoomFor)} disabled={creatingSection || !newRoomTitle.trim()} data-testid="button-confirm-add-room">
-                <Check className="h-3.5 w-3.5" />
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => setAddingRoomFor(null)} data-testid="button-cancel-add-room">
-                <X className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-1" data-testid="trade-preset-chips">
-            {TRADE_PRESETS.map((trade) => (
-              <button
-                key={trade}
-                className={`px-2 py-0.5 text-[10px] font-medium rounded-sm border transition-colors ${newRoomTitle === trade ? "bg-foreground text-background border-foreground" : "border-border/60 text-muted-foreground hover:text-foreground hover:border-border"}`}
-                onClick={() => setNewRoomTitle(trade)}
-                data-testid={`trade-chip-${trade.toLowerCase()}`}
-              >
-                {trade}
-              </button>
-            ))}
+        <div className="flex flex-col sm:flex-row gap-2 p-3 border border-border/60 rounded-sm bg-muted/20" data-testid="form-add-room-inline">
+          <Input placeholder="Room or space name (e.g., Kitchen, Primary Suite, Deck)" value={newRoomTitle} onChange={e => setNewRoomTitle(e.target.value)} className="flex-1" autoFocus data-testid="input-room-title" onKeyDown={e => { if (e.key === "Enter") handleAddRoom(addingRoomFor); }} />
+          <DateField label="Start" value={newRoomStart} onChange={setNewRoomStart} placeholder="Start" testId="button-room-start-date" />
+          <DateField label="End" value={newRoomEnd} onChange={setNewRoomEnd} placeholder="End" testId="button-room-end-date" />
+          <div className="flex gap-1">
+            <Button size="sm" onClick={() => handleAddRoom(addingRoomFor)} disabled={creatingSection || !newRoomTitle.trim()} data-testid="button-confirm-add-room">
+              <Check className="h-3.5 w-3.5" />
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setAddingRoomFor(null)} data-testid="button-cancel-add-room">
+              <X className="h-3.5 w-3.5" />
+            </Button>
           </div>
         </div>
       )}

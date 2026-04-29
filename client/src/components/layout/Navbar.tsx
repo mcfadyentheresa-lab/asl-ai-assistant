@@ -9,7 +9,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { LogOut, UserCog, User, Sun, Moon, Menu } from "lucide-react";
+import { LogOut, User, Sun, Moon, Menu, MoreHorizontal, Check } from "lucide-react";
 import { Link } from "wouter";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useViewMode } from "@/hooks/use-view-mode";
@@ -100,25 +100,35 @@ export function NavbarShell({ onMenuToggle }: NavbarShellProps) {
           {isAdmin && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" data-testid="button-role-switch">
-                  <UserCog className="mr-2 h-4 w-4" />
-                  <span className="hidden sm:inline">
-                    {viewMode === "admin" ? "Admin" : viewMode === "crew" ? "Crew" : "Client"}
-                  </span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-11 w-11"
+                  data-testid="button-role-switch"
+                  aria-label="Switch view"
+                >
+                  <MoreHorizontal className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-40">
+              <DropdownMenuContent align="end" className="w-44">
                 <p className="px-2 py-1.5 text-xs text-muted-foreground font-medium">Switch View</p>
-                {(["admin", "crew", "client"] as const).map((role) => (
-                  <DropdownMenuItem
-                    key={role}
-                    onClick={() => setViewMode(role)}
-                    data-testid={`button-role-${role}`}
-                    className={viewMode === role ? "font-semibold" : ""}
-                  >
-                    {role === "admin" ? "Admin" : role === "crew" ? "Crew" : "Client"}
-                  </DropdownMenuItem>
-                ))}
+                {(["admin", "crew", "client"] as const).map((role) => {
+                  const label =
+                    role === "admin" ? "View as Admin" : role === "crew" ? "View as Crew" : "View as Client";
+                  return (
+                    <DropdownMenuItem
+                      key={role}
+                      onClick={() => setViewMode(role)}
+                      data-testid={`button-role-${role}`}
+                      className={viewMode === role ? "font-semibold" : ""}
+                    >
+                      <Check
+                        className={`mr-2 h-4 w-4 ${viewMode === role ? "opacity-100" : "opacity-0"}`}
+                      />
+                      {label}
+                    </DropdownMenuItem>
+                  );
+                })}
               </DropdownMenuContent>
             </DropdownMenu>
           )}
@@ -175,4 +185,34 @@ export function Navbar() {
   const inShell = useAppShell();
   if (inShell) return null;
   return <NavbarShell />;
+}
+
+export function PreviewBanner() {
+  const { user } = useAuth();
+  const { viewMode, setViewMode } = useViewMode();
+
+  if (!user || user.role !== "admin") return null;
+  if (viewMode === "admin") return null;
+
+  const label = viewMode === "crew" ? "Crew" : "Client";
+
+  return (
+    <div
+      className="w-full flex items-center justify-center gap-3 text-white"
+      style={{ height: 32, backgroundColor: "#2f4a3a", fontFamily: "Inter, sans-serif", fontWeight: 600 }}
+      data-testid="banner-preview"
+      role="status"
+    >
+      <span className="text-xs sm:text-sm">Previewing as {label}</span>
+      <span aria-hidden className="opacity-60">·</span>
+      <button
+        type="button"
+        onClick={() => setViewMode("admin")}
+        className="text-xs sm:text-sm underline underline-offset-2 hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-white/40 rounded-sm px-1"
+        data-testid="button-exit-preview"
+      >
+        Exit
+      </button>
+    </div>
+  );
 }
