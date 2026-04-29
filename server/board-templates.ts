@@ -165,8 +165,6 @@ function wrap(objects: any[]) {
   };
 }
 
-const IMG = "/api/public-assets/images/templates";
-
 // ---------------------------------------------------------------------------
 // Layout grid
 // ---------------------------------------------------------------------------
@@ -302,12 +300,12 @@ const kitchenRenovation = buildSimpleTemplate({
   sectionA: "Cabinetry, Surfaces & Lighting",
   sectionB: "Palette, Materials & Notes",
   images: [
-    { url: `${IMG}/kitchen-cabinets.png`, caption: "Shaker maple uppers — BM White Dove OC-17" },
-    { url: `${IMG}/kitchen-countertop.png`, caption: "Calacatta Nuvo 5131 — 3cm waterfall island" },
-    { url: `${IMG}/kitchen-range.png`, caption: "Wolf 48\" range w/ Zephyr Cypress hood" },
-    { url: `${IMG}/kitchen-tile.png`, caption: "Cle zellige 2×6\" backsplash — running bond" },
-    { url: `${IMG}/kitchen-pendants.png`, caption: "Schoolhouse Otis pendants — aged brass" },
-    { url: `${IMG}/mood-oak-floor.png`, caption: "5\" white oak hardwood — wire-brushed matte" },
+    { url: "", caption: "Shaker maple uppers — BM White Dove OC-17" },
+    { url: "", caption: "Calacatta Nuvo 5131 — 3cm waterfall island" },
+    { url: "", caption: "Wolf 48\" range w/ Zephyr Cypress hood" },
+    { url: "", caption: "Cle zellige 2×6\" backsplash — running bond" },
+    { url: "", caption: "Schoolhouse Otis pendants — aged brass" },
+    { url: "", caption: "5\" white oak hardwood — wire-brushed matte" },
   ],
   swatches: [
     { name: "White Dove", hex: "#F3EFE6", code: "OC-17", brand: "Benjamin Moore" },
@@ -316,9 +314,9 @@ const kitchenRenovation = buildSimpleTemplate({
     { name: "Aged Brass", hex: "#A8895C", code: "Hardware", brand: "Emtek" },
   ],
   materials: [
-    { name: "White Oak Hardwood", supplier: "Local mill", code: "5\" plank", imageUrl: `${IMG}/mood-oak-floor.png`, notes: "Wire-brushed, matte poly. Continuous to dining." },
-    { name: "Calacatta Nuvo Quartz", supplier: "Caesarstone", code: "5131", imageUrl: `${IMG}/kitchen-countertop.png`, notes: "Waterfall island. Eased edge perimeter." },
-    { name: "Zellige Backsplash", supplier: "Cle Tile", code: "2×6 Weathered White", imageUrl: `${IMG}/kitchen-tile.png`, notes: "Running bond. Extend to ceiling behind range." },
+    { name: "White Oak Hardwood", supplier: "Local mill", code: "5\" plank", imageUrl: "", notes: "Wire-brushed, matte poly. Continuous to dining." },
+    { name: "Calacatta Nuvo Quartz", supplier: "Caesarstone", code: "5131", imageUrl: "", notes: "Waterfall island. Eased edge perimeter." },
+    { name: "Zellige Backsplash", supplier: "Cle Tile", code: "2×6 Weathered White", imageUrl: "", notes: "Running bond. Extend to ceiling behind range." },
   ],
   notes: [
     { text: "Lead times: cabinets 12 wks, countertops 6 wks. Order before framing.", color: "#fef9c3" },
@@ -333,12 +331,12 @@ const bathroomRenovation = buildSimpleTemplate({
   zoneColorA: "#e6e9ec",
   zoneColorB: "#ece8e3",
   images: [
-    { url: `${IMG}/bath-tub.png`, caption: "V+A Napoli freestanding — matte white, 65×29\"" },
-    { url: `${IMG}/bath-vanity.png`, caption: "60\" double vanity — white oak floating" },
-    { url: `${IMG}/bath-sconce.png`, caption: "Cedar & Moss Alto sconces — brushed brass" },
-    { url: `${IMG}/bath-hex-tile.png`, caption: "2\" Carrara hex mosaic — heated" },
-    { url: `${IMG}/kitchen-tile.png`, caption: "Large-format Calacatta porcelain — shower" },
-    { url: `${IMG}/mood-oak-floor.png`, caption: "Heated white oak threshold transitions" },
+    { url: "", caption: "V+A Napoli freestanding — matte white, 65×29\"" },
+    { url: "", caption: "60\" double vanity — white oak floating" },
+    { url: "", caption: "Cedar & Moss Alto sconces — brushed brass" },
+    { url: "", caption: "2\" Carrara hex mosaic — heated" },
+    { url: "", caption: "Large-format Calacatta porcelain — shower" },
+    { url: "", caption: "Heated white oak threshold transitions" },
   ],
   swatches: [
     { name: "Pale Oak", hex: "#E8E0D4", code: "OC-20", brand: "Benjamin Moore" },
@@ -347,9 +345,9 @@ const bathroomRenovation = buildSimpleTemplate({
     { name: "Carrara White", hex: "#EDEAE3", code: "Mosaic", brand: "Stone Source" },
   ],
   materials: [
-    { name: "Carrara Marble Hex", supplier: "Stone Source", code: "2\" mosaic", imageUrl: `${IMG}/bath-hex-tile.png`, notes: "Heated w/ Schluter Ditra-Heat under all tile." },
+    { name: "Carrara Marble Hex", supplier: "Stone Source", code: "2\" mosaic", imageUrl: "", notes: "Heated w/ Schluter Ditra-Heat under all tile." },
     { name: "Calacatta Porcelain", supplier: "Cle Tile", code: "24×48\"", imageUrl: "", notes: "Shower walls. Niche in accent stone." },
-    { name: "White Oak Vanity", supplier: "Custom mill", code: "Floating, 60\"", imageUrl: `${IMG}/bath-vanity.png`, notes: "Quartz top, undermount basins." },
+    { name: "White Oak Vanity", supplier: "Custom mill", code: "Floating, 60\"", imageUrl: "", notes: "Quartz top, undermount basins." },
   ],
   notes: [
     { text: "Heated floors mandatory. Schluter Ditra-Heat under all tile.", color: "#dbeafe" },
@@ -364,12 +362,12 @@ const fullCottageBuild = buildSimpleTemplate({
   zoneColorA: "#e4e1db",
   zoneColorB: "#dce5e8",
   images: [
-    { url: `${IMG}/cottage-exterior.png`, caption: "Board-and-batten cedar — Driftwood Grey stain" },
-    { url: `${IMG}/cottage-trusses.png`, caption: "Vaulted great room — exposed timber trusses" },
-    { url: `${IMG}/cottage-dock.png`, caption: "Permanent dock — steel frame, cedar decking" },
-    { url: `${IMG}/cottage-fireplace.png`, caption: "Muskoka granite fieldstone fireplace surround" },
-    { url: `${IMG}/mood-sofa.png`, caption: "Performance linen great-room seating" },
-    { url: `${IMG}/mood-oak-floor.png`, caption: "5\" white oak floors — continuous main level" },
+    { url: "", caption: "Board-and-batten cedar — Driftwood Grey stain" },
+    { url: "", caption: "Vaulted great room — exposed timber trusses" },
+    { url: "", caption: "Permanent dock — steel frame, cedar decking" },
+    { url: "", caption: "Muskoka granite fieldstone fireplace surround" },
+    { url: "", caption: "Performance linen great-room seating" },
+    { url: "", caption: "5\" white oak floors — continuous main level" },
   ],
   swatches: [
     { name: "Driftwood Grey", hex: "#9E9689", code: "Semi-trans.", brand: "Cabot Stain" },
@@ -378,7 +376,7 @@ const fullCottageBuild = buildSimpleTemplate({
     { name: "Salamander", hex: "#1E3A2F", code: "2050-10", brand: "Benjamin Moore" },
   ],
   materials: [
-    { name: "Cedar Board & Batten", supplier: "Local sawmill", code: "1×10 + 1×3", imageUrl: `${IMG}/cottage-exterior.png`, notes: "Semi-transparent stain. Re-stain every 5 yrs." },
+    { name: "Cedar Board & Batten", supplier: "Local sawmill", code: "1×10 + 1×3", imageUrl: "", notes: "Semi-transparent stain. Re-stain every 5 yrs." },
     { name: "Loewen Triple-Glaze", supplier: "Loewen", code: "Douglas fir", imageUrl: "", notes: "8' sliding door to screened porch." },
     { name: "TimberTech Decking", supplier: "TimberTech", code: "Composite", imageUrl: "", notes: "Steel cable rail along all decks." },
   ],
@@ -395,12 +393,12 @@ const moodboard = buildSimpleTemplate({
   zoneColorA: "#ece8e3",
   zoneColorB: "#e5e8e3",
   images: [
-    { url: `${IMG}/mood-sofa.png`, caption: "Performance linen sofa — oatmeal, wool bouclé accents" },
-    { url: `${IMG}/mood-oak-floor.png`, caption: "Wire-brushed white oak — matte poly" },
-    { url: `${IMG}/cottage-fireplace.png`, caption: "Muskoka granite fieldstone fireplace" },
-    { url: `${IMG}/kitchen-cabinets.png`, caption: "White oak + aged brass hardware" },
-    { url: `${IMG}/bath-sconce.png`, caption: "Cedar & Moss sconce — aged brass, 3000K" },
-    { url: `${IMG}/kitchen-pendants.png`, caption: "Schoolhouse globe pendants" },
+    { url: "", caption: "Performance linen sofa — oatmeal, wool bouclé accents" },
+    { url: "", caption: "Wire-brushed white oak — matte poly" },
+    { url: "", caption: "Muskoka granite fieldstone fireplace" },
+    { url: "", caption: "White oak + aged brass hardware" },
+    { url: "", caption: "Cedar & Moss sconce — aged brass, 3000K" },
+    { url: "", caption: "Schoolhouse globe pendants" },
   ],
   swatches: [
     { name: "White Dove", hex: "#F3EFE6", code: "OC-17", brand: "Benjamin Moore" },
@@ -409,9 +407,9 @@ const moodboard = buildSimpleTemplate({
     { name: "Chantilly Lace", hex: "#F5F2ED", code: "OC-65", brand: "Benjamin Moore" },
   ],
   materials: [
-    { name: "White Oak", supplier: "Local mill", code: "Wire-brushed", imageUrl: `${IMG}/mood-oak-floor.png`, notes: "Floors, vanity, shelving. Matte poly." },
-    { name: "Muskoka Granite", supplier: "Local quarry", code: "Fieldstone", imageUrl: `${IMG}/cottage-fireplace.png`, notes: "Fireplace surround. Honed Carrara in baths." },
-    { name: "Performance Linen", supplier: "Kravet", code: "Oatmeal", imageUrl: `${IMG}/mood-sofa.png`, notes: "Sofa + drapery. Wool bouclé on accent chair." },
+    { name: "White Oak", supplier: "Local mill", code: "Wire-brushed", imageUrl: "", notes: "Floors, vanity, shelving. Matte poly." },
+    { name: "Muskoka Granite", supplier: "Local quarry", code: "Fieldstone", imageUrl: "", notes: "Fireplace surround. Honed Carrara in baths." },
+    { name: "Performance Linen", supplier: "Kravet", code: "Oatmeal", imageUrl: "", notes: "Sofa + drapery. Wool bouclé on accent chair." },
   ],
   notes: [
     { text: "Client loves warm minimal. No farmhouse or rustic. Max 3-4 colours.", color: "#fef9c3" },
@@ -426,12 +424,12 @@ const furnitureRefinishingConceptBoardWorking = buildSimpleTemplate({
   zoneColorA: "#f3efe8",
   zoneColorB: "#ede8e1",
   images: [
-    { url: `${IMG}/cottage-exterior.png`, caption: "Before — current piece, full view" },
-    { url: `${IMG}/mood-sofa.png`, caption: "Client inspiration reference" },
-    { url: `${IMG}/cottage-fireplace.png`, caption: "Proposed direction — finish goal" },
-    { url: `${IMG}/mood-oak-floor.png`, caption: "Wood grain reference — matching tone" },
-    { url: `${IMG}/kitchen-cabinets.png`, caption: "Hardware close-up reference" },
-    { url: `${IMG}/bath-vanity.png`, caption: "Edge profile + repair detail" },
+    { url: "", caption: "Before — current piece, full view" },
+    { url: "", caption: "Client inspiration reference" },
+    { url: "", caption: "Proposed direction — finish goal" },
+    { url: "", caption: "Wood grain reference — matching tone" },
+    { url: "", caption: "Hardware close-up reference" },
+    { url: "", caption: "Edge profile + repair detail" },
   ],
   swatches: [
     { name: "Paint Colour", hex: "#F3EFE6", code: "Sample", brand: "TBD" },
@@ -457,12 +455,12 @@ const collageConceptBoard = buildSimpleTemplate({
   zoneColorA: "#f6f3ee",
   zoneColorB: "#ede8e1",
   images: [
-    { url: `${IMG}/cottage-exterior.png`, caption: "Renovation overview" },
-    { url: `${IMG}/cottage-trusses.png`, caption: "House floor plan" },
-    { url: `${IMG}/mood-sofa.png`, caption: "Feature desk inspiration" },
-    { url: `${IMG}/kitchen-cabinets.png`, caption: "Kitchen moodboard" },
-    { url: `${IMG}/cottage-fireplace.png`, caption: "Living room moodboard" },
-    { url: `${IMG}/mood-oak-floor.png`, caption: "Floating display unit" },
+    { url: "", caption: "Renovation overview" },
+    { url: "", caption: "House floor plan" },
+    { url: "", caption: "Feature desk inspiration" },
+    { url: "", caption: "Kitchen moodboard" },
+    { url: "", caption: "Living room moodboard" },
+    { url: "", caption: "Floating display unit" },
   ],
   swatches: [
     { name: "Horizon", hex: "#6FA7B4", code: "", brand: "" },
@@ -488,12 +486,12 @@ const materialInspirationBoard = buildSimpleTemplate({
   zoneColorA: "#f5f3ef",
   zoneColorB: "#ece8e3",
   images: [
-    { url: `${IMG}/bath-vanity.png`, caption: "European fabric samples" },
-    { url: `${IMG}/bath-hex-tile.png`, caption: "Herringbone pattern" },
-    { url: `${IMG}/mood-oak-floor.png`, caption: "Wenge spruce — dark wood grain" },
-    { url: `${IMG}/kitchen-pendants.png`, caption: "Textured lamp + objects" },
-    { url: `${IMG}/kitchen-cabinets.png`, caption: "Bar top oak veneer finish" },
-    { url: `${IMG}/bath-sconce.png`, caption: "Entry door handles" },
+    { url: "", caption: "European fabric samples" },
+    { url: "", caption: "Herringbone pattern" },
+    { url: "", caption: "Wenge spruce — dark wood grain" },
+    { url: "", caption: "Textured lamp + objects" },
+    { url: "", caption: "Bar top oak veneer finish" },
+    { url: "", caption: "Entry door handles" },
   ],
   swatches: [
     { name: "Hemlock", hex: "#556B3F", code: "Accent", brand: "" },
@@ -502,9 +500,9 @@ const materialInspirationBoard = buildSimpleTemplate({
     { name: "Linen", hex: "#E8E0D4", code: "Neutral", brand: "" },
   ],
   materials: [
-    { name: "Oak Veneer", supplier: "Local mill", code: "Bar top", imageUrl: `${IMG}/kitchen-cabinets.png`, notes: "Bar top + display shelving." },
-    { name: "Herringbone Stone", supplier: "Stone Source", code: "Pattern", imageUrl: `${IMG}/bath-hex-tile.png`, notes: "Feature wall in entry." },
-    { name: "European Fabric", supplier: "Kravet", code: "Sample", imageUrl: `${IMG}/bath-vanity.png`, notes: "Drapery + accent pillows." },
+    { name: "Oak Veneer", supplier: "Local mill", code: "Bar top", imageUrl: "", notes: "Bar top + display shelving." },
+    { name: "Herringbone Stone", supplier: "Stone Source", code: "Pattern", imageUrl: "", notes: "Feature wall in entry." },
+    { name: "European Fabric", supplier: "Kravet", code: "Sample", imageUrl: "", notes: "Drapery + accent pillows." },
   ],
   notes: [
     { text: "Keep the palette grounded. Use a single dark accent piece.", color: "#ffffff" },
