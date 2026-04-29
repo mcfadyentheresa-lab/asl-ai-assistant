@@ -71,6 +71,7 @@ import AIPartnerPanel from "@/components/board/AIPartnerPanel";
 import RoomTabStrip, { type BoardMode } from "@/components/board/RoomTabStrip";
 import SecondaryAxisChips from "@/components/board/SecondaryAxisChips";
 import VersionsPopover from "@/components/board/VersionsPopover";
+import { PinterestImportPopover } from "@/components/board/PinterestImportPopover";
 import VersionsCompareDialog from "@/components/board/VersionsCompareDialog";
 import CompareDrawer, { isComparable as isCompareEligible } from "@/components/board/CompareDrawer";
 import {
@@ -1160,6 +1161,40 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
       pushUndo({ type: "create", elementId: el.id });
     } catch {
       toast({ title: "Error", description: "Failed to create element", variant: "destructive" });
+    }
+  };
+
+  // Create an image element prefilled with a remote URL (e.g. a Pinterest pin
+  // thumbnail). Mirrors createElement('image') but injects the URL into
+  // content so the user doesn't have to upload separately.
+  const createImageFromUrl = async (imageUrl: string, caption?: string) => {
+    if (!selectedBoardId) return;
+    const def = ELEMENT_DEFAULTS["image"];
+    const desiredX = Math.round((-pan.x + (containerRef.current?.clientWidth || 800) / 2) / zoom - def.width / 2);
+    const desiredY = Math.round((-pan.y + (containerRef.current?.clientHeight || 600) / 2) / zoom - def.height / 2);
+    const { x: placedX, y: placedY } = findFreeSlot(desiredX, desiredY, def.width, def.height);
+    const newZ = maxZ;
+    setMaxZ((z) => z + 1);
+    const baseContent: any = { ...def.content, url: imageUrl, caption: caption || "" };
+    if (activeRoom) {
+      const targetField = (selectedBoard as any)?.mode === "library" ? "category" : "room";
+      if (targetField === "room") baseContent.room = activeRoom;
+      else baseContent.category = activeRoom;
+    }
+    try {
+      const url = buildUrl(api.canvasElements.create.path, { boardId: selectedBoardId });
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ type: "image", x: placedX, y: placedY, width: def.width, height: def.height, zIndex: newZ, content: baseContent }),
+      });
+      const el = await res.json();
+      addElement(el);
+      sendElementAdd(el);
+      pushUndo({ type: "create", elementId: el.id });
+    } catch {
+      toast({ title: "Error", description: "Failed to add image", variant: "destructive" });
     }
   };
 
@@ -5875,6 +5910,10 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
               {lockLayout ? "Layout locked — tap to unlock" : "Lock layout"}
             </TooltipContent>
           </Tooltip>
+          <PinterestImportPopover
+            disabled={!selectedBoardId}
+            onImport={(imageUrl, title) => createImageFromUrl(imageUrl, title)}
+          />
           <div className="hidden md:flex items-center gap-0.5">
           <Separator orientation="vertical" className="h-4 mx-1" />
           <Tooltip>
@@ -6784,6 +6823,11 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                 >
                   <Hand className="h-[18px] w-[18px]" strokeWidth={1.5} />
                 </button>
+                <PinterestImportPopover
+                  variant="mobile"
+                  disabled={!selectedBoardId}
+                  onImport={(imageUrl, title) => createImageFromUrl(imageUrl, title)}
+                />
                 {editingId && (
                   <>
                     <div className="h-5 w-px bg-border/40 mx-1 shrink-0" />
