@@ -78,6 +78,9 @@ export function useBoardRealtime(
   }, []);
 
   const trackEdit = useCallback((elementId: number, userId: string, firstName: string, lastName: string) => {
+    // Don't pin a "you edited this" pill on your own elements when the
+    // server echoes our own edit back. Other users' edits still show.
+    if (userId === user?.id) return;
     const color = getUserColor(userId, colorMapRef.current);
     setActiveEdits((prev) => ({
       ...prev,
@@ -90,7 +93,7 @@ export function useBoardRealtime(
         expiresAt: Date.now() + 3000,
       },
     }));
-  }, []);
+  }, [user?.id]);
 
   const lastPongRef = useRef<number>(Date.now());
   const pingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -212,6 +215,11 @@ export function useBoardRealtime(
             break;
 
           case "cursor:move": {
+            // Never render our own cursor pill — that's just noise (the
+            // user already knows where their own pointer is). The server
+            // echoes cursor messages back to the sender by default, so we
+            // filter on the client side here.
+            if (msg.userId === user.id) break;
             const cursorColor = getUserColor(msg.userId, colorMapRef.current);
             setCursors((prev) => ({
               ...prev,
