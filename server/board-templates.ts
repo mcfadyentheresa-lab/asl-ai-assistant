@@ -183,20 +183,26 @@ function wrap(objects: any[]) {
 const TITLE_X = 40;
 const TITLE_Y = 24;
 
-const SECTION_A_TOP = 80;
-const SECTION_A_HEIGHT = 400;
-const SECTION_B_TOP = 500;
-const SECTION_B_HEIGHT = 320;
-
 const CANVAS_LEFT = 30;
-const CANVAS_WIDTH = 1100;
+const CANVAS_WIDTH = 1180;
+
+// Section A — image grid (2 rows of 3 images at 220h + 60 row gap + 80 top inset + 40 bottom padding = ~640)
+const SECTION_A_TOP = 90;
+const SECTION_A_HEIGHT = 640;
+// Section B starts below Section A with 30 px gap.
+const SECTION_B_TOP = SECTION_A_TOP + SECTION_A_HEIGHT + 30;
+// Section B holds swatches row (200) + 30 gap + materials row (180) + 80 inset + 40 padding = ~530
+const SECTION_B_HEIGHT = 530;
+
+// Inner column split inside Section B: left side for swatches/materials, right side for notes.
+const SECTION_B_LEFT_WIDTH = 880;
 
 // 3-column image grid inside Section A.
 function imageGrid(top: number, items: { url: string; caption: string }[]) {
   const cols = 3;
   const gutter = 24;
-  const sectionInsetX = 60;
-  const sectionInsetTop = 56; // leaves room below the zone title
+  const sectionInsetX = 40;
+  const sectionInsetTop = 80; // leaves room below the zone title
   const cellW = Math.floor((CANVAS_WIDTH - sectionInsetX * 2 - gutter * (cols - 1)) / cols);
   const cellH = 220;
   const rowGap = 60;
@@ -209,40 +215,40 @@ function imageGrid(top: number, items: { url: string; caption: string }[]) {
   });
 }
 
-// Row of swatches inside Section B (left half).
+// Row of swatches inside Section B (left side, top row).
 function swatchRow(top: number, items: { name: string; hex: string; code?: string; brand?: string }[]) {
   const swatchW = 130;
   const gap = 16;
-  const startX = CANVAS_LEFT + 60;
-  const swatchTop = top + 56;
+  const startX = CANVAS_LEFT + 40;
+  const swatchTop = top + 80;
   return items.map((it, i) => {
     const x = startX + i * (swatchW + gap);
     return makeColorSwatch(x, swatchTop, it.name, it.hex, it.hex, it.code || "", it.brand || "", swatchW);
   });
 }
 
-// Row of materials below swatches in Section B.
+// Row of materials below swatches in Section B (left side, bottom row).
 function materialRow(top: number, items: { name: string; supplier?: string; code?: string; imageUrl?: string; notes?: string }[]) {
   const w = 220;
   const gap = 24;
-  const startX = CANVAS_LEFT + 60;
-  const matTop = top + 56;
+  const startX = CANVAS_LEFT + 40;
+  const matTop = top + 80;
   return items.map((it, i) => {
     const x = startX + i * (w + gap);
     return makeMaterial(x, matTop, it.name, it.supplier || "", it.code || "", it.imageUrl || "", it.notes || "");
   });
 }
 
-// Row of notes (sticky) in the right half of Section B.
-function noteRow(top: number, leftOffset: number, items: { text: string; color?: string }[]) {
-  const w = 200;
-  const h = 90;
+// Column of notes (stickies) on the right side of Section B.
+function noteColumn(top: number, leftOffset: number, items: { text: string; color?: string }[]) {
+  const w = 220;
+  const h = 110;
   const gap = 16;
   const startX = CANVAS_LEFT + leftOffset;
-  const noteTop = top + 100;
+  const noteTop = top + 80;
   return items.map((it, i) => {
-    const x = startX + i * (w + gap);
-    return makeSticky(x, noteTop, it.text, it.color || "#fef9c3", w, h);
+    const y = noteTop + i * (h + gap);
+    return makeSticky(startX, y, it.text, it.color || "#fef9c3", w, h);
   });
 }
 
@@ -264,28 +270,36 @@ function buildSimpleTemplate(input: SimpleTemplateInput) {
   const objects: any[] = [];
   objects.push(makeSectionHeader(TITLE_X, TITLE_Y, input.title));
 
-  // Section A — image grid
+  // Section A — image grid (2 rows × 3 cols of 220h images, fully contained)
   objects.push(makeRoomZone(CANVAS_LEFT, SECTION_A_TOP, CANVAS_WIDTH, SECTION_A_HEIGHT, input.sectionA, input.zoneColorA || "#ece8e1", 0.4));
   objects.push(makeText(CANVAS_LEFT + 24, SECTION_A_TOP + 18, input.sectionA.toUpperCase(), 12, "600", "#1e3a2f"));
   objects.push(...imageGrid(SECTION_A_TOP, input.images.slice(0, 6)));
 
-  // Section B — swatches + materials + notes
+  // Section B — left side: swatches row then materials row; right side: notes column.
   objects.push(makeRoomZone(CANVAS_LEFT, SECTION_B_TOP, CANVAS_WIDTH, SECTION_B_HEIGHT, input.sectionB, input.zoneColorB || "#e8ebe6", 0.35));
   objects.push(makeText(CANVAS_LEFT + 24, SECTION_B_TOP + 18, input.sectionB.toUpperCase(), 12, "600", "#1e3a2f"));
 
+  // Vertical layout inside Section B left half:
+  //   y = SECTION_B_TOP + 50 → "PALETTE" label
+  //   y = SECTION_B_TOP + 80 → swatches row (height 200)
+  //   y = SECTION_B_TOP + 280 → 30 px gap
+  //   y = SECTION_B_TOP + 290 → "MATERIALS" label
+  //   y = SECTION_B_TOP + 320 → materials row (height 180)
+  //   y = SECTION_B_TOP + 500 → fits within SECTION_B_HEIGHT=530
+  const materialsRowTop = SECTION_B_TOP + 240; // adds 240 so its row sits at +320
+
   if (input.swatches && input.swatches.length > 0) {
-    objects.push(makeText(CANVAS_LEFT + 60, SECTION_B_TOP + 36, "PALETTE", 11, "600", "#6b7280"));
+    objects.push(makeText(CANVAS_LEFT + 40, SECTION_B_TOP + 50, "PALETTE", 11, "600", "#6b7280"));
     objects.push(...swatchRow(SECTION_B_TOP, input.swatches.slice(0, 4)));
   }
   if (input.materials && input.materials.length > 0) {
-    const matTop = SECTION_B_TOP + (input.swatches && input.swatches.length ? 200 : 0);
-    objects.push(makeText(CANVAS_LEFT + 60, matTop + 36, "MATERIALS", 11, "600", "#6b7280"));
-    objects.push(...materialRow(matTop, input.materials.slice(0, 3)));
+    objects.push(makeText(CANVAS_LEFT + 40, materialsRowTop + 50, "MATERIALS", 11, "600", "#6b7280"));
+    objects.push(...materialRow(materialsRowTop, input.materials.slice(0, 3)));
   }
   if (input.notes && input.notes.length > 0) {
-    const notesLeftOffset = 720;
-    objects.push(makeText(CANVAS_LEFT + notesLeftOffset, SECTION_B_TOP + 36, "NOTES", 11, "600", "#6b7280"));
-    objects.push(...noteRow(SECTION_B_TOP, notesLeftOffset, input.notes.slice(0, 2)));
+    const notesLeftOffset = SECTION_B_LEFT_WIDTH + 20; // right column starts past left content
+    objects.push(makeText(CANVAS_LEFT + notesLeftOffset, SECTION_B_TOP + 50, "NOTES", 11, "600", "#6b7280"));
+    objects.push(...noteColumn(SECTION_B_TOP, notesLeftOffset, input.notes.slice(0, 2)));
   }
 
   return wrap(objects);
