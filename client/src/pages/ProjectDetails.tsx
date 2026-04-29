@@ -14,7 +14,7 @@ import { useViewMode } from "@/hooks/use-view-mode";
 import { useProjectRealtime } from "@/hooks/use-project-realtime";
 import { Navbar } from "@/components/layout/Navbar";
 import SpatialCanvas from "@/components/SpatialCanvas";
-import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, Upload, Download, X, Paperclip, ZoomIn, Palette, Check, Archive, ArchiveRestore, PanelRightOpen, MoreVertical, Flag, BarChart3, ArrowUpRight, Building2, Sparkles, Armchair, ScrollText } from "lucide-react";
+import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, Upload, Download, X, Paperclip, ZoomIn, Palette, Check, Archive, ArchiveRestore, PanelRightOpen, MoreVertical, Flag, BarChart3, ArrowUpRight, Building2, Sparkles, Armchair, ScrollText, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -67,6 +67,7 @@ import { PeopleCard } from "@/components/project/PeopleCard";
 import { RecentActivityCard } from "@/components/project/RecentActivityCard";
 import { ProgressTab } from "@/components/project/ProgressTab";
 import { DecisionsTab } from "@/components/project/DecisionsTab";
+import { SelectionsTab } from "@/components/project/SelectionsTab";
 import { ClientProjectHeader } from "@/components/project/ClientProjectHeader";
 import { ClientProjectFooter, deriveProjectCode as deriveFooterProjectCode } from "@/components/project/ClientProjectFooter";
 import { HeroImageEditor } from "@/components/project/HeroImageEditor";
@@ -201,6 +202,7 @@ function ProjectDetailsInner() {
     { id: "docs", label: "Documents", icon: FileText, roles: ["admin", "client"] },
     { id: "chat", label: "Messages", icon: MessageSquare, roles: ["admin", "crew", "client"] },
     { id: "decisions", label: "Decisions", icon: ScrollText, roles: ["admin", "crew", "client"] },
+    { id: "selections", label: "Selections", icon: Package, roles: ["admin", "crew", "client"] },
     { id: "board", label: "Planning Board", icon: Palette, roles: ["admin", "crew", "client"], clientRequiresInvite: true },
   ];
 
@@ -764,6 +766,10 @@ function ProjectDetailsInner() {
 
           <TabsContent value="decisions">
             <DecisionsTab projectId={projectId} userRole={userRole} />
+          </TabsContent>
+
+          <TabsContent value="selections">
+            <SelectionsTab projectId={projectId} userRole={userRole} />
           </TabsContent>
         </Tabs>
       </main>
