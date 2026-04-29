@@ -3,11 +3,17 @@ import nodemailer from "nodemailer";
 const gmailUser = process.env.GMAIL_USER;
 const gmailAppPassword = process.env.GMAIL_APP_PASSWORD;
 
-const APP_URL = process.env.REPLIT_DEPLOYMENT_URL
-  ? `https://${process.env.REPLIT_DEPLOYMENT_URL}`
-  : process.env.REPLIT_DEV_DOMAIN
-    ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-    : "https://asterandspruce.com";
+// Canonical URL used inside invite/notification emails.
+// Order: explicit APP_URL (Railway) > legacy Replit envs > marketing site fallback.
+// Without APP_URL on Railway, invite links would point at the marketing site
+// (asterandspruce.com) instead of the portal (app.asl-portal.ca) and 404.
+const APP_URL = (process.env.APP_URL
+  ? process.env.APP_URL
+  : process.env.REPLIT_DEPLOYMENT_URL
+    ? `https://${process.env.REPLIT_DEPLOYMENT_URL}`
+    : process.env.REPLIT_DEV_DOMAIN
+      ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+      : "https://app.asl-portal.ca").replace(/\/$/, "");
 
 let transporter: nodemailer.Transporter | null = null;
 

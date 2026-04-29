@@ -278,7 +278,7 @@ export function ClientDashboardView({ project, isAdminPreview = false }: ClientD
 
       <footer className="px-4 md:px-8 lg:px-12 py-6 border-t border-border/60">
         <p className="font-mono text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
-          Aster &amp; Spruce Living · West Vancouver
+          Aster &amp; Spruce Living{project.city ? ` · ${project.city}` : project.address ? ` · ${project.address}` : ""}
         </p>
       </footer>
     </motion.div>

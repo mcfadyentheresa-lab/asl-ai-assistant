@@ -1,0 +1,5 @@
+User-agent: *
+Disallow: /
+
+# This is a private client portal for Aster & Spruce Living. Public marketing
+# content lives at https://asterandspruce.com — index that instead.
