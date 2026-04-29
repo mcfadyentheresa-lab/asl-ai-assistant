@@ -171,7 +171,7 @@ export default function RoomTabStrip({
   };
 
   const tabBase = "min-h-[44px] px-4 inline-flex items-center gap-2 text-sm whitespace-nowrap rounded-t-md transition-colors select-none";
-  const addLabel = mode === "library" ? "Category" : "Room";
+  const addLabel = mode === "library" ? "Collection" : "Room";
 
   return (
     <div className="shrink-0 bg-card border-b border-border relative z-10" data-testid="room-tab-strip" data-mode={mode}>
@@ -434,10 +434,10 @@ function NewTabDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md" data-testid="new-room-dialog">
         <DialogHeader>
-          <DialogTitle className="font-serif">{isLibrary ? "New category" : "New room"}</DialogTitle>
+          <DialogTitle className="font-serif">{isLibrary ? "New collection" : "New room"}</DialogTitle>
           <DialogDescription>
             {isLibrary
-              ? "Add a category lane. Cards tagged with this category will appear here."
+              ? "Add a collection lane. Items tagged with this collection will appear here."
               : "Add a room lane. Dimensions are optional — useful for scale planning later."}
           </DialogDescription>
         </DialogHeader>
@@ -448,7 +448,7 @@ function NewTabDialog({
               id="new-room-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder={isLibrary ? "Fabric Samples, Stone, Hardware…" : "Kitchen, Primary Bath…"}
+              placeholder={isLibrary ? "Fabrics, Stone, Hardware…" : "Kitchen, Primary Bath…"}
               autoFocus
               onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
               data-testid="new-room-name"

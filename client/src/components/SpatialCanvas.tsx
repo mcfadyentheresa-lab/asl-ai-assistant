@@ -22,7 +22,7 @@
  * Annotations (`content.annotations: Stroke[]`) live inside the element's bounding box; coordinates
  * are stored relative to the element's top-left corner so the ink moves with the card.
  */
-import { useEffect, useRef, useState, useCallback, cloneElement, isValidElement } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo, cloneElement, isValidElement } from "react";
 import type { ReactElement } from "react";
 import { getStroke } from "perfect-freehand";
 import templateKitchenPreview from "../assets/images/template-kitchen-faux.png";
@@ -55,8 +55,12 @@ import {
   Lock, LockOpen, Hand, Wrench, Check,
   Spline, MoveRight, Slash, Droplet,
   Play, Globe, Star, History, AlertTriangle, Settings,
-  Pin, Layers,
+  Pin, Layers, Armchair, Image as ImageIcon, Grid3x3,
 } from "lucide-react";
+import LibraryCollectionsView from "@/components/board/LibraryCollectionsView";
+import { PhotosDrawer } from "@/components/board/PhotosDrawer";
+import { FurnitureDrawer } from "@/components/board/FurnitureDrawer";
+import { MaterialsDrawer } from "@/components/board/MaterialsDrawer";
 import HardwarePickerDialog, { type HardwareDraft } from "@/components/board/HardwarePickerDialog";
 import PaletteExtractionDialog, { type PaletteAddPayload } from "@/components/board/PaletteExtractionDialog";
 import RoomRenderDialog from "@/components/board/RoomRenderDialog";
@@ -227,6 +231,13 @@ function BmColorPicker({
 
 interface SpatialCanvasProps {
   projectId: number;
+  // Project name + back-to-project callback used by the board's thin breadcrumb chip.
+  // Optional so legacy callers keep working.
+  projectName?: string;
+  onBackToProject?: () => void;
+  // Auto-open one of the side drawers on mount. Used for ?drawer= deep links and the
+  // /project/:id/photos and /project/:id/furniture redirects.
+  initialDrawer?: "photos" | "furniture" | "materials" | null;
 }
 
 const GRID_SIZE = 20;
@@ -404,7 +415,7 @@ function getContrastColor(hex: string): string {
   return luminance > 0.55 ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.8)";
 }
 
-export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
+export default function SpatialCanvas({ projectId, projectName: _projectName, onBackToProject: _onBackToProject, initialDrawer = null }: SpatialCanvasProps) {
   const { toast } = useToast();
   const { user } = useAuth();
   const { viewMode } = useViewMode();
@@ -450,6 +461,29 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   const [showNewBoardDialog, setShowNewBoardDialog] = useState(false);
   const [showLinkDialog, setShowLinkDialog] = useState(false);
   const [showCalendarSheet, setShowCalendarSheet] = useState(false);
+  // Side drawers — Photos / Furniture / Materials. Mutually exclusive: opening one closes the others.
+  const [openDrawer, setOpenDrawerRaw] = useState<"photos" | "furniture" | "materials" | null>(initialDrawer);
+  const setOpenDrawer = (next: "photos" | "furniture" | "materials" | null) => setOpenDrawerRaw(next);
+  // Dot grid overlay. Default ON for admin/crew, OFF for client. Persisted per-user
+  // in localStorage so toggling sticks across reloads.
+  const dotGridStorageKey = useMemo(() => `asl-board-dot-grid:${user?.id || "anon"}`, [user?.id]);
+  const [showDotGrid, setShowDotGrid] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    try {
+      const raw = window.localStorage.getItem(`asl-board-dot-grid:${user?.id || "anon"}`);
+      if (raw === null) return user?.role !== "client";
+      return raw === "1";
+    } catch {
+      return user?.role !== "client";
+    }
+  });
+  const toggleDotGrid = () => {
+    setShowDotGrid((prev) => {
+      const next = !prev;
+      try { window.localStorage.setItem(dotGridStorageKey, next ? "1" : "0"); } catch {}
+      return next;
+    });
+  };
   const [notifyOnLink, setNotifyOnLink] = useState(true);
   const [linkDetailSheet, setLinkDetailSheet] = useState<{ type: "calendar" | "milestone" | "checklist"; id: number } | null>(null);
   const [editingEventTitle, setEditingEventTitle] = useState<string | null>(null);
@@ -570,11 +604,17 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
   const categoryOrderKey = selectedBoardId ? `asl:board:${selectedBoardId}:categoryOrder` : null;
   const statusFilterKey = selectedBoardId ? `asl:board:${selectedBoardId}:statusFilter` : null;
   const chipSelectionKey = selectedBoardId ? `asl:board:${selectedBoardId}:secondaryChips` : null;
+  // Library-mode view: "covers" (curated grid) or "chips" (legacy chip-row + canvas).
+  // Per-board, persisted, defaults to "covers" for library boards.
+  const libraryViewKey = selectedBoardId ? `asl:board:${selectedBoardId}:libraryView` : null;
+  const showEmptyCollectionsKey = selectedBoardId ? `asl:board:${selectedBoardId}:showEmptyCollections` : null;
   const [activeRoom, setActiveRoom] = useState<string | null>(null);
   const [savedRoomOrder, setSavedRoomOrder] = useState<string[]>([]);
   const [savedCategoryOrder, setSavedCategoryOrder] = useState<string[]>([]);
   const [statusFilters, setStatusFilters] = useState<Set<RoomStatus>>(() => new Set());
   const [secondaryChips, setSecondaryChips] = useState<Set<string>>(() => new Set());
+  const [libraryView, setLibraryView] = useState<"covers" | "chips">("covers");
+  const [showEmptyCollections, setShowEmptyCollections] = useState<boolean>(false);
   useEffect(() => {
     if (!selectedBoardId) return;
     if (activeRoomKey) {
@@ -623,7 +663,29 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
         setSecondaryChips(new Set());
       }
     }
-  }, [selectedBoardId, activeRoomKey, roomOrderKey, categoryOrderKey, statusFilterKey, chipSelectionKey]);
+    if (libraryViewKey) {
+      const raw = localStorage.getItem(libraryViewKey);
+      setLibraryView(raw === "chips" ? "chips" : "covers");
+    }
+    if (showEmptyCollectionsKey) {
+      const raw = localStorage.getItem(showEmptyCollectionsKey);
+      setShowEmptyCollections(raw === "1");
+    }
+  }, [selectedBoardId, activeRoomKey, roomOrderKey, categoryOrderKey, statusFilterKey, chipSelectionKey, libraryViewKey, showEmptyCollectionsKey]);
+
+  const persistLibraryView = useCallback((next: "covers" | "chips") => {
+    setLibraryView(next);
+    if (libraryViewKey) {
+      try { localStorage.setItem(libraryViewKey, next); } catch {}
+    }
+  }, [libraryViewKey]);
+
+  const persistShowEmptyCollections = useCallback((next: boolean) => {
+    setShowEmptyCollections(next);
+    if (showEmptyCollectionsKey) {
+      try { localStorage.setItem(showEmptyCollectionsKey, next ? "1" : "0"); } catch {}
+    }
+  }, [showEmptyCollectionsKey]);
   const persistActiveRoom = useCallback(
     (room: string | null) => {
       setActiveRoom(room);
@@ -3420,7 +3482,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
     if (!isCategorizable(el)) return null;
     const c = (el.content || {}) as any;
     const isLibrary = (selectedBoard as any)?.mode === "library";
-    const placeholder = isLibrary ? "Category (required)" : "Category";
+    const placeholder = isLibrary ? "Collection (required)" : "Category";
     return (
       <div onMouseDown={(e) => e.stopPropagation()}>
         <input
@@ -5425,6 +5487,34 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
         <div className="flex-1" />
         {/* Right cluster — canvas controls */}
         <div className="flex items-center gap-0.5">
+          {/* Library-mode view toggle — only visible on library boards. Lets the
+              user switch between the curated covers showcase and the legacy
+              chip-row + spatial canvas as a fallback. */}
+          {boardMode === "library" && (
+            <>
+              <div className="flex items-center bg-muted/50 rounded-md p-0.5 mr-1.5" data-testid="library-view-toggle">
+                <button
+                  type="button"
+                  onClick={() => persistLibraryView("covers")}
+                  aria-pressed={libraryView === "covers"}
+                  className={`h-7 px-2.5 text-[11px] font-mono uppercase tracking-[0.12em] rounded transition-colors ${libraryView === "covers" ? "bg-card text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                  data-testid="library-view-covers"
+                >
+                  Covers
+                </button>
+                <button
+                  type="button"
+                  onClick={() => persistLibraryView("chips")}
+                  aria-pressed={libraryView === "chips"}
+                  className={`h-7 px-2.5 text-[11px] font-mono uppercase tracking-[0.12em] rounded transition-colors ${libraryView === "chips" ? "bg-card text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                  data-testid="library-view-chips"
+                >
+                  Chips
+                </button>
+              </div>
+              <Separator orientation="vertical" className="h-4 mx-1" />
+            </>
+          )}
           {/* Docked Add palette — replaces the floating left-rail Add button.
               Same Popover content (Words / Visual / Selections / Layout / Draw)
               with the same kbd hints; just lives in the toolbar now so it can't
@@ -5525,6 +5615,70 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
               </div>
             </PopoverContent>
           </Popover>
+          <Separator orientation="vertical" className="h-4 mx-1" />
+          {/* Side-drawer triggers — Photos, Furniture, Materials. Mutually exclusive
+              (clicking one closes the others). Dot grid toggle visualizes the snap grid
+              that PR #54's auto-grid uses; persisted per-user in localStorage. */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="icon"
+                variant="ghost"
+                className={`h-8 w-8 ${openDrawer === "photos" ? "bg-primary/15 text-primary" : "hover:bg-primary/10 hover:text-primary"}`}
+                onClick={() => setOpenDrawer(openDrawer === "photos" ? null : "photos")}
+                aria-pressed={openDrawer === "photos"}
+                data-testid="button-drawer-photos"
+              >
+                <ImageIcon className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-xs">Photos</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="icon"
+                variant="ghost"
+                className={`h-8 w-8 ${openDrawer === "furniture" ? "bg-primary/15 text-primary" : "hover:bg-primary/10 hover:text-primary"}`}
+                onClick={() => setOpenDrawer(openDrawer === "furniture" ? null : "furniture")}
+                aria-pressed={openDrawer === "furniture"}
+                data-testid="button-drawer-furniture"
+              >
+                <Armchair className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-xs">Furniture</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="icon"
+                variant="ghost"
+                className={`h-8 w-8 ${openDrawer === "materials" ? "bg-primary/15 text-primary" : "hover:bg-primary/10 hover:text-primary"}`}
+                onClick={() => setOpenDrawer(openDrawer === "materials" ? null : "materials")}
+                aria-pressed={openDrawer === "materials"}
+                data-testid="button-drawer-materials"
+              >
+                <Layers className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-xs">Materials</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="icon"
+                variant="ghost"
+                className={`h-8 w-8 ${showDotGrid ? "bg-primary/15 text-primary" : "hover:bg-primary/10 hover:text-primary"}`}
+                onClick={toggleDotGrid}
+                aria-pressed={showDotGrid}
+                data-testid="button-toggle-dot-grid"
+              >
+                <Grid3x3 className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-xs">{showDotGrid ? "Hide dot grid" : "Show dot grid"}</TooltipContent>
+          </Tooltip>
           <Separator orientation="vertical" className="h-4 mx-1" />
           <Tooltip>
             <TooltipTrigger asChild>
@@ -5705,7 +5859,7 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
         </div>
       )}
 
-      {boards.length > 0 && selectedBoardId && (
+      {boards.length > 0 && selectedBoardId && !(boardMode === "library" && libraryView === "covers") && (
         <>
           <RoomTabStrip
             mode={boardMode}
@@ -5739,7 +5893,40 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
         </>
       )}
 
-      {boards.length > 0 && selectedBoardId && (
+      {boards.length > 0 && selectedBoardId && boardMode === "library" && libraryView === "covers" && (
+        <LibraryCollectionsView
+          elements={elementsList}
+          savedCategoryOrder={savedCategoryOrder}
+          onPersistCategoryOrder={persistCategoryOrder}
+          onOpenItem={(id) => {
+            // Switch to chip view and select the element on the canvas so the
+            // existing edit/spec affordances kick in.
+            persistLibraryView("chips");
+            setEditingId(id);
+          }}
+          onCreateCollection={() => {
+            const name = window.prompt("New collection name");
+            if (name && name.trim()) {
+              createCategoryFromTabStrip({ name: name.trim() });
+            }
+          }}
+          onReorderItems={(orderedIds) => {
+            // Persist by zIndex on each affected element; ascending starting at 1.
+            orderedIds.forEach((id, idx) => {
+              const el = elements[id];
+              if (!el) return;
+              const newZ = idx + 1;
+              if (el.zIndex !== newZ) {
+                updateElement(id, { zIndex: newZ });
+              }
+            });
+          }}
+          showEmptyCollections={showEmptyCollections}
+          onToggleShowEmptyCollections={() => persistShowEmptyCollections(!showEmptyCollections)}
+        />
+      )}
+
+      {boards.length > 0 && selectedBoardId && !(boardMode === "library" && libraryView === "covers") && (
         <div className="flex flex-1 gap-0 min-h-0">
           {/* Left rail removed — Add palette docked into the top toolbar so it
               can't collide with the canvas's first column. Delete affordance for
@@ -5824,15 +6011,19 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
             }}
             data-testid="spatial-canvas-viewport"
           >
-            {/* Dot grid background */}
-            <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ opacity: 0.4 }}>
-              <defs>
-                <pattern id="dot-grid" x={pan.x % (GRID_SIZE * zoom)} y={pan.y % (GRID_SIZE * zoom)} width={GRID_SIZE * zoom} height={GRID_SIZE * zoom} patternUnits="userSpaceOnUse">
-                  <circle cx={1} cy={1} r={0.8} fill="currentColor" className="text-border" />
-                </pattern>
-              </defs>
-              <rect width="100%" height="100%" fill="url(#dot-grid)" />
-            </svg>
+            {/* Dot grid background — toggleable. Default ON for admin/crew, OFF for client.
+                Visualizes the snap grid that PR #54's auto-grid uses. Charcoal dots at
+                low opacity work over the warm paper bg as well as image-heavy areas. */}
+            {showDotGrid && (
+              <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ opacity: 0.55, color: "#1f1d1a" }}>
+                <defs>
+                  <pattern id="dot-grid" x={pan.x % (GRID_SIZE * zoom)} y={pan.y % (GRID_SIZE * zoom)} width={GRID_SIZE * zoom} height={GRID_SIZE * zoom} patternUnits="userSpaceOnUse">
+                    <circle cx={1} cy={1} r={0.8} fill="currentColor" />
+                  </pattern>
+                </defs>
+                <rect width="100%" height="100%" fill="url(#dot-grid)" />
+              </svg>
+            )}
 
             {loading && (
               <div className="absolute inset-0 flex items-center justify-center z-50">
@@ -7205,6 +7396,65 @@ export default function SpatialCanvas({ projectId }: SpatialCanvasProps) {
         onAdd={createPaletteSwatches}
         presetImageUrl={palettePresetUrl}
       />
+
+      {/* Side drawers — Photos / Furniture / Materials. Mutually exclusive so opening
+          one closes the others. Width caps around 360px on iPad-and-up so the canvas
+          remains interactive on the left half of the screen. modal=false keeps the
+          backdrop off the canvas — pointer events on the canvas continue to work
+          while a drawer is open. */}
+      <Sheet open={openDrawer === "photos"} modal={false} onOpenChange={(open) => { if (!open) setOpenDrawer(null); }}>
+        <SheetContent
+          side="right"
+          className="w-[360px] sm:max-w-[360px] p-0 flex flex-col"
+          onInteractOutside={(e) => e.preventDefault()}
+          data-testid="sheet-drawer-photos"
+        >
+          <SheetHeader className="px-4 py-3 border-b border-border/60">
+            <SheetTitle className="font-sans text-base font-semibold flex items-center gap-2">
+              <ImageIcon className="h-4 w-4 text-muted-foreground" />
+              Photos
+            </SheetTitle>
+            <SheetDescription className="sr-only">Project photos. Tap or drag to add to the board.</SheetDescription>
+          </SheetHeader>
+          <PhotosDrawer projectId={projectId} onAddImageUrl={handleAddImageByUrl} />
+        </SheetContent>
+      </Sheet>
+
+      <Sheet open={openDrawer === "furniture"} modal={false} onOpenChange={(open) => { if (!open) setOpenDrawer(null); }}>
+        <SheetContent
+          side="right"
+          className="w-[420px] sm:max-w-[420px] p-0 flex flex-col"
+          onInteractOutside={(e) => e.preventDefault()}
+          data-testid="sheet-drawer-furniture"
+        >
+          <SheetHeader className="px-4 py-3 border-b border-border/60">
+            <SheetTitle className="font-sans text-base font-semibold flex items-center gap-2">
+              <Armchair className="h-4 w-4 text-muted-foreground" />
+              Furniture
+            </SheetTitle>
+            <SheetDescription className="sr-only">Furniture inventory for this project.</SheetDescription>
+          </SheetHeader>
+          <FurnitureDrawer projectId={projectId} />
+        </SheetContent>
+      </Sheet>
+
+      <Sheet open={openDrawer === "materials"} modal={false} onOpenChange={(open) => { if (!open) setOpenDrawer(null); }}>
+        <SheetContent
+          side="right"
+          className="w-[360px] sm:max-w-[360px] p-0 flex flex-col"
+          onInteractOutside={(e) => e.preventDefault()}
+          data-testid="sheet-drawer-materials"
+        >
+          <SheetHeader className="px-4 py-3 border-b border-border/60">
+            <SheetTitle className="font-sans text-base font-semibold flex items-center gap-2">
+              <Layers className="h-4 w-4 text-muted-foreground" />
+              Materials
+            </SheetTitle>
+            <SheetDescription className="sr-only">Items pulled from your Library boards. Tap or drag to add to the board.</SheetDescription>
+          </SheetHeader>
+          <MaterialsDrawer projectId={projectId} onAddImageUrl={handleAddImageByUrl} />
+        </SheetContent>
+      </Sheet>
 
       <Sheet open={!!linkDetailSheet} onOpenChange={(open) => { if (!open) setLinkDetailSheet(null); }}>
         <SheetContent className="sm:max-w-md" data-testid="sheet-link-detail">

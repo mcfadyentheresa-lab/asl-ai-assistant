@@ -14,7 +14,6 @@ import { useViewMode } from "@/hooks/use-view-mode";
 import { useProjectRealtime } from "@/hooks/use-project-realtime";
 import { Navbar } from "@/components/layout/Navbar";
 import SpatialCanvas from "@/components/SpatialCanvas";
-import { FurniturePlannerPanel } from "@/pages/TableRedesignPlanner";
 import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, Upload, Download, X, Paperclip, ZoomIn, Palette, Check, Archive, ArchiveRestore, PanelRightOpen, MoreVertical, Flag, BarChart3, ArrowUpRight, Building2, Sparkles, Armchair } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -112,12 +111,25 @@ function ProjectDetailsInner() {
     if (tab === "planning") return "board";
     if (tab === "calendar") return "calendar";
     if (tab === "checklist") return "checklist";
-    if (tab === "photos") return "photos";
+    // Photos and Furniture were removed as top-level tabs and live as drawers inside the board.
+    // Legacy ?tab=photos / ?tab=furniture deep links route to the board with the matching drawer.
+    if (tab === "photos" || tab === "furniture") return "board";
     if (tab === "documents") return "documents";
+    if (tab === "board") return "board";
     const cachedRole = localStorage.getItem("userRole");
     if (cachedRole === "admin" || cachedRole === "crew") return "checklist";
     return "overview";
   });
+  // Initial board drawer derived from ?drawer= or legacy ?tab=photos/furniture; null = no drawer open.
+  const initialBoardDrawer = (() => {
+    const params = new URLSearchParams(window.location.search);
+    const d = params.get("drawer");
+    if (d === "photos" || d === "furniture" || d === "materials") return d;
+    const t = params.get("tab");
+    if (t === "photos") return "photos";
+    if (t === "furniture") return "furniture";
+    return null;
+  })();
   const [_editingPhoneUserId, _setEditingPhoneUserId] = useState<string | null>(null);
   const [_phoneInput, _setPhoneInput] = useState("");
   const [editingUser, setEditingUser] = useState<any>(null);
@@ -180,14 +192,14 @@ function ProjectDetailsInner() {
     clientRequiresInvite?: boolean;
   };
 
+  // Photos and Furniture are no longer top-level tabs — they live as drawers inside the
+  // Planning Board (see SpatialCanvas drawers). Materials drawer also lives there.
   const tabConfig: TabConfig[] = [
     { id: "overview", label: "Overview", icon: Clock, roles: ["admin", "crew", "client"] },
     { id: "checklist", label: "Progress", icon: BarChart3, roles: ["admin", "crew", "client"] },
-    { id: "photos", label: "Photos", icon: ImageIcon, roles: ["admin", "crew", "client"] },
     { id: "docs", label: "Documents", icon: FileText, roles: ["admin", "client"] },
     { id: "chat", label: "Messages", icon: MessageSquare, roles: ["admin", "crew", "client"] },
     { id: "board", label: "Planning Board", icon: Palette, roles: ["admin", "crew", "client"], clientRequiresInvite: true },
-    { id: "furniture", label: "Furniture", icon: Armchair, roles: ["admin"] },
   ];
 
   const canViewTab = (tab: TabConfig) => {
@@ -503,13 +515,31 @@ function ProjectDetailsInner() {
       ) : (
         <div className="w-full border-b border-border/60 bg-background/90 backdrop-blur-sm" data-testid="project-thin-header">
           <div className="container px-5 md:px-8 h-10 flex items-center gap-3">
-            <Link href="/" className="inline-flex items-center text-[11px] text-muted-foreground transition-colors hover:text-foreground shrink-0" onClick={() => window.sessionStorage.setItem("aster-spruce:last-planning-board", String(projectId))} data-testid="link-back-thin">
-              <ArrowLeft className="mr-1 h-3.5 w-3.5" /> Dashboard
-            </Link>
-            <span className="text-border/80">·</span>
-            <h1 className="font-serif text-sm font-semibold text-foreground leading-none truncate" data-testid="text-project-title-thin">
-              {project.name}
-            </h1>
+            {safeActiveTab === "board" ? (
+              // On the Planning Board, the breadcrumb chip goes back to project Overview
+              // (rather than all the way out to the dashboard) — the tab bar is hidden so
+              // this is the user's only way back into the project shell.
+              <button
+                type="button"
+                onClick={() => setActiveTab("overview")}
+                className="inline-flex items-center h-11 -my-1 px-2 -ml-2 text-[11px] text-muted-foreground transition-colors hover:text-foreground shrink-0 rounded-md hover:bg-foreground/[0.04]"
+                data-testid="link-back-thin"
+              >
+                <ArrowLeft className="mr-1 h-3.5 w-3.5" /> {project.name}
+              </button>
+            ) : (
+              <Link href="/" className="inline-flex items-center text-[11px] text-muted-foreground transition-colors hover:text-foreground shrink-0" onClick={() => window.sessionStorage.setItem("aster-spruce:last-planning-board", String(projectId))} data-testid="link-back-thin">
+                <ArrowLeft className="mr-1 h-3.5 w-3.5" /> Dashboard
+              </Link>
+            )}
+            {safeActiveTab !== "board" && (
+              <>
+                <span className="text-border/80">·</span>
+                <h1 className="font-serif text-sm font-semibold text-foreground leading-none truncate" data-testid="text-project-title-thin">
+                  {project.name}
+                </h1>
+              </>
+            )}
             <span className="text-[10px] font-mono uppercase tracking-[0.12em] text-muted-foreground shrink-0" data-testid="badge-project-status-thin">
               {statusLabel[project.status] || project.status}
             </span>
@@ -534,16 +564,21 @@ function ProjectDetailsInner() {
 
       <main className={`container px-5 md:px-8 ${safeActiveTab === "board" ? "mt-0 flex flex-col flex-1 min-h-0" : "mt-4"}`} id="project-main">
         <Tabs value={safeActiveTab} onValueChange={setActiveTab} className={safeActiveTab === "board" ? "space-y-1 flex flex-col flex-1 min-h-0" : "space-y-4"}>
-          <div className={`overflow-x-auto -mx-6 px-6 md:mx-0 md:px-0 ${safeActiveTab === "board" ? "mobile-landscape:hidden" : ""}`}>
-            <TabsList className="w-max md:w-auto h-8 p-0.5 gap-0.5" data-testid="tabs-list">
-              {visibleTabs.map((tab) => (
-                <TabsTrigger key={tab.id} value={tab.id} className="h-7 px-2.5 text-[11px] md:text-xs gap-1.5" data-testid={`tab-${tab.id}`}>
-                  <tab.icon className="h-3 w-3" />
-                  <span className="hidden md:inline font-medium">{tab.label}</span>
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </div>
+          {/* Hide the tab strip entirely on the Planning Board — the board owns the
+              full vertical space. SpatialCanvas renders its own thin breadcrumb chip
+              at the top to navigate back to Overview. */}
+          {safeActiveTab !== "board" && (
+            <div className="overflow-x-auto -mx-6 px-6 md:mx-0 md:px-0">
+              <TabsList className="w-max md:w-auto h-8 p-0.5 gap-0.5" data-testid="tabs-list">
+                {visibleTabs.map((tab) => (
+                  <TabsTrigger key={tab.id} value={tab.id} className="h-7 px-2.5 text-[11px] md:text-xs gap-1.5" data-testid={`tab-${tab.id}`}>
+                    <tab.icon className="h-3 w-3" />
+                    <span className="hidden md:inline font-medium">{tab.label}</span>
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </div>
+          )}
 
           <TabsContent value="overview" className="space-y-8">
             {userRole === "client" ? (
@@ -709,21 +744,16 @@ function ProjectDetailsInner() {
           </TabsContent>
 
           <TabsContent value="board" className="flex-1 min-h-0">
-            <SpatialCanvas projectId={projectId} />
-          </TabsContent>
-
-          <TabsContent value="furniture">
-            <div className="p-4">
-              <FurniturePlannerPanel projectId={projectId} />
-            </div>
+            <SpatialCanvas
+              projectId={projectId}
+              projectName={project.name}
+              initialDrawer={initialBoardDrawer}
+              onBackToProject={() => setActiveTab("overview")}
+            />
           </TabsContent>
 
           <TabsContent value="chat">
             <ChatTab projectId={projectId} />
-          </TabsContent>
-
-          <TabsContent value="photos">
-            <PhotosTab projectId={projectId} />
           </TabsContent>
 
           <TabsContent value="docs">
