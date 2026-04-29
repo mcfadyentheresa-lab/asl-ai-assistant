@@ -6989,103 +6989,153 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
 
       {/* Dialogs */}
       <Dialog open={showNewBoardDialog} onOpenChange={(open) => { if (!open) { closeNewBoardDialog(); } }}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Create New Board</DialogTitle>
-            <DialogDescription>Create a new board or start from a template.</DialogDescription>
-          </DialogHeader>
-          <Input placeholder="Board name" value={newBoardName} onChange={(e) => setNewBoardName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") handleCreateBoard(); }} data-testid="input-new-board-name" autoFocus />
-          {/* Mode picker — sets the primary axis for the tab strip. Switching
-              later doesn't lose data, just reorganizes the tabs. */}
-          <div className="space-y-2" data-testid="new-board-mode-picker">
-            <Label className="text-xs uppercase tracking-wider text-muted-foreground">Board type</Label>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setNewBoardMode("project")}
-                className={`text-left rounded-lg border p-3 transition-colors ${newBoardMode === "project" ? "border-primary ring-1 ring-primary bg-primary/5" : "border-border/70 hover:border-primary/40"}`}
-                data-testid="new-board-mode-project"
-              >
-                <div className="text-sm font-semibold">Project board</div>
-                <div className="text-[11px] text-muted-foreground mt-0.5">Tabs are rooms — Kitchen, Powder…</div>
-              </button>
-              <button
-                type="button"
-                onClick={() => setNewBoardMode("library")}
-                className={`text-left rounded-lg border p-3 transition-colors ${newBoardMode === "library" ? "border-primary ring-1 ring-primary bg-primary/5" : "border-border/70 hover:border-primary/40"}`}
-                data-testid="new-board-mode-library"
-              >
-                <div className="text-sm font-semibold">Library board</div>
-                <div className="text-[11px] text-muted-foreground mt-0.5">Tabs are categories — Fabric, Stone…</div>
-              </button>
-            </div>
-          </div>
-          {isAdmin && templateCatalogue.length > 0 && (
-            <div className="space-y-2">
-              <Label className="text-xs uppercase tracking-wider text-muted-foreground">Start from Template</Label>
-              <div className="grid grid-cols-2 gap-3" data-testid="template-picker-grid">
-                <button
-                  type="button"
-                  onClick={() => setSelectedTemplateId(null)}
-                  className={`group overflow-hidden rounded-xl border bg-card text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${selectedTemplateId === null ? "border-primary ring-1 ring-primary" : "border-border/70"}`}
-                  data-testid="template-blank"
-                >
-                  <div className="flex h-20 items-center justify-center bg-gradient-to-br from-muted/80 to-muted/40">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-full border border-border/60 bg-background/90 shadow-sm">
-                      <FileText className="h-5 w-5 text-muted-foreground" />
-                    </div>
-                  </div>
-                  <div className="space-y-1.5 p-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs font-semibold uppercase tracking-wide">Blank Board</span>
-                      {selectedTemplateId === null && <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">Selected</Badge>}
-                    </div>
-                    <span className="block text-[11px] leading-snug text-muted-foreground">Start with an empty canvas</span>
-                  </div>
-                </button>
-                {templateCatalogue.map((tmpl) => {
-                  const IconComp = tmpl.icon === "ChefHat" ? ChefHat : tmpl.icon === "Bath" ? Bath : tmpl.icon === "Home" ? Home : tmpl.icon === "Palette" ? Palette : LayoutPanelLeft;
-                  return (
-                    <button
-                      key={tmpl.id}
-                      type="button"
-                      onClick={() => setSelectedTemplateId(tmpl.id)}
-                      onDoubleClick={() => {
-                        setSelectedTemplateId(tmpl.id);
-                        void handleCreateBoard();
-                      }}
-                      className={`group overflow-hidden rounded-xl border bg-card text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${selectedTemplateId === tmpl.id ? "border-primary ring-1 ring-primary" : "border-border/70"}`}
-                      data-testid={`template-${tmpl.id}`}
-                    >
-                      <div className="relative h-20 overflow-hidden">
-                        <img
-                          src={templatePreviewById[tmpl.id] ?? ""}
-                          alt={tmpl.name}
-                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                          data-testid={`img-template-${tmpl.id}`}
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-background/85 via-background/20 to-transparent" />
-                        <div className="absolute left-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-background/85 shadow-sm">
-                          <IconComp className="h-4 w-4 text-foreground/70" />
-                        </div>
-                        {selectedTemplateId === tmpl.id && (
-                          <Badge className="absolute right-2 top-2 h-5 px-1.5 text-[10px]">Selected</Badge>
-                        )}
+        <DialogContent className="sm:max-w-4xl p-0 gap-0 overflow-hidden">
+          {(() => {
+            const selectedTmpl = isAdmin && selectedTemplateId
+              ? templateCatalogue.find((t) => t.id === selectedTemplateId)
+              : null;
+            const showGallery = isAdmin && templateCatalogue.length > 0;
+            const effectiveName = newBoardName.trim() || selectedTmpl?.name || "";
+            const canCreate = effectiveName.length > 0;
+            return (
+              <>
+                <DialogHeader className="px-6 pt-5 pb-4 border-b border-border/60">
+                  <DialogTitle className="text-lg">Create a new board</DialogTitle>
+                  <DialogDescription className="text-xs">
+                    {showGallery
+                      ? "Pick a starting point. You'll name the board after."
+                      : "Give your board a name to get started."}
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="flex flex-col md:flex-row max-h-[70vh]">
+                  {showGallery && (
+                    <div className="flex-1 min-w-0 overflow-y-auto px-6 py-5" data-testid="template-picker-grid">
+                      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+                        {/* Blank tile */}
+                        <button
+                          type="button"
+                          onClick={() => setSelectedTemplateId(null)}
+                          onDoubleClick={() => { setSelectedTemplateId(null); void handleCreateBoard(); }}
+                          className={`group overflow-hidden rounded-xl border bg-card text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${selectedTemplateId === null ? "border-primary ring-2 ring-primary" : "border-border/70"}`}
+                          data-testid="template-blank"
+                        >
+                          <div className="flex h-28 items-center justify-center bg-gradient-to-br from-muted/80 to-muted/40">
+                            <div className="flex h-12 w-12 items-center justify-center rounded-full border border-border/60 bg-background/90 shadow-sm">
+                              <FileText className="h-5 w-5 text-muted-foreground" />
+                            </div>
+                          </div>
+                          <div className="p-3">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-xs font-semibold uppercase tracking-wide">Blank board</span>
+                              {selectedTemplateId === null && <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">Selected</Badge>}
+                            </div>
+                            <span className="mt-1 block text-[11px] leading-snug text-muted-foreground">Start with an empty canvas.</span>
+                          </div>
+                        </button>
+                        {templateCatalogue.map((tmpl) => {
+                          const IconComp = tmpl.icon === "ChefHat" ? ChefHat : tmpl.icon === "Bath" ? Bath : tmpl.icon === "Home" ? Home : tmpl.icon === "Palette" ? Palette : LayoutPanelLeft;
+                          const isSel = selectedTemplateId === tmpl.id;
+                          return (
+                            <button
+                              key={tmpl.id}
+                              type="button"
+                              onClick={() => setSelectedTemplateId(tmpl.id)}
+                              onDoubleClick={() => { setSelectedTemplateId(tmpl.id); void handleCreateBoard(); }}
+                              className={`group overflow-hidden rounded-xl border bg-card text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${isSel ? "border-primary ring-2 ring-primary" : "border-border/70"}`}
+                              data-testid={`template-${tmpl.id}`}
+                            >
+                              <div className="relative h-28 overflow-hidden">
+                                <img
+                                  src={templatePreviewById[tmpl.id] ?? ""}
+                                  alt={tmpl.name}
+                                  className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                  data-testid={`img-template-${tmpl.id}`}
+                                />
+                                <div className="absolute inset-0 bg-gradient-to-t from-background/85 via-background/20 to-transparent" />
+                                <div className="absolute left-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-background/85 shadow-sm">
+                                  <IconComp className="h-4 w-4 text-foreground/70" />
+                                </div>
+                                {isSel && <Badge className="absolute right-2 top-2 h-5 px-1.5 text-[10px]">Selected</Badge>}
+                              </div>
+                              <div className="p-3">
+                                <span className="block text-xs font-semibold uppercase tracking-wide">{tmpl.name}</span>
+                                <span className="mt-1 block text-[11px] leading-snug text-muted-foreground line-clamp-2">{tmpl.description}</span>
+                              </div>
+                            </button>
+                          );
+                        })}
                       </div>
-                      <div className="space-y-1.5 p-3">
-                        <span className="block text-xs font-semibold uppercase tracking-wide">{tmpl.name}</span>
-                        <span className="block text-[11px] leading-snug text-muted-foreground">{tmpl.description}</span>
+                    </div>
+                  )}
+
+                  {/* Right side panel — board details */}
+                  <div className={`${showGallery ? "md:w-[300px] md:border-l border-t md:border-t-0 border-border/60" : ""} flex flex-col bg-muted/20 px-6 py-5 gap-4`}>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="new-board-name" className="text-[10px] font-mono uppercase tracking-[0.14em] text-muted-foreground">Board name</Label>
+                      <Input
+                        id="new-board-name"
+                        placeholder={selectedTmpl?.name || "e.g. Master Bath Reno"}
+                        value={newBoardName}
+                        onChange={(e) => setNewBoardName(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter" && canCreate) handleCreateBoard(); }}
+                        data-testid="input-new-board-name"
+                        autoFocus
+                      />
+                      {selectedTmpl && !newBoardName.trim() && (
+                        <p className="text-[10px] text-muted-foreground">Defaults to “{selectedTmpl.name}” if left blank.</p>
+                      )}
+                    </div>
+
+                    <div className="space-y-1.5" data-testid="new-board-mode-picker">
+                      <Label className="text-[10px] font-mono uppercase tracking-[0.14em] text-muted-foreground">Board type</Label>
+                      <div className="grid grid-cols-1 gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setNewBoardMode("project")}
+                          className={`text-left rounded-md border p-2.5 transition-colors ${newBoardMode === "project" ? "border-primary ring-1 ring-primary bg-primary/5" : "border-border/70 hover:border-primary/40 bg-background"}`}
+                          data-testid="new-board-mode-project"
+                        >
+                          <div className="text-xs font-semibold">Project board</div>
+                          <div className="text-[10px] text-muted-foreground mt-0.5">Tabs are rooms — Kitchen, Powder…</div>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setNewBoardMode("library")}
+                          className={`text-left rounded-md border p-2.5 transition-colors ${newBoardMode === "library" ? "border-primary ring-1 ring-primary bg-primary/5" : "border-border/70 hover:border-primary/40 bg-background"}`}
+                          data-testid="new-board-mode-library"
+                        >
+                          <div className="text-xs font-semibold">Library board</div>
+                          <div className="text-[10px] text-muted-foreground mt-0.5">Tabs are categories — Fabric, Stone…</div>
+                        </button>
                       </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={closeNewBoardDialog}>Cancel</Button>
-            <Button onClick={handleCreateBoard} data-testid="button-confirm-new-board">Create</Button>
-          </DialogFooter>
+                    </div>
+
+                    {selectedTmpl && (
+                      <div className="rounded-md bg-background border border-border/60 p-3 space-y-1" data-testid="template-summary">
+                        <div className="text-[10px] font-mono uppercase tracking-[0.14em] text-muted-foreground">Template</div>
+                        <div className="text-xs font-semibold">{selectedTmpl.name}</div>
+                        <div className="text-[11px] text-muted-foreground leading-snug">{selectedTmpl.description}</div>
+                      </div>
+                    )}
+
+                    <div className="flex-1" />
+                  </div>
+                </div>
+
+                <DialogFooter className="px-6 py-4 border-t border-border/60 bg-background">
+                  <Button variant="outline" onClick={closeNewBoardDialog} data-testid="button-cancel-new-board">Cancel</Button>
+                  <Button
+                    onClick={handleCreateBoard}
+                    disabled={!canCreate}
+                    data-testid="button-confirm-new-board"
+                  >
+                    {selectedTmpl ? `Create from ${selectedTmpl.name}` : "Create board"}
+                  </Button>
+                </DialogFooter>
+              </>
+            );
+          })()}
         </DialogContent>
       </Dialog>
 
