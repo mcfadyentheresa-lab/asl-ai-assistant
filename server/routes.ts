@@ -1519,6 +1519,66 @@ Respond with valid JSON only:
     broadcastProjectChange(updated.projectId, ["decisions"], "updated", updated.id, userId);
   }));
 
+  // Selections ledger
+  // Read: any authenticated user with access to the project (clients see only their projects)
+  // Write/update: crew or admin only
+  app.get(api.selections.list.path, isAuthenticated, asyncHandler(async (req: any, res) => {
+    const projectId = Number(req.params.projectId);
+    const userId = req.user.claims.sub;
+    const project = await storage.getProject(projectId);
+    if (!project) return res.status(404).json({ message: "Project not found" });
+    const dbUser = await authStorage.getUser(userId);
+    if (dbUser?.role === "client" && project.clientId !== userId) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    // Clients never see archived selections; crew/admin see them via ?includeArchived=1
+    const includeArchived =
+      dbUser?.role !== "client" && req.query.includeArchived === "1";
+    const list = await storage.getSelections(projectId, includeArchived);
+    res.json(list);
+  }));
+
+  app.post(api.selections.create.path, isAuthenticated, asyncHandler(async (req: any, res) => {
+    const projectId = Number(req.params.projectId);
+    const userId = req.user.claims.sub;
+    const dbUser = await authStorage.getUser(userId);
+    if (dbUser?.role !== "admin" && dbUser?.role !== "crew") {
+      return res.status(403).json({ message: "Only crew or admin can record selections" });
+    }
+    const project = await storage.getProject(projectId);
+    if (!project) return res.status(404).json({ message: "Project not found" });
+    const input = api.selections.create.input.parse(req.body);
+    const selection = await storage.createSelection({
+      ...input,
+      projectId,
+      createdBy: userId,
+    });
+    res.status(201).json(selection);
+    broadcastProjectChange(projectId, ["selections"], "created", selection.id, userId);
+    storage.createActivityLog({
+      projectId,
+      userId,
+      type: "selection_added",
+      title: `Selection: ${selection.item}`,
+      description: [selection.product, selection.vendor].filter(Boolean).join(" · ").slice(0, 140),
+    }).catch(() => {});
+  }));
+
+  app.patch(api.selections.update.path, isAuthenticated, asyncHandler(async (req: any, res) => {
+    const id = Number(req.params.id);
+    const userId = req.user.claims.sub;
+    const dbUser = await authStorage.getUser(userId);
+    if (dbUser?.role !== "admin" && dbUser?.role !== "crew") {
+      return res.status(403).json({ message: "Only crew or admin can update selections" });
+    }
+    const existing = await storage.getSelection(id);
+    if (!existing) return res.status(404).json({ message: "Selection not found" });
+    const input = api.selections.update.input.parse(req.body);
+    const updated = await storage.updateSelection(id, input);
+    res.json(updated);
+    broadcastProjectChange(updated.projectId, ["selections"], "updated", updated.id, userId);
+  }));
+
   // Time Entries
   app.get(api.timeEntries.list.path, isAuthenticated, asyncHandler(async (req, res) => {
     const entries = await storage.getTimeEntries(Number(req.params.projectId));
