@@ -63,7 +63,7 @@ export function PhotosDrawer({ projectId, onAddImageUrl }: PhotosDrawerProps) {
           data-testid="button-upload-photo"
         >
           {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-          Upload photo
+          Upload asset
         </Button>
         <input
           ref={fileInputRef}
@@ -83,9 +83,9 @@ export function PhotosDrawer({ projectId, onAddImageUrl }: PhotosDrawerProps) {
         ) : visible.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 gap-2 text-center">
             <ImageIcon className="h-8 w-8 text-muted-foreground/40" />
-            <p className="text-sm text-muted-foreground">No photos yet</p>
+            <p className="text-sm text-muted-foreground">No assets yet</p>
             <p className="text-[11px] text-muted-foreground/70 max-w-[220px]">
-              Upload progress photos and add them to the board.
+              Upload images and add them to the board.
             </p>
           </div>
         ) : (

@@ -5836,7 +5836,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                 <ImageIcon className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="bottom" className="text-xs">Photos</TooltipContent>
+            <TooltipContent side="bottom" className="text-xs">Assets</TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -7836,9 +7836,9 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
           <SheetHeader className="px-4 py-3 border-b border-border/60">
             <SheetTitle className="font-sans text-base font-semibold flex items-center gap-2">
               <ImageIcon className="h-4 w-4 text-muted-foreground" />
-              Photos
+              Assets
             </SheetTitle>
-            <SheetDescription className="sr-only">Project photos. Tap or drag to add to the board.</SheetDescription>
+            <SheetDescription className="sr-only">Project assets. Tap or drag to add to the board.</SheetDescription>
           </SheetHeader>
           <PhotosDrawer projectId={projectId} onAddImageUrl={handleAddImageByUrl} />
         </SheetContent>
