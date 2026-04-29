@@ -221,6 +221,24 @@ export const planningBoards = pgTable("planning_boards", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Decisions log
+// A permanent record of choices made on a project. Visible to client; recorded by crew/admin.
+export const decisions = pgTable("decisions", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => projects.id),
+  title: text("title").notNull(), // e.g. "Cabinet hardware"
+  decision: text("decision").notNull(), // e.g. "Emtek Stock pulls in matte black"
+  context: text("context"), // optional why/where it came up
+  decidedOn: date("decided_on").notNull(), // the date the decision was made (not entered)
+  decidedBy: text("decided_by").references(() => users.id), // who recorded it
+  category: text("category"), // optional grouping: finishes, schedule, scope, budget, materials
+  relatedMilestoneId: integer("related_milestone_id").references(() => milestones.id),
+  attachmentPhotoId: integer("attachment_photo_id"), // optional photo (FK to photos.id, no .references to avoid circular dep)
+  archived: boolean("archived").default(false), // soft-hide without deleting
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Messages (Chat)
 export const messages = pgTable("messages", {
   id: serial("id").primaryKey(),
@@ -246,6 +264,22 @@ export const projectsRelations = relations(projects, ({ one, many }) => ({
   boardItems: many(boardItems),
   calendarEvents: many(calendarEvents),
   planningBoards: many(planningBoards),
+  decisions: many(decisions),
+}));
+
+export const decisionsRelations = relations(decisions, ({ one }) => ({
+  project: one(projects, {
+    fields: [decisions.projectId],
+    references: [projects.id],
+  }),
+  decidedByUser: one(users, {
+    fields: [decisions.decidedBy],
+    references: [users.id],
+  }),
+  relatedMilestone: one(milestones, {
+    fields: [decisions.relatedMilestoneId],
+    references: [milestones.id],
+  }),
 }));
 
 export const calendarEventsRelations = relations(calendarEvents, ({ one }) => ({
@@ -664,6 +698,7 @@ export const insertPhotoSchema = createInsertSchema(photos).omit({ id: true, cre
 export const insertDocumentSchema = createInsertSchema(documents).omit({ id: true, createdAt: true });
 export const insertTimeEntrySchema = createInsertSchema(timeEntries).omit({ id: true, createdAt: true });
 export const insertMessageSchema = createInsertSchema(messages).omit({ id: true, createdAt: true });
+export const insertDecisionSchema = createInsertSchema(decisions).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertChecklistItemSchema = createInsertSchema(checklistItems).omit({ id: true, createdAt: true });
 export const insertBoardItemSchema = createInsertSchema(boardItems).omit({ id: true, createdAt: true });
 export const insertCanvasElementSchema = createInsertSchema(canvasElements).omit({ id: true, createdAt: true, updatedAt: true });
@@ -703,6 +738,8 @@ export type InsertPhoto = z.infer<typeof insertPhotoSchema>;
 export type InsertDocument = z.infer<typeof insertDocumentSchema>;
 export type InsertTimeEntry = z.infer<typeof insertTimeEntrySchema>;
 export type InsertMessage = z.infer<typeof insertMessageSchema>;
+export type Decision = typeof decisions.$inferSelect;
+export type InsertDecision = z.infer<typeof insertDecisionSchema>;
 export type ChecklistItem = typeof checklistItems.$inferSelect;
 export type BoardItem = typeof boardItems.$inferSelect;
 export type CalendarEvent = typeof calendarEvents.$inferSelect;
