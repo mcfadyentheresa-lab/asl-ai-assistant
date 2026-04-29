@@ -12,6 +12,7 @@ import { ChangeOrdersInboxCard } from "@/components/client/ChangeOrdersInboxCard
 import { RecentSiteVisitsCard } from "@/components/client/RecentSiteVisitsCard";
 import { YourActionItemsCard } from "@/components/client/YourActionItemsCard";
 import { BudgetPulseCard } from "@/components/client/BudgetPulseCard";
+import { DocumentsShelfCard } from "@/components/client/DocumentsShelfCard";
 
 interface Project {
   id: number;
@@ -270,6 +271,8 @@ export function ClientDashboardView({ project, isAdminPreview = false }: ClientD
       <RecentSiteVisitsCard projectId={project.id} />
 
       <BudgetPulseCard projectId={project.id} />
+
+      <DocumentsShelfCard projectId={project.id} />
 
       <ReferenceCardGrid cards={referenceCards} />
 
