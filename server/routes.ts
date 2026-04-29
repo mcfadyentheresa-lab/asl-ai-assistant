@@ -870,10 +870,22 @@ export async function registerRoutes(
       const projectReceipts = await storage.getReceipts(projectId);
       const totalSpent = projectReceipts.reduce((sum, r) => sum + (parseFloat(r.amount) || 0), 0);
 
+      // Approved change orders adjust the contract. Sum positive (additions)
+      // and negative (credits) approved COs, ignore drafts/sent/declined.
+      const cos = await storage.getChangeOrders(projectId, false, true);
+      const approvedChangeOrders = cos
+        .filter((c) => c.status === "approved")
+        .reduce((sum, c) => sum + (parseFloat(c.amount) || 0), 0);
+
+      // Adjusted contract = base budget + approved CO total. Status is
+      // computed against the adjusted total so going over only flags when
+      // spending exceeds the *current* contract, not the original.
+      const adjustedBudget = budget + approvedChangeOrders;
+
       let status: "no_budget" | "on_track" | "under_budget" | "over_budget" = "no_budget";
       let variancePercent = 0;
-      if (budget > 0) {
-        variancePercent = ((totalSpent - budget) / budget) * 100;
+      if (adjustedBudget > 0) {
+        variancePercent = ((totalSpent - adjustedBudget) / adjustedBudget) * 100;
         if (Math.abs(variancePercent) <= 5) status = "on_track";
         else if (variancePercent < -5) status = "under_budget";
         else status = "over_budget";
@@ -882,6 +894,8 @@ export async function registerRoutes(
       res.json({
         hidden: false,
         budget,
+        approvedChangeOrders,
+        adjustedBudget,
         totalSpent,
         status,
         variancePercent,
@@ -1577,6 +1591,105 @@ Respond with valid JSON only:
     const updated = await storage.updateSelection(id, input);
     res.json(updated);
     broadcastProjectChange(updated.projectId, ["selections"], "updated", updated.id, userId);
+  }));
+
+  // Change orders inbox
+  // Read: any authenticated user with project access. Clients see only
+  //   non-draft, non-archived rows.
+  // Create: crew/admin only. Server auto-assigns the per-project number.
+  // Update: crew/admin can change any field. Clients can only flip status
+  //   from 'sent' to 'approved' or 'declined' on their own project.
+  app.get(api.changeOrders.list.path, isAuthenticated, asyncHandler(async (req: any, res) => {
+    const projectId = Number(req.params.projectId);
+    const userId = req.user.claims.sub;
+    const project = await storage.getProject(projectId);
+    if (!project) return res.status(404).json({ message: "Project not found" });
+    const dbUser = await authStorage.getUser(userId);
+    const isClient = dbUser?.role === "client";
+    if (isClient && project.clientId !== userId) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    // Clients never see drafts or archived rows.
+    // Crew/admin opt in via ?includeArchived=1 and ?includeDrafts=1.
+    const includeArchived = !isClient && req.query.includeArchived === "1";
+    const includeDrafts = !isClient && req.query.includeDrafts === "1";
+    const list = await storage.getChangeOrders(projectId, includeArchived, includeDrafts);
+    res.json(list);
+  }));
+
+  app.post(api.changeOrders.create.path, isAuthenticated, asyncHandler(async (req: any, res) => {
+    const projectId = Number(req.params.projectId);
+    const userId = req.user.claims.sub;
+    const dbUser = await authStorage.getUser(userId);
+    if (dbUser?.role !== "admin" && dbUser?.role !== "crew") {
+      return res.status(403).json({ message: "Only crew or admin can create change orders" });
+    }
+    const project = await storage.getProject(projectId);
+    if (!project) return res.status(404).json({ message: "Project not found" });
+    const input = api.changeOrders.create.input.parse(req.body);
+    const number = await storage.getNextChangeOrderNumber(projectId);
+    const co = await storage.createChangeOrder({
+      ...input,
+      projectId,
+      createdBy: userId,
+      number,
+    });
+    res.status(201).json(co);
+    broadcastProjectChange(projectId, ["changeOrders", "budget"], "created", co.id, userId);
+    storage.createActivityLog({
+      projectId,
+      userId,
+      type: "change_order_created",
+      title: `Change order CO-${co.number}: ${co.title}`,
+      description: (co.description || "").slice(0, 140),
+    }).catch(() => {});
+  }));
+
+  app.patch(api.changeOrders.update.path, isAuthenticated, asyncHandler(async (req: any, res) => {
+    const id = Number(req.params.id);
+    const userId = req.user.claims.sub;
+    const dbUser = await authStorage.getUser(userId);
+    const existing = await storage.getChangeOrder(id);
+    if (!existing) return res.status(404).json({ message: "Change order not found" });
+    const input = api.changeOrders.update.input.parse(req.body);
+
+    if (dbUser?.role === "client") {
+      // Clients can only respond to a change order that's been sent to them.
+      // They can transition status from 'sent' to 'approved' or 'declined' — nothing else.
+      const project = await storage.getProject(existing.projectId);
+      if (!project || project.clientId !== userId) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      const allowedKeys = new Set(["status"]);
+      const keys = Object.keys(input);
+      const onlyAllowed = keys.length > 0 && keys.every((k) => allowedKeys.has(k));
+      const allowedNext = input.status === "approved" || input.status === "declined";
+      if (!onlyAllowed || !allowedNext || existing.status !== "sent") {
+        return res.status(403).json({ message: "Clients can only approve or decline a sent change order" });
+      }
+      const updated = await storage.updateChangeOrder(id, {
+        status: input.status,
+        decidedBy: userId,
+        decidedOn: new Date().toISOString().slice(0, 10),
+      });
+      res.json(updated);
+      broadcastProjectChange(updated.projectId, ["changeOrders", "budget"], "updated", updated.id, userId);
+      storage.createActivityLog({
+        projectId: updated.projectId,
+        userId,
+        type: input.status === "approved" ? "change_order_approved" : "change_order_declined",
+        title: `Change order CO-${updated.number} ${input.status}`,
+        description: updated.title,
+      }).catch(() => {});
+      return;
+    }
+
+    if (dbUser?.role !== "admin" && dbUser?.role !== "crew") {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    const updated = await storage.updateChangeOrder(id, input);
+    res.json(updated);
+    broadcastProjectChange(updated.projectId, ["changeOrders", "budget"], "updated", updated.id, userId);
   }));
 
   // Time Entries

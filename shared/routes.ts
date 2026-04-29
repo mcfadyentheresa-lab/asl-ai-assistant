@@ -1,9 +1,9 @@
 import { z } from 'zod';
 import { 
   insertProjectSchema, insertMilestoneSchema, insertTaskSchema, 
-  insertPhotoSchema, insertDocumentSchema, insertTimeEntrySchema, insertMessageSchema, insertDecisionSchema, insertSelectionSchema,
+  insertPhotoSchema, insertDocumentSchema, insertTimeEntrySchema, insertMessageSchema, insertDecisionSchema, insertSelectionSchema, insertChangeOrderSchema,
   insertChecklistItemSchema, insertBoardItemSchema, insertCalendarEventSchema, insertPlanningBoardSchema, insertCanvasElementSchema,
-  projects, milestones, tasks, photos, documents, timeEntries, messages, decisions, selections, users, checklistItems, boardItems, calendarEvents, planningBoards, canvasElements, boardSnapshots
+  projects, milestones, tasks, photos, documents, timeEntries, messages, decisions, selections, changeOrders, users, checklistItems, boardItems, calendarEvents, planningBoards, canvasElements, boardSnapshots
 } from './schema';
 
 export const errorSchemas = {
@@ -223,6 +223,34 @@ export const api = {
       input: insertSelectionSchema.omit({ projectId: true, createdBy: true }).partial(),
       responses: {
         200: z.custom<typeof selections.$inferSelect>(),
+      },
+    },
+  },
+
+  // Change orders inbox
+  changeOrders: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/projects/:projectId/change-orders' as const,
+      responses: {
+        200: z.array(z.custom<typeof changeOrders.$inferSelect & { creator?: typeof users.$inferSelect; decider?: typeof users.$inferSelect }>()),
+      },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/projects/:projectId/change-orders' as const,
+      // server fills projectId from URL, createdBy from session, and number sequentially
+      input: insertChangeOrderSchema.omit({ projectId: true, createdBy: true, number: true }),
+      responses: {
+        201: z.custom<typeof changeOrders.$inferSelect>(),
+      },
+    },
+    update: {
+      method: 'PATCH' as const,
+      path: '/api/change-orders/:id' as const,
+      input: insertChangeOrderSchema.omit({ projectId: true, createdBy: true, number: true }).partial(),
+      responses: {
+        200: z.custom<typeof changeOrders.$inferSelect>(),
       },
     },
   },
