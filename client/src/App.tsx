@@ -22,6 +22,16 @@ function RoleGuard({ component: Component, allowedRoles }: { component: React.Co
   return <Component />;
 }
 
+// Legacy /project/:id/photos and /project/:id/furniture deep links predate the drawer
+// rework — both now route to the Planning Board with the matching drawer auto-opened.
+function BoardDrawerRedirect({ drawer, params }: { drawer: "photos" | "furniture"; params: { id: string } }) {
+  const [, navigate] = useLocation();
+  useEffect(() => {
+    navigate(`/project/${params.id}?tab=board&drawer=${drawer}`, { replace: true });
+  }, [params.id, drawer]);
+  return null;
+}
+
 import Dashboard from "@/pages/Dashboard";
 import ProjectDetails from "@/pages/ProjectDetails";
 import Profile from "@/pages/Profile";
@@ -125,6 +135,12 @@ function Router() {
                 <Route path="/project/:id" component={ProjectDetails} />
                 <Route path="/project/:id/estimate" component={CostEstimator} />
                 <Route path="/project/:id/settings" component={ProjectSettings} />
+                <Route path="/project/:id/photos">
+                  {(params) => <BoardDrawerRedirect drawer="photos" params={params} />}
+                </Route>
+                <Route path="/project/:id/furniture">
+                  {(params) => <BoardDrawerRedirect drawer="furniture" params={params} />}
+                </Route>
                 <Route path="/colors">
                   {() => <RoleGuard component={ColorPortfolio} allowedRoles={["admin", "crew"]} />}
                 </Route>
