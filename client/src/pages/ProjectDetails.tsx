@@ -7,10 +7,9 @@ import {
   useCalendarEvents, useCreateCalendarEvent,
   useDocuments, useUploadDocument, useDeleteDocument,
   usePhotos, useCreatePhoto, useDeletePhoto, useUploadImage,
-  useUsers, useUpdateProject, usePlanningBoards, useUpdateUserPhone, useNotifyTeam,
+  useUsers, useUpdateProject, usePlanningBoards, useUpdateUserPhone,
   useActivityLog, useUpdateMilestone, useSections, useCreateMilestone, useCreateTask,
 } from "@/hooks/use-projects";
-import { useOnlineUsers } from "@/hooks/use-presence";
 import { useViewMode } from "@/hooks/use-view-mode";
 import { useProjectRealtime } from "@/hooks/use-project-realtime";
 import { Navbar } from "@/components/layout/Navbar";
@@ -65,12 +64,13 @@ import { useRecentProjects } from "@/hooks/use-recent-projects";
 import { format } from "date-fns";
 import { ProjectProgressSummary } from "@/components/project/ProjectProgressSummary";
 import { BudgetSnapshot } from "@/components/project/BudgetSnapshot";
-import { ProjectSidebarCards } from "@/components/project/ProjectSidebarCards";
+import { PeopleCard } from "@/components/project/PeopleCard";
+import { RecentActivityCard } from "@/components/project/RecentActivityCard";
 import { ProgressTab } from "@/components/project/ProgressTab";
 import { ClientProjectHeader } from "@/components/project/ClientProjectHeader";
 import { ClientProjectFooter, deriveProjectCode as deriveFooterProjectCode } from "@/components/project/ClientProjectFooter";
 import { HeroImageEditor } from "@/components/project/HeroImageEditor";
-import { Crop } from "lucide-react";
+import { Crop, Settings as SettingsIcon } from "lucide-react";
 import { ProjectNowCard } from "@/components/project/ProjectNowCard";
 import { ClientMilestoneList } from "@/components/project/ClientMilestoneList";
 import { ClientReferenceCards } from "@/components/project/ClientReferenceCards";
@@ -94,8 +94,6 @@ function ProjectDetailsInner() {
   const { mutate: updateProject } = useUpdateProject();
   const { mutate: _updateMilestone } = useUpdateMilestone();
   const { mutate: _updatePhone } = useUpdateUserPhone();
-  const { mutate: notifyTeam, isPending: sendingNotification } = useNotifyTeam();
-  const { data: onlineUsers } = useOnlineUsers();
   const { viewers } = useProjectRealtime(projectId, user);
   const { toast } = useToast();
   const { trackProject } = useRecentProjects();
@@ -122,9 +120,6 @@ function ProjectDetailsInner() {
   });
   const [_editingPhoneUserId, _setEditingPhoneUserId] = useState<string | null>(null);
   const [_phoneInput, _setPhoneInput] = useState("");
-  const [showNotifyForm, setShowNotifyForm] = useState(false);
-  const [notifyMessage, setNotifyMessage] = useState("");
-  const [selectedRecipients, setSelectedRecipients] = useState<string[]>([]);
   const [editingUser, setEditingUser] = useState<any>(null);
   const [profileForm, setProfileForm] = useState({ firstName: "", lastName: "", email: "", phone: "", role: "" });
   const [confirmDeleteUser, setConfirmDeleteUser] = useState(false);
@@ -454,9 +449,12 @@ function ProjectDetailsInner() {
                   <h1 className="font-serif text-xl md:text-2xl font-bold text-foreground leading-tight" data-testid="text-project-title">
                     {project.name}
                   </h1>
-                  <Badge variant="secondary" className="text-[10px]" data-testid="badge-project-status">
+                  <span
+                    className="inline-flex items-center px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-mono font-medium tracking-[0.04em]"
+                    data-testid="badge-project-status"
+                  >
                     {statusLabel[project.status] || project.status}
-                  </Badge>
+                  </span>
                   {viewers.length > 0 && (
                     <div className="flex items-center gap-1 ml-1" data-testid="active-viewers">
                       <div className="flex -space-x-1.5">
@@ -574,33 +572,29 @@ function ProjectDetailsInner() {
                 </button>
                 <div className="space-y-6">
                   <BudgetSnapshot projectId={projectId} userRole={userRole} />
-                  <ProjectSidebarCards
+                  <PeopleCard
                     project={project}
-                    user={user}
                     users={users}
                     userRole={userRole}
-                    onlineUsers={onlineUsers}
                     planningBoards={planningBoards}
-                    assignedClient={assignedClient}
-                    activityLog={activityLog}
-                    seenLocally={seenLocally}
-                    toast={toast}
-                    updateProject={updateProject}
-                    notifyTeam={notifyTeam}
-                    sendingNotification={sendingNotification}
-                    showNotifyForm={showNotifyForm}
-                    setShowNotifyForm={setShowNotifyForm}
-                    notifyMessage={notifyMessage}
-                    setNotifyMessage={setNotifyMessage}
-                    selectedRecipients={selectedRecipients}
-                    setSelectedRecipients={setSelectedRecipients}
                     setEditingUser={setEditingUser}
                     setProfileForm={setProfileForm}
                     setShowAddPerson={setShowAddPerson}
                     setAddPersonForm={setAddPersonForm}
-                    setActiveTab={setActiveTab}
                     projectId={projectId}
+                    toast={toast}
                   />
+                  <RecentActivityCard
+                    user={user}
+                    activityLog={activityLog || []}
+                    seenLocally={seenLocally}
+                    setActiveTab={setActiveTab}
+                  />
+                  {isAdminUser && (
+                    <Link href={`/project/${projectId}/settings`} className="inline-flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors h-11" data-testid="link-project-settings">
+                      <SettingsIcon className="h-3.5 w-3.5 mr-1.5" /> Project settings
+                    </Link>
+                  )}
                 </div>
               </div>
             ) : (
@@ -644,33 +638,29 @@ function ProjectDetailsInner() {
                       </SheetHeader>
                       <div className="space-y-6 mt-4">
                         <BudgetSnapshot projectId={projectId} userRole={userRole} />
-                        <ProjectSidebarCards
+                        <PeopleCard
                           project={project}
-                          user={user}
                           users={users}
                           userRole={userRole}
-                          onlineUsers={onlineUsers}
                           planningBoards={planningBoards}
-                          assignedClient={assignedClient}
-                          activityLog={activityLog}
-                          seenLocally={seenLocally}
-                          toast={toast}
-                          updateProject={updateProject}
-                          notifyTeam={notifyTeam}
-                          sendingNotification={sendingNotification}
-                          showNotifyForm={showNotifyForm}
-                          setShowNotifyForm={setShowNotifyForm}
-                          notifyMessage={notifyMessage}
-                          setNotifyMessage={setNotifyMessage}
-                          selectedRecipients={selectedRecipients}
-                          setSelectedRecipients={setSelectedRecipients}
                           setEditingUser={setEditingUser}
                           setProfileForm={setProfileForm}
                           setShowAddPerson={setShowAddPerson}
                           setAddPersonForm={setAddPersonForm}
-                          setActiveTab={setActiveTab}
                           projectId={projectId}
+                          toast={toast}
                         />
+                        <RecentActivityCard
+                          user={user}
+                          activityLog={activityLog || []}
+                          seenLocally={seenLocally}
+                          setActiveTab={setActiveTab}
+                        />
+                        {isAdminUser && (
+                          <Link href={`/project/${projectId}/settings`} className="inline-flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors h-11" data-testid="link-project-settings-drawer">
+                            <SettingsIcon className="h-3.5 w-3.5 mr-1.5" /> Project settings
+                          </Link>
+                        )}
                       </div>
                     </SheetContent>
                   </Sheet>
@@ -678,33 +668,29 @@ function ProjectDetailsInner() {
 
                 <div className="space-y-6 hidden md:block">
                   <BudgetSnapshot projectId={projectId} userRole={userRole} />
-                  <ProjectSidebarCards
+                  <PeopleCard
                     project={project}
-                    user={user}
                     users={users}
                     userRole={userRole}
-                    onlineUsers={onlineUsers}
                     planningBoards={planningBoards}
-                    assignedClient={assignedClient}
-                    activityLog={activityLog}
-                    seenLocally={seenLocally}
-                    toast={toast}
-                    updateProject={updateProject}
-                    notifyTeam={notifyTeam}
-                    sendingNotification={sendingNotification}
-                    showNotifyForm={showNotifyForm}
-                    setShowNotifyForm={setShowNotifyForm}
-                    notifyMessage={notifyMessage}
-                    setNotifyMessage={setNotifyMessage}
-                    selectedRecipients={selectedRecipients}
-                    setSelectedRecipients={setSelectedRecipients}
                     setEditingUser={setEditingUser}
                     setProfileForm={setProfileForm}
                     setShowAddPerson={setShowAddPerson}
                     setAddPersonForm={setAddPersonForm}
-                    setActiveTab={setActiveTab}
                     projectId={projectId}
+                    toast={toast}
                   />
+                  <RecentActivityCard
+                    user={user}
+                    activityLog={activityLog || []}
+                    seenLocally={seenLocally}
+                    setActiveTab={setActiveTab}
+                  />
+                  {isAdminUser && (
+                    <Link href={`/project/${projectId}/settings`} className="inline-flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors h-11" data-testid="link-project-settings">
+                      <SettingsIcon className="h-3.5 w-3.5 mr-1.5" /> Project settings
+                    </Link>
+                  )}
                 </div>
               </div>
             )}
