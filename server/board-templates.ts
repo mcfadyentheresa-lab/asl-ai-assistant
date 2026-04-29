@@ -1,3 +1,11 @@
+// Curated Unsplash photo IDs grouped by category. Helper renders to a 1080-wide CDN URL.
+function unsplash(id: string): string {
+  return `https://images.unsplash.com/${id}?fm=jpg&q=70&w=1080&auto=format&fit=crop`;
+}
+function premiumUnsplash(id: string): string {
+  return `https://plus.unsplash.com/${id}?fm=jpg&q=70&w=1080&auto=format&fit=crop`;
+}
+
 function makeRect(left: number, top: number, width: number, height: number, fill: string) {
   return {
     type: "rect",
@@ -188,9 +196,8 @@ const CANVAS_WIDTH = 1180;
 
 // Section A — image grid (2 rows of 3 images at 220h + 60 row gap + 80 top inset + 40 bottom padding = ~640)
 const SECTION_A_TOP = 90;
-const SECTION_A_HEIGHT = 640;
-// Section B starts below Section A with 30 px gap.
-const SECTION_B_TOP = SECTION_A_TOP + SECTION_A_HEIGHT + 30;
+const SECTION_A_HEIGHT_BASE = 640;
+const SECTION_A_HEIGHT_WITH_ARTWORK = 920; // adds room for a 3-image artwork row (~220 + 60 gap)
 // Section B holds swatches row (200) + 30 gap + materials row (180) + 80 inset + 40 padding = ~530
 const SECTION_B_HEIGHT = 530;
 
@@ -259,6 +266,7 @@ interface SimpleTemplateInput {
   sectionA: string;
   sectionB: string;
   images: { url: string; caption: string }[]; // up to 6
+  artwork?: { url: string; caption: string }[]; // up to 3 — adds an Artwork row inside Section A
   swatches?: { name: string; hex: string; code?: string; brand?: string }[];
   materials?: { name: string; supplier?: string; code?: string; imageUrl?: string; notes?: string }[];
   notes?: { text: string; color?: string }[];
@@ -270,36 +278,42 @@ function buildSimpleTemplate(input: SimpleTemplateInput) {
   const objects: any[] = [];
   objects.push(makeSectionHeader(TITLE_X, TITLE_Y, input.title));
 
+  const hasArtwork = !!(input.artwork && input.artwork.length > 0);
+  const sectionAHeight = hasArtwork ? SECTION_A_HEIGHT_WITH_ARTWORK : SECTION_A_HEIGHT_BASE;
+  const sectionBTop = SECTION_A_TOP + sectionAHeight + 30;
+
   // Section A — image grid (2 rows × 3 cols of 220h images, fully contained)
-  objects.push(makeRoomZone(CANVAS_LEFT, SECTION_A_TOP, CANVAS_WIDTH, SECTION_A_HEIGHT, input.sectionA, input.zoneColorA || "#ece8e1", 0.4));
+  objects.push(makeRoomZone(CANVAS_LEFT, SECTION_A_TOP, CANVAS_WIDTH, sectionAHeight, input.sectionA, input.zoneColorA || "#ece8e1", 0.4));
   objects.push(makeText(CANVAS_LEFT + 24, SECTION_A_TOP + 18, input.sectionA.toUpperCase(), 12, "600", "#1e3a2f"));
   objects.push(...imageGrid(SECTION_A_TOP, input.images.slice(0, 6)));
 
-  // Section B — left side: swatches row then materials row; right side: notes column.
-  objects.push(makeRoomZone(CANVAS_LEFT, SECTION_B_TOP, CANVAS_WIDTH, SECTION_B_HEIGHT, input.sectionB, input.zoneColorB || "#e8ebe6", 0.35));
-  objects.push(makeText(CANVAS_LEFT + 24, SECTION_B_TOP + 18, input.sectionB.toUpperCase(), 12, "600", "#1e3a2f"));
+  if (hasArtwork) {
+    // Artwork row sits below the 2 image rows. Image grid uses sectionInsetTop=80, 2 rows of 220 + 60 gap = 500
+    // So artwork row label at +600 and images at +630.
+    const artworkLabelY = SECTION_A_TOP + 620;
+    const artworkRowTop = SECTION_A_TOP + 540; // imageGrid uses top + 80 + r*(220+60); for r=2 → 540+80=620 vs row 1 at 360
+    objects.push(makeText(CANVAS_LEFT + 40, artworkLabelY, "ARTWORK", 11, "600", "#6b7280"));
+    objects.push(...imageGrid(artworkRowTop, input.artwork!.slice(0, 3)));
+  }
 
-  // Vertical layout inside Section B left half:
-  //   y = SECTION_B_TOP + 50 → "PALETTE" label
-  //   y = SECTION_B_TOP + 80 → swatches row (height 200)
-  //   y = SECTION_B_TOP + 280 → 30 px gap
-  //   y = SECTION_B_TOP + 290 → "MATERIALS" label
-  //   y = SECTION_B_TOP + 320 → materials row (height 180)
-  //   y = SECTION_B_TOP + 500 → fits within SECTION_B_HEIGHT=530
-  const materialsRowTop = SECTION_B_TOP + 240; // adds 240 so its row sits at +320
+  // Section B — left side: swatches row then materials row; right side: notes column.
+  objects.push(makeRoomZone(CANVAS_LEFT, sectionBTop, CANVAS_WIDTH, SECTION_B_HEIGHT, input.sectionB, input.zoneColorB || "#e8ebe6", 0.35));
+  objects.push(makeText(CANVAS_LEFT + 24, sectionBTop + 18, input.sectionB.toUpperCase(), 12, "600", "#1e3a2f"));
+
+  const materialsRowTop = sectionBTop + 240;
 
   if (input.swatches && input.swatches.length > 0) {
-    objects.push(makeText(CANVAS_LEFT + 40, SECTION_B_TOP + 50, "PALETTE", 11, "600", "#6b7280"));
-    objects.push(...swatchRow(SECTION_B_TOP, input.swatches.slice(0, 4)));
+    objects.push(makeText(CANVAS_LEFT + 40, sectionBTop + 50, "PALETTE", 11, "600", "#6b7280"));
+    objects.push(...swatchRow(sectionBTop, input.swatches.slice(0, 4)));
   }
   if (input.materials && input.materials.length > 0) {
     objects.push(makeText(CANVAS_LEFT + 40, materialsRowTop + 50, "MATERIALS", 11, "600", "#6b7280"));
     objects.push(...materialRow(materialsRowTop, input.materials.slice(0, 3)));
   }
   if (input.notes && input.notes.length > 0) {
-    const notesLeftOffset = SECTION_B_LEFT_WIDTH + 20; // right column starts past left content
-    objects.push(makeText(CANVAS_LEFT + notesLeftOffset, SECTION_B_TOP + 50, "NOTES", 11, "600", "#6b7280"));
-    objects.push(...noteColumn(SECTION_B_TOP, notesLeftOffset, input.notes.slice(0, 2)));
+    const notesLeftOffset = SECTION_B_LEFT_WIDTH + 20;
+    objects.push(makeText(CANVAS_LEFT + notesLeftOffset, sectionBTop + 50, "NOTES", 11, "600", "#6b7280"));
+    objects.push(...noteColumn(sectionBTop, notesLeftOffset, input.notes.slice(0, 2)));
   }
 
   return wrap(objects);
@@ -314,12 +328,12 @@ const kitchenRenovation = buildSimpleTemplate({
   sectionA: "Cabinetry, Surfaces & Lighting",
   sectionB: "Palette, Materials & Notes",
   images: [
-    { url: "", caption: "Shaker maple uppers — BM White Dove OC-17" },
-    { url: "", caption: "Calacatta Nuvo 5131 — 3cm waterfall island" },
-    { url: "", caption: "Wolf 48\" range w/ Zephyr Cypress hood" },
-    { url: "", caption: "Cle zellige 2×6\" backsplash — running bond" },
-    { url: "", caption: "Schoolhouse Otis pendants — aged brass" },
-    { url: "", caption: "5\" white oak hardwood — wire-brushed matte" },
+    { url: unsplash("photo-1771371854543-bb274762389e"), caption: "Shaker uppers — BM White Dove OC-17" },
+    { url: premiumUnsplash("premium_photo-1768228106004-912a8dc7b8bf"), caption: "Calacatta marble — 3cm waterfall island" },
+    { url: unsplash("photo-1682888818650-0a7cbb35287d"), caption: "Marble counter w/ pendant lighting" },
+    { url: unsplash("photo-1682888818589-404faaa4dbc9"), caption: "White cabinets w/ aged brass hardware" },
+    { url: unsplash("photo-1682888818620-94875adf5bb9"), caption: "Open island layout — stone countertop" },
+    { url: unsplash("photo-1771371854543-bb274762389e"), caption: "5\" white oak hardwood — wire-brushed matte" },
   ],
   swatches: [
     { name: "White Dove", hex: "#F3EFE6", code: "OC-17", brand: "Benjamin Moore" },
@@ -345,12 +359,12 @@ const bathroomRenovation = buildSimpleTemplate({
   zoneColorA: "#e6e9ec",
   zoneColorB: "#ece8e3",
   images: [
-    { url: "", caption: "V+A Napoli freestanding — matte white, 65×29\"" },
-    { url: "", caption: "60\" double vanity — white oak floating" },
-    { url: "", caption: "Cedar & Moss Alto sconces — brushed brass" },
-    { url: "", caption: "2\" Carrara hex mosaic — heated" },
-    { url: "", caption: "Large-format Calacatta porcelain — shower" },
-    { url: "", caption: "Heated white oak threshold transitions" },
+    { url: premiumUnsplash("premium_photo-1768423936222-9d2d803f3faf"), caption: "Freestanding tub — matte white" },
+    { url: unsplash("photo-1759223607861-f0ef3e617739"), caption: "Marble vanity w/ glass shower" },
+    { url: unsplash("photo-1771372012124-f7696f374a5a"), caption: "Freestanding tub w/ double vanity" },
+    { url: unsplash("photo-1753605788101-04d1e653e74a"), caption: "Luxe freestanding bathtub" },
+    { url: unsplash("photo-1765766600820-58eaf8687f1d"), caption: "Calacatta marble walls — shower" },
+    { url: premiumUnsplash("premium_photo-1661884424253-08db7c7758ce"), caption: "Marble vanity — brushed brass fixtures" },
   ],
   swatches: [
     { name: "Pale Oak", hex: "#E8E0D4", code: "OC-20", brand: "Benjamin Moore" },
@@ -376,12 +390,12 @@ const fullCottageBuild = buildSimpleTemplate({
   zoneColorA: "#e4e1db",
   zoneColorB: "#dce5e8",
   images: [
-    { url: "", caption: "Board-and-batten cedar — Driftwood Grey stain" },
-    { url: "", caption: "Vaulted great room — exposed timber trusses" },
-    { url: "", caption: "Permanent dock — steel frame, cedar decking" },
-    { url: "", caption: "Muskoka granite fieldstone fireplace surround" },
-    { url: "", caption: "Performance linen great-room seating" },
-    { url: "", caption: "5\" white oak floors — continuous main level" },
+    { url: unsplash("photo-1693498871905-3b0646657786"), caption: "Cedar exterior on the lake" },
+    { url: premiumUnsplash("premium_photo-1663091687045-d108c7fb83e4"), caption: "Modern cottage on a quiet lake" },
+    { url: unsplash("photo-1693498868381-fef2612e49dd"), caption: "Lakeside dock — cedar decking" },
+    { url: unsplash("photo-1559767949-0faa5c7e9992"), caption: "Lakefront cottage facade" },
+    { url: unsplash("photo-1586090097830-147b7f2be946"), caption: "Vaulted great room w/ wood beams" },
+    { url: unsplash("photo-1572970385182-97a64c98205b"), caption: "Cottage interior — white oak floors" },
   ],
   swatches: [
     { name: "Driftwood Grey", hex: "#9E9689", code: "Semi-trans.", brand: "Cabot Stain" },
@@ -407,12 +421,17 @@ const moodboard = buildSimpleTemplate({
   zoneColorA: "#ece8e3",
   zoneColorB: "#e5e8e3",
   images: [
-    { url: "", caption: "Performance linen sofa — oatmeal, wool bouclé accents" },
-    { url: "", caption: "Wire-brushed white oak — matte poly" },
-    { url: "", caption: "Muskoka granite fieldstone fireplace" },
-    { url: "", caption: "White oak + aged brass hardware" },
-    { url: "", caption: "Cedar & Moss sconce — aged brass, 3000K" },
-    { url: "", caption: "Schoolhouse globe pendants" },
+    { url: premiumUnsplash("premium_photo-1722048810826-751afbcc98c0"), caption: "Wabi-sabi interior — warm neutrals" },
+    { url: premiumUnsplash("premium_photo-1705262413765-5fe7a310d4e6"), caption: "Beige living room — layered textures" },
+    { url: unsplash("photo-1572970385182-97a64c98205b"), caption: "Wire-brushed white oak — matte poly" },
+    { url: premiumUnsplash("premium_photo-1768228106004-912a8dc7b8bf"), caption: "Stone surface — calacatta marble" },
+    { url: unsplash("photo-1771371854543-bb274762389e"), caption: "White oak + aged brass hardware" },
+    { url: premiumUnsplash("premium_photo-1673152979577-64b00806a6d1"), caption: "Beige textured wall — wabi-sabi" },
+  ],
+  artwork: [
+    { url: premiumUnsplash("premium_photo-1673152979577-64b00806a6d1"), caption: "Textured beige wall art" },
+    { url: premiumUnsplash("premium_photo-1722048810826-751afbcc98c0"), caption: "Sculptural neutral form" },
+    { url: unsplash("photo-1572970385182-97a64c98205b"), caption: "Wood + sculpture detail" },
   ],
   swatches: [
     { name: "White Dove", hex: "#F3EFE6", code: "OC-17", brand: "Benjamin Moore" },
@@ -438,12 +457,12 @@ const furnitureRefinishingConceptBoardWorking = buildSimpleTemplate({
   zoneColorA: "#f3efe8",
   zoneColorB: "#ede8e1",
   images: [
-    { url: "", caption: "Before — current piece, full view" },
-    { url: "", caption: "Client inspiration reference" },
-    { url: "", caption: "Proposed direction — finish goal" },
-    { url: "", caption: "Wood grain reference — matching tone" },
-    { url: "", caption: "Hardware close-up reference" },
-    { url: "", caption: "Edge profile + repair detail" },
+    { url: "", caption: "Before — tap to add current piece photo" },
+    { url: "", caption: "Client inspiration — tap to upload" },
+    { url: unsplash("photo-1572970385182-97a64c98205b"), caption: "Proposed direction — natural wood finish" },
+    { url: premiumUnsplash("premium_photo-1722048810826-751afbcc98c0"), caption: "Wood grain reference — matching tone" },
+    { url: unsplash("photo-1771371854543-bb274762389e"), caption: "Hardware reference — aged brass" },
+    { url: "", caption: "Edge profile + repair detail — tap to upload" },
   ],
   swatches: [
     { name: "Paint Colour", hex: "#F3EFE6", code: "Sample", brand: "TBD" },
@@ -469,12 +488,17 @@ const collageConceptBoard = buildSimpleTemplate({
   zoneColorA: "#f6f3ee",
   zoneColorB: "#ede8e1",
   images: [
-    { url: "", caption: "Renovation overview" },
-    { url: "", caption: "House floor plan" },
-    { url: "", caption: "Feature desk inspiration" },
-    { url: "", caption: "Kitchen moodboard" },
-    { url: "", caption: "Living room moodboard" },
-    { url: "", caption: "Floating display unit" },
+    { url: unsplash("photo-1586090097830-147b7f2be946"), caption: "Renovation overview" },
+    { url: "", caption: "House floor plan — tap to upload" },
+    { url: premiumUnsplash("premium_photo-1705262413765-5fe7a310d4e6"), caption: "Living room moodboard" },
+    { url: unsplash("photo-1771371854543-bb274762389e"), caption: "Kitchen moodboard" },
+    { url: premiumUnsplash("premium_photo-1722048810826-751afbcc98c0"), caption: "Feature wall inspiration" },
+    { url: unsplash("photo-1572970385182-97a64c98205b"), caption: "Floating display unit" },
+  ],
+  artwork: [
+    { url: premiumUnsplash("premium_photo-1673152979577-64b00806a6d1"), caption: "Textured neutral artwork" },
+    { url: premiumUnsplash("premium_photo-1722048810826-751afbcc98c0"), caption: "Sculptural form study" },
+    { url: unsplash("photo-1572970385182-97a64c98205b"), caption: "Material detail piece" },
   ],
   swatches: [
     { name: "Horizon", hex: "#6FA7B4", code: "", brand: "" },
@@ -500,12 +524,17 @@ const materialInspirationBoard = buildSimpleTemplate({
   zoneColorA: "#f5f3ef",
   zoneColorB: "#ece8e3",
   images: [
-    { url: "", caption: "European fabric samples" },
-    { url: "", caption: "Herringbone pattern" },
-    { url: "", caption: "Wenge spruce — dark wood grain" },
-    { url: "", caption: "Textured lamp + objects" },
-    { url: "", caption: "Bar top oak veneer finish" },
-    { url: "", caption: "Entry door handles" },
+    { url: premiumUnsplash("premium_photo-1722048810826-751afbcc98c0"), caption: "Linen + natural texture" },
+    { url: unsplash("photo-1572970385182-97a64c98205b"), caption: "White oak — wire-brushed grain" },
+    { url: unsplash("photo-1771371854543-bb274762389e"), caption: "Aged brass hardware detail" },
+    { url: premiumUnsplash("premium_photo-1768228106004-912a8dc7b8bf"), caption: "Calacatta marble surface" },
+    { url: premiumUnsplash("premium_photo-1705262413765-5fe7a310d4e6"), caption: "Beige interior — layered" },
+    { url: premiumUnsplash("premium_photo-1673152979577-64b00806a6d1"), caption: "Textured beige wall" },
+  ],
+  artwork: [
+    { url: premiumUnsplash("premium_photo-1673152979577-64b00806a6d1"), caption: "Wabi-sabi wall texture" },
+    { url: premiumUnsplash("premium_photo-1722048810826-751afbcc98c0"), caption: "Sculptural object" },
+    { url: unsplash("photo-1572970385182-97a64c98205b"), caption: "Wood + form detail" },
   ],
   swatches: [
     { name: "Hemlock", hex: "#556B3F", code: "Accent", brand: "" },
