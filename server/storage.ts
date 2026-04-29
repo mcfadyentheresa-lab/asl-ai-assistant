@@ -1,10 +1,10 @@
 import { db } from "./db";
 import { 
-  users, projects, milestones, subMilestones, sections, tasks, photos, documents, timeEntries, messages, decisions, selections, checklistItems, boardItems, calendarEvents, planningBoards, canvasElements, activityLog, activityViews, paintColors, boardSnapshots, costCategories, marketRates, projectEstimates, estimateItems, receipts, estimateWarnings, crewRates, subcontractors, suppliers, supplierPrices, clientInvites, socialPosts, tableRedesignPlans, tableRedesignMaterials, recentProjectViews,
-  type Project, type Milestone, type SubMilestone, type Section, type Task, type Photo, type Document, type TimeEntry, type Message, type Decision, type Selection,
+  users, projects, milestones, subMilestones, sections, tasks, photos, documents, timeEntries, messages, decisions, selections, changeOrders, checklistItems, boardItems, calendarEvents, planningBoards, canvasElements, activityLog, activityViews, paintColors, boardSnapshots, costCategories, marketRates, projectEstimates, estimateItems, receipts, estimateWarnings, crewRates, subcontractors, suppliers, supplierPrices, clientInvites, socialPosts, tableRedesignPlans, tableRedesignMaterials, recentProjectViews,
+  type Project, type Milestone, type SubMilestone, type Section, type Task, type Photo, type Document, type TimeEntry, type Message, type Decision, type Selection, type ChangeOrder,
   type ChecklistItem, type BoardItem, type CalendarEvent, type PlanningBoard, type CanvasElement, type ActivityLog, type PaintColor, type BoardSnapshot, type CostCategory, type MarketRate, type ProjectEstimate, type EstimateItem, type Receipt, type EstimateWarning, type CrewRate, type Subcontractor,
   type InsertProject, type InsertMilestone, type InsertSubMilestone, type InsertSection, type InsertTask, type InsertPhoto, type InsertDocument, 
-  type InsertTimeEntry, type InsertMessage, type InsertDecision, type InsertSelection, type InsertChecklistItem, type InsertBoardItem, type InsertCalendarEvent, type InsertPlanningBoard, type InsertCanvasElement, type InsertActivityLog, type InsertBoardSnapshot, type InsertCostCategory, type InsertMarketRate, type InsertProjectEstimate, type InsertEstimateItem, type InsertReceipt, type InsertEstimateWarning, type InsertCrewRate, type InsertSubcontractor, type Supplier, type SupplierPrice, type InsertSupplier, type InsertSupplierPrice,
+  type InsertTimeEntry, type InsertMessage, type InsertDecision, type InsertSelection, type InsertChangeOrder, type InsertChecklistItem, type InsertBoardItem, type InsertCalendarEvent, type InsertPlanningBoard, type InsertCanvasElement, type InsertActivityLog, type InsertBoardSnapshot, type InsertCostCategory, type InsertMarketRate, type InsertProjectEstimate, type InsertEstimateItem, type InsertReceipt, type InsertEstimateWarning, type InsertCrewRate, type InsertSubcontractor, type Supplier, type SupplierPrice, type InsertSupplier, type InsertSupplierPrice,
   type ClientInvite, type InsertClientInvite,
   type SocialPost, type InsertSocialPost,
   type TableRedesignPlan, type InsertTableRedesignPlan,
@@ -12,6 +12,7 @@ import {
 } from "@shared/schema";
 import { type User } from "@shared/models/auth";
 import { eq, desc, and, ilike, or, gte, lte, inArray, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 
 export interface IStorage {
   // Projects
@@ -74,6 +75,12 @@ export interface IStorage {
   getSelection(id: number): Promise<Selection | undefined>;
   createSelection(selection: InsertSelection): Promise<Selection>;
   updateSelection(id: number, updates: Partial<InsertSelection>): Promise<Selection>;
+  // Change orders
+  getChangeOrders(projectId: number, includeArchived?: boolean, includeDrafts?: boolean): Promise<(ChangeOrder & { creator: User | null; decider: User | null })[]>;
+  getChangeOrder(id: number): Promise<ChangeOrder | undefined>;
+  getNextChangeOrderNumber(projectId: number): Promise<number>;
+  createChangeOrder(co: InsertChangeOrder): Promise<ChangeOrder>;
+  updateChangeOrder(id: number, updates: Partial<InsertChangeOrder>): Promise<ChangeOrder>;
 
   // Time Entries / Timesheets
   getTimeEntries(projectId: number): Promise<TimeEntry[]>;
@@ -477,6 +484,49 @@ export class DatabaseStorage implements IStorage {
     const [updated] = await db.update(selections)
       .set({ ...updates, updatedAt: new Date() })
       .where(eq(selections.id, id))
+      .returning();
+    return updated;
+  }
+
+  // Change orders
+  async getChangeOrders(projectId: number, includeArchived = false, includeDrafts = false): Promise<(ChangeOrder & { creator: User | null; decider: User | null })[]> {
+    // Build where clause: project match, plus optional archived and draft filters.
+    // Note we left-join users twice (creator, decider) using aliases.
+    const decider = alias(users, 'decider');
+    const conditions = [eq(changeOrders.projectId, projectId)];
+    if (!includeArchived) conditions.push(eq(changeOrders.archived, false));
+    if (!includeDrafts) conditions.push(sql`${changeOrders.status} != 'draft'`);
+    const results = await db.select({
+      co: changeOrders,
+      creator: users,
+      decider: decider,
+    })
+      .from(changeOrders)
+      .leftJoin(users, eq(changeOrders.createdBy, users.id))
+      .leftJoin(decider, eq(changeOrders.decidedBy, decider.id))
+      .where(and(...conditions))
+      .orderBy(desc(changeOrders.number));
+    return results.map(r => ({ ...r.co, creator: r.creator, decider: r.decider }));
+  }
+  async getChangeOrder(id: number): Promise<ChangeOrder | undefined> {
+    const [c] = await db.select().from(changeOrders).where(eq(changeOrders.id, id));
+    return c;
+  }
+  async getNextChangeOrderNumber(projectId: number): Promise<number> {
+    const [row] = await db
+      .select({ max: sql<number>`coalesce(max(${changeOrders.number}), 0)` })
+      .from(changeOrders)
+      .where(eq(changeOrders.projectId, projectId));
+    return (row?.max ?? 0) + 1;
+  }
+  async createChangeOrder(co: InsertChangeOrder): Promise<ChangeOrder> {
+    const [created] = await db.insert(changeOrders).values(co).returning();
+    return created;
+  }
+  async updateChangeOrder(id: number, updates: Partial<InsertChangeOrder>): Promise<ChangeOrder> {
+    const [updated] = await db.update(changeOrders)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(changeOrders.id, id))
       .returning();
     return updated;
   }
