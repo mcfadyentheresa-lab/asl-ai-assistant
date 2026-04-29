@@ -2,7 +2,7 @@ import twilio from "twilio";
 import { authStorage } from "./replit_integrations/auth/storage";
 import type { User } from "@shared/models/auth";
 import { db } from "./db";
-import { queuedSms } from "@shared/schema";
+import { queuedSms, tenantSettings, type TenantSettings } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
@@ -11,16 +11,54 @@ const fromNumber = process.env.TWILIO_PHONE_NUMBER;
 
 let client: twilio.Twilio | null = null;
 
-const APP_URL = process.env.REPLIT_DEPLOYMENT_URL
-  ? `https://${process.env.REPLIT_DEPLOYMENT_URL}`
-  : process.env.REPLIT_DEV_DOMAIN
-    ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-    : "https://asterandspruce.com";
+// Tenant settings cache. Reloaded every 5 minutes to pick up admin changes
+// without forcing a server restart. See docs/PRODUCT_PHILOSOPHY.md.
+let cachedSettings: TenantSettings | null = null;
+let cachedSettingsAt = 0;
+const SETTINGS_CACHE_MS = 5 * 60 * 1000;
+
+async function getTenantSettings(): Promise<TenantSettings | null> {
+  const now = Date.now();
+  if (cachedSettings && now - cachedSettingsAt < SETTINGS_CACHE_MS) {
+    return cachedSettings;
+  }
+  try {
+    const rows = await db
+      .select()
+      .from(tenantSettings)
+      .where(eq(tenantSettings.tenantKey, "default"))
+      .limit(1);
+    cachedSettings = rows[0] ?? null;
+    cachedSettingsAt = now;
+    return cachedSettings;
+  } catch (err: any) {
+    // Table may not exist yet on a fresh DB — fail closed (no SMS).
+    console.warn("tenant_settings unavailable; defaulting to SMS off:", err.message || err);
+    return null;
+  }
+}
+
+export function invalidateTenantSettingsCache(): void {
+  cachedSettings = null;
+  cachedSettingsAt = 0;
+}
+
+/**
+ * SMS message kind. Determines which tenant flag gates the send.
+ *  - "notification": routine project notifications (off by default — see philosophy doc)
+ *  - "invite":       client/crew invite SMS (on by default; high deliverability priority)
+ *  - "test":         admin test message (bypasses gates if Twilio is configured)
+ */
+export type SmsKind = "notification" | "invite" | "test";
+
+const APP_URL = (() => {
+  if (process.env.APP_URL) return process.env.APP_URL;
+  if (process.env.PUBLIC_URL) return process.env.PUBLIC_URL;
+  if (process.env.RAILWAY_PUBLIC_DOMAIN) return `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`;
+  return "https://asterandspruceliving.ca";
+})();
 
 const SMS_FOOTER = `\n\nDo not reply to this number. Log in for updates: ${APP_URL}`;
-
-const TIMEZONE = "America/Toronto";
-const BUSINESS_HOURS_NOTE = "\n(Texts are sent Mon-Thu 8am-5pm, Fri 8am-12pm ET. Messages outside these hours are held until the next business day.)";
 
 function getClient(): twilio.Twilio | null {
   if (!accountSid || !authToken || !fromNumber) {
@@ -41,18 +79,26 @@ function formatPhone(phone: string): string {
   return `+${digits}`;
 }
 
-function getETNow(): { day: number; hour: number; minute: number; date: Date } {
-  const str = new Date().toLocaleString("en-US", { timeZone: TIMEZONE });
+function getLocalNow(timezone: string): { day: number; hour: number; minute: number; date: Date } {
+  const str = new Date().toLocaleString("en-US", { timeZone: timezone });
   const d = new Date(str);
   return { day: d.getDay(), hour: d.getHours(), minute: d.getMinutes(), date: d };
 }
 
-function isWithinBusinessHours(): boolean {
-  const { day, hour, minute } = getETNow();
+/**
+ * Quiet hours check. Returns true when the current local time falls INSIDE the
+ * tenant's allowed sending window. Defaults match the product philosophy:
+ * 9am–7pm Mon–Fri in the tenant timezone.
+ */
+function isWithinQuietHours(settings: TenantSettings | null): boolean {
+  const tz = settings?.timezone ?? "America/Toronto";
+  const startHour = settings?.smsQuietHoursStart ?? 9;
+  const endHour = settings?.smsQuietHoursEnd ?? 19;
+  const allowedDays = settings?.smsQuietHoursDays ?? [1, 2, 3, 4, 5];
+  const { day, hour, minute } = getLocalNow(tz);
+  if (!allowedDays.includes(day)) return false;
   const t = hour + minute / 60;
-  if (day === 0 || day === 6) return false;
-  if (day === 5) return t >= 8 && t < 12;
-  return t >= 8 && t < 17;
+  return t >= startHour && t < endHour;
 }
 
 async function sendSmsNow(to: string, body: string): Promise<boolean> {
@@ -72,10 +118,47 @@ async function sendSmsNow(to: string, body: string): Promise<boolean> {
   }
 }
 
-async function sendSms(to: string, body: string, bypassHours = false): Promise<boolean> {
-  const fullBody = body + SMS_FOOTER + BUSINESS_HOURS_NOTE;
+/**
+ * Master SMS gate. ALL outbound SMS in this app go through here.
+ *
+ * Decision flow:
+ *   1. Twilio configured? → if not, no-op
+ *   2. Tenant settings loaded? → if missing, fail closed for notifications
+ *   3. Kind allowed by tenant flags?
+ *      - notification → requires settings.smsEnabled
+ *      - invite       → requires settings.smsInvitesEnabled
+ *      - test         → always allowed if Twilio is configured
+ *   4. Within quiet hours?
+ *      - yes → send now
+ *      - no  → queue for later (handled by startSmsQueueProcessor)
+ */
+async function sendSms(
+  to: string,
+  body: string,
+  kind: SmsKind = "notification"
+): Promise<boolean> {
+  const settings = await getTenantSettings();
 
-  if (bypassHours || isWithinBusinessHours()) {
+  // Gate by tenant kind-specific flag
+  if (kind === "notification") {
+    if (!settings?.smsEnabled) {
+      console.log(`SMS notification suppressed (smsEnabled=false) for ${to.slice(0, 3)}***`);
+      return false;
+    }
+  } else if (kind === "invite") {
+    // Default-on per product philosophy, but respect explicit opt-out.
+    if (settings && !settings.smsInvitesEnabled) {
+      console.log(`SMS invite suppressed (smsInvitesEnabled=false) for ${to.slice(0, 3)}***`);
+      return false;
+    }
+  }
+  // "test" kind passes through; only requires Twilio to be configured.
+
+  const fullBody = body + SMS_FOOTER;
+
+  // Test messages and invites bypass quiet hours — they are explicit user
+  // actions, not background notifications.
+  if (kind === "test" || kind === "invite" || isWithinQuietHours(settings)) {
     return sendSmsNow(to, fullBody);
   }
 
@@ -85,7 +168,7 @@ async function sendSms(to: string, body: string, bypassHours = false): Promise<b
       body: fullBody,
       sent: false,
     });
-    console.log(`SMS queued for ${to.slice(0, 3)}*** (outside business hours)`);
+    console.log(`SMS queued for ${to.slice(0, 3)}*** (outside quiet hours)`);
     return true;
   } catch (err: any) {
     console.error("SMS queue error:", err.message || err);
@@ -94,7 +177,8 @@ async function sendSms(to: string, body: string, bypassHours = false): Promise<b
 }
 
 async function processQueuedSms(): Promise<void> {
-  if (!isWithinBusinessHours()) return;
+  const settings = await getTenantSettings();
+  if (!isWithinQuietHours(settings)) return;
 
   try {
     const pending = await db
@@ -321,13 +405,13 @@ export async function sendClientInviteSms(
 ): Promise<boolean> {
   const inviteLink = `${APP_URL}/invite/${inviteToken}`;
   const body = `Hi ${clientFirstName}, welcome to Aster & Spruce! You've been invited to your project portal for "${projectName}". Access your portal here: ${inviteLink}`;
-  return sendSms(toPhone, body, true);
+  return sendSms(toPhone, body, "invite");
 }
 
 export async function sendTestSms(toPhone: string): Promise<boolean> {
   return sendSms(
     toPhone,
     `Aster & Spruce Connect: This is a test notification. Your SMS alerts are working!`,
-    true
+    "test"
   );
 }
