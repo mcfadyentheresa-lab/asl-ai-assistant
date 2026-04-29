@@ -4,6 +4,8 @@ interface BudgetSummaryResponse {
   hidden: boolean;
   budget?: number;
   totalSpent?: number;
+  approvedChangeOrders?: number;
+  adjustedBudget?: number;
   status?: "no_budget" | "on_track" | "under_budget" | "over_budget";
   variancePercent?: number;
   budgetVisibleToClient?: boolean;
@@ -29,12 +31,10 @@ function formatCurrency(amount: number): string {
  *  - the budget is hidden from the client (admin toggle)
  *  - there is no budget set yet
  *
- * The mockup calls for four numbers: contract, approved change orders,
- * spent, and remaining. Change orders aren't yet a tracked entity —
- * they're priority #5 in the follow-up plan — so the card shows three
- * numbers today, with a structural slot for change orders to drop in
- * later. We intentionally don't show "Approved COs: $0" because that
- * implies a complete record; we just omit until the data exists.
+ * Shows four figures: contract, approved change orders, spent, and
+ * remaining (or over). "Remaining" is computed against the adjusted
+ * budget (contract + approvedChangeOrders), so once the client signs
+ * off on a change order the budget shifts here right away.
  *
  * Voice is calm and factual. No percentages, no warning colors — the
  * client sees the truth in dollars and decides for themselves how to
@@ -58,11 +58,13 @@ export function BudgetPulseCard({ projectId }: BudgetPulseCardProps) {
 
   const budget = data.budget ?? 0;
   const totalSpent = data.totalSpent ?? 0;
+  const approvedChangeOrders = data.approvedChangeOrders ?? 0;
+  const adjustedBudget = data.adjustedBudget ?? budget + approvedChangeOrders;
 
   // No budget set — don't show a placeholder, just stay quiet.
   if (budget <= 0) return null;
 
-  const remaining = budget - totalSpent;
+  const remaining = adjustedBudget - totalSpent;
   const overBudget = remaining < 0;
 
   return (
@@ -82,8 +84,17 @@ export function BudgetPulseCard({ projectId }: BudgetPulseCardProps) {
         </span>
       </div>
 
-      <div className="grid grid-cols-3 gap-px rounded-md overflow-hidden bg-border/60 border border-border/60">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-px rounded-md overflow-hidden bg-border/60 border border-border/60">
         <Figure label="Contract" value={formatCurrency(budget)} testId="budget-contract" />
+        <Figure
+          label="Change orders"
+          value={
+            approvedChangeOrders < 0
+              ? `−${formatCurrency(Math.abs(approvedChangeOrders))}`
+              : formatCurrency(approvedChangeOrders)
+          }
+          testId="budget-change-orders"
+        />
         <Figure label="Spent" value={formatCurrency(totalSpent)} testId="budget-spent" />
         <Figure
           label={overBudget ? "Over" : "Remaining"}

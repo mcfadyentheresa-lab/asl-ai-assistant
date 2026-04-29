@@ -8,6 +8,7 @@ import { MilestoneStrip } from "@/components/client/MilestoneStrip";
 import { ReferenceCardGrid } from "@/components/client/ReferenceCardGrid";
 import { RecentDecisionsCard } from "@/components/client/RecentDecisionsCard";
 import { SelectionsCard } from "@/components/client/SelectionsCard";
+import { ChangeOrdersInboxCard } from "@/components/client/ChangeOrdersInboxCard";
 import { YourActionItemsCard } from "@/components/client/YourActionItemsCard";
 import { BudgetPulseCard } from "@/components/client/BudgetPulseCard";
 
@@ -260,6 +261,8 @@ export function ClientDashboardView({ project, isAdminPreview = false }: ClientD
       {sortedMilestones.length > 0 && <MilestoneStrip milestones={sortedMilestones} />}
 
       <RecentDecisionsCard projectId={project.id} decisions={decisions || []} />
+
+      <ChangeOrdersInboxCard projectId={project.id} />
 
       <SelectionsCard projectId={project.id} selections={selections || []} />
 
