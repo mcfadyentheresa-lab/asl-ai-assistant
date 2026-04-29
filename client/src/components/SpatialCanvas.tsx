@@ -7468,7 +7468,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                     className="h-3.5 w-3.5"
                   />
                   {notifyOnLink ? <Bell className="h-3 w-3 text-muted-foreground" /> : <BellOff className="h-3 w-3 text-muted-foreground" />}
-                  <span className="text-[11px] text-muted-foreground">SMS alert</span>
+                  <span className="text-[11px] text-muted-foreground">Notify</span>
                 </label>
               </div>
               <div className="space-y-0.5 max-h-32 overflow-y-auto rounded border p-1.5" data-testid="link-people-list">

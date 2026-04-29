@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { Loader2, ArrowRight, Home } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -120,43 +119,16 @@ export default function Welcome() {
                   data-testid="input-welcome-phone"
                 />
                 <p className="text-xs text-muted-foreground">
-                  We'll use this to send you project updates via text.
+                  Optional secondary contact for your project team.
                 </p>
               </div>
 
-              <div className="border rounded-lg p-4 space-y-4">
-                <h3 className="text-sm font-semibold uppercase tracking-wide">
-                  Notification Preferences
-                </h3>
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="smsNotifications" className="text-sm">SMS Notifications</Label>
-                    <p className="text-xs text-muted-foreground">
-                      Receive text messages for project updates
-                    </p>
-                  </div>
-                  <Switch
-                    id="smsNotifications"
-                    checked={smsNotifications}
-                    onCheckedChange={setSmsNotifications}
-                    data-testid="switch-sms-notifications"
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="emailNotifications" className="text-sm">Email Notifications</Label>
-                    <p className="text-xs text-muted-foreground">
-                      Receive email updates about your project
-                    </p>
-                  </div>
-                  <Switch
-                    id="emailNotifications"
-                    checked={emailNotifications}
-                    onCheckedChange={setEmailNotifications}
-                    data-testid="switch-email-notifications"
-                  />
-                </div>
-              </div>
+              {/* Notification preferences: SMS UI is hidden for now (the SMS
+                  feature is paused). Email notifications stay on by default;
+                  we don't render a dedicated section for a single toggle. The
+                  underlying smsNotifications/emailNotifications state is still
+                  posted on submit so this can be re-enabled by un-hiding
+                  this block. */}
             </div>
 
             <Button

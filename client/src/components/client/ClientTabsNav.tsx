@@ -9,9 +9,9 @@ interface ProjectStub {
 
 interface ClientTab {
   label: string;
-  /** Path resolver: receives the client's primary project id (or null) and
-   *  returns the route to navigate to. We resolve at render time so a fresh
-   *  client without a project still gets a sensible href (the dashboard). */
+  /** Path resolver: receives the project id to deep-link against (the project
+   *  the user is currently viewing, falling back to their primary project, or
+   *  null when they have no project at all). */
   resolve: (projectId: number | null) => string;
   /** Predicate used to mark this tab active for a given location string. */
   isActiveFor: (location: string) => boolean;
@@ -20,10 +20,12 @@ interface ClientTab {
 const TABS: ClientTab[] = [
   {
     label: "The Plan",
-    resolve: () => "/",
+    // The Plan is the project root with no `?tab=` parameter. If we know which
+    // project the user is viewing we deep-link to it; otherwise we send them
+    // home and let the dashboard pick a project.
+    resolve: (id) => (id ? `/project/${id}` : "/"),
     isActiveFor: (loc) =>
       loc === "/" ||
-      // Project root with no tab param == The Plan
       (loc.startsWith("/project/") && !loc.includes("?tab=")),
   },
   {
@@ -49,6 +51,17 @@ const TABS: ClientTab[] = [
 ];
 
 /**
+ * Pull the project id out of a route like `/project/5` or `/project/5?tab=...`.
+ * Returns null if we are not on a project page.
+ */
+function projectIdFromLocation(location: string): number | null {
+  const m = location.match(/^\/project\/(\d+)/);
+  if (!m) return null;
+  const n = Number(m[1]);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
  * Flat underlined file-tab navigation for the client view.
  *
  * Background: previously this nav linked to `/updates` and `/design-board`,
@@ -59,9 +72,14 @@ const TABS: ClientTab[] = [
 export function ClientTabsNav() {
   const [location] = useLocation();
 
-  // Pull the client's projects to resolve the primary one. If they have none
-  // we still render the tabs (disabled / point at /) so the layout doesn't
-  // jump between empty and full states on first load.
+  // 1. Prefer the project the user is currently viewing (URL is the source of
+  //    truth). This is the case for both real clients on a project page AND
+  //    admins using the Client Preview toggle on a specific project.
+  const currentProjectId = projectIdFromLocation(location);
+
+  // 2. If we are NOT on a project page (e.g. on `/`), fall back to the user's
+  //    primary non-archived project so the tabs still deep-link somewhere
+  //    sensible. We only fetch the list when needed.
   const { data: projects } = useQuery<ProjectStub[]>({
     queryKey: ["/api/projects"],
     queryFn: async () => {
@@ -69,12 +87,13 @@ export function ClientTabsNav() {
       if (!res.ok) return [];
       return res.json();
     },
+    enabled: currentProjectId === null,
     staleTime: 60_000,
   });
 
   const primaryProject =
     (projects || []).find((p) => p.status !== "archived") || null;
-  const projectId = primaryProject?.id ?? null;
+  const projectId = currentProjectId ?? primaryProject?.id ?? null;
 
   return (
     <nav
