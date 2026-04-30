@@ -625,35 +625,50 @@ export class DatabaseStorage implements IStorage {
       .returning();
   }
 
-  // Delete project (cascading deletes handled by cleaning up related data)
+  // Delete project (cleans up every project-scoped table that has a notNull FK
+  // to projects.id without ON DELETE CASCADE). Wrapped in a transaction so a
+  // partial failure rolls back instead of leaving the project in a half-deleted
+  // state.
   async deleteProject(id: number): Promise<void> {
-    const boards = await db.select().from(planningBoards).where(eq(planningBoards.projectId, id));
-    for (const board of boards) {
-      await db.delete(canvasElements).where(eq(canvasElements.boardId, board.id));
-    }
-    await db.delete(planningBoards).where(eq(planningBoards.projectId, id));
-    await db.delete(calendarEvents).where(eq(calendarEvents.projectId, id));
-    await db.delete(checklistItems).where(eq(checklistItems.projectId, id));
-    await db.delete(boardItems).where(eq(boardItems.projectId, id));
-    await db.delete(messages).where(eq(messages.projectId, id));
-    // Clean up cost estimator data
-    const estimates = await db.select().from(projectEstimates).where(eq(projectEstimates.projectId, id));
-    for (const est of estimates) {
-      const items = await db.select().from(estimateItems).where(eq(estimateItems.estimateId, est.id));
-      for (const item of items) {
-        await db.delete(estimateWarnings).where(eq(estimateWarnings.estimateItemId, item.id));
+    await db.transaction(async (tx) => {
+      const boards = await tx.select().from(planningBoards).where(eq(planningBoards.projectId, id));
+      for (const board of boards) {
+        await tx.delete(canvasElements).where(eq(canvasElements.boardId, board.id));
       }
-      await db.delete(estimateItems).where(eq(estimateItems.estimateId, est.id));
-    }
-    await db.delete(projectEstimates).where(eq(projectEstimates.projectId, id));
-    await db.delete(receipts).where(eq(receipts.projectId, id));
-    await db.delete(timeEntries).where(eq(timeEntries.projectId, id));
-    await db.delete(documents).where(eq(documents.projectId, id));
-    await db.delete(photos).where(eq(photos.projectId, id));
-    await db.delete(tasks).where(eq(tasks.projectId, id));
-    await db.delete(sections).where(eq(sections.projectId, id));
-    await db.delete(milestones).where(eq(milestones.projectId, id));
-    await db.delete(projects).where(eq(projects.id, id));
+      await tx.delete(planningBoards).where(eq(planningBoards.projectId, id));
+      await tx.delete(calendarEvents).where(eq(calendarEvents.projectId, id));
+      await tx.delete(checklistItems).where(eq(checklistItems.projectId, id));
+      await tx.delete(boardItems).where(eq(boardItems.projectId, id));
+      await tx.delete(messages).where(eq(messages.projectId, id));
+      // Clean up cost estimator data
+      const estimates = await tx.select().from(projectEstimates).where(eq(projectEstimates.projectId, id));
+      for (const est of estimates) {
+        const items = await tx.select().from(estimateItems).where(eq(estimateItems.estimateId, est.id));
+        for (const item of items) {
+          await tx.delete(estimateWarnings).where(eq(estimateWarnings.estimateItemId, item.id));
+        }
+        await tx.delete(estimateItems).where(eq(estimateItems.estimateId, est.id));
+      }
+      await tx.delete(projectEstimates).where(eq(projectEstimates.projectId, id));
+      await tx.delete(receipts).where(eq(receipts.projectId, id));
+      await tx.delete(timeEntries).where(eq(timeEntries.projectId, id));
+      await tx.delete(documents).where(eq(documents.projectId, id));
+      await tx.delete(photos).where(eq(photos.projectId, id));
+      await tx.delete(tasks).where(eq(tasks.projectId, id));
+      await tx.delete(sections).where(eq(sections.projectId, id));
+      await tx.delete(milestones).where(eq(milestones.projectId, id));
+      // Tables that were missing from the original cleanup and caused
+      // foreign-key violations on delete:
+      //   activity_views → cascades from activity_log automatically
+      await tx.delete(activityLog).where(eq(activityLog.projectId, id));
+      await tx.delete(decisions).where(eq(decisions.projectId, id));
+      await tx.delete(selections).where(eq(selections.projectId, id));
+      await tx.delete(changeOrders).where(eq(changeOrders.projectId, id));
+      await tx.delete(siteVisits).where(eq(siteVisits.projectId, id));
+      await tx.delete(clientInvites).where(eq(clientInvites.projectId, id));
+      await tx.delete(socialPosts).where(eq(socialPosts.projectId, id));
+      await tx.delete(projects).where(eq(projects.id, id));
+    });
   }
 
   // Checklist Items
