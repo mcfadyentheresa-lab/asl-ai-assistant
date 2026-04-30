@@ -621,6 +621,62 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
   const imageUrlInputRef = useRef<HTMLInputElement | null>(null);
   const noteTextareaRefs = useRef<Record<string, HTMLTextAreaElement | HTMLInputElement | null>>({});
   const [focusedTodoItem, setFocusedTodoItem] = useState<{ elementId: number; itemIdx: number } | null>(null);
+
+  // Auto-grow a single-line textarea so its visible height matches its
+  // content. Used by to-do item editors so long task text wraps and the
+  // card grows vertically with the typing.
+  const autoGrowTextarea = useCallback((ta: HTMLTextAreaElement) => {
+    ta.style.height = "auto";
+    ta.style.height = `${ta.scrollHeight}px`;
+  }, []);
+
+  // ResizeObserver wiring for to-do cards. The card has minHeight:80 but no
+  // fixed height — it grows naturally as items are added or as long item
+  // text wraps. We measure the rendered DOM and persist that height back to
+  // the element so resize handles, drag math, and auto-fit calculations stay
+  // consistent with what's actually on screen.
+  const todoResizeObservers = useRef<Map<number, ResizeObserver>>(new Map());
+  const todoResizeRafs = useRef<Map<number, number>>(new Map());
+  const detachTodoResizeObserver = useCallback((elementId: number) => {
+    const ob = todoResizeObservers.current.get(elementId);
+    if (ob) { ob.disconnect(); todoResizeObservers.current.delete(elementId); }
+    const raf = todoResizeRafs.current.get(elementId);
+    if (raf) { cancelAnimationFrame(raf); todoResizeRafs.current.delete(elementId); }
+  }, []);
+  const attachTodoResizeObserver = useCallback((elementId: number, node: HTMLElement) => {
+    if (todoResizeObservers.current.has(elementId)) return;
+    const ob = new ResizeObserver(() => {
+      const measured = node.offsetHeight;
+      // Coalesce multiple ticks per frame.
+      {
+        const prev = todoResizeRafs.current.get(elementId);
+        if (prev) cancelAnimationFrame(prev);
+        const rafId = requestAnimationFrame(() => {
+          todoResizeRafs.current.delete(elementId);
+          const current = useCanvasStore.getState().elements[elementId];
+          if (!current || current.type !== "todo") return;
+          // Snap to grid and require >= 4px change to avoid feedback loops with
+          // the rounded value.
+          const snapped = Math.max(80, Math.round(measured / GRID_SIZE) * GRID_SIZE);
+          if (Math.abs((current.height ?? 0) - snapped) < 4) return;
+          useCanvasStore.getState().updateElement(elementId, { height: snapped });
+          const boardId = useCanvasStore.getState().boardId;
+          if (boardId) debouncedSavePositions(boardId);
+        });
+        todoResizeRafs.current.set(elementId, rafId);
+      }
+    });
+    // Initial measurement so DB height matches what's rendered.
+    ob.observe(node);
+    todoResizeObservers.current.set(elementId, ob);
+  }, []);
+  // Cleanup all observers on unmount.
+  useEffect(() => () => {
+    todoResizeObservers.current.forEach((ob) => ob.disconnect());
+    todoResizeObservers.current.clear();
+    todoResizeRafs.current.forEach((id) => cancelAnimationFrame(id));
+    todoResizeRafs.current.clear();
+  }, []);
   const [drawingMode, setDrawingMode] = useState(false);
   const [drawTool, setDrawTool] = useState<"pen" | "eraser">("pen");
   const [drawColor, setDrawColor] = useState("#1e3a2f");
@@ -4691,6 +4747,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
       return (
         <div
           key={el.id}
+          ref={(node) => { if (node) attachTodoResizeObserver(el.id, node); else detachTodoResizeObserver(el.id); }}
           className={`${cardBase} bg-card border border-border cursor-grab`}
           style={{ left: el.x, top: el.y, width: el.width, minHeight: 80, zIndex: effectiveZ }}
           onMouseDown={(e) => {
@@ -4737,12 +4794,24 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                     data-testid={`checkbox-${el.id}-${idx}`}
                   />
                   {isSelected ? (
-                    <input
-                      ref={(ref) => { if (ref) noteTextareaRefs.current[`${el.id}-todo-${idx}`] = ref; }}
-                      className="flex-1 bg-transparent border-none text-xs outline-none"
+                    // Textarea (not input) so long task text wraps and the
+                    // card can grow vertically with the typing instead of
+                    // clipping horizontally. rows={1} + auto-grow keeps it
+                    // looking like a single-line input until the user
+                    // actually types past the wrap point.
+                    <textarea
+                      ref={(ref) => {
+                        if (ref) {
+                          noteTextareaRefs.current[`${el.id}-todo-${idx}`] = ref;
+                          autoGrowTextarea(ref);
+                        }
+                      }}
+                      rows={1}
+                      className="flex-1 bg-transparent border-none text-xs outline-none resize-none overflow-hidden leading-snug py-0"
                       key={`todo-item-${item.id ?? ""}-${item.text ?? ""}`}
                       defaultValue={item.text}
                       onFocus={() => setFocusedTodoItem({ elementId: el.id, itemIdx: idx })}
+                      onInput={(e) => autoGrowTextarea(e.currentTarget)}
                       onBlur={(e) => {
                         const newItems = [...items];
                         newItems[idx] = { ...newItems[idx], text: e.target.value };
@@ -4751,7 +4820,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                       data-testid={`input-todo-${el.id}-${idx}`}
                     />
                   ) : (
-                    <span className={`text-xs ${item.checked ? "line-through text-muted-foreground" : ""}`}>{item.text}</span>
+                    <span className={`text-xs whitespace-pre-wrap break-words ${item.checked ? "line-through text-muted-foreground" : ""}`}>{item.text}</span>
                   )}
                 </label>
               ))}
