@@ -5220,6 +5220,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
             {isSelected ? (
               <div className="space-y-1.5">
                 <input
+                  key={`name-${c.name ?? ""}`}
                   className="w-full bg-transparent border-none text-sm font-medium outline-none"
                   defaultValue={c.name}
                   placeholder="Product name"
@@ -5227,6 +5228,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                   data-testid={`input-product-name-${el.id}`}
                 />
                 <input
+                  key={`price-${c.price ?? ""}`}
                   className="w-full bg-transparent border-none text-xs text-muted-foreground outline-none"
                   defaultValue={c.price}
                   placeholder="Price (e.g. $249)"
@@ -5235,6 +5237,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                 />
                 <div className="flex items-center gap-1">
                   <input
+                    key={`supplier-${c.supplier ?? ""}`}
                     className="flex-1 bg-transparent border-none text-xs text-muted-foreground outline-none"
                     defaultValue={c.supplier}
                     placeholder="Supplier"
@@ -5294,6 +5297,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                   </Popover>
                 </div>
                 <input
+                  key={`image-${c.imageUrl ?? ""}`}
                   className="w-full bg-transparent border-none text-xs text-primary outline-none"
                   defaultValue={c.imageUrl || ""}
                   placeholder="Image URL"
@@ -5301,6 +5305,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                   data-testid={`input-product-image-${el.id}`}
                 />
                 <input
+                  key={`url-${c.url ?? ""}`}
                   className="w-full bg-transparent border-none text-xs text-primary outline-none"
                   defaultValue={c.url}
                   placeholder="https://product-link..."
@@ -5308,6 +5313,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                   data-testid={`input-product-url-${el.id}`}
                 />
                 <input
+                  key={`room-${c.room ?? ""}`}
                   className="w-full bg-transparent border border-border/50 rounded text-xs outline-none px-1.5 py-0.5"
                   defaultValue={c.room || ""}
                   placeholder="Room"
