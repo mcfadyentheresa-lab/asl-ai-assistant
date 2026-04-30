@@ -2351,13 +2351,62 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
     const centerY =
       pos?.y ??
       Math.round((-pan.y + (containerRef.current?.clientHeight || 600) / 2) / zoom - 100);
+
+    // Re-host external images through our server to bypass Referer-based
+    // hotlink protection (Houzz, Pinterest, many CDNs return blank/blocked
+    // when fetched cross-origin with the wrong Referer). The server fetches
+    // the bytes, validates the content-type, and stores them in our bucket.
+    // If our own /objects/ path is already given, skip the proxy step.
+    const trimmed = url.trim();
+    const isAlreadyOurs =
+      trimmed.startsWith("/objects/") ||
+      trimmed.startsWith(`${window.location.origin}/objects/`);
+    let finalUrl = trimmed;
+    if (!isAlreadyOurs) {
+      try {
+        const proxyRes = await fetch("/api/uploads/from-url", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ url: trimmed }),
+        });
+        if (proxyRes.ok) {
+          const data = await proxyRes.json();
+          if (data?.objectPath) {
+            finalUrl = data.objectPath;
+          }
+        } else {
+          // Surface the real reason instead of silently keeping a blank
+          // hot-linked image on the canvas.
+          let reason = `${proxyRes.status}`;
+          try {
+            const j = await proxyRes.json();
+            if (j?.error) reason = j.error;
+          } catch { /* non-JSON body — keep status */ }
+          toast({
+            title: "Couldn't fetch that image",
+            description: reason,
+            variant: "destructive",
+          });
+          return;
+        }
+      } catch {
+        toast({
+          title: "Couldn't fetch that image",
+          description: "Network error",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
     try {
       const apiUrl = buildUrl(api.canvasElements.create.path, { boardId: selectedBoardId });
       const res = await fetch(apiUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ type: "image", x: centerX, y: centerY, width: 240, height: 200, zIndex: newZ, content: { url: url.trim(), caption: "" } }),
+        body: JSON.stringify({ type: "image", x: centerX, y: centerY, width: 240, height: 200, zIndex: newZ, content: { url: finalUrl, caption: "" } }),
       });
       const el = await res.json();
       addElement(el);

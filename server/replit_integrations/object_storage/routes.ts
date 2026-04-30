@@ -35,6 +35,90 @@ export function registerObjectStorageRoutes(app: Express): void {
    * IMPORTANT: The client should NOT send the file to this endpoint.
    * Send JSON metadata only, then upload the file directly to uploadURL.
    */
+  /**
+   * Re-host an external image URL into our own bucket.
+   *
+   * Why this exists: dropping or pasting an image URL from sites like Houzz,
+   * Pinterest, or any CDN that uses Referer-based hotlink protection results
+   * in a blank/white box on the canvas because the browser silently fails to
+   * load the image. By fetching it server-side first and re-hosting it under
+   * /objects/..., we get a reliable, persistent image that survives even if
+   * the original is taken down.
+   *
+   * Request body: { url: string }
+   * Response 200: { objectPath: "/objects/uploads/<uuid>", contentType }
+   * Response 400: { error } when the URL is missing/invalid or doesn't point
+   *   to a real image.
+   * Response 502: { error } when the upstream fetch or our re-upload fails.
+   *
+   * Size cap: 25 MiB per image. Allowed types: image/* only.
+   */
+  app.post("/api/uploads/from-url", async (req, res) => {
+    const { url } = req.body || {};
+    if (typeof url !== "string" || !/^https?:\/\//i.test(url)) {
+      return res.status(400).json({ error: "Missing or invalid url" });
+    }
+
+    try {
+      // Fetch the source image. Send a desktop UA + a benign Referer matching
+      // the source host so hotlink-protected CDNs serve us the bytes. Time
+      // out aggressively so a slow or dead source doesn't tie up a worker.
+      let sourceHost = "";
+      try { sourceHost = new URL(url).host; } catch { /* validated above */ }
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15_000);
+      let upstream: Response;
+      try {
+        upstream = await fetch(url, {
+          redirect: "follow",
+          signal: controller.signal,
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 " +
+              "(KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+            "Referer": sourceHost ? `https://${sourceHost}/` : "",
+            "Accept": "image/*,*/*;q=0.8",
+          },
+        });
+      } finally {
+        clearTimeout(timeout);
+      }
+
+      if (!upstream.ok) {
+        return res.status(502).json({ error: `Source returned ${upstream.status}` });
+      }
+      const contentType = (upstream.headers.get("content-type") || "").toLowerCase();
+      if (!contentType.startsWith("image/")) {
+        return res.status(400).json({ error: `Not an image (content-type: ${contentType || "unknown"})` });
+      }
+      const buf = Buffer.from(await upstream.arrayBuffer());
+      const MAX = 25 * 1024 * 1024;
+      if (buf.byteLength === 0) {
+        return res.status(502).json({ error: "Empty response from source" });
+      }
+      if (buf.byteLength > MAX) {
+        return res.status(400).json({ error: "Image larger than 25 MiB" });
+      }
+
+      // Mint a presigned PUT URL into our bucket and stream the bytes up.
+      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+      const putRes = await fetch(uploadURL, {
+        method: "PUT",
+        headers: { "Content-Type": contentType },
+        body: buf,
+      });
+      if (!putRes.ok) {
+        return res.status(502).json({ error: `Re-upload failed: ${putRes.status}` });
+      }
+      const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
+      return res.json({ objectPath, contentType, bytes: buf.byteLength });
+    } catch (err: any) {
+      const msg = err?.name === "AbortError" ? "Source fetch timed out" : (err?.message || "unknown error");
+      console.error("[uploads/from-url] failed:", msg);
+      return res.status(502).json({ error: msg });
+    }
+  });
+
   app.post("/api/uploads/request-url", async (req, res) => {
     try {
       const { name, size, contentType } = req.body;
