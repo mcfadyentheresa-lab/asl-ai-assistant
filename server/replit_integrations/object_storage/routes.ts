@@ -17,6 +17,55 @@ export function registerObjectStorageRoutes(app: Express): void {
   const objectStorageService = new ObjectStorageService();
 
   /**
+   * Admin diagnostic: report which object-storage env vars are present and
+   * try a no-op signed-URL mint so we can tell *at boot* whether GCS is
+   * actually working on this deploy. Returns shape:
+   *   { ok: boolean, env: {...presence flags}, sign?: { ok, detail?, kind? } }
+   * No secrets are echoed — we only report whether each var is set, plus
+   * the parsed project_id if GCS_CREDENTIALS_JSON is valid JSON.
+   *
+   * Intentionally unauthenticated — it leaks nothing sensitive and we need
+   * to be able to curl it from anywhere when uploads are dead.
+   */
+  app.get("/api/uploads/diagnostic", async (_req, res) => {
+    const env = {
+      GCS_PROJECT_ID: !!process.env.GCS_PROJECT_ID,
+      GCS_CREDENTIALS_JSON: !!process.env.GCS_CREDENTIALS_JSON,
+      GCS_KEY_FILE: !!process.env.GCS_KEY_FILE,
+      GOOGLE_APPLICATION_CREDENTIALS: !!process.env.GOOGLE_APPLICATION_CREDENTIALS,
+      PRIVATE_OBJECT_DIR: !!process.env.PRIVATE_OBJECT_DIR,
+      PUBLIC_OBJECT_SEARCH_PATHS: !!process.env.PUBLIC_OBJECT_SEARCH_PATHS,
+      credentials_json_valid: false as boolean,
+      credentials_project_id: "" as string,
+      private_object_dir_value: process.env.PRIVATE_OBJECT_DIR || "",
+    };
+    if (process.env.GCS_CREDENTIALS_JSON) {
+      try {
+        const parsed = JSON.parse(process.env.GCS_CREDENTIALS_JSON);
+        env.credentials_json_valid = true;
+        env.credentials_project_id = String(parsed.project_id || "");
+      } catch {
+        env.credentials_json_valid = false;
+      }
+    }
+    let sign: { ok: boolean; detail?: string; kind?: "config" | "auth" | "runtime" } = { ok: false };
+    try {
+      await objectStorageService.getObjectEntityUploadURL();
+      sign = { ok: true };
+    } catch (error: any) {
+      const msg = String(error?.message || error || "unknown error");
+      let kind: "config" | "auth" | "runtime" = "runtime";
+      if (/PRIVATE_OBJECT_DIR|GCS_CREDENTIALS_JSON|GCS_PROJECT_ID|PUBLIC_OBJECT_SEARCH_PATHS/.test(msg)) {
+        kind = "config";
+      } else if (/credential|permission|forbidden|403|401|invalid_grant|invalid_jwt/i.test(msg)) {
+        kind = "auth";
+      }
+      sign = { ok: false, detail: msg, kind };
+    }
+    res.json({ ok: sign.ok, env, sign });
+  });
+
+  /**
    * Request a presigned URL for file upload.
    *
    * Request body (JSON):
@@ -140,9 +189,21 @@ export function registerObjectStorageRoutes(app: Express): void {
         // Echo back the metadata for client convenience
         metadata: { name, size, contentType },
       });
-    } catch (error) {
-      console.error("Error generating upload URL:", error);
-      res.status(500).json({ error: "Failed to generate upload URL" });
+    } catch (error: any) {
+      // Surface the underlying GCS / config error so the client toast and the
+      // server log both tell us *why* — generic 500s have cost us hours of
+      // back-and-forth on this exact path. Differentiate config errors
+      // (missing env vars) from auth errors (bad credentials) from runtime
+      // signing errors so we can tell at a glance which knob is wrong.
+      const msg = String(error?.message || error || "unknown error");
+      console.error("[uploads/request-url] failed:", msg, error?.stack || "");
+      let kind: "config" | "auth" | "runtime" = "runtime";
+      if (/PRIVATE_OBJECT_DIR|GCS_CREDENTIALS_JSON|GCS_PROJECT_ID|PUBLIC_OBJECT_SEARCH_PATHS/.test(msg)) {
+        kind = "config";
+      } else if (/credential|permission|forbidden|403|401|invalid_grant|invalid_jwt/i.test(msg)) {
+        kind = "auth";
+      }
+      res.status(500).json({ error: "Failed to generate upload URL", detail: msg, kind });
     }
   });
 
@@ -158,12 +219,22 @@ export function registerObjectStorageRoutes(app: Express): void {
     try {
       const objectFile = await objectStorageService.getObjectEntityFile(req.path);
       await objectStorageService.downloadObject(objectFile, res);
-    } catch (error) {
-      console.error("Error serving object:", error);
+    } catch (error: any) {
       if (error instanceof ObjectNotFoundError) {
         return res.status(404).json({ error: "Object not found" });
       }
-      return res.status(500).json({ error: "Failed to serve object" });
+      // Same diagnostic shape as /api/uploads/request-url so a single curl
+      // tells us whether reads are dying for the same config/auth reason as
+      // writes, or for something object-specific.
+      const msg = String(error?.message || error || "unknown error");
+      console.error("[objects/get] failed:", msg, error?.stack || "");
+      let kind: "config" | "auth" | "runtime" = "runtime";
+      if (/PRIVATE_OBJECT_DIR|GCS_CREDENTIALS_JSON|GCS_PROJECT_ID|PUBLIC_OBJECT_SEARCH_PATHS/.test(msg)) {
+        kind = "config";
+      } else if (/credential|permission|forbidden|403|401|invalid_grant|invalid_jwt/i.test(msg)) {
+        kind = "auth";
+      }
+      return res.status(500).json({ error: "Failed to serve object", detail: msg, kind });
     }
   });
 
