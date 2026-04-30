@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { usePlanningBoards, usePhotos, useCreatePhoto, useDeletePhoto, useUploadImage } from "@/hooks/use-projects";
-import { Loader2, Layers, Plus, Palette, Shapes, Wrench, Armchair, Trash2, RefreshCw, Upload } from "lucide-react";
+import { Loader2, Layers, Plus, Palette, Shapes, Wrench, Armchair, Trash2, RefreshCw, Upload, FolderPlus, Check, X, CheckSquare, Square, Tag } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useUpload } from "@/hooks/use-upload";
@@ -98,6 +98,14 @@ export function MaterialsDrawer({ projectId, onAddImageUrl, activeRoom, activeRo
   // every reference image lives in one place. Photos are represented as
   // virtual image elements with _photoId set; Remove routes to /api/photos.
   const { data: photos, isLoading: loadingPhotos } = usePhotos(projectId);
+  // Lookup map for a photo's current tags array, keyed by photo id. The
+  // grouping flow needs to read+write the tags array (first tag is the asset
+  // group label) without an extra round-trip per write.
+  const photoTagsById = useMemo(() => {
+    const map = new Map<number, string[]>();
+    (photos || []).forEach((p: any) => map.set(p.id, Array.isArray(p.tags) ? [...p.tags] : []));
+    return map;
+  }, [photos]);
   const { mutate: createPhoto } = useCreatePhoto();
   const { mutateAsync: deletePhoto } = useDeletePhoto();
   const { mutateAsync: uploadImage, isPending: isUploadingPhoto } = useUploadImage();
@@ -123,6 +131,27 @@ export function MaterialsDrawer({ projectId, onAddImageUrl, activeRoom, activeRo
     photoIds: number[];
     label: string;
   } | null>(null);
+
+  // Grouping state. Users can stamp every tile with a free-form group label
+  // ("Kitchen", "Lighting", "Phase 2", whatever) so the Assets drawer organises
+  // around their mental model, not just the kind buckets. Grouping is
+  // project-scoped and independent of board tabs / rooms / categories.
+  // - groupBy: when true, the grid renders sectioned by group.
+  // - selectMode: when true, tiles show a checkbox and tap-to-select instead
+  //   of tap-to-add. The bottom action bar exposes bulk Set/Clear group.
+  // - selectedKeys: dedupe keys of currently selected tiles.
+  const [groupBy, setGroupBy] = useState(false);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
+  // Dialog state for the "Set group" prompt. targetKeys is the list of dedupe
+  // keys to apply the group to — either [singleTile] for a per-tile assign or
+  // the whole selectedKeys set for a bulk assign.
+  const [groupAssign, setGroupAssign] = useState<{
+    targetKeys: string[];
+    label: string;
+    initial: string;
+  } | null>(null);
+  const [groupInput, setGroupInput] = useState("");
 
   const invalidateLibrary = async () => {
     // Force-refetch every query that produces Assets data. Prefix matching is
@@ -262,6 +291,125 @@ export function MaterialsDrawer({ projectId, onAddImageUrl, activeRoom, activeRo
     });
     return map;
   }, [elementsRaw, photoElements]);
+
+  // Map of dedupe-key -> current group label. Read from the first source that
+  // has a non-empty value: canvas elements use content.assetGroup, photo
+  // uploads use the first entry of their tags array. If a dedupe group's
+  // members disagree (rare; happens after partial writes) we surface the
+  // first non-empty value and silently overwrite when the user assigns again.
+  const groupByDedupeKey = useMemo(() => {
+    const map = new Map<string, string>();
+    (elementsRaw || []).forEach((el: any) => {
+      if (!LIBRARY_TYPES.has(el.type)) return;
+      const c = el.content || {};
+      const key = `${bucketFor(el)}|${(c.name || c.title || "").toLowerCase()}|${(c.hex || c.color || c.imageUrl || c.url || "").toLowerCase()}`;
+      const g = typeof c.assetGroup === "string" ? c.assetGroup.trim() : "";
+      if (g && !map.get(key)) map.set(key, g);
+    });
+    photoElements.forEach((el: any) => {
+      const c = el.content || {};
+      const key = `${bucketFor(el)}|${(c.name || c.title || "").toLowerCase()}|${(c.hex || c.color || c.imageUrl || c.url || "").toLowerCase()}`;
+      const tags = photoTagsById.get(el._photoId) || [];
+      const g = (tags[0] || "").trim();
+      if (g && !map.get(key)) map.set(key, g);
+    });
+    return map;
+  }, [elementsRaw, photoElements, photoTagsById]);
+
+  // Distinct group labels seen anywhere in the project, sorted. Used both for
+  // the group-by sectioned view and as <datalist> suggestions when assigning.
+  const allGroups = useMemo(() => {
+    const s = new Set<string>();
+    groupByDedupeKey.forEach((g) => { if (g) s.add(g); });
+    return Array.from(s).sort((a, b) => a.localeCompare(b));
+  }, [groupByDedupeKey]);
+
+  // Apply a group label to every dedupe-group identified by `keys`. Empty
+  // string clears the group. Hits canvas-elements PATCH for board cards and
+  // /api/photos/:id/tags for raw uploads.
+  const applyGroupToKeys = async (keys: string[], nextGroup: string) => {
+    const trimmed = nextGroup.trim();
+    let canvasOk = 0, canvasFail = 0, photoOk = 0, photoFail = 0;
+    for (const key of keys) {
+      const group = idsByDedupeKey.get(key);
+      if (!group) continue;
+      // Patch every canvas element in the dedupe group.
+      await Promise.all(group.canvasElementIds.map(async (id) => {
+        const existing = (elementsRaw || []).find((x: any) => x.id === id);
+        const nextContent = { ...(existing?.content || {}), assetGroup: trimmed || undefined };
+        try {
+          const res = await fetch(`/api/canvas-elements/${id}`, {
+            method: "PATCH",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ content: nextContent }),
+          });
+          if (res.ok) canvasOk++; else canvasFail++;
+        } catch { canvasFail++; }
+      }));
+      // For each photo, replace tags[0] with the new group (or drop the first
+      // entry when clearing). Other tags are preserved so existing /tag
+      // workflows aren't disturbed.
+      await Promise.all(group.photoIds.map(async (pid) => {
+        const cur = photoTagsById.get(pid) || [];
+        const rest = cur.slice(1);
+        const nextTags = trimmed ? [trimmed, ...rest] : rest;
+        try {
+          const res = await fetch(`/api/photos/${pid}/tags`, {
+            method: "PATCH",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ tags: nextTags }),
+          });
+          if (res.ok) photoOk++; else photoFail++;
+        } catch { photoFail++; }
+      }));
+    }
+    await invalidateLibrary();
+    const total = canvasOk + canvasFail + photoOk + photoFail;
+    const failed = canvasFail + photoFail;
+    if (total === 0) {
+      toast({ title: "Nothing to update" });
+    } else if (failed === 0) {
+      toast({
+        title: trimmed ? `Set group “${trimmed}”` : "Cleared group",
+        description: `${total} ${total === 1 ? "item" : "items"} updated.`,
+      });
+    } else {
+      toast({
+        title: "Some updates failed",
+        description: `${failed} of ${total} didn't save.`,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const openGroupAssign = (keys: string[], label: string, initial: string) => {
+    setGroupAssign({ targetKeys: keys, label, initial });
+    setGroupInput(initial);
+  };
+
+  const confirmGroupAssign = async () => {
+    if (!groupAssign) return;
+    const target = groupAssign;
+    const next = groupInput;
+    setGroupAssign(null);
+    setGroupInput("");
+    await applyGroupToKeys(target.targetKeys, next);
+    // Bulk-assign exits select mode so the action bar collapses cleanly.
+    if (target.targetKeys.length > 1) {
+      setSelectedKeys(new Set());
+      setSelectMode(false);
+    }
+  };
+
+  const toggleSelected = (key: string) => {
+    setSelectedKeys((cur) => {
+      const next = new Set(cur);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
 
   // Confirmation state now also tracks photo ids so the dialog can describe
   // the cleanup accurately and the confirm handler can fire both deletes.
@@ -477,6 +625,37 @@ export function MaterialsDrawer({ projectId, onAddImageUrl, activeRoom, activeRo
             );
           })}
         </div>
+        {/* Grouping controls. Group-by toggles a sectioned view; Select enters
+            multi-pick mode so the user can stamp many tiles with the same
+            group label in one go. The two are independent — you can run
+            select mode while the view is grouped or flat. */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setGroupBy((v) => !v)}
+            aria-pressed={groupBy}
+            className={`h-7 px-2.5 rounded-full text-[11px] font-medium transition-colors inline-flex items-center gap-1 ${groupBy ? "bg-[#2f4a3a] text-white" : "bg-muted text-muted-foreground hover:bg-muted/70"}`}
+            data-testid="materials-group-by-toggle"
+            title={groupBy ? "Showing grouped sections" : "Group items by their assigned group"}
+          >
+            <FolderPlus className="h-3 w-3" /> {groupBy ? "Grouped" : "Group by…"}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setSelectMode((v) => {
+                if (v) setSelectedKeys(new Set());
+                return !v;
+              });
+            }}
+            aria-pressed={selectMode}
+            className={`h-7 px-2.5 rounded-full text-[11px] font-medium transition-colors inline-flex items-center gap-1 ${selectMode ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/70"}`}
+            data-testid="materials-select-toggle"
+          >
+            {selectMode ? <CheckSquare className="h-3 w-3" /> : <Square className="h-3 w-3" />}
+            {selectMode ? `Selecting (${selectedKeys.size})` : "Select"}
+          </button>
+        </div>
       </div>
       <div className="flex-1 overflow-y-auto p-3">
         {isLoading ? (
@@ -492,7 +671,7 @@ export function MaterialsDrawer({ projectId, onAddImageUrl, activeRoom, activeRo
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-2">
+          <>
             {/* Shared hidden file input for the Replace flow. */}
             <input
               ref={fileInputRef}
@@ -502,112 +681,251 @@ export function MaterialsDrawer({ projectId, onAddImageUrl, activeRoom, activeRo
               onChange={handleReplaceFile}
               data-testid="library-replace-file-input"
             />
-            {visible.map((el: any) => {
-              const c = el.content || {};
-              const url: string | undefined = c.imageUrl || c.url;
-              const swatchColor = (el.type === "color_swatch" || (el.type === "surface" && c.kind === "paint")) ? (c.color || c.hex) : undefined;
-              const label = c.name || c.title || c.caption || el.type;
-              const sub = c.brand || c.supplier || c.code || el.boardName || "";
-              const bucket = bucketFor(el);
-              const isBusy = busyKey === el._dedupeKey;
-              const _group = idsByDedupeKey.get(el._dedupeKey);
-              const groupSize = (_group ? _group.canvasElementIds.length + _group.photoIds.length : 0) || 1;
-
-              return (
-                <button
-                  key={el.id}
-                  type="button"
-                  draggable={!isBusy}
-                  onDragStart={(e) => {
-                    // For paint swatches drag with full structured payload so SpatialCanvas can
-                    // recreate a real paint card. For everything else, fall back to image-url drop.
-                    if (swatchColor) {
-                      e.dataTransfer.setData("tool-type", "surface-paint");
-                      e.dataTransfer.setData("library-payload", JSON.stringify({
-                        kind: "paint",
-                        color: swatchColor,
-                        hex: c.hex || swatchColor,
-                        name: c.name || "",
-                        code: c.code || "",
-                        brand: c.brand || "",
-                      }));
-                    } else if (url) {
-                      e.dataTransfer.setData("tool-type", "image");
-                      e.dataTransfer.setData("image-url", url);
-                    } else {
-                      return;
-                    }
-                    e.dataTransfer.effectAllowed = "copy";
-                  }}
-                  onClick={() => { if (url) onAddImageUrl(url); }}
-                  className="group relative aspect-square overflow-hidden rounded-md border border-border/60 hover:border-primary transition-colors bg-card text-left"
-                  data-testid={`drawer-material-${el.id}`}
-                >
-                  {swatchColor ? (
-                    <span className="block w-full h-full" style={{ backgroundColor: swatchColor }} />
-                  ) : url ? (
-                    <img src={url} alt={label} className="w-full h-full object-cover pointer-events-none" draggable={false} />
-                  ) : (
-                    <span className="flex w-full h-full items-center justify-center bg-muted text-muted-foreground text-[10px] font-mono uppercase tracking-[0.14em]">
+            {(() => {
+              const renderTile = (el: any) => {
+                const c = el.content || {};
+                const url: string | undefined = c.imageUrl || c.url;
+                const swatchColor = (el.type === "color_swatch" || (el.type === "surface" && c.kind === "paint")) ? (c.color || c.hex) : undefined;
+                const label = c.name || c.title || c.caption || el.type;
+                const sub = c.brand || c.supplier || c.code || el.boardName || "";
+                const bucket = bucketFor(el);
+                const isBusy = busyKey === el._dedupeKey;
+                const _g = idsByDedupeKey.get(el._dedupeKey);
+                const groupSize = (_g ? _g.canvasElementIds.length + _g.photoIds.length : 0) || 1;
+                const groupLabel = groupByDedupeKey.get(el._dedupeKey) || "";
+                const isSelected = selectedKeys.has(el._dedupeKey);
+                const onTileClick = () => {
+                  if (selectMode) {
+                    toggleSelected(el._dedupeKey);
+                    return;
+                  }
+                  if (url) onAddImageUrl(url);
+                };
+                return (
+                  <button
+                    key={el.id}
+                    type="button"
+                    draggable={!isBusy && !selectMode}
+                    onDragStart={(e) => {
+                      // For paint swatches drag with full structured payload so SpatialCanvas can
+                      // recreate a real paint card. For everything else, fall back to image-url drop.
+                      if (swatchColor) {
+                        e.dataTransfer.setData("tool-type", "surface-paint");
+                        e.dataTransfer.setData("library-payload", JSON.stringify({
+                          kind: "paint",
+                          color: swatchColor,
+                          hex: c.hex || swatchColor,
+                          name: c.name || "",
+                          code: c.code || "",
+                          brand: c.brand || "",
+                        }));
+                      } else if (url) {
+                        e.dataTransfer.setData("tool-type", "image");
+                        e.dataTransfer.setData("image-url", url);
+                      } else {
+                        return;
+                      }
+                      e.dataTransfer.effectAllowed = "copy";
+                    }}
+                    onClick={onTileClick}
+                    className={`group relative aspect-square overflow-hidden rounded-md border transition-colors bg-card text-left ${
+                      isSelected
+                        ? "border-primary ring-2 ring-primary"
+                        : "border-border/60 hover:border-primary"
+                    }`}
+                    data-testid={`drawer-material-${el.id}`}
+                    aria-pressed={selectMode ? isSelected : undefined}
+                  >
+                    {swatchColor ? (
+                      <span className="block w-full h-full" style={{ backgroundColor: swatchColor }} />
+                    ) : url ? (
+                      <img src={url} alt={label} className="w-full h-full object-cover pointer-events-none" draggable={false} />
+                    ) : (
+                      <span className="flex w-full h-full items-center justify-center bg-muted text-muted-foreground text-[10px] font-mono uppercase tracking-[0.14em]">
+                        {bucket}
+                      </span>
+                    )}
+                    {/* Bucket label (top-left, top row) */}
+                    <span className="absolute top-1.5 left-1.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-sm bg-card/85 backdrop-blur text-[9px] font-mono uppercase tracking-[0.12em] text-foreground/70">
                       {bucket}
                     </span>
-                  )}
-                  <span className="absolute top-1.5 left-1.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-sm bg-card/85 backdrop-blur text-[9px] font-mono uppercase tracking-[0.12em] text-foreground/70">
-                    {bucket}
-                  </span>
-                  <span className="absolute inset-0 flex items-center justify-center bg-foreground/0 group-hover:bg-foreground/30 transition-colors pointer-events-none">
-                    <span className="opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center justify-center h-9 w-9 rounded-full bg-primary text-primary-foreground">
-                      <Plus className="h-4 w-4" />
-                    </span>
-                  </span>
-                  {/* Hover affordances: Replace (image kinds only) and Remove. */}
-                  <span
-                    className="absolute top-1.5 right-1.5 flex gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    {!swatchColor && (
+                    {/* Group chip — below the bucket label. Tap to assign or
+                        change. Always visible when a group is set; otherwise
+                        a faint “+ Group” affordance appears on hover. */}
+                    {!selectMode && (
                       <span
                         role="button"
                         tabIndex={0}
-                        aria-label="Replace image"
-                        title="Replace image"
-                        onClick={(e) => { e.stopPropagation(); e.preventDefault(); if (!isBusy) handleReplaceClick(el); }}
-                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); e.preventDefault(); if (!isBusy) handleReplaceClick(el); } }}
+                        title={groupLabel ? `Group: ${groupLabel} — click to change` : "Add a group"}
+                        aria-label={groupLabel ? `Group: ${groupLabel}` : "Add to a group"}
+                        onClick={(e) => { e.stopPropagation(); e.preventDefault(); openGroupAssign([el._dedupeKey], label, groupLabel); }}
+                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); e.preventDefault(); openGroupAssign([el._dedupeKey], label, groupLabel); } }}
                         onMouseDown={(e) => e.stopPropagation()}
                         onPointerDown={(e) => e.stopPropagation()}
                         onDragStart={(e) => { e.stopPropagation(); e.preventDefault(); }}
-                        className={`inline-flex items-center justify-center h-6 w-6 rounded-md bg-card/95 backdrop-blur border border-border/60 text-foreground/80 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors ${isBusy ? "pointer-events-none opacity-50" : ""}`}
-                        data-testid={`library-replace-${el.id}`}
+                        className={`absolute top-7 left-1.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-sm backdrop-blur text-[10px] font-medium max-w-[calc(100%-1rem)] ${
+                          groupLabel
+                            ? "bg-[#2f4a3a] text-white"
+                            : "bg-card/85 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                        }`}
+                        data-testid={`tile-group-chip-${el.id}`}
                       >
-                        {isBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                        {groupLabel ? <Tag className="h-2.5 w-2.5 shrink-0" /> : <FolderPlus className="h-2.5 w-2.5 shrink-0" />}
+                        <span className="truncate">{groupLabel || "Add group"}</span>
                       </span>
                     )}
-                    <span
-                      role="button"
-                      tabIndex={0}
-                      aria-label={groupSize > 1 ? `Remove from library (${groupSize} copies)` : "Remove from library"}
-                      title={groupSize > 1 ? `Remove from library — deletes ${groupSize} copies across boards` : "Remove from library"}
-                      onClick={(e) => { e.stopPropagation(); e.preventDefault(); if (!isBusy) requestRemove(el); }}
-                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); e.preventDefault(); if (!isBusy) requestRemove(el); } }}
-                      onMouseDown={(e) => e.stopPropagation()}
-                      onPointerDown={(e) => e.stopPropagation()}
-                      onDragStart={(e) => { e.stopPropagation(); e.preventDefault(); }}
-                      className={`inline-flex items-center justify-center h-6 w-6 rounded-md bg-card/95 backdrop-blur border border-border/60 text-foreground/80 hover:bg-destructive hover:text-destructive-foreground hover:border-destructive transition-colors ${isBusy ? "pointer-events-none opacity-50" : ""}`}
-                      data-testid={`library-remove-${el.id}`}
-                    >
-                      {isBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+                    {/* Selection checkbox (only in select mode). */}
+                    {selectMode && (
+                      <span
+                        className={`absolute top-1.5 right-1.5 inline-flex items-center justify-center h-5 w-5 rounded-sm border-2 ${
+                          isSelected
+                            ? "bg-primary border-primary text-primary-foreground"
+                            : "bg-card/95 border-border/80"
+                        }`}
+                        aria-hidden
+                      >
+                        {isSelected && <Check className="h-3 w-3" />}
+                      </span>
+                    )}
+                    <span className="absolute inset-0 flex items-center justify-center bg-foreground/0 group-hover:bg-foreground/30 transition-colors pointer-events-none">
+                      {!selectMode && (
+                        <span className="opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center justify-center h-9 w-9 rounded-full bg-primary text-primary-foreground">
+                          <Plus className="h-4 w-4" />
+                        </span>
+                      )}
                     </span>
-                  </span>
-                  <span className="absolute bottom-0 inset-x-0 bg-card/90 backdrop-blur px-2 py-1 text-[10px] flex flex-col gap-0.5">
-                    <span className="truncate font-medium">{label}</span>
-                    {sub && <span className="truncate text-muted-foreground font-mono text-[9px] uppercase tracking-[0.1em]">{sub}</span>}
-                  </span>
-                </button>
+                    {/* Hover affordances: Replace (image kinds only) and Remove. Hidden in select mode. */}
+                    {!selectMode && (
+                      <span
+                        className="absolute top-1.5 right-1.5 flex gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {!swatchColor && (
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            aria-label="Replace image"
+                            title="Replace image"
+                            onClick={(e) => { e.stopPropagation(); e.preventDefault(); if (!isBusy) handleReplaceClick(el); }}
+                            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); e.preventDefault(); if (!isBusy) handleReplaceClick(el); } }}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onDragStart={(e) => { e.stopPropagation(); e.preventDefault(); }}
+                            className={`inline-flex items-center justify-center h-6 w-6 rounded-md bg-card/95 backdrop-blur border border-border/60 text-foreground/80 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors ${isBusy ? "pointer-events-none opacity-50" : ""}`}
+                            data-testid={`library-replace-${el.id}`}
+                          >
+                            {isBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                          </span>
+                        )}
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          aria-label={groupSize > 1 ? `Remove (${groupSize} copies)` : "Remove"}
+                          title={groupSize > 1 ? `Remove — deletes ${groupSize} copies across boards` : "Remove"}
+                          onClick={(e) => { e.stopPropagation(); e.preventDefault(); if (!isBusy) requestRemove(el); }}
+                          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); e.preventDefault(); if (!isBusy) requestRemove(el); } }}
+                          onMouseDown={(e) => e.stopPropagation()}
+                          onPointerDown={(e) => e.stopPropagation()}
+                          onDragStart={(e) => { e.stopPropagation(); e.preventDefault(); }}
+                          className={`inline-flex items-center justify-center h-6 w-6 rounded-md bg-card/95 backdrop-blur border border-border/60 text-foreground/80 hover:bg-destructive hover:text-destructive-foreground hover:border-destructive transition-colors ${isBusy ? "pointer-events-none opacity-50" : ""}`}
+                          data-testid={`library-remove-${el.id}`}
+                        >
+                          {isBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+                        </span>
+                      </span>
+                    )}
+                    <span className="absolute bottom-0 inset-x-0 bg-card/90 backdrop-blur px-2 py-1 text-[10px] flex flex-col gap-0.5">
+                      <span className="truncate font-medium">{label}</span>
+                      {sub && <span className="truncate text-muted-foreground font-mono text-[9px] uppercase tracking-[0.1em]">{sub}</span>}
+                    </span>
+                  </button>
+                );
+              };
+
+              if (!groupBy) {
+                return (
+                  <div className="grid grid-cols-2 gap-2">
+                    {visible.map(renderTile)}
+                  </div>
+                );
+              }
+
+              // Sectioned (group-by) view. Sections are sorted alphabetically;
+              // ungrouped items go in a final “No group” section so nothing
+              // disappears when grouping is on.
+              const sections = new Map<string, any[]>();
+              visible.forEach((el: any) => {
+                const g = groupByDedupeKey.get(el._dedupeKey) || "";
+                const k = g || "__ungrouped__";
+                const arr = sections.get(k) || [];
+                arr.push(el);
+                sections.set(k, arr);
+              });
+              const sectionKeys = Array.from(sections.keys()).sort((a, b) => {
+                if (a === "__ungrouped__") return 1;
+                if (b === "__ungrouped__") return -1;
+                return a.localeCompare(b);
+              });
+              return (
+                <div className="space-y-4">
+                  {sectionKeys.map((k) => {
+                    const tiles = sections.get(k) || [];
+                    const heading = k === "__ungrouped__" ? "No group" : k;
+                    return (
+                      <div key={k} data-testid={`materials-group-section-${k === "__ungrouped__" ? "none" : k}`}>
+                        <div className="flex items-center justify-between gap-2 mb-1.5">
+                          <div className="flex items-center gap-1.5 text-[11px] font-medium text-foreground/80">
+                            {k === "__ungrouped__" ? <FolderPlus className="h-3 w-3 text-muted-foreground" /> : <Tag className="h-3 w-3 text-[#2f4a3a]" />}
+                            <span className="uppercase tracking-[0.1em]">{heading}</span>
+                            <span className="text-[10px] font-mono text-muted-foreground">({tiles.length})</span>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          {tiles.map(renderTile)}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               );
-            })}
-          </div>
+            })()}
+          </>
         )}
       </div>
+      {/* Bulk action bar — sits flush above the bottom edge while select mode
+          is on. “Set group” opens the assign dialog scoped to selectedKeys;
+          “Clear group” wipes the group on every selected tile. */}
+      {selectMode && (
+        <div className="px-3 py-2.5 border-t border-border/60 bg-card flex items-center justify-between gap-2" data-testid="materials-bulk-action-bar">
+          <div className="text-xs text-muted-foreground">
+            {selectedKeys.size === 0 ? "Tap tiles to select" : `${selectedKeys.size} selected`}
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 px-2.5 gap-1"
+              disabled={selectedKeys.size === 0}
+              onClick={() => openGroupAssign(Array.from(selectedKeys), `${selectedKeys.size} items`, "")}
+              data-testid="materials-bulk-set-group"
+            >
+              <FolderPlus className="h-3.5 w-3.5" />
+              <span className="text-xs">Set group</span>
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-8 px-2.5 gap-1 text-muted-foreground"
+              disabled={selectedKeys.size === 0}
+              onClick={() => applyGroupToKeys(Array.from(selectedKeys), "").then(() => { setSelectedKeys(new Set()); setSelectMode(false); })}
+              data-testid="materials-bulk-clear-group"
+            >
+              <X className="h-3.5 w-3.5" />
+              <span className="text-xs">Clear group</span>
+            </Button>
+          </div>
+        </div>
+      )}
       <AlertDialog open={!!pendingRemove} onOpenChange={(v) => { if (!v) setPendingRemove(null); }}>
         <AlertDialogContent data-testid="library-remove-confirm">
           <AlertDialogHeader>
@@ -633,6 +951,49 @@ export function MaterialsDrawer({ projectId, onAddImageUrl, activeRoom, activeRo
               data-testid="library-remove-confirm-action"
             >
               Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      {/* Group-assign dialog. Shared by per-tile clicks and the bulk action
+          bar. The <datalist> surfaces every group already used in the
+          project so the user can re-pick an existing label without typing
+          it again — or type a brand-new one and it joins the suggestions. */}
+      <AlertDialog open={!!groupAssign} onOpenChange={(v) => { if (!v) { setGroupAssign(null); setGroupInput(""); } }}>
+        <AlertDialogContent data-testid="materials-group-assign-dialog">
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {groupAssign && groupAssign.targetKeys.length > 1
+                ? `Group ${groupAssign.targetKeys.length} items`
+                : groupAssign && groupAssign.initial
+                  ? `Change group for “${groupAssign.label}”`
+                  : `Add “${groupAssign?.label || "item"}” to a group`}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Type a name (e.g. “Kitchen”, “Lighting”, “Phase 2”) or pick one
+              you’ve used before. Leave blank and clear to remove the group.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="px-1 pb-1">
+            <Input
+              autoFocus
+              value={groupInput}
+              onChange={(e) => setGroupInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") { e.preventDefault(); confirmGroupAssign(); }
+              }}
+              placeholder="Group name"
+              list="materials-group-suggestions"
+              data-testid="materials-group-input"
+            />
+            <datalist id="materials-group-suggestions">
+              {allGroups.map((g) => <option key={g} value={g} />)}
+            </datalist>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => { setGroupAssign(null); setGroupInput(""); }}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmGroupAssign} data-testid="materials-group-assign-confirm">
+              {groupInput.trim() ? "Save" : "Clear group"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
