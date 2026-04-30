@@ -104,6 +104,35 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  // Real health check: pings the database with a cheap `SELECT 1`.
+  // Registered FIRST so it can never be shadowed by the SPA catch-all in
+  // production. Returns 200 + JSON when the DB round-trips, 503 + JSON when
+  // it does not. Railway's health probe relies on this returning 5xx (not
+  // 200 SPA HTML) when the database is unreachable so a bad pod gets cycled
+  // instead of silently serving the marketing page from a broken backend.
+  app.get("/api/health", async (_req, res) => {
+    const startedAt = Date.now();
+    try {
+      const { pool } = await import("./db");
+      await pool.query("SELECT 1");
+      res.status(200).json({
+        status: "ok",
+        database: "ok",
+        durationMs: Date.now() - startedAt,
+        timestamp: new Date().toISOString(),
+        commit: process.env.RAILWAY_GIT_COMMIT_SHA || process.env.GIT_COMMIT || null,
+      });
+    } catch (err: any) {
+      res.status(503).json({
+        status: "error",
+        database: "unreachable",
+        error: err?.message || "unknown",
+        durationMs: Date.now() - startedAt,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  });
+
   // Auth setup
   await setupAuth(app);
   registerAuthRoutes(app);

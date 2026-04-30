@@ -118,6 +118,10 @@ export default function Dashboard() {
   const hour = new Date().getHours();
   const timeGreeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 
+  // Active client project selection. Lives at top of component so the hook
+  // order is stable across renders even when `isLoading` flips below.
+  const [selectedClientProjectId, setSelectedClientProjectId] = useState<number | null>(null);
+
   const handleArchive = (id: number) => {
     archiveProject(id, {
       onSuccess: () => toast({ title: "Success", description: "Project archived." }),
@@ -148,8 +152,17 @@ export default function Dashboard() {
   }
 
   const canCreateProjects = isAdmin;
+  // All non-archived projects this client belongs to. Most clients have one,
+  // but some have multiple (main reno + secondary suite, or two homes under
+  // one renovation contract). Pick the first as the default selection but
+  // let the user switch via chips in the dashboard or links in the sidebar.
+  const clientProjectsList = isClientView
+    ? (filteredProjects?.filter((p) => p.status !== "archived") || [])
+    : [];
   const clientProject = isClientView
-    ? (filteredProjects?.filter((p) => p.status !== "archived") || [])[0] ?? null
+    ? (selectedClientProjectId
+        ? clientProjectsList.find((p) => p.id === selectedClientProjectId) ?? clientProjectsList[0] ?? null
+        : clientProjectsList[0] ?? null)
     : null;
 
   const todayTaskCount = myTasks?.filter(
@@ -180,7 +193,12 @@ export default function Dashboard() {
       <div className="min-h-screen bg-background" data-role="client">
         <Navbar />
         <main>
-          <ClientDashboardView project={clientProject} isAdminPreview={isAdmin} />
+          <ClientDashboardView
+            project={clientProject}
+            isAdminPreview={isAdmin}
+            allProjects={clientProjectsList.map((p) => ({ id: p.id, name: p.name }))}
+            onSelectProject={setSelectedClientProjectId}
+          />
         </main>
       </div>
     );
