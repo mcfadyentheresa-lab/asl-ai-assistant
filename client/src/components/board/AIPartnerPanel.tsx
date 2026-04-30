@@ -463,8 +463,14 @@ function SuggestionsTab(props: SuggestionsTabProps) {
         return;
       }
       if (!res.ok) {
-        const t = await res.text();
-        throw new Error(t || "Failed");
+        let detail = "Failed";
+        try {
+          const body = await res.json();
+          detail = body?.detail || body?.error || detail;
+        } catch {
+          try { detail = await res.text(); } catch { /* keep default */ }
+        }
+        throw new Error(detail);
       }
       const data = await res.json() as { text: string };
       const sug: StoredSuggestion = {
@@ -720,8 +726,14 @@ function CritiqueTab({ boardId, projectId, hasClient }: CritiqueTabProps) {
         body: JSON.stringify({ boardId, focus: "all" }),
       });
       if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || "Critique failed");
+        let detail = "Critique failed";
+        try {
+          const body = await res.json();
+          detail = body?.detail || body?.error || detail;
+        } catch {
+          try { detail = await res.text(); } catch { /* keep default */ }
+        }
+        throw new Error(detail);
       }
       const data = await res.json() as { critique: string; generatedAt: string };
       setCritique(data.critique);

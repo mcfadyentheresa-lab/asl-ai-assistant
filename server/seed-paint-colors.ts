@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import { db } from "./db";
 import { paintColors } from "@shared/schema";
 
@@ -368,17 +369,17 @@ const benjaminMooreColors: ColorFamily[] = [
   },
 ];
 
-async function seedPaintColors() {
-  console.log("Checking existing paint colors...");
-  const existing = await db.select().from(paintColors).limit(1);
+export async function seedBenjaminMooreColors(): Promise<number> {
+  const existing = await db
+    .select()
+    .from(paintColors)
+    .where(eq(paintColors.brand, "Benjamin Moore"))
+    .limit(1);
   if (existing.length > 0) {
-    console.log("Paint colors already seeded. Skipping.");
-    return;
+    return 0;
   }
 
-  console.log("Seeding Benjamin Moore paint colors...");
   let count = 0;
-
   for (const family of benjaminMooreColors) {
     const values = family.colors.map((c) => ({
       brand: "Benjamin Moore",
@@ -392,15 +393,21 @@ async function seedPaintColors() {
     }));
     await db.insert(paintColors).values(values);
     count += values.length;
-    console.log(`  Inserted ${values.length} ${family.family} colors`);
   }
-
-  console.log(`Done! Seeded ${count} Benjamin Moore colors.`);
+  return count;
 }
 
-seedPaintColors()
-  .then(() => process.exit(0))
-  .catch((err) => {
-    console.error("Seed error:", err);
-    process.exit(1);
-  });
+// Run as standalone script: `tsx server/seed-paint-colors.ts`
+const isMainModule = import.meta.url === `file://${process.argv[1]}`;
+if (isMainModule) {
+  console.log("Seeding Benjamin Moore paint colors...");
+  seedBenjaminMooreColors()
+    .then((count) => {
+      console.log(count > 0 ? `Done! Seeded ${count} Benjamin Moore colors.` : "Already seeded. Skipping.");
+      process.exit(0);
+    })
+    .catch((err) => {
+      console.error("Seed error:", err);
+      process.exit(1);
+    });
+}

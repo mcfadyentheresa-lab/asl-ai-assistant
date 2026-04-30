@@ -3115,8 +3115,9 @@ Use designer language naturally. Be specific. Mention items by their actual name
       const critique = response.choices[0]?.message?.content?.trim() || "Could not generate a critique. Try again.";
       res.json({ critique, generatedAt: new Date().toISOString() });
     } catch (error: any) {
-      console.error("Design critique error:", error);
-      res.status(500).json({ error: "Failed to generate critique" });
+      console.error("Design critique error:", error?.status, error?.message, error?.response?.data || error);
+      const detail = error?.message || "Unknown error";
+      res.status(500).json({ error: "Failed to generate critique", detail });
     }
   }));
 
@@ -3308,8 +3309,9 @@ Respond with ONLY a JSON object: { "suggestions": Suggestion[] } where Suggestio
         signature: digest.signature ?? null,
       });
     } catch (error: any) {
-      console.error("Board pulse error:", error);
-      res.status(500).json({ error: "Failed to generate partner suggestions" });
+      console.error("Board pulse error:", error?.status, error?.message, error?.response?.data || error);
+      const detail = error?.message || "Unknown error";
+      res.status(500).json({ error: "Failed to generate partner suggestions", detail });
     }
   }));
 
@@ -3380,8 +3382,9 @@ Respond with ONLY a JSON object: { "suggestions": Suggestion[] } where Suggestio
       const text = response.choices[0]?.message?.content?.trim() || "Couldn't read the board well enough — try again?";
       res.json({ text, generatedAt: new Date().toISOString() });
     } catch (error: any) {
-      console.error("Board prompt error:", error);
-      res.status(500).json({ error: "Failed to generate response" });
+      console.error("Board prompt error:", error?.status, error?.message, error?.response?.data || error);
+      const detail = error?.message || "Unknown error";
+      res.status(500).json({ error: "Failed to generate response", detail });
     }
   }));
 

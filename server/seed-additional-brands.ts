@@ -407,17 +407,24 @@ async function seedBrandColors(brand: string, colorFamilies: ColorFamily[]) {
   return count;
 }
 
-async function seedAdditionalBrands() {
+export async function seedAdditionalBrands(): Promise<number> {
   let total = 0;
   total += await seedBrandColors("Sherwin-Williams", sherwinWilliamsColors);
   total += await seedBrandColors("Farrow & Ball", farrowAndBallColors);
   total += await seedBrandColors("Para Paints", paraPaintsColors);
-  console.log(`\nTotal additional colors seeded: ${total}`);
+  return total;
 }
 
-seedAdditionalBrands()
-  .then(() => process.exit(0))
-  .catch((err) => {
-    console.error("Seed error:", err);
-    process.exit(1);
-  });
+// Run as standalone script: `tsx server/seed-additional-brands.ts`
+const isMainModule = import.meta.url === `file://${process.argv[1]}`;
+if (isMainModule) {
+  seedAdditionalBrands()
+    .then((total) => {
+      console.log(`\nTotal additional colors seeded: ${total}`);
+      process.exit(0);
+    })
+    .catch((err) => {
+      console.error("Seed error:", err);
+      process.exit(1);
+    });
+}
