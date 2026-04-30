@@ -224,8 +224,8 @@ function imageGrid(top: number, items: { url: string; caption: string }[]) {
 
 // Row of swatches inside Section B (left side, top row).
 function swatchRow(top: number, items: { name: string; hex: string; code?: string; brand?: string }[]) {
-  const swatchW = 130;
-  const gap = 16;
+  const swatchW = 170;
+  const gap = 18;
   const startX = CANVAS_LEFT + 40;
   const swatchTop = top + 80;
   return items.map((it, i) => {
@@ -342,9 +342,9 @@ const kitchenRenovation = buildSimpleTemplate({
     { name: "Aged Brass", hex: "#A8895C", code: "Hardware", brand: "Emtek" },
   ],
   materials: [
-    { name: "White Oak Hardwood", supplier: "Local mill", code: "5\" plank", imageUrl: "", notes: "Wire-brushed, matte poly. Continuous to dining." },
-    { name: "Calacatta Nuvo Quartz", supplier: "Caesarstone", code: "5131", imageUrl: "", notes: "Waterfall island. Eased edge perimeter." },
-    { name: "Zellige Backsplash", supplier: "Cle Tile", code: "2×6 Weathered White", imageUrl: "", notes: "Running bond. Extend to ceiling behind range." },
+    { name: "White Oak Hardwood", supplier: "Local mill", code: "5\" plank", imageUrl: unsplash("photo-1572970385182-97a64c98205b"), notes: "Wire-brushed, matte poly. Continuous to dining." },
+    { name: "Calacatta Nuvo Quartz", supplier: "Caesarstone", code: "5131", imageUrl: premiumUnsplash("premium_photo-1768228106004-912a8dc7b8bf"), notes: "Waterfall island. Eased edge perimeter." },
+    { name: "Zellige Backsplash", supplier: "Cle Tile", code: "2×6 Weathered White", imageUrl: unsplash("photo-1682888818650-0a7cbb35287d"), notes: "Running bond. Extend to ceiling behind range." },
   ],
   notes: [
     { text: "Lead times: cabinets 12 wks, countertops 6 wks. Order before framing.", color: "#fef9c3" },
@@ -373,9 +373,9 @@ const bathroomRenovation = buildSimpleTemplate({
     { name: "Carrara White", hex: "#EDEAE3", code: "Mosaic", brand: "Stone Source" },
   ],
   materials: [
-    { name: "Carrara Marble Hex", supplier: "Stone Source", code: "2\" mosaic", imageUrl: "", notes: "Heated w/ Schluter Ditra-Heat under all tile." },
-    { name: "Calacatta Porcelain", supplier: "Cle Tile", code: "24×48\"", imageUrl: "", notes: "Shower walls. Niche in accent stone." },
-    { name: "White Oak Vanity", supplier: "Custom mill", code: "Floating, 60\"", imageUrl: "", notes: "Quartz top, undermount basins." },
+    { name: "Carrara Marble Hex", supplier: "Stone Source", code: "2\" mosaic", imageUrl: unsplash("photo-1765766600820-58eaf8687f1d"), notes: "Heated w/ Schluter Ditra-Heat under all tile." },
+    { name: "Calacatta Porcelain", supplier: "Cle Tile", code: "24×48\"", imageUrl: premiumUnsplash("premium_photo-1768228106004-912a8dc7b8bf"), notes: "Shower walls. Niche in accent stone." },
+    { name: "White Oak Vanity", supplier: "Custom mill", code: "Floating, 60\"", imageUrl: unsplash("photo-1572970385182-97a64c98205b"), notes: "Quartz top, undermount basins." },
   ],
   notes: [
     { text: "Heated floors mandatory. Schluter Ditra-Heat under all tile.", color: "#dbeafe" },
@@ -404,9 +404,9 @@ const fullCottageBuild = buildSimpleTemplate({
     { name: "Salamander", hex: "#1E3A2F", code: "2050-10", brand: "Benjamin Moore" },
   ],
   materials: [
-    { name: "Cedar Board & Batten", supplier: "Local sawmill", code: "1×10 + 1×3", imageUrl: "", notes: "Semi-transparent stain. Re-stain every 5 yrs." },
-    { name: "Loewen Triple-Glaze", supplier: "Loewen", code: "Douglas fir", imageUrl: "", notes: "8' sliding door to screened porch." },
-    { name: "TimberTech Decking", supplier: "TimberTech", code: "Composite", imageUrl: "", notes: "Steel cable rail along all decks." },
+    { name: "Cedar Board & Batten", supplier: "Local sawmill", code: "1×10 + 1×3", imageUrl: unsplash("photo-1693498871905-3b0646657786"), notes: "Semi-transparent stain. Re-stain every 5 yrs." },
+    { name: "Loewen Triple-Glaze", supplier: "Loewen", code: "Douglas fir", imageUrl: unsplash("photo-1559767949-0faa5c7e9992"), notes: "8' sliding door to screened porch." },
+    { name: "TimberTech Decking", supplier: "TimberTech", code: "Composite", imageUrl: unsplash("photo-1693498868381-fef2612e49dd"), notes: "Steel cable rail along all decks." },
   ],
   notes: [
     { text: "Confirm dock permit w/ township. Check setback for screened porch.", color: "#fef9c3" },
@@ -440,9 +440,9 @@ const moodboard = buildSimpleTemplate({
     { name: "Chantilly Lace", hex: "#F5F2ED", code: "OC-65", brand: "Benjamin Moore" },
   ],
   materials: [
-    { name: "White Oak", supplier: "Local mill", code: "Wire-brushed", imageUrl: "", notes: "Floors, vanity, shelving. Matte poly." },
-    { name: "Muskoka Granite", supplier: "Local quarry", code: "Fieldstone", imageUrl: "", notes: "Fireplace surround. Honed Carrara in baths." },
-    { name: "Performance Linen", supplier: "Kravet", code: "Oatmeal", imageUrl: "", notes: "Sofa + drapery. Wool bouclé on accent chair." },
+    { name: "White Oak", supplier: "Local mill", code: "Wire-brushed", imageUrl: unsplash("photo-1572970385182-97a64c98205b"), notes: "Floors, vanity, shelving. Matte poly." },
+    { name: "Muskoka Granite", supplier: "Local quarry", code: "Fieldstone", imageUrl: premiumUnsplash("premium_photo-1768228106004-912a8dc7b8bf"), notes: "Fireplace surround. Honed Carrara in baths." },
+    { name: "Performance Linen", supplier: "Kravet", code: "Oatmeal", imageUrl: premiumUnsplash("premium_photo-1722048810826-751afbcc98c0"), notes: "Sofa + drapery. Wool bouclé on accent chair." },
   ],
   notes: [
     { text: "Client loves warm minimal. No farmhouse or rustic. Max 3-4 colours.", color: "#fef9c3" },
@@ -457,23 +457,23 @@ const furnitureRefinishingConceptBoardWorking = buildSimpleTemplate({
   zoneColorA: "#f3efe8",
   zoneColorB: "#ede8e1",
   images: [
-    { url: "", caption: "Before — tap to add current piece photo" },
-    { url: "", caption: "Client inspiration — tap to upload" },
+    { url: unsplash("photo-1586090097830-147b7f2be946"), caption: "Before — replace with current piece photo" },
+    { url: premiumUnsplash("premium_photo-1705262413765-5fe7a310d4e6"), caption: "Client inspiration — replace with reference" },
     { url: unsplash("photo-1572970385182-97a64c98205b"), caption: "Proposed direction — natural wood finish" },
     { url: premiumUnsplash("premium_photo-1722048810826-751afbcc98c0"), caption: "Wood grain reference — matching tone" },
     { url: unsplash("photo-1771371854543-bb274762389e"), caption: "Hardware reference — aged brass" },
-    { url: "", caption: "Edge profile + repair detail — tap to upload" },
+    { url: premiumUnsplash("premium_photo-1673152979577-64b00806a6d1"), caption: "Edge profile + finish detail" },
   ],
   swatches: [
-    { name: "Paint Colour", hex: "#F3EFE6", code: "Sample", brand: "TBD" },
-    { name: "Stain Colour", hex: "#B58A63", code: "Sample", brand: "TBD" },
-    { name: "Topcoat Sheen", hex: "#D9D4CB", code: "Matte", brand: "TBD" },
-    { name: "Hardware Tone", hex: "#A8895C", code: "Aged brass", brand: "TBD" },
+    { name: "Simply White", hex: "#F4F1E8", code: "OC-117", brand: "Benjamin Moore" },
+    { name: "Special Walnut", hex: "#7A5230", code: "224", brand: "Minwax" },
+    { name: "Rubio Pure", hex: "#D9D4CB", code: "Monocoat", brand: "Rubio" },
+    { name: "Aged Brass", hex: "#A8895C", code: "US7", brand: "Emtek" },
   ],
   materials: [
-    { name: "Wood Grain Note", supplier: "", code: "Direction", imageUrl: "", notes: "Visible grain to remain. Reduce orange undertone." },
-    { name: "Edge Profile", supplier: "", code: "Eased", imageUrl: "", notes: "Sand to 220. Dust off twice before finish." },
-    { name: "Topcoat", supplier: "Rubio Monocoat", code: "Pure", imageUrl: "", notes: "Matte. Sample approval before final." },
+    { name: "White Oak Grain", supplier: "Reference", code: "Direction", imageUrl: unsplash("photo-1572970385182-97a64c98205b"), notes: "Visible grain to remain. Reduce orange undertone." },
+    { name: "Eased Edge Profile", supplier: "Custom mill", code: "3mm radius", imageUrl: premiumUnsplash("premium_photo-1722048810826-751afbcc98c0"), notes: "Sand to 220. Dust off twice before finish." },
+    { name: "Rubio Monocoat", supplier: "Rubio", code: "Pure 2C", imageUrl: unsplash("photo-1771371854543-bb274762389e"), notes: "Matte. Sample approval before final." },
   ],
   notes: [
     { text: "Sample approval required before final finish. Photo client reply.", color: "#fef9c3" },
@@ -489,7 +489,7 @@ const collageConceptBoard = buildSimpleTemplate({
   zoneColorB: "#ede8e1",
   images: [
     { url: unsplash("photo-1586090097830-147b7f2be946"), caption: "Renovation overview" },
-    { url: "", caption: "House floor plan — tap to upload" },
+    { url: premiumUnsplash("premium_photo-1722048810826-751afbcc98c0"), caption: "House floor plan — replace with project plan" },
     { url: premiumUnsplash("premium_photo-1705262413765-5fe7a310d4e6"), caption: "Living room moodboard" },
     { url: unsplash("photo-1771371854543-bb274762389e"), caption: "Kitchen moodboard" },
     { url: premiumUnsplash("premium_photo-1722048810826-751afbcc98c0"), caption: "Feature wall inspiration" },
@@ -507,9 +507,9 @@ const collageConceptBoard = buildSimpleTemplate({
     { name: "Charcoal", hex: "#3A3A3A", code: "", brand: "" },
   ],
   materials: [
-    { name: "Renovation", supplier: "", code: "Existing", imageUrl: "", notes: "Emphasise the home's existing architectural character." },
-    { name: "Materials List", supplier: "", code: "Source", imageUrl: "", notes: "Add product references. Mark anything still to source." },
-    { name: "Display Shelf", supplier: "", code: "Floating", imageUrl: "", notes: "Reserve room for arrows and callouts on plan." },
+    { name: "Architectural Detail", supplier: "Existing", code: "Trim + millwork", imageUrl: unsplash("photo-1586090097830-147b7f2be946"), notes: "Emphasise the home's existing architectural character." },
+    { name: "Stone Surface", supplier: "To source", code: "Sample", imageUrl: premiumUnsplash("premium_photo-1768228106004-912a8dc7b8bf"), notes: "Add product references. Mark anything still to source." },
+    { name: "Floating Shelf", supplier: "Custom mill", code: "White oak", imageUrl: unsplash("photo-1572970385182-97a64c98205b"), notes: "Reserve room for arrows and callouts on plan." },
   ],
   notes: [
     { text: "Calm, timeless palette. Use warm materials. Keep airy and presentation-ready.", color: "#ffffff" },
@@ -543,9 +543,9 @@ const materialInspirationBoard = buildSimpleTemplate({
     { name: "Linen", hex: "#E8E0D4", code: "Neutral", brand: "" },
   ],
   materials: [
-    { name: "Oak Veneer", supplier: "Local mill", code: "Bar top", imageUrl: "", notes: "Bar top + display shelving." },
-    { name: "Herringbone Stone", supplier: "Stone Source", code: "Pattern", imageUrl: "", notes: "Feature wall in entry." },
-    { name: "European Fabric", supplier: "Kravet", code: "Sample", imageUrl: "", notes: "Drapery + accent pillows." },
+    { name: "Oak Veneer", supplier: "Local mill", code: "Bar top", imageUrl: unsplash("photo-1572970385182-97a64c98205b"), notes: "Bar top + display shelving." },
+    { name: "Herringbone Stone", supplier: "Stone Source", code: "Pattern", imageUrl: premiumUnsplash("premium_photo-1768228106004-912a8dc7b8bf"), notes: "Feature wall in entry." },
+    { name: "European Linen", supplier: "Kravet", code: "Oatmeal", imageUrl: premiumUnsplash("premium_photo-1722048810826-751afbcc98c0"), notes: "Drapery + accent pillows." },
   ],
   notes: [
     { text: "Keep the palette grounded. Use a single dark accent piece.", color: "#ffffff" },

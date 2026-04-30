@@ -19,7 +19,7 @@
 // iPad-first: 44pt min height, swipe-scroll horizontally.
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Plus, Pencil, Check, X as XIcon, AlertTriangle, Sparkles, Trash2 } from "lucide-react";
+import { Plus, Pencil, Check, X as XIcon, AlertTriangle, Sparkles, Trash2, FileDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -61,6 +61,12 @@ interface RoomTabStripProps {
   // room is active, the budget rollup row shows a small "Render" sparkle button
   // that calls this with the active room name.
   onRenderRoom?: (roomName: string) => void;
+  // Step 6 — admin/crew only. When provided AND mode='project' AND a specific
+  // room is active, the strip shows a "Spec PDF" button that exports just that
+  // room's selected/ordered items as a spec sheet for one trade.
+  onExportRoomSpec?: (roomName: string) => void;
+  // True while the per-room spec PDF is being generated. Disables the button.
+  isExportingRoomSpec?: boolean;
 }
 
 const STATUS_PILL_CLASS: Record<RoomStatus, { dot: string; label: string }> = {
@@ -85,6 +91,8 @@ export default function RoomTabStrip({
   onDeleteTab,
   onToggleStatusFilter,
   onRenderRoom,
+  onExportRoomSpec,
+  isExportingRoomSpec,
 }: RoomTabStripProps) {
   const [renamingTab, setRenamingTab] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
@@ -319,6 +327,23 @@ export default function RoomTabStrip({
             title={`Render ${activeTab}`}
           >
             <Sparkles className="h-3.5 w-3.5" /> Render
+          </button>
+        )}
+
+        {/* Per-room spec PDF — admin/crew only, project mode, room focused.
+            Pays off the user's tagging investment: tag a card to a room, then
+            click here to hand that one room to that one trade. */}
+        {mode === "project" && activeTab !== null && onExportRoomSpec && (
+          <button
+            type="button"
+            onClick={() => onExportRoomSpec(activeTab)}
+            disabled={isExportingRoomSpec}
+            className={`${onRenderRoom ? "" : "ml-auto"} mr-1 pb-0.5 inline-flex items-center gap-1 min-h-[32px] px-2.5 rounded-md text-[11px] uppercase tracking-wider bg-[#2f4a3a]/10 text-[#2f4a3a] hover:bg-[#2f4a3a]/15 transition-colors disabled:opacity-60 disabled:cursor-wait`}
+            style={{ fontFamily: "var(--font-mono)" }}
+            data-testid="room-spec-pdf-trigger"
+            title={`Export ${activeTab} spec sheet PDF`}
+          >
+            <FileDown className="h-3.5 w-3.5" /> {isExportingRoomSpec ? "Building…" : "Spec PDF"}
           </button>
         )}
 

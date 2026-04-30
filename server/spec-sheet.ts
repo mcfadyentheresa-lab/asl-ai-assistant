@@ -654,7 +654,11 @@ function drawEmptyNotice(ctx: PdfContext): void {
   doc.fillColor(INK);
 }
 
-export async function generateSpecSheetPdf(projectId: number, res: Response): Promise<void> {
+export async function generateSpecSheetPdf(
+  projectId: number,
+  res: Response,
+  options: { roomFilter?: string | null } = {},
+): Promise<void> {
   const project = await storage.getProject(projectId);
   if (!project) {
     res.status(404).json({ message: "Project not found" });
@@ -669,7 +673,14 @@ export async function generateSpecSheetPdf(projectId: number, res: Response): Pr
     allElements.push(...els);
   }
 
-  const items = buildItems(allElements);
+  // Optional per-room scope. When provided, the resulting PDF includes only
+  // items tagged to that room, the room name appears in the filename, and the
+  // grand total is the room's total. Useful for handing one trade one room.
+  const normalizedRoom = options.roomFilter && options.roomFilter.trim() ? options.roomFilter.trim() : null;
+  const allItems = buildItems(allElements);
+  const items = normalizedRoom
+    ? allItems.filter((it) => (it.room || "").trim().toLowerCase() === normalizedRoom.toLowerCase())
+    : allItems;
   const groups = groupByRoom(items);
   const grandTotal = items.reduce((acc, it) => acc + it.lineTotal, 0);
 
@@ -688,13 +699,17 @@ export async function generateSpecSheetPdf(projectId: number, res: Response): Pr
     size: "LETTER",
     margins: { top: PAGE_MARGIN, bottom: PAGE_MARGIN, left: PAGE_MARGIN, right: PAGE_MARGIN },
     info: {
-      Title: `Spec Sheet — ${project.name}`,
+      Title: normalizedRoom ? `Spec Sheet — ${project.name} — ${normalizedRoom}` : `Spec Sheet — ${project.name}`,
       Author: "Aster & Spruce Living",
-      Subject: "Project spec sheet for trades",
+      Subject: normalizedRoom ? `Spec sheet for ${normalizedRoom}` : "Project spec sheet for trades",
     },
   });
 
-  const filenameSafe = project.name.replace(/[^a-z0-9-_ ]/gi, "").replace(/\s+/g, "_") || "project";
+  const projectSafe = project.name.replace(/[^a-z0-9-_ ]/gi, "").replace(/\s+/g, "_") || "project";
+  const roomSafe = normalizedRoom
+    ? `_${normalizedRoom.replace(/[^a-z0-9-_ ]/gi, "").replace(/\s+/g, "_") || "room"}`
+    : "";
+  const filenameSafe = `${projectSafe}${roomSafe}`;
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader("Content-Disposition", `attachment; filename="spec-sheet-${filenameSafe}.pdf"`);
   doc.pipe(res);

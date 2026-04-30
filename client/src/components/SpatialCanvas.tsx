@@ -309,8 +309,8 @@ const ELEMENT_DEFAULTS: Record<string, { width: number; height: number; content:
   "text-callout": { width: 200, height: 80,  content: { variant: "callout", text: "Add note...", color: "#fef9c3" } },
   "text-heading": { width: 360, height: 44,  content: { variant: "heading", title: "Section Title", tracking: "normal", align: "left", size: "md" } },
   // Surface variants
-  "surface-paint":    { width: 220, height: 220, content: { kind: "paint",    color: "#1e3a2f", name: "Forest Green", hex: "#1E3A2F", status: "idea" } },
-  "surface-material": { width: 220, height: 180, content: { kind: "material", name: "Material", supplier: "", code: "", imageUrl: "", notes: "", status: "idea" } },
+  "surface-paint":    { width: 240, height: 240, content: { kind: "paint",    color: "#1e3a2f", name: "Forest Green", hex: "#1E3A2F", status: "idea" } },
+  "surface-material": { width: 240, height: 290, content: { kind: "material", name: "Material", supplier: "", code: "", imageUrl: "", notes: "", status: "idea" } },
   // Other types
   todo: { width: 240, height: 200, content: { title: "To-do", items: [{ text: "Add a task...", checked: false }] } },
   column: { width: 240, height: 400, content: { title: "New Column", subtitle: "0 cards" } },
@@ -319,8 +319,8 @@ const ELEMENT_DEFAULTS: Record<string, { width: number; height: number; content:
   image: { width: 360, height: 260, content: { url: "", caption: "" } },
   draw: { width: 400, height: 300, content: { paths: [], color: "#000000", strokeWidth: 2 } },
   room_zone: { width: 500, height: 400, content: { title: "Room Name", color: "#f0ede8", opacity: 0.5 } },
-  product: { width: 240, height: 120, content: { name: "Product", price: "", supplier: "", url: "", status: "idea" } },
-  hardware: { width: 280, height: 200, content: { category: "pull", name: "New hardware", status: "idea", currency: "CAD" } },
+  product: { width: 240, height: 270, content: { name: "Product", price: "", supplier: "", url: "", imageUrl: "", status: "idea" } },
+  hardware: { width: 240, height: 290, content: { category: "pull", name: "New hardware", status: "idea", currency: "CAD" } },
   connector: { width: 0, height: 0, content: { fromId: 0, toId: 0, style: "arrow", curve: "curved" } },
 };
 
@@ -553,6 +553,9 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
   const pendingHardwareDropRef = useRef<{ x: number; y: number } | null>(null);
   const [showPaletteDialog, setShowPaletteDialog] = useState(false);
   const [renderRoomName, setRenderRoomName] = useState<string | null>(null);
+  // Step 6 — per-room spec PDF export. While truthy, the Spec PDF button on
+  // the room tab strip shows "Building…" and is disabled.
+  const [exportingSpecRoom, setExportingSpecRoom] = useState<string | null>(null);
   const [palettePresetUrl, setPalettePresetUrl] = useState<string | null>(null);
   const palettePresetSourceRef = useRef<{ x: number; y: number; w: number; h: number } | null>(null);
   const [imageUrlInput, setImageUrlInput] = useState("");
@@ -4533,7 +4536,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
           >
             {renderStatusEdge(el)}
             {kindPicker}
-            <div className="h-[140px] relative pointer-events-none select-none" style={{ backgroundColor: c.color || "#1e3a2f" }}>
+            <div className="h-[160px] relative pointer-events-none select-none" style={{ backgroundColor: c.color || "#1e3a2f" }}>
               <span className="absolute bottom-2 left-3 text-xs text-white/80" style={{ fontFamily: "var(--font-mono)" }}>{(c.hex || c.color || "#1E3A2F").toUpperCase()}</span>
               {typeof c.lrv === "number" && (
                 <span
@@ -4670,11 +4673,33 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
         >
           {renderStatusEdge(el)}
           {kindPicker}
-          {c.imageUrl && (
-            <div className="h-[80px] bg-muted overflow-hidden">
-              <img src={c.imageUrl} alt={c.name} className="w-full h-full object-cover pointer-events-none" />
-            </div>
-          )}
+          {/* Image-first: always render a 160h photo area at the top so the card feels visual
+              even before the user uploads. Empty state shows a warm-paper gradient + Shapes glyph. */}
+          <div className="h-[160px] bg-muted overflow-hidden relative pointer-events-none select-none">
+            {c.imageUrl ? (
+              <img
+                src={c.imageUrl}
+                alt={c.name || "Material"}
+                className="w-full h-full object-cover"
+                style={{ filter: "saturate(0.92) contrast(0.97)" }}
+                draggable={false}
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+              />
+            ) : (
+              <div
+                className="w-full h-full flex flex-col items-center justify-center gap-1"
+                style={{ background: "linear-gradient(135deg, #f4ede0 0%, #ede4d3 100%)" }}
+              >
+                <Shapes className="h-7 w-7 text-foreground/30" strokeWidth={1.5} />
+                <span
+                  className="text-[10px] uppercase tracking-wider text-foreground/40"
+                  style={{ fontFamily: "var(--font-mono)" }}
+                >
+                  Material photo
+                </span>
+              </div>
+            )}
+          </div>
           <div className="p-3">
             {isSelected ? (
               <div className="space-y-1.5">
@@ -4803,45 +4828,59 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
           data-testid={`element-hardware-${el.id}`}
         >
           {renderStatusEdge(el)}
-          <div className="p-3 flex flex-col gap-2 pointer-events-none select-none">
-            <div className="flex items-start gap-3">
-              {c.imageUrl && (
-                <div
-                  className="w-[72px] h-[72px] rounded-sm bg-muted overflow-hidden shrink-0"
-                  style={{ filter: "saturate(0.85) contrast(0.96)" }}
-                >
-                  <img src={c.imageUrl} alt={c.name || "Hardware"} className="w-full h-full object-cover" />
-                </div>
-              )}
-              <div className="flex-1 min-w-0">
-                <div
-                  className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground truncate"
+          {/* Image-first hardware: 160h photo area on top, always rendered (warm-paper gradient + glyph when empty). */}
+          <div className="h-[160px] bg-muted overflow-hidden relative pointer-events-none select-none">
+            {c.imageUrl ? (
+              <img
+                src={c.imageUrl}
+                alt={c.name || "Hardware"}
+                className="w-full h-full object-cover"
+                style={{ filter: "saturate(0.85) contrast(0.96)" }}
+                draggable={false}
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+              />
+            ) : (
+              <div
+                className="w-full h-full flex flex-col items-center justify-center gap-1"
+                style={{ background: "linear-gradient(135deg, #f4ede0 0%, #ede4d3 100%)" }}
+              >
+                <Wrench className="h-7 w-7 text-foreground/30" strokeWidth={1.5} />
+                <span
+                  className="text-[10px] uppercase tracking-wider text-foreground/40"
                   style={{ fontFamily: "var(--font-mono)" }}
-                  data-testid={`text-hardware-meta-${el.id}`}
                 >
-                  {labelTop || "hardware"}
-                </div>
-                <div className="text-sm font-semibold leading-snug mt-0.5 line-clamp-2" data-testid={`text-hardware-name-${el.id}`}>
-                  {c.name || "New hardware"}
-                </div>
-                {(c.brand || c.finish) && (
-                  <div className="text-[11px] text-muted-foreground mt-0.5 truncate">
-                    {[c.brand, c.finish].filter(Boolean).join(" · ")}
-                  </div>
-                )}
-                {c.sku && (
-                  <div className="text-[10px] text-muted-foreground/80 mt-0.5 truncate" style={{ fontFamily: "var(--font-mono)" }}>
-                    {c.sku}
-                  </div>
-                )}
-                {c.dimensions && (
-                  <div className="text-[10px] text-muted-foreground/80 truncate" style={{ fontFamily: "var(--font-mono)" }}>
-                    {c.dimensions}
-                  </div>
-                )}
+                  Hardware photo
+                </span>
               </div>
+            )}
+          </div>
+          <div className="p-3 flex flex-col gap-1.5 pointer-events-none select-none">
+            <div
+              className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground truncate"
+              style={{ fontFamily: "var(--font-mono)" }}
+              data-testid={`text-hardware-meta-${el.id}`}
+            >
+              {labelTop || "hardware"}
             </div>
-            <div className="flex items-center justify-between gap-2 pt-1">
+            <div className="text-sm font-semibold leading-snug line-clamp-2" data-testid={`text-hardware-name-${el.id}`}>
+              {c.name || "New hardware"}
+            </div>
+            {(c.brand || c.finish) && (
+              <div className="text-[11px] text-muted-foreground truncate">
+                {[c.brand, c.finish].filter(Boolean).join(" · ")}
+              </div>
+            )}
+            {c.sku && (
+              <div className="text-[10px] text-muted-foreground/80 truncate" style={{ fontFamily: "var(--font-mono)" }}>
+                {c.sku}
+              </div>
+            )}
+            {c.dimensions && (
+              <div className="text-[10px] text-muted-foreground/80 truncate" style={{ fontFamily: "var(--font-mono)" }}>
+                {c.dimensions}
+              </div>
+            )}
+            <div className="flex items-center justify-between gap-2 pt-0.5">
               <div className="text-xs" style={{ fontFamily: "var(--font-mono)" }} data-testid={`text-hardware-price-${el.id}`}>
                 {priceLabel || <span className="text-muted-foreground/60">—</span>}
               </div>
@@ -4893,7 +4932,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
       return (
         <div
           key={el.id}
-          className={`${cardBase} bg-card border border-border cursor-grab`}
+          className={`${cardBase} bg-card border border-border overflow-hidden cursor-grab`}
           style={{ left: el.x, top: el.y, width: el.width, zIndex: effectiveZ }}
           onMouseDown={(e) => {
             const tag = (e.target as HTMLElement).tagName.toLowerCase();
@@ -4909,6 +4948,32 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
           data-testid={`element-product-${el.id}`}
         >
           {renderStatusEdge(el)}
+          {/* Image-first product: 160h photo area on top, always rendered. Empty state gets warm-paper + glyph. */}
+          <div className="h-[160px] bg-muted overflow-hidden relative pointer-events-none select-none">
+            {c.imageUrl ? (
+              <img
+                src={c.imageUrl}
+                alt={c.name || "Product"}
+                className="w-full h-full object-cover"
+                style={{ filter: "saturate(0.92) contrast(0.97)" }}
+                draggable={false}
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+              />
+            ) : (
+              <div
+                className="w-full h-full flex flex-col items-center justify-center gap-1"
+                style={{ background: "linear-gradient(135deg, #f4ede0 0%, #ede4d3 100%)" }}
+              >
+                <Armchair className="h-7 w-7 text-foreground/30" strokeWidth={1.5} />
+                <span
+                  className="text-[10px] uppercase tracking-wider text-foreground/40"
+                  style={{ fontFamily: "var(--font-mono)" }}
+                >
+                  Product photo
+                </span>
+              </div>
+            )}
+          </div>
           <div className="p-3">
             {isSelected ? (
               <div className="space-y-1.5">
@@ -4932,6 +4997,13 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                   placeholder="Supplier"
                   onBlur={(e) => handleUpdateContent(el.id, { ...c, supplier: e.target.value })}
                   data-testid={`input-product-supplier-${el.id}`}
+                />
+                <input
+                  className="w-full bg-transparent border-none text-xs text-primary outline-none"
+                  defaultValue={c.imageUrl || ""}
+                  placeholder="Image URL"
+                  onBlur={(e) => handleUpdateContent(el.id, { ...c, imageUrl: e.target.value })}
+                  data-testid={`input-product-image-${el.id}`}
                 />
                 <input
                   className="w-full bg-transparent border-none text-xs text-primary outline-none"
@@ -5464,42 +5536,48 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
     return null;
   };
 
-  // Legacy structure used by the mobile floating bottom toolbar.
+  // Mobile floating bottom toolbar — mirrors the 5-group Add palette so desktop and mobile
+  // present the same mental model: Image / Card / Text / Shape / Draw.
   const sidebarToolGroups = [
     {
-      label: "Content",
+      label: "Image",
       tools: [
-        { type: "text-note", icon: StickyNote, label: "Note" },
-        { type: "text-clean", icon: FileText, label: "Plain Text" },
+        { type: "image", icon: ImagePlus, label: "Photo" },
         { type: "link", icon: Link2, label: "Link" },
-        { type: "todo", icon: CheckSquare, label: "To-do" },
-        { type: "image", icon: ImagePlus, label: "Image" },
+        ...(effectiveRole === "client" ? [] : [{ type: "palette", icon: Droplet, label: "Palette" }]),
       ],
     },
     {
-      label: "Layout",
+      label: "Card",
       tools: [
-        { type: "column", icon: Columns3, label: "Column" },
-        { type: "text-heading", icon: Type, label: "Header" },
-        { type: "room_zone", icon: Square, label: "Zone" },
-      ],
-    },
-    {
-      label: "Design",
-      tools: [
-        { type: "surface-paint", icon: Palette, label: "Color" },
+        { type: "surface-paint", icon: Palette, label: "Paint" },
         { type: "surface-material", icon: Shapes, label: "Material" },
         ...(effectiveRole === "client" ? [] : [{ type: "hardware", icon: Wrench, label: "Hardware" }]),
-        { type: "text-callout", icon: Sparkles, label: "Callout" },
-        { type: "product", icon: ExternalLink, label: "Product" },
+        { type: "product", icon: Armchair, label: "Product" },
       ],
     },
     {
-      label: "Tools",
+      label: "Text",
+      tools: [
+        { type: "text-note", icon: StickyNote, label: "Note" },
+        { type: "text-clean", icon: FileText, label: "Plain" },
+        { type: "text-heading", icon: Type, label: "Header" },
+        { type: "text-callout", icon: Sparkles, label: "Callout" },
+      ],
+    },
+    {
+      label: "Shape",
+      tools: [
+        { type: "room_zone", icon: Square, label: "Zone" },
+        { type: "column", icon: Columns3, label: "Column" },
+        { type: "todo", icon: CheckSquare, label: "To-do" },
+      ],
+    },
+    {
+      label: "Draw",
       tools: [
         { type: "draw", icon: Pencil, label: "Draw" },
         ...(effectiveRole === "client" ? [] : [{ type: "connect", icon: Spline, label: "Connect" }]),
-        ...(effectiveRole === "client" ? [] : [{ type: "palette", icon: Droplet, label: "Extract palette" }]),
       ],
     },
   ];
@@ -5521,51 +5599,55 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
     accent: string; // border / text accent
     items: AddPaletteItem[];
   };
+  // 5-group Add palette: Image / Card / Text / Shape / Draw. Each top-level group opens a
+  // popover; choices inside are still distinct types under the hood, but the user only sees
+  // 5 doors instead of 15+ scattered tools. Hardware/connector hidden from clients.
   const addPaletteGroups: AddPaletteGroup[] = [
     {
-      label: "Words",
-      tint: "bg-[#f7f1e7]/70",
-      accent: "text-[#2f4a3a]",
-      items: [
-        { type: "text-note", icon: StickyNote, label: "Note", hint: "Sticky thought with title", key: "N" },
-        { type: "text-clean", icon: FileText, label: "Clean", hint: "Plain text, no card", key: "T" },
-        { type: "text-callout", icon: Sparkles, label: "Callout", hint: "Highlight with arrow" },
-        { type: "text-heading", icon: Type, label: "Heading", hint: "Section heading band" },
-      ],
-    },
-    {
-      label: "Visual",
+      label: "Image",
       tint: "bg-[#eef0e8]/70",
       accent: "text-[#2f4a3a]",
       items: [
-        { type: "image", icon: ImagePlus, label: "Image", hint: "Upload or paste URL", key: "I" },
-        { type: "surface-paint", icon: Palette, label: "Paint", hint: "Paint swatch + LRV", key: "C" },
-        { type: "surface-material", icon: Shapes, label: "Material", hint: "Photo + supplier code" },
+        { type: "image", icon: ImagePlus, label: "Photo", hint: "Upload or paste URL", key: "I" },
+        { type: "link", icon: Link2, label: "Web link", hint: "Pulls preview image automatically" },
         ...(effectiveRole === "client"
           ? []
           : [{ type: "palette", icon: Droplet, label: "Extract palette", hint: "Pull colors from a photo" }]),
       ],
     },
     {
-      label: "Selections",
+      label: "Card",
       tint: "bg-[#e8ece4]/70",
       accent: "text-[#2f4a3a]",
       items: [
+        { type: "surface-paint", icon: Palette, label: "Paint", hint: "Paint swatch + LRV", key: "C" },
+        { type: "surface-material", icon: Shapes, label: "Material", hint: "Photo + supplier code", key: "M" },
         ...(effectiveRole === "client"
           ? []
           : [{ type: "hardware", icon: Wrench, label: "Hardware", hint: "Pull, knob, faucet — typed", key: "H" }]),
-        { type: "product", icon: ExternalLink, label: "Product", hint: "Linked product card" },
+        { type: "product", icon: Armchair, label: "Product", hint: "Furniture, lighting, decor", key: "P" },
       ],
     },
     {
-      label: "Layout",
+      label: "Text",
+      tint: "bg-[#f7f1e7]/70",
+      accent: "text-[#2f4a3a]",
+      items: [
+        { type: "text-note", icon: StickyNote, label: "Sticky note", hint: "Sticky thought with title", key: "N" },
+        { type: "text-clean", icon: FileText, label: "Plain text", hint: "No card, no border", key: "T" },
+        { type: "text-heading", icon: Type, label: "Heading", hint: "Section heading band" },
+        { type: "text-callout", icon: Sparkles, label: "Callout", hint: "Highlight with arrow" },
+      ],
+    },
+    {
+      label: "Shape",
       tint: "bg-[#f1ece1]/70",
       accent: "text-[#2f4a3a]",
       items: [
-        { type: "room_zone", icon: Square, label: "Room zone", hint: "Lane background" },
-        { type: "todo", icon: CheckSquare, label: "To-do", hint: "Task list" },
+        { type: "room_zone", icon: Square, label: "Room zone", hint: "Lane background for grouping" },
         { type: "column", icon: Columns3, label: "Column", hint: "Stacked container" },
-        { type: "link", icon: Link2, label: "Board link", hint: "Jump to another board" },
+        { type: "todo", icon: CheckSquare, label: "To-do list", hint: "Checkable task list" },
+        { type: "board_link", icon: LayoutGrid, label: "Board link", hint: "Jump to another board" },
       ],
     },
     {
@@ -5887,21 +5969,8 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
             </TooltipTrigger>
             <TooltipContent side="bottom" className="text-xs">Assets</TooltipContent>
           </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                size="icon"
-                variant="ghost"
-                className={`h-8 w-8 ${openDrawer === "furniture" ? "bg-primary/15 text-primary" : "hover:bg-primary/10 hover:text-primary"}`}
-                onClick={() => setOpenDrawer(openDrawer === "furniture" ? null : "furniture")}
-                aria-pressed={openDrawer === "furniture"}
-                data-testid="button-drawer-furniture"
-              >
-                <Armchair className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" className="text-xs">Furniture</TooltipContent>
-          </Tooltip>
+          {/* Furniture drawer button removed — the user noted it's redundant with the left sidebar
+              and was cramped when opened. Furniture remains accessible from the project sidebar. */}
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -5915,7 +5984,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                 <Layers className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="bottom" className="text-xs">Materials</TooltipContent>
+            <TooltipContent side="bottom" className="text-xs">Library</TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -6143,6 +6212,46 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                 ? (room) => setRenderRoomName(room)
                 : undefined
             }
+            onExportRoomSpec={
+              boardMode === "project" && (effectiveRole === "admin" || effectiveRole === "crew")
+                ? async (room) => {
+                    if (exportingSpecRoom) return;
+                    setExportingSpecRoom(room);
+                    try {
+                      const res = await fetch(`/api/projects/${projectId}/spec-sheet`, {
+                        method: "POST",
+                        credentials: "include",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ room }),
+                      });
+                      if (!res.ok) {
+                        let msg = "Couldn't generate spec sheet.";
+                        try { const data = await res.json(); if (data?.message) msg = data.message; } catch { /* ignore */ }
+                        toast({ title: "Spec sheet failed", description: msg, variant: "destructive" });
+                        return;
+                      }
+                      const blob = await res.blob();
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      const projectSafe = ((clientProject as any)?.name || "project")
+                        .replace(/[^a-z0-9-_ ]/gi, "")
+                        .replace(/\s+/g, "_");
+                      const roomSafe = room.replace(/[^a-z0-9-_ ]/gi, "").replace(/\s+/g, "_") || "room";
+                      a.download = `spec-sheet-${projectSafe}_${roomSafe}.pdf`;
+                      document.body.appendChild(a);
+                      a.click();
+                      a.remove();
+                      URL.revokeObjectURL(url);
+                    } catch (err: any) {
+                      toast({ title: "Spec sheet failed", description: err?.message || "Network error", variant: "destructive" });
+                    } finally {
+                      setExportingSpecRoom(null);
+                    }
+                  }
+                : undefined
+            }
+            isExportingRoomSpec={!!exportingSpecRoom}
           />
           {showSecondaryAxis && (
             <SecondaryAxisChips
@@ -6319,9 +6428,76 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
 
               // 3) Internal tool palette drops (existing behaviour).
               const toolType = e.dataTransfer.getData("tool-type");
-              if (!toolType) return;
+              if (!toolType) {
+                // Library drag-and-drop without a tool-type: treat any image-url as an image drop.
+                const libImageUrl = e.dataTransfer.getData("image-url");
+                if (libImageUrl) handleAddImageByUrl(libImageUrl, { x: canvasX, y: canvasY });
+                return;
+              }
+              // 3a) Library drawer drops carry a structured `library-payload` so we can
+              // recreate a real card (paint with name/brand/code, etc.) instead of just
+              // a generic empty element of that type.
+              const libraryPayloadRaw = e.dataTransfer.getData("library-payload");
+              if (libraryPayloadRaw && selectedBoardId) {
+                try {
+                  const payload = JSON.parse(libraryPayloadRaw);
+                  if (toolType === "surface-paint" && payload && payload.kind === "paint") {
+                    const def = ELEMENT_DEFAULTS["surface-paint"];
+                    const newZ = maxZ;
+                    setMaxZ((z) => z + 1);
+                    const baseContent: any = {
+                      kind: "paint",
+                      color: payload.color || payload.hex || "#1e3a2f",
+                      hex: payload.hex || payload.color || "#1E3A2F",
+                      name: payload.name || "Paint",
+                      code: payload.code || "",
+                      brand: payload.brand || "",
+                      status: "idea",
+                    };
+                    if (activeRoom) {
+                      const targetField = (selectedBoard as any)?.mode === "library" ? "category" : "room";
+                      if (targetField === "room") baseContent.room = activeRoom;
+                      else baseContent.category = activeRoom;
+                    }
+                    const url = buildUrl(api.canvasElements.create.path, { boardId: selectedBoardId });
+                    fetch(url, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      credentials: "include",
+                      body: JSON.stringify({
+                        type: "surface",
+                        x: canvasX,
+                        y: canvasY,
+                        width: def.width,
+                        height: def.height,
+                        zIndex: newZ,
+                        content: baseContent,
+                      }),
+                    })
+                      .then((r) => r.json())
+                      .then((el) => {
+                        addElement(el);
+                        sendElementAdd(el);
+                        pushUndo({ type: "create", elementId: el.id });
+                      })
+                      .catch(() => {
+                        toast({ title: "Error", description: "Failed to add paint from library", variant: "destructive" });
+                      });
+                    return;
+                  }
+                } catch {
+                  // fall through to default tool handling on malformed payload
+                }
+              }
               if (toolType === "image") {
-                triggerImageUpload();
+                // If the drop came from the library with an image-url, use that instead
+                // of triggering a file picker.
+                const libImageUrl = e.dataTransfer.getData("image-url");
+                if (libImageUrl) {
+                  handleAddImageByUrl(libImageUrl, { x: canvasX, y: canvasY });
+                } else {
+                  triggerImageUpload();
+                }
               } else if (toolType === "draw") {
                 setDrawingMode(true); setDrawTool("pen"); setDrawingPaths([]); drawPathsRef.current = []; setDrawUndoStack([]); setEditingId(null);
               } else if (toolType === "hardware") {
@@ -7914,18 +8090,23 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
       <Sheet open={openDrawer === "materials"} modal={false} onOpenChange={(open) => { if (!open) setOpenDrawer(null); }}>
         <SheetContent
           side="right"
-          className="w-[360px] sm:max-w-[360px] p-0 flex flex-col"
+          className="w-[480px] sm:max-w-[480px] p-0 flex flex-col"
           onInteractOutside={(e) => e.preventDefault()}
           data-testid="sheet-drawer-materials"
         >
           <SheetHeader className="px-4 py-3 border-b border-border/60">
             <SheetTitle className="font-sans text-base font-semibold flex items-center gap-2">
               <Layers className="h-4 w-4 text-muted-foreground" />
-              Materials
+              Library
             </SheetTitle>
-            <SheetDescription className="sr-only">Items pulled from your Library boards. Tap or drag to add to the board.</SheetDescription>
+            <SheetDescription className="sr-only">All paints, materials, hardware, and products you've saved across this project. Tap or drag to add.</SheetDescription>
           </SheetHeader>
-          <MaterialsDrawer projectId={projectId} onAddImageUrl={handleAddImageByUrl} />
+          <MaterialsDrawer
+            projectId={projectId}
+            onAddImageUrl={handleAddImageByUrl}
+            activeRoom={activeRoom}
+            activeRoomLabel={boardMode === "library" ? "Category" : "Room"}
+          />
         </SheetContent>
       </Sheet>
 
