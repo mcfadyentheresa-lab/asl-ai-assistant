@@ -125,12 +125,15 @@ function ProjectDetailsInner() {
     return "overview";
   });
   // Initial board drawer derived from ?drawer= or legacy ?tab=photos/furniture; null = no drawer open.
-  const initialBoardDrawer = (() => {
+  // Photos was merged into the unified Assets (materials) drawer — legacy ?drawer=photos and
+  // ?tab=photos deep links now open the merged Assets drawer instead.
+  const initialBoardDrawer = ((): "furniture" | "materials" | null => {
     const params = new URLSearchParams(window.location.search);
     const d = params.get("drawer");
-    if (d === "photos" || d === "furniture" || d === "materials") return d;
+    if (d === "photos" || d === "materials") return "materials";
+    if (d === "furniture") return "furniture";
     const t = params.get("tab");
-    if (t === "photos") return "photos";
+    if (t === "photos") return "materials";
     if (t === "furniture") return "furniture";
     return null;
   })();

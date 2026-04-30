@@ -58,7 +58,6 @@ import {
   Pin, Layers, Armchair, Image as ImageIcon, Grid3x3, Crop as CropIcon, RotateCcw,
 } from "lucide-react";
 import LibraryCollectionsView from "@/components/board/LibraryCollectionsView";
-import { PhotosDrawer } from "@/components/board/PhotosDrawer";
 import { FurnitureDrawer } from "@/components/board/FurnitureDrawer";
 import { MaterialsDrawer } from "@/components/board/MaterialsDrawer";
 import HardwarePickerDialog, { type HardwareDraft } from "@/components/board/HardwarePickerDialog";
@@ -239,7 +238,7 @@ interface SpatialCanvasProps {
   onBackToProject?: () => void;
   // Auto-open one of the side drawers on mount. Used for ?drawer= deep links and the
   // /project/:id/photos and /project/:id/furniture redirects.
-  initialDrawer?: "photos" | "furniture" | "materials" | null;
+  initialDrawer?: "furniture" | "materials" | null;
 }
 
 const GRID_SIZE = 20;
@@ -464,8 +463,8 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
   const [showLinkDialog, setShowLinkDialog] = useState(false);
   const [showCalendarSheet, setShowCalendarSheet] = useState(false);
   // Side drawers — Photos / Furniture / Materials. Mutually exclusive: opening one closes the others.
-  const [openDrawer, setOpenDrawerRaw] = useState<"photos" | "furniture" | "materials" | null>(initialDrawer);
-  const setOpenDrawer = (next: "photos" | "furniture" | "materials" | null) => setOpenDrawerRaw(next);
+  const [openDrawer, setOpenDrawerRaw] = useState<"furniture" | "materials" | null>(initialDrawer ?? null);
+  const setOpenDrawer = (next: "furniture" | "materials" | null) => setOpenDrawerRaw(next);
   // Dot grid overlay. Default ON for admin/crew, OFF for client. Persisted per-user
   // in localStorage so toggling sticks across reloads.
   const dotGridStorageKey = useMemo(() => `asl-board-dot-grid:${user?.id || "anon"}`, [user?.id]);
@@ -6027,24 +6026,11 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
             </PopoverContent>
           </Popover>
           <Separator orientation="vertical" className="h-4 mx-1" />
-          {/* Side-drawer triggers — Photos, Furniture, Materials. Mutually exclusive
-              (clicking one closes the others). Dot grid toggle visualizes the snap grid
-              that PR #54's auto-grid uses; persisted per-user in localStorage. */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                size="icon"
-                variant="ghost"
-                className={`h-8 w-8 ${openDrawer === "photos" ? "bg-primary/15 text-primary" : "hover:bg-primary/10 hover:text-primary"}`}
-                onClick={() => setOpenDrawer(openDrawer === "photos" ? null : "photos")}
-                aria-pressed={openDrawer === "photos"}
-                data-testid="button-drawer-photos"
-              >
-                <ImageIcon className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" className="text-xs">Assets</TooltipContent>
-          </Tooltip>
+          {/* Side-drawer triggers — Assets and Materials drawer (now also called Assets).
+              Mutually exclusive (clicking one closes the others). Dot grid toggle visualizes
+              the snap grid that PR #54's auto-grid uses; persisted per-user in localStorage.
+              The old Photos drawer was merged into the Assets drawer below — raw uploads,
+              paints, materials, hardware, and products all live in one panel now. */}
           {/* Furniture drawer button removed — the user noted it's redundant with the left sidebar
               and was cramped when opened. Furniture remains accessible from the project sidebar. */}
           <Tooltip>
@@ -6060,7 +6046,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                 <Layers className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="bottom" className="text-xs">Library</TooltipContent>
+            <TooltipContent side="bottom" className="text-xs">Assets</TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -8127,24 +8113,6 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
           remains interactive on the left half of the screen. modal=false keeps the
           backdrop off the canvas — pointer events on the canvas continue to work
           while a drawer is open. */}
-      <Sheet open={openDrawer === "photos"} modal={false} onOpenChange={(open) => { if (!open) setOpenDrawer(null); }}>
-        <SheetContent
-          side="right"
-          className="w-[360px] sm:max-w-[360px] p-0 flex flex-col"
-          onInteractOutside={(e) => e.preventDefault()}
-          data-testid="sheet-drawer-photos"
-        >
-          <SheetHeader className="px-4 py-3 border-b border-border/60">
-            <SheetTitle className="font-sans text-base font-semibold flex items-center gap-2">
-              <ImageIcon className="h-4 w-4 text-muted-foreground" />
-              Assets
-            </SheetTitle>
-            <SheetDescription className="sr-only">Project assets. Tap or drag to add to the board.</SheetDescription>
-          </SheetHeader>
-          <PhotosDrawer projectId={projectId} onAddImageUrl={handleAddImageByUrl} />
-        </SheetContent>
-      </Sheet>
-
       <Sheet open={openDrawer === "furniture"} modal={false} onOpenChange={(open) => { if (!open) setOpenDrawer(null); }}>
         <SheetContent
           side="right"
@@ -8173,9 +8141,9 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
           <SheetHeader className="px-4 py-3 border-b border-border/60">
             <SheetTitle className="font-sans text-base font-semibold flex items-center gap-2">
               <Layers className="h-4 w-4 text-muted-foreground" />
-              Library
+              Assets
             </SheetTitle>
-            <SheetDescription className="sr-only">All paints, materials, hardware, and products you've saved across this project. Tap or drag to add.</SheetDescription>
+            <SheetDescription className="sr-only">All photos, paints, materials, hardware, and products you've saved across this project. Upload new photos from the button at the top, then drag any tile onto the board.</SheetDescription>
           </SheetHeader>
           <MaterialsDrawer
             projectId={projectId}
