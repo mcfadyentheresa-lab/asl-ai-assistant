@@ -5533,42 +5533,48 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
     return null;
   };
 
-  // Legacy structure used by the mobile floating bottom toolbar.
+  // Mobile floating bottom toolbar — mirrors the 5-group Add palette so desktop and mobile
+  // present the same mental model: Image / Card / Text / Shape / Draw.
   const sidebarToolGroups = [
     {
-      label: "Content",
+      label: "Image",
       tools: [
-        { type: "text-note", icon: StickyNote, label: "Note" },
-        { type: "text-clean", icon: FileText, label: "Plain Text" },
+        { type: "image", icon: ImagePlus, label: "Photo" },
         { type: "link", icon: Link2, label: "Link" },
-        { type: "todo", icon: CheckSquare, label: "To-do" },
-        { type: "image", icon: ImagePlus, label: "Image" },
+        ...(effectiveRole === "client" ? [] : [{ type: "palette", icon: Droplet, label: "Palette" }]),
       ],
     },
     {
-      label: "Layout",
+      label: "Card",
       tools: [
-        { type: "column", icon: Columns3, label: "Column" },
-        { type: "text-heading", icon: Type, label: "Header" },
-        { type: "room_zone", icon: Square, label: "Zone" },
-      ],
-    },
-    {
-      label: "Design",
-      tools: [
-        { type: "surface-paint", icon: Palette, label: "Color" },
+        { type: "surface-paint", icon: Palette, label: "Paint" },
         { type: "surface-material", icon: Shapes, label: "Material" },
         ...(effectiveRole === "client" ? [] : [{ type: "hardware", icon: Wrench, label: "Hardware" }]),
-        { type: "text-callout", icon: Sparkles, label: "Callout" },
-        { type: "product", icon: ExternalLink, label: "Product" },
+        { type: "product", icon: Armchair, label: "Product" },
       ],
     },
     {
-      label: "Tools",
+      label: "Text",
+      tools: [
+        { type: "text-note", icon: StickyNote, label: "Note" },
+        { type: "text-clean", icon: FileText, label: "Plain" },
+        { type: "text-heading", icon: Type, label: "Header" },
+        { type: "text-callout", icon: Sparkles, label: "Callout" },
+      ],
+    },
+    {
+      label: "Shape",
+      tools: [
+        { type: "room_zone", icon: Square, label: "Zone" },
+        { type: "column", icon: Columns3, label: "Column" },
+        { type: "todo", icon: CheckSquare, label: "To-do" },
+      ],
+    },
+    {
+      label: "Draw",
       tools: [
         { type: "draw", icon: Pencil, label: "Draw" },
         ...(effectiveRole === "client" ? [] : [{ type: "connect", icon: Spline, label: "Connect" }]),
-        ...(effectiveRole === "client" ? [] : [{ type: "palette", icon: Droplet, label: "Extract palette" }]),
       ],
     },
   ];
@@ -5590,51 +5596,55 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
     accent: string; // border / text accent
     items: AddPaletteItem[];
   };
+  // 5-group Add palette: Image / Card / Text / Shape / Draw. Each top-level group opens a
+  // popover; choices inside are still distinct types under the hood, but the user only sees
+  // 5 doors instead of 15+ scattered tools. Hardware/connector hidden from clients.
   const addPaletteGroups: AddPaletteGroup[] = [
     {
-      label: "Words",
-      tint: "bg-[#f7f1e7]/70",
-      accent: "text-[#2f4a3a]",
-      items: [
-        { type: "text-note", icon: StickyNote, label: "Note", hint: "Sticky thought with title", key: "N" },
-        { type: "text-clean", icon: FileText, label: "Clean", hint: "Plain text, no card", key: "T" },
-        { type: "text-callout", icon: Sparkles, label: "Callout", hint: "Highlight with arrow" },
-        { type: "text-heading", icon: Type, label: "Heading", hint: "Section heading band" },
-      ],
-    },
-    {
-      label: "Visual",
+      label: "Image",
       tint: "bg-[#eef0e8]/70",
       accent: "text-[#2f4a3a]",
       items: [
-        { type: "image", icon: ImagePlus, label: "Image", hint: "Upload or paste URL", key: "I" },
-        { type: "surface-paint", icon: Palette, label: "Paint", hint: "Paint swatch + LRV", key: "C" },
-        { type: "surface-material", icon: Shapes, label: "Material", hint: "Photo + supplier code" },
+        { type: "image", icon: ImagePlus, label: "Photo", hint: "Upload or paste URL", key: "I" },
+        { type: "link", icon: Link2, label: "Web link", hint: "Pulls preview image automatically" },
         ...(effectiveRole === "client"
           ? []
           : [{ type: "palette", icon: Droplet, label: "Extract palette", hint: "Pull colors from a photo" }]),
       ],
     },
     {
-      label: "Selections",
+      label: "Card",
       tint: "bg-[#e8ece4]/70",
       accent: "text-[#2f4a3a]",
       items: [
+        { type: "surface-paint", icon: Palette, label: "Paint", hint: "Paint swatch + LRV", key: "C" },
+        { type: "surface-material", icon: Shapes, label: "Material", hint: "Photo + supplier code", key: "M" },
         ...(effectiveRole === "client"
           ? []
           : [{ type: "hardware", icon: Wrench, label: "Hardware", hint: "Pull, knob, faucet — typed", key: "H" }]),
-        { type: "product", icon: ExternalLink, label: "Product", hint: "Linked product card" },
+        { type: "product", icon: Armchair, label: "Product", hint: "Furniture, lighting, decor", key: "P" },
       ],
     },
     {
-      label: "Layout",
+      label: "Text",
+      tint: "bg-[#f7f1e7]/70",
+      accent: "text-[#2f4a3a]",
+      items: [
+        { type: "text-note", icon: StickyNote, label: "Sticky note", hint: "Sticky thought with title", key: "N" },
+        { type: "text-clean", icon: FileText, label: "Plain text", hint: "No card, no border", key: "T" },
+        { type: "text-heading", icon: Type, label: "Heading", hint: "Section heading band" },
+        { type: "text-callout", icon: Sparkles, label: "Callout", hint: "Highlight with arrow" },
+      ],
+    },
+    {
+      label: "Shape",
       tint: "bg-[#f1ece1]/70",
       accent: "text-[#2f4a3a]",
       items: [
-        { type: "room_zone", icon: Square, label: "Room zone", hint: "Lane background" },
-        { type: "todo", icon: CheckSquare, label: "To-do", hint: "Task list" },
+        { type: "room_zone", icon: Square, label: "Room zone", hint: "Lane background for grouping" },
         { type: "column", icon: Columns3, label: "Column", hint: "Stacked container" },
-        { type: "link", icon: Link2, label: "Board link", hint: "Jump to another board" },
+        { type: "todo", icon: CheckSquare, label: "To-do list", hint: "Checkable task list" },
+        { type: "board_link", icon: LayoutGrid, label: "Board link", hint: "Jump to another board" },
       ],
     },
     {
