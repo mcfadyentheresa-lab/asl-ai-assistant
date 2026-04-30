@@ -26,6 +26,8 @@ import { setupWebSocket } from "./websocket";
 import { startSmsQueueProcessor } from "./sms";
 import { bootstrapAdminFromEnv } from "./bootstrap-admin";
 import { startLinkHealthJob } from "./link-health";
+import { seedBenjaminMooreColors } from "./seed-paint-colors";
+import { seedAdditionalBrands } from "./seed-additional-brands";
 
 const app = express();
 const httpServer = createServer(app);
@@ -91,6 +93,17 @@ app.use((req, res, next) => {
   // Idempotent admin bootstrap from env vars. No-op if ADMIN_EMAIL /
   // ADMIN_PASSWORD aren't set. Errors are logged but don't block startup.
   await bootstrapAdminFromEnv();
+
+  // Idempotent paint-color catalog seed. Each function checks per-brand and
+  // skips if rows already exist. Errors are logged but don't block startup.
+  try {
+    const bm = await seedBenjaminMooreColors();
+    if (bm > 0) log(`Seeded ${bm} Benjamin Moore paint colors.`);
+    const additional = await seedAdditionalBrands();
+    if (additional > 0) log(`Seeded ${additional} additional brand paint colors.`);
+  } catch (err) {
+    console.error("Paint-color seed error (non-fatal):", err);
+  }
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
