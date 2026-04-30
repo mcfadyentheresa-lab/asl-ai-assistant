@@ -937,7 +937,9 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
         // doesn't yank the viewport back to fit).
         if (data.length > 0 && lastAutoFitBoardId.current !== selectedBoardId) {
           lastAutoFitBoardId.current = selectedBoardId;
-          scheduleAutoFit();
+          // Pass the freshly fetched array so the fit math doesn't depend on
+          // React having re-rendered with the new store snapshot yet.
+          scheduleAutoFit(data);
         }
       })
       .catch(() => setLoading(false));
@@ -2986,8 +2988,11 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
     };
   }, [isPanning, editingId]);
 
-  const fitToScreen = () => {
-    const els = Object.values(elements);
+  // Pure fit math — takes an explicit element list so callers don't depend on
+  // a stale `elements` closure. Used by both the toolbar fit-to-screen button
+  // (which reads from the store at call time) and the auto-fit-on-load effect
+  // (which passes the freshly fetched array, before React has re-rendered).
+  const fitElementsToScreen = useCallback((els: { x: number; y: number; width: number; height: number }[]) => {
     if (els.length === 0) { setPan({ x: 0, y: 0 }); setZoom(1); return; }
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     els.forEach((e) => {
@@ -2999,30 +3004,42 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
     const cw = containerRef.current?.clientWidth || 800;
     const ch = containerRef.current?.clientHeight || 600;
     const PAD = 80;
-    const contentW = maxX - minX;
-    const contentH = maxY - minY;
+    const contentW = Math.max(1, maxX - minX);
+    const contentH = Math.max(1, maxY - minY);
     const newZoom = Math.min((cw - PAD * 2) / contentW, (ch - PAD * 2) / contentH, 2);
     const cx = (minX + maxX) / 2;
     const cy = (minY + maxY) / 2;
-    setPan({ x: cw / 2 - cx * newZoom, y: ch / 2 - cy * newZoom });
-    setZoom(Math.max(0.15, newZoom));
+    const z = Math.max(0.15, newZoom);
+    setPan({ x: cw / 2 - cx * z, y: ch / 2 - cy * z });
+    setZoom(z);
+  }, []);
+
+  const fitToScreen = () => {
+    fitElementsToScreen(Object.values(elements));
   };
 
   const resetView = () => { setPan({ x: 0, y: 0 }); setZoom(1); };
 
   // Auto fit-to-screen when a populated board is first opened. We track the
   // board id we've already auto-fit so switching boards re-fits, but every
-  // subsequent element add doesn't yank the viewport back. Used by the
-  // load-effect below — see `lastAutoFitBoardId.current = selectedBoardId`.
+  // subsequent element add doesn't yank the viewport back.
+  //
+  // Stale-closure note: the previous version called fitToScreen() inside two
+  // RAFs, but fitToScreen read `elements` from the React render closure that
+  // existed when `scheduleAutoFit` was created — which was empty on first
+  // mount. So the auto-fit silently fell into the `els.length === 0` branch
+  // and reset to {x:0,y:0,zoom:1} (top-left, not centered).
+  //
+  // Fix: pass the freshly fetched element array into the fit math directly.
   const lastAutoFitBoardId = useRef<number | null>(null);
   // Schedule auto-fit on the next animation frame after layout settles. Two
   // RAFs is the well-known pattern to ensure the container has measured its
   // size after a board switch (drawer open/close, tab switch, etc).
-  const scheduleAutoFit = useCallback(() => {
+  const scheduleAutoFit = useCallback((els: { x: number; y: number; width: number; height: number }[]) => {
     requestAnimationFrame(() => {
-      requestAnimationFrame(() => fitToScreen());
+      requestAnimationFrame(() => fitElementsToScreen(els));
     });
-  }, []);
+  }, [fitElementsToScreen]);
 
   const startResize = (id: number, handle: string, e: React.MouseEvent) => {
     if (lockLayout) return;
