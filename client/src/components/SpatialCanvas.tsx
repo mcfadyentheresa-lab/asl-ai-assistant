@@ -2037,7 +2037,16 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
   // Unified action dispatcher used by the Add palette, mobile bar, and shortcuts.
   // "image" / "connect" arm a placement cursor or open a dialog; everything else
   // inserts at viewport center.
-  const runTool = useCallback((type: string) => {
+  //
+  // Plain const — NOT useCallback. Previously this was a useCallback with deps
+  // [connectMode, exitConnectMode] only, which captured a stale `createElement`
+  // closure from the first render (when `selectedBoardId` was still null).
+  // After boards loaded and the user clicked an Add palette item, the stale
+  // createElement bailed out at `if (!selectedBoardId) return` — silent no-op.
+  // The button's onClick handler is recreated each render so it always sees
+  // the fresh runTool; the keydown effect uses runToolRef.current to dodge
+  // the same closure trap.
+  const runTool = (type: string) => {
     if (type === "image") {
       setShowImagePopup((v) => !v);
     } else if (type === "draw") {
@@ -2066,8 +2075,11 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
     } else {
       createElement(type);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [connectMode, exitConnectMode]);
+  };
+  // Mirror runTool into a ref so the keydown listener can always reach the
+  // latest version without re-binding (see effect below).
+  const runToolRef = useRef(runTool);
+  runToolRef.current = runTool;
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -2112,14 +2124,18 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
             // Skip role-restricted tools.
             if ((type === "hardware" || type === "connect") && effectiveRole === "client") return;
             e.preventDefault();
-            runTool(type);
+            runToolRef.current(type);
           }
         }
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [handleUndo, connectMode, exitConnectMode, selectedConnectorId, runTool, effectiveRole]);
+    // runTool intentionally omitted from deps — we read it via runToolRef.current
+    // inside the handler so we always get the latest version without rebinding
+    // the listener every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [handleUndo, connectMode, exitConnectMode, selectedConnectorId, effectiveRole]);
 
   // Connector endpoint re-targeting drag.
   useEffect(() => {
