@@ -309,8 +309,8 @@ const ELEMENT_DEFAULTS: Record<string, { width: number; height: number; content:
   "text-callout": { width: 200, height: 80,  content: { variant: "callout", text: "Add note...", color: "#fef9c3" } },
   "text-heading": { width: 360, height: 44,  content: { variant: "heading", title: "Section Title", tracking: "normal", align: "left", size: "md" } },
   // Surface variants
-  "surface-paint":    { width: 220, height: 220, content: { kind: "paint",    color: "#1e3a2f", name: "Forest Green", hex: "#1E3A2F", status: "idea" } },
-  "surface-material": { width: 220, height: 180, content: { kind: "material", name: "Material", supplier: "", code: "", imageUrl: "", notes: "", status: "idea" } },
+  "surface-paint":    { width: 240, height: 240, content: { kind: "paint",    color: "#1e3a2f", name: "Forest Green", hex: "#1E3A2F", status: "idea" } },
+  "surface-material": { width: 240, height: 290, content: { kind: "material", name: "Material", supplier: "", code: "", imageUrl: "", notes: "", status: "idea" } },
   // Other types
   todo: { width: 240, height: 200, content: { title: "To-do", items: [{ text: "Add a task...", checked: false }] } },
   column: { width: 240, height: 400, content: { title: "New Column", subtitle: "0 cards" } },
@@ -319,8 +319,8 @@ const ELEMENT_DEFAULTS: Record<string, { width: number; height: number; content:
   image: { width: 360, height: 260, content: { url: "", caption: "" } },
   draw: { width: 400, height: 300, content: { paths: [], color: "#000000", strokeWidth: 2 } },
   room_zone: { width: 500, height: 400, content: { title: "Room Name", color: "#f0ede8", opacity: 0.5 } },
-  product: { width: 240, height: 120, content: { name: "Product", price: "", supplier: "", url: "", status: "idea" } },
-  hardware: { width: 280, height: 200, content: { category: "pull", name: "New hardware", status: "idea", currency: "CAD" } },
+  product: { width: 240, height: 270, content: { name: "Product", price: "", supplier: "", url: "", imageUrl: "", status: "idea" } },
+  hardware: { width: 240, height: 290, content: { category: "pull", name: "New hardware", status: "idea", currency: "CAD" } },
   connector: { width: 0, height: 0, content: { fromId: 0, toId: 0, style: "arrow", curve: "curved" } },
 };
 
@@ -4533,7 +4533,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
           >
             {renderStatusEdge(el)}
             {kindPicker}
-            <div className="h-[140px] relative pointer-events-none select-none" style={{ backgroundColor: c.color || "#1e3a2f" }}>
+            <div className="h-[160px] relative pointer-events-none select-none" style={{ backgroundColor: c.color || "#1e3a2f" }}>
               <span className="absolute bottom-2 left-3 text-xs text-white/80" style={{ fontFamily: "var(--font-mono)" }}>{(c.hex || c.color || "#1E3A2F").toUpperCase()}</span>
               {typeof c.lrv === "number" && (
                 <span
@@ -4670,11 +4670,33 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
         >
           {renderStatusEdge(el)}
           {kindPicker}
-          {c.imageUrl && (
-            <div className="h-[80px] bg-muted overflow-hidden">
-              <img src={c.imageUrl} alt={c.name} className="w-full h-full object-cover pointer-events-none" />
-            </div>
-          )}
+          {/* Image-first: always render a 160h photo area at the top so the card feels visual
+              even before the user uploads. Empty state shows a warm-paper gradient + Shapes glyph. */}
+          <div className="h-[160px] bg-muted overflow-hidden relative pointer-events-none select-none">
+            {c.imageUrl ? (
+              <img
+                src={c.imageUrl}
+                alt={c.name || "Material"}
+                className="w-full h-full object-cover"
+                style={{ filter: "saturate(0.92) contrast(0.97)" }}
+                draggable={false}
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+              />
+            ) : (
+              <div
+                className="w-full h-full flex flex-col items-center justify-center gap-1"
+                style={{ background: "linear-gradient(135deg, #f4ede0 0%, #ede4d3 100%)" }}
+              >
+                <Shapes className="h-7 w-7 text-foreground/30" strokeWidth={1.5} />
+                <span
+                  className="text-[10px] uppercase tracking-wider text-foreground/40"
+                  style={{ fontFamily: "var(--font-mono)" }}
+                >
+                  Material photo
+                </span>
+              </div>
+            )}
+          </div>
           <div className="p-3">
             {isSelected ? (
               <div className="space-y-1.5">
@@ -4803,45 +4825,59 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
           data-testid={`element-hardware-${el.id}`}
         >
           {renderStatusEdge(el)}
-          <div className="p-3 flex flex-col gap-2 pointer-events-none select-none">
-            <div className="flex items-start gap-3">
-              {c.imageUrl && (
-                <div
-                  className="w-[72px] h-[72px] rounded-sm bg-muted overflow-hidden shrink-0"
-                  style={{ filter: "saturate(0.85) contrast(0.96)" }}
-                >
-                  <img src={c.imageUrl} alt={c.name || "Hardware"} className="w-full h-full object-cover" />
-                </div>
-              )}
-              <div className="flex-1 min-w-0">
-                <div
-                  className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground truncate"
+          {/* Image-first hardware: 160h photo area on top, always rendered (warm-paper gradient + glyph when empty). */}
+          <div className="h-[160px] bg-muted overflow-hidden relative pointer-events-none select-none">
+            {c.imageUrl ? (
+              <img
+                src={c.imageUrl}
+                alt={c.name || "Hardware"}
+                className="w-full h-full object-cover"
+                style={{ filter: "saturate(0.85) contrast(0.96)" }}
+                draggable={false}
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+              />
+            ) : (
+              <div
+                className="w-full h-full flex flex-col items-center justify-center gap-1"
+                style={{ background: "linear-gradient(135deg, #f4ede0 0%, #ede4d3 100%)" }}
+              >
+                <Wrench className="h-7 w-7 text-foreground/30" strokeWidth={1.5} />
+                <span
+                  className="text-[10px] uppercase tracking-wider text-foreground/40"
                   style={{ fontFamily: "var(--font-mono)" }}
-                  data-testid={`text-hardware-meta-${el.id}`}
                 >
-                  {labelTop || "hardware"}
-                </div>
-                <div className="text-sm font-semibold leading-snug mt-0.5 line-clamp-2" data-testid={`text-hardware-name-${el.id}`}>
-                  {c.name || "New hardware"}
-                </div>
-                {(c.brand || c.finish) && (
-                  <div className="text-[11px] text-muted-foreground mt-0.5 truncate">
-                    {[c.brand, c.finish].filter(Boolean).join(" · ")}
-                  </div>
-                )}
-                {c.sku && (
-                  <div className="text-[10px] text-muted-foreground/80 mt-0.5 truncate" style={{ fontFamily: "var(--font-mono)" }}>
-                    {c.sku}
-                  </div>
-                )}
-                {c.dimensions && (
-                  <div className="text-[10px] text-muted-foreground/80 truncate" style={{ fontFamily: "var(--font-mono)" }}>
-                    {c.dimensions}
-                  </div>
-                )}
+                  Hardware photo
+                </span>
               </div>
+            )}
+          </div>
+          <div className="p-3 flex flex-col gap-1.5 pointer-events-none select-none">
+            <div
+              className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground truncate"
+              style={{ fontFamily: "var(--font-mono)" }}
+              data-testid={`text-hardware-meta-${el.id}`}
+            >
+              {labelTop || "hardware"}
             </div>
-            <div className="flex items-center justify-between gap-2 pt-1">
+            <div className="text-sm font-semibold leading-snug line-clamp-2" data-testid={`text-hardware-name-${el.id}`}>
+              {c.name || "New hardware"}
+            </div>
+            {(c.brand || c.finish) && (
+              <div className="text-[11px] text-muted-foreground truncate">
+                {[c.brand, c.finish].filter(Boolean).join(" · ")}
+              </div>
+            )}
+            {c.sku && (
+              <div className="text-[10px] text-muted-foreground/80 truncate" style={{ fontFamily: "var(--font-mono)" }}>
+                {c.sku}
+              </div>
+            )}
+            {c.dimensions && (
+              <div className="text-[10px] text-muted-foreground/80 truncate" style={{ fontFamily: "var(--font-mono)" }}>
+                {c.dimensions}
+              </div>
+            )}
+            <div className="flex items-center justify-between gap-2 pt-0.5">
               <div className="text-xs" style={{ fontFamily: "var(--font-mono)" }} data-testid={`text-hardware-price-${el.id}`}>
                 {priceLabel || <span className="text-muted-foreground/60">—</span>}
               </div>
@@ -4893,7 +4929,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
       return (
         <div
           key={el.id}
-          className={`${cardBase} bg-card border border-border cursor-grab`}
+          className={`${cardBase} bg-card border border-border overflow-hidden cursor-grab`}
           style={{ left: el.x, top: el.y, width: el.width, zIndex: effectiveZ }}
           onMouseDown={(e) => {
             const tag = (e.target as HTMLElement).tagName.toLowerCase();
@@ -4909,6 +4945,32 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
           data-testid={`element-product-${el.id}`}
         >
           {renderStatusEdge(el)}
+          {/* Image-first product: 160h photo area on top, always rendered. Empty state gets warm-paper + glyph. */}
+          <div className="h-[160px] bg-muted overflow-hidden relative pointer-events-none select-none">
+            {c.imageUrl ? (
+              <img
+                src={c.imageUrl}
+                alt={c.name || "Product"}
+                className="w-full h-full object-cover"
+                style={{ filter: "saturate(0.92) contrast(0.97)" }}
+                draggable={false}
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+              />
+            ) : (
+              <div
+                className="w-full h-full flex flex-col items-center justify-center gap-1"
+                style={{ background: "linear-gradient(135deg, #f4ede0 0%, #ede4d3 100%)" }}
+              >
+                <Armchair className="h-7 w-7 text-foreground/30" strokeWidth={1.5} />
+                <span
+                  className="text-[10px] uppercase tracking-wider text-foreground/40"
+                  style={{ fontFamily: "var(--font-mono)" }}
+                >
+                  Product photo
+                </span>
+              </div>
+            )}
+          </div>
           <div className="p-3">
             {isSelected ? (
               <div className="space-y-1.5">
@@ -4932,6 +4994,13 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                   placeholder="Supplier"
                   onBlur={(e) => handleUpdateContent(el.id, { ...c, supplier: e.target.value })}
                   data-testid={`input-product-supplier-${el.id}`}
+                />
+                <input
+                  className="w-full bg-transparent border-none text-xs text-primary outline-none"
+                  defaultValue={c.imageUrl || ""}
+                  placeholder="Image URL"
+                  onBlur={(e) => handleUpdateContent(el.id, { ...c, imageUrl: e.target.value })}
+                  data-testid={`input-product-image-${el.id}`}
                 />
                 <input
                   className="w-full bg-transparent border-none text-xs text-primary outline-none"
