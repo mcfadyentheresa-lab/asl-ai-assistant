@@ -550,6 +550,20 @@ export const paintColors = pgTable("paint_colors", {
   isPopular: boolean("is_popular").default(false),
 });
 
+// Board Templates — user-saved reusable boards. Replaces the old curated
+// faux-content catalogue. A user clicks "Save as template" on a board and a
+// row is created here with a deep copy of the canvas data; opening the
+// "Create board" dialog lists these as options alongside Blank.
+export const boardTemplates = pgTable("board_templates", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  canvasData: jsonb("canvas_data").notNull(),
+  sourceBoardId: integer("source_board_id").references(() => planningBoards.id, { onDelete: "set null" }),
+  createdBy: text("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Activity Log
 export const activityLog = pgTable("activity_log", {
   id: serial("id").primaryKey(),
@@ -843,6 +857,7 @@ export const insertCalendarEventSchema = createInsertSchema(calendarEvents).omit
 export const insertActivityLogSchema = createInsertSchema(activityLog).omit({ id: true, createdAt: true });
 export const insertPaintColorSchema = createInsertSchema(paintColors).omit({ id: true });
 export const insertBoardSnapshotSchema = createInsertSchema(boardSnapshots).omit({ id: true, createdAt: true });
+export const insertBoardTemplateSchema = createInsertSchema(boardTemplates).omit({ id: true, createdAt: true });
 export const insertCostCategorySchema = createInsertSchema(costCategories).omit({ id: true });
 export const insertMarketRateSchema = createInsertSchema(marketRates).omit({ id: true, createdAt: true });
 export const insertProjectEstimateSchema = createInsertSchema(projectEstimates).omit({ id: true, createdAt: true });
@@ -904,6 +919,8 @@ export type QueuedSms = typeof queuedSms.$inferSelect;
 export type InsertQueuedSms = z.infer<typeof insertQueuedSmsSchema>;
 export type BoardSnapshot = typeof boardSnapshots.$inferSelect;
 export type InsertBoardSnapshot = z.infer<typeof insertBoardSnapshotSchema>;
+export type BoardTemplate = typeof boardTemplates.$inferSelect;
+export type InsertBoardTemplate = z.infer<typeof insertBoardTemplateSchema>;
 export type CostCategory = typeof costCategories.$inferSelect;
 export type InsertCostCategory = z.infer<typeof insertCostCategorySchema>;
 export type MarketRate = typeof marketRates.$inferSelect;

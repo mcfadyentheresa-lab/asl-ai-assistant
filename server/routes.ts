@@ -2035,7 +2035,50 @@ Respond with valid JSON only:
     if (userRecord?.role !== "admin") {
       return res.status(403).json({ message: "Access denied" });
     }
-    res.json(getTemplateCatalogue());
+    res.json(await getTemplateCatalogue());
+  }));
+
+  // Save the current state of a board as a reusable template. Body:
+  //   { boardId: number, name: string, description?: string }
+  // The board's canvasData is deep-cloned at save time; later edits to the
+  // source board do not retroactively change the template.
+  app.post("/api/board-templates", isAuthenticated, asyncHandler(async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const userRecord = await authStorage.getUser(userId);
+    if (userRecord?.role !== "admin") {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    const { boardId, name, description } = req.body ?? {};
+    if (!boardId || typeof name !== "string" || !name.trim()) {
+      return res.status(400).json({ message: "boardId and name are required" });
+    }
+    const board = await storage.getPlanningBoard(Number(boardId));
+    if (!board) {
+      return res.status(404).json({ message: "Source board not found" });
+    }
+    const canvasData = board.canvasData ?? { objects: [] };
+    const created = await storage.createBoardTemplate({
+      name: name.trim(),
+      description: typeof description === "string" && description.trim() ? description.trim() : null,
+      canvasData: JSON.parse(JSON.stringify(canvasData)),
+      sourceBoardId: Number(boardId),
+      createdBy: userId,
+    });
+    res.status(201).json(created);
+  }));
+
+  app.delete("/api/board-templates/:templateId", isAuthenticated, asyncHandler(async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const userRecord = await authStorage.getUser(userId);
+    if (userRecord?.role !== "admin") {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    const id = Number(req.params.templateId);
+    if (!Number.isFinite(id)) {
+      return res.status(400).json({ message: "Invalid template id" });
+    }
+    await storage.deleteBoardTemplate(id);
+    res.status(204).end();
   }));
 
   app.get("/api/board-templates/:templateId", isAuthenticated, asyncHandler(async (req: any, res) => {
@@ -2044,7 +2087,7 @@ Respond with valid JSON only:
     if (userRecord?.role !== "admin") {
       return res.status(403).json({ message: "Access denied" });
     }
-    const canvasData = getTemplateCanvasData(req.params.templateId);
+    const canvasData = await getTemplateCanvasData(req.params.templateId);
     if (!canvasData) {
       return res.status(404).json({ message: "Template not found" });
     }
@@ -2245,7 +2288,7 @@ function templateCanvasToElements(canvasData: any, boardId: number, createdBy: s
         if (userRecord?.role !== "admin") {
           return res.status(403).json({ message: "Only admins can use board templates" });
         }
-        canvasData = getTemplateCanvasData(templateId);
+        canvasData = await getTemplateCanvasData(templateId);
         if (!canvasData) {
           return res.status(400).json({ message: "Invalid template ID" });
         }
