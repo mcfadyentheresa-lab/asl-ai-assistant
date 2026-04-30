@@ -1220,8 +1220,8 @@ export async function registerRoutes(
           try {
             const OpenAI = (await import("openai")).default;
             const openai = new OpenAI({
-              apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-              baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+              apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY,
+              baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || process.env.OPENAI_BASE_URL,
             });
             const projectPhotos = await storage.getPhotos(project.id);
             const pairedPhoto = projectPhotos.find((p: any) => p.isShowcase) || projectPhotos[0] || null;
@@ -2886,8 +2886,8 @@ function templateCanvasToElements(canvasData: any, boardId: number, createdBy: s
 
       const OpenAI = (await import("openai")).default;
       const client = new OpenAI({
-        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || process.env.OPENAI_BASE_URL,
       });
 
       const response = await client.chat.completions.create({
@@ -3100,8 +3100,8 @@ Use designer language naturally. Be specific. Mention items by their actual name
     try {
       const OpenAI = (await import("openai")).default;
       const client = new OpenAI({
-        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || process.env.OPENAI_BASE_URL,
       });
 
       const response = await client.chat.completions.create({
@@ -3280,8 +3280,8 @@ Respond with ONLY a JSON object: { "suggestions": Suggestion[] } where Suggestio
     try {
       const OpenAI = (await import("openai")).default;
       const client = new OpenAI({
-        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || process.env.OPENAI_BASE_URL,
       });
 
       const response = await client.chat.completions.create({
@@ -3367,8 +3367,8 @@ Respond with ONLY a JSON object: { "suggestions": Suggestion[] } where Suggestio
     try {
       const OpenAI = (await import("openai")).default;
       const client = new OpenAI({
-        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || process.env.OPENAI_BASE_URL,
       });
 
       const response = await client.chat.completions.create({
@@ -3479,8 +3479,8 @@ Prefer faces, architectural focal subjects, strong compositional anchors (a fire
     try {
       const OpenAI = (await import("openai")).default;
       const client = new OpenAI({
-        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || process.env.OPENAI_BASE_URL,
       });
 
       const response = await client.chat.completions.create({
@@ -4167,8 +4167,8 @@ Prefer faces, architectural focal subjects, strong compositional anchors (a fire
 
     const OpenAI = (await import("openai")).default;
     const openai = new OpenAI({
-      apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-      baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+      apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY,
+      baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || process.env.OPENAI_BASE_URL,
     });
 
     const systemPrompt = `You are an expert construction estimator specializing in high-end Muskoka, Ontario cottage renovations. 
@@ -4311,8 +4311,8 @@ Respond with valid JSON only, no markdown. Format:
 
       const OpenAI = (await import("openai")).default;
       const openai = new OpenAI({
-        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || process.env.OPENAI_BASE_URL,
       });
 
       const systemPrompt = `You are an expert construction estimator specializing in high-end Muskoka, Ontario cottage renovations.
@@ -4457,8 +4457,8 @@ The post should reference visual content where appropriate (e.g., "see the stunn
 
       const OpenAI = (await import("openai")).default;
       const openai = new OpenAI({
-        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || process.env.OPENAI_BASE_URL,
       });
 
       const systemPrompt = `You are a social media copywriter for Aster & Spruce Living, a high-end Muskoka cottage renovation company based in Ontario, Canada. 
@@ -4661,8 +4661,8 @@ Respond with valid JSON only, no markdown:
 
       const OpenAI = (await import("openai")).default;
       const openai = new OpenAI({
-        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || process.env.OPENAI_BASE_URL,
       });
 
       const batchPrompt = `You are a social media copywriter for Aster & Spruce Living, a high-end Muskoka cottage renovation company based in Ontario, Canada.
@@ -4758,8 +4758,8 @@ Respond with valid JSON only:
 
       const OpenAI = (await import("openai")).default;
       const openai = new OpenAI({
-        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || process.env.OPENAI_BASE_URL,
       });
 
       const prompt = `You are a social media copywriter for Aster & Spruce Living, a high-end Muskoka cottage renovation company.
@@ -4874,8 +4874,8 @@ Respond with valid JSON only:
 
       const OpenAI = (await import("openai")).default;
       const openai = new OpenAI({
-        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || process.env.OPENAI_BASE_URL,
       });
 
       const prompt = `You are a social media copywriter for Aster & Spruce Living, a high-end Muskoka cottage renovation company.
@@ -5120,8 +5120,8 @@ Rules:
 
       const OpenAI = (await import("openai")).default;
       const openai = new OpenAI({
-        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || process.env.OPENAI_BASE_URL,
       });
 
       const response = await openai.chat.completions.create({
@@ -5338,8 +5338,8 @@ Rules:
     }
     const OpenAI = (await import("openai")).default;
     const openai = new OpenAI({
-      apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-      baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+      apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY,
+      baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || process.env.OPENAI_BASE_URL,
     });
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
