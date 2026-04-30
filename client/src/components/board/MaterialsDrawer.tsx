@@ -1,13 +1,13 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { usePlanningBoards } from "@/hooks/use-projects";
-import { Loader2, Layers, Plus } from "lucide-react";
+import { Loader2, Layers, Plus, Palette, Shapes, Wrench, Armchair } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 
 interface MaterialsDrawerProps {
   projectId: number;
-  // Add an image URL to the canvas. Same handler used by PhotosDrawer.
+  // Add an image URL to the canvas. Used as a fallback for items that have only an image,
+  // not a structured kind. Structured kinds drag onto the canvas as their native card type.
   onAddImageUrl: (url: string) => void;
 }
 
@@ -18,21 +18,47 @@ interface CanvasElement {
   content: any;
 }
 
-// Aggregate all canvas elements across this project's library boards. We want items
-// that are visually material-like: image, color_swatch, hardware, material, product.
-const MATERIAL_TYPES = new Set(["image", "color_swatch", "hardware", "material", "product", "surface"]);
+// All element types that should appear in the Library drawer. We intentionally include items
+// from every board in the project (not just `mode === "library"`) so the user sees their
+// saved finishes everywhere, not only items they manually moved into a Library board.
+const LIBRARY_TYPES = new Set(["surface", "hardware", "product", "image", "color_swatch", "material"]);
 
-function useLibraryBoardElements(libraryBoards: any[]) {
-  const enabled = Array.isArray(libraryBoards) && libraryBoards.length > 0;
+// Top-level kind buckets shown as filter chips. Each maps to an element subset:
+type KindBucket = "all" | "paint" | "material" | "hardware" | "product" | "photo";
+
+function bucketFor(el: any): KindBucket {
+  const c = el.content || {};
+  if (el.type === "surface") {
+    if (c.kind === "paint") return "paint";
+    if (c.kind === "material") return "material";
+  }
+  if (el.type === "color_swatch") return "paint";
+  if (el.type === "material") return "material";
+  if (el.type === "hardware") return "hardware";
+  if (el.type === "product") return "product";
+  if (el.type === "image") return "photo";
+  return "all";
+}
+
+const BUCKET_META: Record<Exclude<KindBucket, "all">, { label: string; icon: any }> = {
+  paint: { label: "Paint", icon: Palette },
+  material: { label: "Material", icon: Shapes },
+  hardware: { label: "Hardware", icon: Wrench },
+  product: { label: "Product", icon: Armchair },
+  photo: { label: "Photos", icon: Layers },
+};
+
+function useAllProjectElements(boards: any[]) {
+  const enabled = Array.isArray(boards) && boards.length > 0;
   return useQuery({
-    queryKey: ["materials-drawer", "library-elements", (libraryBoards || []).map((b: any) => b.id).sort().join(",")],
+    queryKey: ["library-drawer", "all-elements", (boards || []).map((b: any) => b.id).sort().join(",")],
     queryFn: async () => {
       const results = await Promise.all(
-        (libraryBoards || []).map(async (b: any) => {
+        (boards || []).map(async (b: any) => {
           const res = await fetch(`/api/planning-boards/${b.id}/elements`, { credentials: "include" });
           if (!res.ok) return [];
           const elements: CanvasElement[] = await res.json();
-          return elements.map((el) => ({ ...el, boardName: b.name }));
+          return elements.map((el) => ({ ...el, boardName: b.name, boardMode: b.mode }));
         })
       );
       return results.flat();
@@ -43,50 +69,54 @@ function useLibraryBoardElements(libraryBoards: any[]) {
 
 export function MaterialsDrawer({ projectId, onAddImageUrl }: MaterialsDrawerProps) {
   const { data: boards, isLoading: loadingBoards } = usePlanningBoards(projectId);
-  const libraryBoards = useMemo(
-    () => (boards || []).filter((b: any) => b.mode === "library"),
-    [boards]
-  );
-  const { data: elementsRaw, isLoading: loadingElements } = useLibraryBoardElements(libraryBoards);
+  const allBoards = useMemo(() => boards || [], [boards]);
+  const { data: elementsRaw, isLoading: loadingElements } = useAllProjectElements(allBoards);
 
   const items = useMemo(
-    () => (elementsRaw || []).filter((el: any) => MATERIAL_TYPES.has(el.type)),
+    () => (elementsRaw || [])
+      .filter((el: any) => LIBRARY_TYPES.has(el.type))
+      // De-dupe by (kind, name+hex) so the same paint colour saved on five boards shows once.
+      .reduce((acc: any[], el: any) => {
+        const c = el.content || {};
+        const key = `${bucketFor(el)}|${(c.name || c.title || "").toLowerCase()}|${(c.hex || c.color || c.imageUrl || c.url || "").toLowerCase()}`;
+        if (!acc.find((x) => x._dedupeKey === key)) {
+          acc.push({ ...el, _dedupeKey: key });
+        }
+        return acc;
+      }, []),
     [elementsRaw]
   );
 
-  const collectionNames = useMemo(() => {
-    const set = new Set<string>();
-    items.forEach((el: any) => {
-      const c = el.content || {};
-      if (c.category) set.add(c.category);
-    });
-    return Array.from(set).sort();
-  }, [items]);
-
-  const [activeCollection, setActiveCollection] = useState<string | null>(null);
+  const [activeBucket, setActiveBucket] = useState<KindBucket>("all");
   const [filter, setFilter] = useState("");
 
+  const counts = useMemo(() => {
+    const out: Record<KindBucket, number> = { all: items.length, paint: 0, material: 0, hardware: 0, product: 0, photo: 0 };
+    items.forEach((el: any) => { out[bucketFor(el)] = (out[bucketFor(el)] || 0) + 1; });
+    return out;
+  }, [items]);
+
   const visible = useMemo(() => items.filter((el: any) => {
-    const c = el.content || {};
-    if (activeCollection && c.category !== activeCollection) return false;
+    if (activeBucket !== "all" && bucketFor(el) !== activeBucket) return false;
     if (filter.trim()) {
-      const hay = `${c.name || ""} ${c.title || ""} ${c.caption || ""} ${el.boardName || ""}`.toLowerCase();
+      const c = el.content || {};
+      const hay = `${c.name || ""} ${c.title || ""} ${c.caption || ""} ${c.brand || ""} ${c.supplier || ""} ${c.code || ""} ${el.boardName || ""}`.toLowerCase();
       if (!hay.includes(filter.toLowerCase().trim())) return false;
     }
     return true;
-  }), [items, activeCollection, filter]);
+  }), [items, activeBucket, filter]);
 
   const isLoading = loadingBoards || loadingElements;
 
-  if (!isLoading && libraryBoards.length === 0) {
+  if (!isLoading && allBoards.length === 0) {
     return (
       <div className="flex flex-col h-full" data-testid="drawer-materials">
         <div className="flex-1 flex flex-col items-center justify-center px-6 text-center gap-3">
           <Layers className="h-10 w-10 text-muted-foreground/40" />
-          <p className="text-sm font-medium text-foreground">No materials yet</p>
-          <p className="text-xs text-muted-foreground max-w-[260px]">
-            Build a Library board to populate your materials drawer. Library mode lets you
-            curate finishes, hardware, and products you can drag onto any project board.
+          <p className="text-sm font-medium text-foreground">Nothing in your library yet</p>
+          <p className="text-xs text-muted-foreground max-w-[300px]">
+            Add a paint swatch, material, hardware, or product card to any board in this project
+            and it will show up here. Drag from this panel onto any board to reuse without typing.
           </p>
         </div>
       </div>
@@ -95,37 +125,41 @@ export function MaterialsDrawer({ projectId, onAddImageUrl }: MaterialsDrawerPro
 
   return (
     <div className="flex flex-col h-full" data-testid="drawer-materials">
-      <div className="px-4 py-3 border-b border-border/60 space-y-2">
+      <div className="px-4 py-3 border-b border-border/60 space-y-2.5">
         <Input
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          placeholder="Search materials…"
+          placeholder="Search by name, brand, code…"
           className="h-9 text-sm"
           data-testid="input-materials-filter"
         />
-        {collectionNames.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            <button
-              type="button"
-              onClick={() => setActiveCollection(null)}
-              className={`h-7 px-2.5 rounded-full text-[11px] font-medium transition-colors ${activeCollection === null ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/70"}`}
-              data-testid="materials-collection-all"
-            >
-              All
-            </button>
-            {collectionNames.map((c) => (
+        <div className="flex flex-wrap gap-1.5">
+          <button
+            type="button"
+            onClick={() => setActiveBucket("all")}
+            className={`h-7 px-2.5 rounded-full text-[11px] font-medium transition-colors inline-flex items-center gap-1 ${activeBucket === "all" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/70"}`}
+            data-testid="materials-bucket-all"
+          >
+            All <span className="text-[10px] opacity-70 font-mono">({counts.all})</span>
+          </button>
+          {(["paint","material","hardware","product","photo"] as const).map((b) => {
+            const meta = BUCKET_META[b];
+            const Icon = meta.icon;
+            const n = counts[b] || 0;
+            if (n === 0) return null;
+            return (
               <button
-                key={c}
+                key={b}
                 type="button"
-                onClick={() => setActiveCollection(c)}
-                className={`h-7 px-2.5 rounded-full text-[11px] font-medium transition-colors ${activeCollection === c ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/70"}`}
-                data-testid={`materials-collection-${c}`}
+                onClick={() => setActiveBucket(b)}
+                className={`h-7 px-2.5 rounded-full text-[11px] font-medium transition-colors inline-flex items-center gap-1 ${activeBucket === b ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/70"}`}
+                data-testid={`materials-bucket-${b}`}
               >
-                {c}
+                <Icon className="h-3 w-3" /> {meta.label} <span className="text-[10px] opacity-70 font-mono">({n})</span>
               </button>
-            ))}
-          </div>
-        )}
+            );
+          })}
+        </div>
       </div>
       <div className="flex-1 overflow-y-auto p-3">
         {isLoading ? (
@@ -136,60 +170,74 @@ export function MaterialsDrawer({ projectId, onAddImageUrl }: MaterialsDrawerPro
           <div className="flex flex-col items-center justify-center py-16 gap-2 text-center">
             <Layers className="h-8 w-8 text-muted-foreground/40" />
             <p className="text-sm text-muted-foreground">No matches</p>
+            <p className="text-[11px] text-muted-foreground/70 max-w-[260px]">
+              Add a paint, material, hardware, or product card to any board to see it here.
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-2">
             {visible.map((el: any) => {
               const c = el.content || {};
-              const url: string | undefined = c.url || c.imageUrl;
+              const url: string | undefined = c.imageUrl || c.url;
+              const swatchColor = (el.type === "color_swatch" || (el.type === "surface" && c.kind === "paint")) ? (c.color || c.hex) : undefined;
               const label = c.name || c.title || c.caption || el.type;
-              const swatchColor = el.type === "color_swatch" ? (c.color || c.hex) : undefined;
+              const sub = c.brand || c.supplier || c.code || el.boardName || "";
+              const bucket = bucketFor(el);
+
               return (
                 <button
                   key={el.id}
                   type="button"
-                  draggable={!!url}
+                  draggable
                   onDragStart={(e) => {
-                    if (!url) return;
-                    e.dataTransfer.setData("tool-type", "image");
-                    e.dataTransfer.setData("image-url", url);
+                    // For paint swatches drag with full structured payload so SpatialCanvas can
+                    // recreate a real paint card. For everything else, fall back to image-url drop.
+                    if (swatchColor) {
+                      e.dataTransfer.setData("tool-type", "surface-paint");
+                      e.dataTransfer.setData("library-payload", JSON.stringify({
+                        kind: "paint",
+                        color: swatchColor,
+                        hex: c.hex || swatchColor,
+                        name: c.name || "",
+                        code: c.code || "",
+                        brand: c.brand || "",
+                      }));
+                    } else if (url) {
+                      e.dataTransfer.setData("tool-type", "image");
+                      e.dataTransfer.setData("image-url", url);
+                    } else {
+                      return;
+                    }
                     e.dataTransfer.effectAllowed = "copy";
                   }}
                   onClick={() => { if (url) onAddImageUrl(url); }}
                   className="group relative aspect-square overflow-hidden rounded-md border border-border/60 hover:border-primary transition-colors bg-card text-left"
                   data-testid={`drawer-material-${el.id}`}
                 >
-                  {url ? (
-                    <img src={url} alt={label} className="w-full h-full object-cover pointer-events-none" draggable={false} />
-                  ) : swatchColor ? (
+                  {swatchColor ? (
                     <span className="block w-full h-full" style={{ backgroundColor: swatchColor }} />
+                  ) : url ? (
+                    <img src={url} alt={label} className="w-full h-full object-cover pointer-events-none" draggable={false} />
                   ) : (
                     <span className="flex w-full h-full items-center justify-center bg-muted text-muted-foreground text-[10px] font-mono uppercase tracking-[0.14em]">
-                      {el.type}
+                      {bucket}
                     </span>
                   )}
+                  <span className="absolute top-1.5 left-1.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-sm bg-card/85 backdrop-blur text-[9px] font-mono uppercase tracking-[0.12em] text-foreground/70">
+                    {bucket}
+                  </span>
                   <span className="absolute inset-0 flex items-center justify-center bg-foreground/0 group-hover:bg-foreground/30 transition-colors">
                     <span className="opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center justify-center h-9 w-9 rounded-full bg-primary text-primary-foreground">
                       <Plus className="h-4 w-4" />
                     </span>
                   </span>
-                  <span className="absolute bottom-0 inset-x-0 bg-card/90 backdrop-blur px-2 py-0.5 text-[10px] truncate flex items-center justify-between gap-1">
-                    <span className="truncate">{label}</span>
-                    {el.boardName && (
-                      <span className="text-muted-foreground font-mono text-[9px] uppercase tracking-[0.1em] shrink-0 truncate max-w-[60px]">{el.boardName}</span>
-                    )}
+                  <span className="absolute bottom-0 inset-x-0 bg-card/90 backdrop-blur px-2 py-1 text-[10px] flex flex-col gap-0.5">
+                    <span className="truncate font-medium">{label}</span>
+                    {sub && <span className="truncate text-muted-foreground font-mono text-[9px] uppercase tracking-[0.1em]">{sub}</span>}
                   </span>
                 </button>
               );
             })}
-          </div>
-        )}
-        {!isLoading && libraryBoards.length > 0 && items.length === 0 && (
-          <div className="text-center py-12 px-6">
-            <p className="text-xs text-muted-foreground">
-              Your library boards have no material-like items yet. Add images, color swatches,
-              materials, or hardware to a library board to see them here.
-            </p>
           </div>
         )}
       </div>

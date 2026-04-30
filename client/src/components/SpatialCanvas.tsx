@@ -5966,21 +5966,8 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
             </TooltipTrigger>
             <TooltipContent side="bottom" className="text-xs">Assets</TooltipContent>
           </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                size="icon"
-                variant="ghost"
-                className={`h-8 w-8 ${openDrawer === "furniture" ? "bg-primary/15 text-primary" : "hover:bg-primary/10 hover:text-primary"}`}
-                onClick={() => setOpenDrawer(openDrawer === "furniture" ? null : "furniture")}
-                aria-pressed={openDrawer === "furniture"}
-                data-testid="button-drawer-furniture"
-              >
-                <Armchair className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" className="text-xs">Furniture</TooltipContent>
-          </Tooltip>
+          {/* Furniture drawer button removed — the user noted it's redundant with the left sidebar
+              and was cramped when opened. Furniture remains accessible from the project sidebar. */}
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -5994,7 +5981,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                 <Layers className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="bottom" className="text-xs">Materials</TooltipContent>
+            <TooltipContent side="bottom" className="text-xs">Library</TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -6398,9 +6385,76 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
 
               // 3) Internal tool palette drops (existing behaviour).
               const toolType = e.dataTransfer.getData("tool-type");
-              if (!toolType) return;
+              if (!toolType) {
+                // Library drag-and-drop without a tool-type: treat any image-url as an image drop.
+                const libImageUrl = e.dataTransfer.getData("image-url");
+                if (libImageUrl) handleAddImageByUrl(libImageUrl, { x: canvasX, y: canvasY });
+                return;
+              }
+              // 3a) Library drawer drops carry a structured `library-payload` so we can
+              // recreate a real card (paint with name/brand/code, etc.) instead of just
+              // a generic empty element of that type.
+              const libraryPayloadRaw = e.dataTransfer.getData("library-payload");
+              if (libraryPayloadRaw && selectedBoardId) {
+                try {
+                  const payload = JSON.parse(libraryPayloadRaw);
+                  if (toolType === "surface-paint" && payload && payload.kind === "paint") {
+                    const def = ELEMENT_DEFAULTS["surface-paint"];
+                    const newZ = maxZ;
+                    setMaxZ((z) => z + 1);
+                    const baseContent: any = {
+                      kind: "paint",
+                      color: payload.color || payload.hex || "#1e3a2f",
+                      hex: payload.hex || payload.color || "#1E3A2F",
+                      name: payload.name || "Paint",
+                      code: payload.code || "",
+                      brand: payload.brand || "",
+                      status: "idea",
+                    };
+                    if (activeRoom) {
+                      const targetField = (selectedBoard as any)?.mode === "library" ? "category" : "room";
+                      if (targetField === "room") baseContent.room = activeRoom;
+                      else baseContent.category = activeRoom;
+                    }
+                    const url = buildUrl(api.canvasElements.create.path, { boardId: selectedBoardId });
+                    fetch(url, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      credentials: "include",
+                      body: JSON.stringify({
+                        type: "surface",
+                        x: canvasX,
+                        y: canvasY,
+                        width: def.width,
+                        height: def.height,
+                        zIndex: newZ,
+                        content: baseContent,
+                      }),
+                    })
+                      .then((r) => r.json())
+                      .then((el) => {
+                        addElement(el);
+                        sendElementAdd(el);
+                        pushUndo({ type: "create", elementId: el.id });
+                      })
+                      .catch(() => {
+                        toast({ title: "Error", description: "Failed to add paint from library", variant: "destructive" });
+                      });
+                    return;
+                  }
+                } catch {
+                  // fall through to default tool handling on malformed payload
+                }
+              }
               if (toolType === "image") {
-                triggerImageUpload();
+                // If the drop came from the library with an image-url, use that instead
+                // of triggering a file picker.
+                const libImageUrl = e.dataTransfer.getData("image-url");
+                if (libImageUrl) {
+                  handleAddImageByUrl(libImageUrl, { x: canvasX, y: canvasY });
+                } else {
+                  triggerImageUpload();
+                }
               } else if (toolType === "draw") {
                 setDrawingMode(true); setDrawTool("pen"); setDrawingPaths([]); drawPathsRef.current = []; setDrawUndoStack([]); setEditingId(null);
               } else if (toolType === "hardware") {
@@ -7993,16 +8047,16 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
       <Sheet open={openDrawer === "materials"} modal={false} onOpenChange={(open) => { if (!open) setOpenDrawer(null); }}>
         <SheetContent
           side="right"
-          className="w-[360px] sm:max-w-[360px] p-0 flex flex-col"
+          className="w-[480px] sm:max-w-[480px] p-0 flex flex-col"
           onInteractOutside={(e) => e.preventDefault()}
           data-testid="sheet-drawer-materials"
         >
           <SheetHeader className="px-4 py-3 border-b border-border/60">
             <SheetTitle className="font-sans text-base font-semibold flex items-center gap-2">
               <Layers className="h-4 w-4 text-muted-foreground" />
-              Materials
+              Library
             </SheetTitle>
-            <SheetDescription className="sr-only">Items pulled from your Library boards. Tap or drag to add to the board.</SheetDescription>
+            <SheetDescription className="sr-only">All paints, materials, hardware, and products you've saved across this project. Tap or drag to add.</SheetDescription>
           </SheetHeader>
           <MaterialsDrawer projectId={projectId} onAddImageUrl={handleAddImageByUrl} />
         </SheetContent>
