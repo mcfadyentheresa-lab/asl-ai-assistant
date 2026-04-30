@@ -25,13 +25,6 @@
 import { useEffect, useRef, useState, useCallback, useMemo, cloneElement, isValidElement } from "react";
 import type { ReactElement } from "react";
 import { getStroke } from "perfect-freehand";
-import templateKitchenPreview from "../assets/images/template-kitchen-faux.png";
-import templateBathroomPreview from "../assets/images/template-bathroom-faux.png";
-import templateCottagePreview from "../assets/images/template-cottage-faux.png";
-import templateMoodboardPreview from "@assets/Screenshot_2026-04-08_at_12.56.52_PM_1775667416114.png";
-import templateFurnitureRefinishingPreview from "@assets/Screenshot_2026-04-09_at_10.29.34_AM_1775744978712.png";
-import templateCollageConceptPreview from "@assets/Screenshot_2026-04-09_at_10.54.53_AM_1775746499391.png";
-import templateMaterialInspirationPreview from "@assets/Screenshot_2026-04-09_at_10.57.06_AM_1775746631248.png";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -429,15 +422,9 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
     queryKey: ["/api/board-templates"],
     enabled: isAdmin,
   });
-  const templatePreviewById: Record<string, string> = {
-    kitchen: templateKitchenPreview,
-    bathroom: templateBathroomPreview,
-    cottage: templateCottagePreview,
-    moodboard: templateMoodboardPreview,
-    "furniture-refinishing-working": templateFurnitureRefinishingPreview,
-    "collage-concept": templateCollageConceptPreview,
-    "material-inspiration": templateMaterialInspirationPreview,
-  };
+  // User-saved templates have no shipped preview images. The picker renders
+  // a clean iconic tile when this map yields undefined for a template id.
+  const templatePreviewById: Record<string, string> = {};
 
   const [selectedBoardId, setSelectedBoardId] = useState<number | null>(null);
   const justCreatedBoardId = useRef<number | null>(null);
@@ -451,6 +438,13 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
   const spaceRef = useRef(false);
 
   const [showRenameDialog, setShowRenameDialog] = useState(false);
+  // Save-as-template dialog state. Opening it copies the current selectedBoard's
+  // canvas to a new row in board_templates via POST /api/board-templates.
+  const [showSaveTemplateDialog, setShowSaveTemplateDialog] = useState(false);
+  const [saveTemplateName, setSaveTemplateName] = useState("");
+  const [saveTemplateDesc, setSaveTemplateDesc] = useState("");
+  const [saveTemplateBusy, setSaveTemplateBusy] = useState(false);
+  const [saveTemplateError, setSaveTemplateError] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showManageBoards, setShowManageBoards] = useState(false);
   const [showPresentation, setShowPresentation] = useState(false);
@@ -5792,6 +5786,19 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                 <DropdownMenuItem onClick={() => setShowCalendarSheet(true)} data-testid="menu-view-calendar">
                   <CalendarDays className="h-4 w-4 mr-2" /> View Calendar
                 </DropdownMenuItem>
+                {isAdmin && (
+                  <DropdownMenuItem
+                    onClick={() => {
+                      setSaveTemplateName(selectedBoard?.name ? `${selectedBoard.name} template` : "");
+                      setSaveTemplateDesc("");
+                      setSaveTemplateError(null);
+                      setShowSaveTemplateDialog(true);
+                    }}
+                    data-testid="menu-save-as-template"
+                  >
+                    <Save className="h-4 w-4 mr-2" /> Save as template
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem className="text-destructive" onClick={() => setShowDeleteConfirm(true)} data-testid="menu-delete-board">
                   <Trash2 className="h-4 w-4 mr-2" /> Delete Board
                 </DropdownMenuItem>
@@ -7458,33 +7465,76 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                         {templateCatalogue.map((tmpl) => {
                           const IconComp = tmpl.icon === "ChefHat" ? ChefHat : tmpl.icon === "Bath" ? Bath : tmpl.icon === "Home" ? Home : tmpl.icon === "Palette" ? Palette : LayoutPanelLeft;
                           const isSel = selectedTemplateId === tmpl.id;
+                          // Legacy curated templates shipped a preview PNG keyed
+                          // off the slug. User-saved templates have no preview
+                          // image — render a clean iconic tile in that case.
+                          const previewSrc = templatePreviewById[tmpl.id];
                           return (
-                            <button
-                              key={tmpl.id}
-                              type="button"
-                              onClick={() => setSelectedTemplateId(tmpl.id)}
-                              onDoubleClick={() => { setSelectedTemplateId(tmpl.id); void handleCreateBoard(); }}
-                              className={`group overflow-hidden rounded-xl border bg-card text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${isSel ? "border-primary ring-2 ring-primary" : "border-border/70"}`}
-                              data-testid={`template-${tmpl.id}`}
-                            >
-                              <div className="relative h-28 overflow-hidden">
-                                <img
-                                  src={templatePreviewById[tmpl.id] ?? ""}
-                                  alt={tmpl.name}
-                                  className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                                  data-testid={`img-template-${tmpl.id}`}
-                                />
-                                <div className="absolute inset-0 bg-gradient-to-t from-background/85 via-background/20 to-transparent" />
-                                <div className="absolute left-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-background/85 shadow-sm">
-                                  <IconComp className="h-4 w-4 text-foreground/70" />
+                            <div key={tmpl.id} className="relative group/template">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedTemplateId(tmpl.id)}
+                                onDoubleClick={() => { setSelectedTemplateId(tmpl.id); void handleCreateBoard(); }}
+                                className={`group block w-full overflow-hidden rounded-xl border bg-card text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${isSel ? "border-primary ring-2 ring-primary" : "border-border/70"}`}
+                                data-testid={`template-${tmpl.id}`}
+                              >
+                                <div className="relative h-28 overflow-hidden">
+                                  {previewSrc ? (
+                                    <>
+                                      <img
+                                        src={previewSrc}
+                                        alt={tmpl.name}
+                                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                        data-testid={`img-template-${tmpl.id}`}
+                                      />
+                                      <div className="absolute inset-0 bg-gradient-to-t from-background/85 via-background/20 to-transparent" />
+                                    </>
+                                  ) : (
+                                    <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-muted/80 to-muted/40">
+                                      <div className="flex h-12 w-12 items-center justify-center rounded-full border border-border/60 bg-background/90 shadow-sm">
+                                        <IconComp className="h-5 w-5 text-muted-foreground" />
+                                      </div>
+                                    </div>
+                                  )}
+                                  {previewSrc && (
+                                    <div className="absolute left-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-background/85 shadow-sm">
+                                      <IconComp className="h-4 w-4 text-foreground/70" />
+                                    </div>
+                                  )}
+                                  {isSel && <Badge className="absolute right-2 top-2 h-5 px-1.5 text-[10px]">Selected</Badge>}
                                 </div>
-                                {isSel && <Badge className="absolute right-2 top-2 h-5 px-1.5 text-[10px]">Selected</Badge>}
-                              </div>
-                              <div className="p-3">
-                                <span className="block text-xs font-semibold uppercase tracking-wide">{tmpl.name}</span>
-                                <span className="mt-1 block text-[11px] leading-snug text-muted-foreground line-clamp-2">{tmpl.description}</span>
-                              </div>
-                            </button>
+                                <div className="p-3">
+                                  <span className="block text-xs font-semibold uppercase tracking-wide">{tmpl.name}</span>
+                                  {tmpl.description && (
+                                    <span className="mt-1 block text-[11px] leading-snug text-muted-foreground line-clamp-2">{tmpl.description}</span>
+                                  )}
+                                </div>
+                              </button>
+                              {/* Delete affordance — user can prune their own template library. */}
+                              <button
+                                type="button"
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  if (!confirm(`Delete the template "${tmpl.name}"?`)) return;
+                                  try {
+                                    const res = await fetch(`/api/board-templates/${tmpl.id}`, {
+                                      method: "DELETE",
+                                      credentials: "include",
+                                    });
+                                    if (!res.ok) throw new Error("Could not delete template");
+                                    if (selectedTemplateId === tmpl.id) setSelectedTemplateId(null);
+                                    queryClient.invalidateQueries({ queryKey: ["/api/board-templates"] });
+                                  } catch (err: any) {
+                                    toast({ title: "Could not delete template", description: err?.message ?? "", variant: "destructive" });
+                                  }
+                                }}
+                                className="absolute right-1.5 top-1.5 z-10 hidden h-6 w-6 items-center justify-center rounded-full bg-background/95 text-muted-foreground shadow-sm hover:text-destructive group-hover/template:flex"
+                                aria-label={`Delete ${tmpl.name}`}
+                                data-testid={`button-delete-template-${tmpl.id}`}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
                           );
                         })}
                       </div>
@@ -7571,6 +7621,80 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowRenameDialog(false)}>Cancel</Button>
             <Button onClick={handleRename} data-testid="button-confirm-rename">Rename</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Save the current board as a reusable template (admin only). */}
+      <Dialog open={showSaveTemplateDialog} onOpenChange={(open) => { if (!open) setShowSaveTemplateDialog(false); }}>
+        <DialogContent data-testid="save-template-dialog">
+          <DialogHeader>
+            <DialogTitle>Save board as template</DialogTitle>
+            <DialogDescription>
+              Captures the current canvas as a reusable starting point. Future
+              edits to this board won't change the saved template.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label htmlFor="save-template-name" className="text-xs uppercase tracking-wider text-muted-foreground">Template name</Label>
+              <Input
+                id="save-template-name"
+                value={saveTemplateName}
+                onChange={(e) => { setSaveTemplateName(e.target.value); setSaveTemplateError(null); }}
+                placeholder="e.g. Lakeside cottage moodboard"
+                disabled={saveTemplateBusy}
+                data-testid="input-save-template-name"
+                autoFocus
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="save-template-desc" className="text-xs uppercase tracking-wider text-muted-foreground">Description (optional)</Label>
+              <Input
+                id="save-template-desc"
+                value={saveTemplateDesc}
+                onChange={(e) => setSaveTemplateDesc(e.target.value)}
+                placeholder="Short note about when to use it"
+                disabled={saveTemplateBusy}
+                data-testid="input-save-template-desc"
+              />
+            </div>
+            {saveTemplateError && (
+              <div className="text-[11px] text-destructive leading-snug" data-testid="text-save-template-error">{saveTemplateError}</div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSaveTemplateDialog(false)} disabled={saveTemplateBusy}>Cancel</Button>
+            <Button
+              onClick={async () => {
+                if (!selectedBoardId) return;
+                const name = saveTemplateName.trim();
+                if (!name) { setSaveTemplateError("Give the template a name."); return; }
+                setSaveTemplateBusy(true);
+                setSaveTemplateError(null);
+                try {
+                  const res = await fetch("/api/board-templates", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    credentials: "include",
+                    body: JSON.stringify({ boardId: selectedBoardId, name, description: saveTemplateDesc.trim() || undefined }),
+                  });
+                  const data = await res.json().catch(() => ({}));
+                  if (!res.ok) throw new Error((data && (data.detail || data.message)) || "Could not save template.");
+                  queryClient.invalidateQueries({ queryKey: ["/api/board-templates"] });
+                  toast({ title: "Template saved", description: `"${name}" is now in the template picker.` });
+                  setShowSaveTemplateDialog(false);
+                } catch (err: any) {
+                  setSaveTemplateError(err?.message ?? "Could not save template.");
+                } finally {
+                  setSaveTemplateBusy(false);
+                }
+              }}
+              disabled={saveTemplateBusy || !saveTemplateName.trim()}
+              data-testid="button-confirm-save-template"
+            >
+              {saveTemplateBusy ? "Saving…" : "Save template"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

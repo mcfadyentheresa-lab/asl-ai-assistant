@@ -1,10 +1,10 @@
 import { db } from "./db";
 import { 
-  users, projects, milestones, subMilestones, sections, tasks, photos, documents, timeEntries, messages, decisions, selections, changeOrders, siteVisits, checklistItems, boardItems, calendarEvents, planningBoards, canvasElements, activityLog, activityViews, paintColors, boardSnapshots, costCategories, marketRates, projectEstimates, estimateItems, receipts, estimateWarnings, crewRates, subcontractors, suppliers, supplierPrices, clientInvites, socialPosts, tableRedesignPlans, tableRedesignMaterials, recentProjectViews,
+  users, projects, milestones, subMilestones, sections, tasks, photos, documents, timeEntries, messages, decisions, selections, changeOrders, siteVisits, checklistItems, boardItems, calendarEvents, planningBoards, canvasElements, activityLog, activityViews, paintColors, boardSnapshots, boardTemplates, costCategories, marketRates, projectEstimates, estimateItems, receipts, estimateWarnings, crewRates, subcontractors, suppliers, supplierPrices, clientInvites, socialPosts, tableRedesignPlans, tableRedesignMaterials, recentProjectViews,
   type Project, type Milestone, type SubMilestone, type Section, type Task, type Photo, type Document, type TimeEntry, type Message, type Decision, type Selection, type ChangeOrder, type SiteVisit,
-  type ChecklistItem, type BoardItem, type CalendarEvent, type PlanningBoard, type CanvasElement, type ActivityLog, type PaintColor, type BoardSnapshot, type CostCategory, type MarketRate, type ProjectEstimate, type EstimateItem, type Receipt, type EstimateWarning, type CrewRate, type Subcontractor,
+  type ChecklistItem, type BoardItem, type CalendarEvent, type PlanningBoard, type CanvasElement, type ActivityLog, type PaintColor, type BoardSnapshot, type BoardTemplate, type CostCategory, type MarketRate, type ProjectEstimate, type EstimateItem, type Receipt, type EstimateWarning, type CrewRate, type Subcontractor,
   type InsertProject, type InsertMilestone, type InsertSubMilestone, type InsertSection, type InsertTask, type InsertPhoto, type InsertDocument, 
-  type InsertTimeEntry, type InsertMessage, type InsertDecision, type InsertSelection, type InsertChangeOrder, type InsertSiteVisit, type InsertChecklistItem, type InsertBoardItem, type InsertCalendarEvent, type InsertPlanningBoard, type InsertCanvasElement, type InsertActivityLog, type InsertBoardSnapshot, type InsertCostCategory, type InsertMarketRate, type InsertProjectEstimate, type InsertEstimateItem, type InsertReceipt, type InsertEstimateWarning, type InsertCrewRate, type InsertSubcontractor, type Supplier, type SupplierPrice, type InsertSupplier, type InsertSupplierPrice,
+  type InsertTimeEntry, type InsertMessage, type InsertDecision, type InsertSelection, type InsertChangeOrder, type InsertSiteVisit, type InsertChecklistItem, type InsertBoardItem, type InsertCalendarEvent, type InsertPlanningBoard, type InsertCanvasElement, type InsertActivityLog, type InsertBoardSnapshot, type InsertBoardTemplate, type InsertCostCategory, type InsertMarketRate, type InsertProjectEstimate, type InsertEstimateItem, type InsertReceipt, type InsertEstimateWarning, type InsertCrewRate, type InsertSubcontractor, type Supplier, type SupplierPrice, type InsertSupplier, type InsertSupplierPrice,
   type ClientInvite, type InsertClientInvite,
   type SocialPost, type InsertSocialPost,
   type TableRedesignPlan, type InsertTableRedesignPlan,
@@ -159,6 +159,12 @@ export interface IStorage {
   getBoardSnapshot(id: number): Promise<BoardSnapshot | undefined>;
   renameBoardSnapshot(id: number, name: string): Promise<BoardSnapshot | undefined>;
   deleteBoardSnapshot(id: number): Promise<void>;
+
+  // Board Templates
+  listBoardTemplates(): Promise<BoardTemplate[]>;
+  getBoardTemplate(id: number): Promise<BoardTemplate | undefined>;
+  createBoardTemplate(template: InsertBoardTemplate): Promise<BoardTemplate>;
+  deleteBoardTemplate(id: number): Promise<void>;
 
   // Cost Categories
   getCostCategories(): Promise<CostCategory[]>;
@@ -875,6 +881,22 @@ export class DatabaseStorage implements IStorage {
   }
   async deleteBoardSnapshot(id: number): Promise<void> {
     await db.delete(boardSnapshots).where(eq(boardSnapshots.id, id));
+  }
+
+  // Board Templates (user-saved reusable boards)
+  async listBoardTemplates(): Promise<BoardTemplate[]> {
+    return db.select().from(boardTemplates).orderBy(desc(boardTemplates.createdAt));
+  }
+  async getBoardTemplate(id: number): Promise<BoardTemplate | undefined> {
+    const [row] = await db.select().from(boardTemplates).where(eq(boardTemplates.id, id));
+    return row;
+  }
+  async createBoardTemplate(template: InsertBoardTemplate): Promise<BoardTemplate> {
+    const [created] = await db.insert(boardTemplates).values(template).returning();
+    return created;
+  }
+  async deleteBoardTemplate(id: number): Promise<void> {
+    await db.delete(boardTemplates).where(eq(boardTemplates.id, id));
   }
 
   // Cost Categories
