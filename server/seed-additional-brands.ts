@@ -414,17 +414,3 @@ export async function seedAdditionalBrands(): Promise<number> {
   total += await seedBrandColors("Para Paints", paraPaintsColors);
   return total;
 }
-
-// Run as standalone script: `tsx server/seed-additional-brands.ts`
-const isMainModule = import.meta.url === `file://${process.argv[1]}`;
-if (isMainModule) {
-  seedAdditionalBrands()
-    .then((total) => {
-      console.log(`\nTotal additional colors seeded: ${total}`);
-      process.exit(0);
-    })
-    .catch((err) => {
-      console.error("Seed error:", err);
-      process.exit(1);
-    });
-}

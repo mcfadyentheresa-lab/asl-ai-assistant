@@ -159,59 +159,6 @@ export async function registerRoutes(
     });
   });
 
-  // Pinterest pin import. Takes a Pinterest pin URL (or pin.it short link) and
-  // returns a usable thumbnail URL by calling Pinterest's public oEmbed endpoint.
-  // No API key required. Only works for individual pin URLs — board URLs are
-  // not supported by Pinterest's oEmbed.
-  app.post("/api/integrations/pinterest/import", isAuthenticated, async (req: any, res) => {
-    const rawUrl = String(req.body?.url || "").trim();
-    if (!rawUrl) {
-      return res.status(400).json({ message: "Missing url" });
-    }
-    let pinUrl = rawUrl;
-    // Resolve pin.it short links by following the redirect.
-    try {
-      if (/^https?:\/\/pin\.it\//i.test(pinUrl)) {
-        const head = await fetch(pinUrl, { method: "GET", redirect: "follow", headers: { "User-Agent": "Mozilla/5.0" } });
-        pinUrl = head.url || pinUrl;
-      }
-    } catch {
-      // fall through with original
-    }
-    // Validate it looks like a pin URL (must contain /pin/<id>).
-    if (!/pinterest\.[a-z.]+\/pin\//i.test(pinUrl)) {
-      return res.status(400).json({
-        message: "That looks like a Pinterest board, not a single pin. Open the pin and copy its URL (it should contain '/pin/...').",
-      });
-    }
-    // Normalize to the canonical pin URL: pinterest's oEmbed rejects share-flow
-    // suffixes like /sent/?invite_code=... and country subdomains can also fail.
-    // Reduce to https://www.pinterest.com/pin/<id>/ which oEmbed always accepts.
-    const pinIdMatch = pinUrl.match(/pinterest\.[a-z.]+\/pin\/(\d+)/i);
-    if (pinIdMatch) {
-      pinUrl = `https://www.pinterest.com/pin/${pinIdMatch[1]}/`;
-    }
-    try {
-      const oembed = await fetch(`https://www.pinterest.com/oembed.json?url=${encodeURIComponent(pinUrl)}`, {
-        headers: { "User-Agent": "Mozilla/5.0" },
-      });
-      if (!oembed.ok) {
-        return res.status(502).json({ message: "Pinterest could not load that pin." });
-      }
-      const data: any = await oembed.json();
-      const thumbnail = data?.thumbnail_url;
-      if (!thumbnail) {
-        return res.status(502).json({ message: "Pinterest did not return an image for that pin." });
-      }
-      // Pinterest's oEmbed returns a small (236px) thumbnail. Upgrade to a higher-res
-      // version by swapping the size segment if present.
-      const upgraded = String(thumbnail).replace(/\/\d+x\//, "/originals/");
-      res.json({ url: upgraded, fallbackUrl: thumbnail, title: data?.title || "" });
-    } catch (e: any) {
-      res.status(500).json({ message: e?.message || "Failed to import pin" });
-    }
-  });
-
   // Receipt upload — accepts images and PDFs
   app.post("/api/receipts/upload", isAuthenticated, (req: any, res) => {
     docUpload.single("file")(req, res, (err: any) => {
