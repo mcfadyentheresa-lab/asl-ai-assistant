@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { usePlanningBoards } from "@/hooks/use-projects";
-import { Loader2, Layers, Plus, Palette, Shapes, Wrench, Armchair, Trash2, RefreshCw } from "lucide-react";
+import { usePlanningBoards, usePhotos, useCreatePhoto, useDeletePhoto, useUploadImage } from "@/hooks/use-projects";
+import { Loader2, Layers, Plus, Palette, Shapes, Wrench, Armchair, Trash2, RefreshCw, Upload } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { useUpload } from "@/hooks/use-upload";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -39,7 +40,7 @@ interface CanvasElement {
   content: any;
 }
 
-// All element types that should appear in the Library drawer. We intentionally include items
+// All element types that should appear in the Assets drawer. We intentionally include items
 // from every board in the project (not just `mode === "library"`) so the user sees their
 // saved finishes everywhere, not only items they manually moved into a Library board.
 const LIBRARY_TYPES = new Set(["surface", "hardware", "product", "image", "color_swatch", "material"]);
@@ -92,9 +93,19 @@ export function MaterialsDrawer({ projectId, onAddImageUrl, activeRoom, activeRo
   const { data: boards, isLoading: loadingBoards } = usePlanningBoards(projectId);
   const allBoards = useMemo(() => boards || [], [boards]);
   const { data: elementsRaw, isLoading: loadingElements } = useAllProjectElements(allBoards);
+  // Project-level photo uploads. We surface these in the same Assets grid so
+  // users don't need a separate "Photos" drawer just to find raw uploads —
+  // every reference image lives in one place. Photos are represented as
+  // virtual image elements with _photoId set; Remove routes to /api/photos.
+  const { data: photos, isLoading: loadingPhotos } = usePhotos(projectId);
+  const { mutate: createPhoto } = useCreatePhoto();
+  const { mutateAsync: deletePhoto } = useDeletePhoto();
+  const { mutateAsync: uploadImage, isPending: isUploadingPhoto } = useUploadImage();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { uploadFile } = useUpload();
+  // Hidden input for the "Upload" button at the top of the drawer.
+  const uploadInputRef = useRef<HTMLInputElement | null>(null);
   // Per-tile pending state: which dedupe-group is currently mutating, and what kind of op.
   const [busyKey, setBusyKey] = useState<string | null>(null);
   // Hidden file input for the Replace flow. We share a single input across the
@@ -108,18 +119,22 @@ export function MaterialsDrawer({ projectId, onAddImageUrl, activeRoom, activeRo
   // confirm, and (b) it gives a much better UX matching the rest of the app.
   const [pendingRemove, setPendingRemove] = useState<{
     key: string;
-    ids: number[];
+    canvasElementIds: number[];
+    photoIds: number[];
     label: string;
   } | null>(null);
 
   const invalidateLibrary = async () => {
-    // Force-refetch every query that produces Library data. Prefix matching is
+    // Force-refetch every query that produces Assets data. Prefix matching is
     // the default but we use refetchType:'all' so even inactive queries are
     // refetched — the badge counts and grid both depend on this returning fresh.
     await queryClient.invalidateQueries({
       queryKey: ["library-drawer", "all-elements"],
       refetchType: "all",
     });
+    // Photos query — raw uploads now appear in the same grid, so deletes /
+    // uploads need to refresh both lists.
+    await queryClient.invalidateQueries({ queryKey: ["/api/projects/:projectId/photos", projectId], refetchType: "all" });
     // The per-board elements queries used by SpatialCanvas also need to drop
     // their cache so the deleted/replaced element disappears from canvases.
     await Promise.all((allBoards || []).map((b: any) =>
@@ -127,19 +142,69 @@ export function MaterialsDrawer({ projectId, onAddImageUrl, activeRoom, activeRo
     ));
   };
 
+  // Upload-from-disk handler for the new "Upload" button at the top of the
+  // drawer. Replaces the old PhotosDrawer's upload flow — same hook, same
+  // backend route, just lives in the merged drawer now. Multiple files are
+  // uploaded sequentially; on success they appear as photo tiles in the grid.
+  const handleUploadFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    for (const file of Array.from(files)) {
+      try {
+        const { url } = await uploadImage(file);
+        createPhoto(
+          { projectId, url, caption: file.name },
+          {
+            onError: (err: any) => toast({ title: "Upload failed", description: err?.message || file.name, variant: "destructive" }),
+          }
+        );
+      } catch (err: any) {
+        toast({ title: "Upload failed", description: err?.message || file.name, variant: "destructive" });
+      }
+    }
+    if (uploadInputRef.current) uploadInputRef.current.value = "";
+    // Force a refresh once the createPhoto mutations resolve. Their hook
+    // already invalidates the photos query — invalidateLibrary makes sure the
+    // unified grid here also re-renders.
+    setTimeout(() => { invalidateLibrary(); }, 100);
+  };
+
+  // Project-level photos surfaced as virtual image elements so they slot
+  // straight into the existing dedupe + filter pipeline. id is namespaced
+  // with the photo: prefix so it can never collide with a real canvas
+  // element id, and _photoId carries the real photo id for delete routing.
+  const photoElements = useMemo(() => {
+    return (photos || []).map((p: any) => ({
+      id: `photo:${p.id}`,
+      _photoId: p.id,
+      boardId: -1,
+      boardName: "Uploads",
+      boardMode: "uploads",
+      type: "image",
+      content: { imageUrl: p.url, url: p.url, caption: p.caption, name: p.caption },
+    }));
+  }, [photos]);
+
   const items = useMemo(
-    () => (elementsRaw || [])
+    () => [...(elementsRaw || []), ...photoElements]
       .filter((el: any) => LIBRARY_TYPES.has(el.type))
       // De-dupe by (kind, name+hex) so the same paint colour saved on five boards shows once.
       .reduce((acc: any[], el: any) => {
         const c = el.content || {};
         const key = `${bucketFor(el)}|${(c.name || c.title || "").toLowerCase()}|${(c.hex || c.color || c.imageUrl || c.url || "").toLowerCase()}`;
-        if (!acc.find((x) => x._dedupeKey === key)) {
+        const existing = acc.find((x) => x._dedupeKey === key);
+        if (!existing) {
           acc.push({ ...el, _dedupeKey: key });
+        } else if (el._photoId && !existing._photoId) {
+          // If a duplicate exists where one is a raw photo upload and the other
+          // is a board element, prefer keeping the photo upload reference so
+          // Remove can clean up the source photo. The board element is still
+          // discoverable through the same key.
+          existing._photoId = el._photoId;
         }
         return acc;
       }, []),
-    [elementsRaw]
+    [elementsRaw, photoElements]
   );
 
   const [activeBucket, setActiveBucket] = useState<KindBucket>("all");
@@ -173,44 +238,82 @@ export function MaterialsDrawer({ projectId, onAddImageUrl, activeRoom, activeRo
     return true;
   }), [items, activeBucket, filter, scopeToRoom, activeRoom]);
 
-  // Map of dedupe-key -> every underlying element id, so Remove can purge every
-  // copy across boards (otherwise the de-duped tile would reappear after the
-  // first delete).
+  // Map of dedupe-key -> { canvasElementIds, photoIds } so Remove can purge
+  // every copy across boards AND the underlying source photo upload(s) (if
+  // any), otherwise the de-duped tile would reappear after one delete.
   const idsByDedupeKey = useMemo(() => {
-    const map = new Map<string, number[]>();
+    const map = new Map<string, { canvasElementIds: number[]; photoIds: number[] }>();
+    const push = (key: string, type: "el" | "photo", id: number) => {
+      const cur = map.get(key) || { canvasElementIds: [], photoIds: [] };
+      if (type === "el") cur.canvasElementIds.push(id);
+      else cur.photoIds.push(id);
+      map.set(key, cur);
+    };
     (elementsRaw || []).forEach((el: any) => {
       if (!LIBRARY_TYPES.has(el.type)) return;
       const c = el.content || {};
       const key = `${bucketFor(el)}|${(c.name || c.title || "").toLowerCase()}|${(c.hex || c.color || c.imageUrl || c.url || "").toLowerCase()}`;
-      const arr = map.get(key) || [];
-      arr.push(el.id);
-      map.set(key, arr);
+      push(key, "el", el.id);
+    });
+    photoElements.forEach((el: any) => {
+      const c = el.content || {};
+      const key = `${bucketFor(el)}|${(c.name || c.title || "").toLowerCase()}|${(c.hex || c.color || c.imageUrl || c.url || "").toLowerCase()}`;
+      push(key, "photo", el._photoId);
     });
     return map;
-  }, [elementsRaw]);
+  }, [elementsRaw, photoElements]);
+
+  // Confirmation state now also tracks photo ids so the dialog can describe
+  // the cleanup accurately and the confirm handler can fire both deletes.
+  type PendingRemove = {
+    key: string;
+    canvasElementIds: number[];
+    photoIds: number[];
+    label: string;
+  };
 
   const requestRemove = (el: any) => {
     const key: string = el._dedupeKey;
-    const ids = idsByDedupeKey.get(key) || [el.id];
+    const group = idsByDedupeKey.get(key) || { canvasElementIds: [], photoIds: [] };
     const label = el.content?.name || el.content?.title || el.content?.caption || "this item";
-    setPendingRemove({ key, ids, label });
+    if (group.canvasElementIds.length === 0 && group.photoIds.length === 0) {
+      // Defensive: nothing to delete — happens if the grouping map drifted from
+      // the rendered tile (race during refetch). Just silently no-op.
+      return;
+    }
+    setPendingRemove({
+      key,
+      canvasElementIds: group.canvasElementIds,
+      photoIds: group.photoIds,
+      label,
+    });
   };
 
   const confirmRemove = async () => {
     if (!pendingRemove) return;
-    const { key, ids } = pendingRemove;
+    const { key, canvasElementIds, photoIds } = pendingRemove;
     setPendingRemove(null);
     setBusyKey(key);
     try {
-      // Delete every element in the dedupe group so the tile actually disappears.
-      const results = await Promise.all(ids.map((id) =>
+      // Delete every canvas element in the dedupe group + every source photo
+      // upload that fed into it. Both are needed: skip the photo and the tile
+      // reappears on next refresh; skip the elements and the saved cards on
+      // boards stay (which is fine for replace flows but not remove).
+      const elResults = await Promise.all(canvasElementIds.map((id) =>
         fetch(`/api/canvas-elements/${id}`, { method: "DELETE", credentials: "include" })
       ));
-      const failed = results.filter((r) => !r.ok).length;
+      const photoResults = await Promise.allSettled(photoIds.map((id) => deletePhoto({ id, projectId })));
+      const elFailed = elResults.filter((r) => !r.ok).length;
+      const photoFailed = photoResults.filter((r) => r.status === "rejected").length;
+      const total = canvasElementIds.length + photoIds.length;
+      const failed = elFailed + photoFailed;
       if (failed > 0) {
-        toast({ title: "Some copies couldn't be removed", description: `${failed} of ${ids.length} failed. Try again.`, variant: "destructive" });
+        toast({ title: "Some copies couldn't be removed", description: `${failed} of ${total} failed. Try again.`, variant: "destructive" });
       } else {
-        toast({ title: "Removed from library", description: `${ids.length} ${ids.length === 1 ? "copy" : "copies"} deleted.` });
+        const parts: string[] = [];
+        if (canvasElementIds.length) parts.push(`${canvasElementIds.length} board ${canvasElementIds.length === 1 ? "card" : "cards"}`);
+        if (photoIds.length) parts.push(`${photoIds.length} ${photoIds.length === 1 ? "upload" : "uploads"}`);
+        toast({ title: "Removed", description: parts.join(" + ") });
       }
       await invalidateLibrary();
     } catch (e: any) {
@@ -222,7 +325,17 @@ export function MaterialsDrawer({ projectId, onAddImageUrl, activeRoom, activeRo
 
   const handleReplaceClick = (el: any) => {
     const key: string = el._dedupeKey;
-    const ids = idsByDedupeKey.get(key) || [el.id];
+    // Replace only operates on real canvas elements — raw photo uploads have
+    // no PATCH endpoint. Fall back to the tile's own id only when it's a
+    // numeric canvas element (not a `photo:NN` virtual id).
+    const group = idsByDedupeKey.get(key);
+    const ids = group?.canvasElementIds.length
+      ? group.canvasElementIds
+      : (typeof el.id === "number" ? [el.id] : []);
+    if (ids.length === 0) {
+      toast({ title: "Can't replace", description: "This is a raw upload — remove and re-upload instead." });
+      return;
+    }
     replaceTargetRef.current = { key, ids };
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
@@ -269,17 +382,18 @@ export function MaterialsDrawer({ projectId, onAddImageUrl, activeRoom, activeRo
     }
   };
 
-  const isLoading = loadingBoards || loadingElements;
+  const isLoading = loadingBoards || loadingElements || loadingPhotos;
 
   if (!isLoading && allBoards.length === 0) {
     return (
       <div className="flex flex-col h-full" data-testid="drawer-materials">
         <div className="flex-1 flex flex-col items-center justify-center px-6 text-center gap-3">
           <Layers className="h-10 w-10 text-muted-foreground/40" />
-          <p className="text-sm font-medium text-foreground">Nothing in your library yet</p>
+          <p className="text-sm font-medium text-foreground">Nothing in your assets yet</p>
           <p className="text-xs text-muted-foreground max-w-[300px]">
-            Add a paint swatch, material, hardware, or product card to any board in this project
-            and it will show up here. Drag from this panel onto any board to reuse without typing.
+            Upload a photo with the button above, or add a paint swatch, material, hardware, or
+            product card to any board in this project. Everything you save here can be dragged
+            onto any board.
           </p>
         </div>
       </div>
@@ -289,13 +403,41 @@ export function MaterialsDrawer({ projectId, onAddImageUrl, activeRoom, activeRo
   return (
     <div className="flex flex-col h-full" data-testid="drawer-materials">
       <div className="px-4 py-3 border-b border-border/60 space-y-2.5">
-        <Input
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          placeholder="Search by name, brand, code…"
-          className="h-9 text-sm"
-          data-testid="input-materials-filter"
-        />
+        <div className="flex items-center gap-2">
+          <Input
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            placeholder="Search by name, brand, code…"
+            className="h-9 text-sm flex-1"
+            data-testid="input-materials-filter"
+          />
+          {/* Hidden input + button: drop a photo into the project from inside
+              the merged Assets drawer. Replaces the standalone PhotosDrawer. */}
+          <input
+            ref={uploadInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={handleUploadFiles}
+            data-testid="materials-upload-input"
+          />
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-9 px-3 gap-1.5 shrink-0"
+            onClick={() => uploadInputRef.current?.click()}
+            disabled={isUploadingPhoto}
+            data-testid="button-materials-upload"
+          >
+            {isUploadingPhoto ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Upload className="h-3.5 w-3.5" />
+            )}
+            <span className="text-xs">Upload</span>
+          </Button>
+        </div>
         {activeRoom && (
           <button
             type="button"
@@ -368,7 +510,8 @@ export function MaterialsDrawer({ projectId, onAddImageUrl, activeRoom, activeRo
               const sub = c.brand || c.supplier || c.code || el.boardName || "";
               const bucket = bucketFor(el);
               const isBusy = busyKey === el._dedupeKey;
-              const groupSize = idsByDedupeKey.get(el._dedupeKey)?.length || 1;
+              const _group = idsByDedupeKey.get(el._dedupeKey);
+              const groupSize = (_group ? _group.canvasElementIds.length + _group.photoIds.length : 0) || 1;
 
               return (
                 <button
@@ -468,11 +611,18 @@ export function MaterialsDrawer({ projectId, onAddImageUrl, activeRoom, activeRo
       <AlertDialog open={!!pendingRemove} onOpenChange={(v) => { if (!v) setPendingRemove(null); }}>
         <AlertDialogContent data-testid="library-remove-confirm">
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove “{pendingRemove?.label}” from your library?</AlertDialogTitle>
+            <AlertDialogTitle>Remove “{pendingRemove?.label}” from your assets?</AlertDialogTitle>
             <AlertDialogDescription>
-              {pendingRemove && pendingRemove.ids.length > 1
-                ? `This deletes ${pendingRemove.ids.length} copies across boards in this project. You can't undo this.`
-                : `This deletes it from its board. You can't undo this.`}
+              {(() => {
+                if (!pendingRemove) return null;
+                const cards = pendingRemove.canvasElementIds.length;
+                const uploads = pendingRemove.photoIds.length;
+                const parts: string[] = [];
+                if (cards) parts.push(`${cards} board ${cards === 1 ? "card" : "cards"}`);
+                if (uploads) parts.push(`${uploads} ${uploads === 1 ? "upload" : "uploads"}`);
+                if (parts.length === 0) return `This deletes it. You can't undo this.`;
+                return `This deletes ${parts.join(" and ")} across this project. You can't undo this.`;
+              })()}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
