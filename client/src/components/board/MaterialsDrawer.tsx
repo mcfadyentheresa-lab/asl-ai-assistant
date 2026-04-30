@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { usePlanningBoards } from "@/hooks/use-projects";
 import { Loader2, Layers, Plus, Palette, Shapes, Wrench, Armchair } from "lucide-react";
@@ -9,6 +9,15 @@ interface MaterialsDrawerProps {
   // Add an image URL to the canvas. Used as a fallback for items that have only an image,
   // not a structured kind. Structured kinds drag onto the canvas as their native card type.
   onAddImageUrl: (url: string) => void;
+  // Step 6 — cross-board filter by active room/category. When the user is
+  // focused on a room tab (e.g. Kitchen), they can toggle a chip that hides
+  // every library item whose tagged room/category doesn't match. This is the
+  // payoff for the user's tagging investment: tag a card to a room, then see
+  // only that room's stuff across every board.
+  activeRoom?: string | null;
+  // Label shown on the room scope chip. "Room" for project boards,
+  // "Category" for library boards. Falls back to "Tag" if not given.
+  activeRoomLabel?: string;
 }
 
 interface CanvasElement {
@@ -67,7 +76,7 @@ function useAllProjectElements(boards: any[]) {
   });
 }
 
-export function MaterialsDrawer({ projectId, onAddImageUrl }: MaterialsDrawerProps) {
+export function MaterialsDrawer({ projectId, onAddImageUrl, activeRoom, activeRoomLabel }: MaterialsDrawerProps) {
   const { data: boards, isLoading: loadingBoards } = usePlanningBoards(projectId);
   const allBoards = useMemo(() => boards || [], [boards]);
   const { data: elementsRaw, isLoading: loadingElements } = useAllProjectElements(allBoards);
@@ -89,6 +98,13 @@ export function MaterialsDrawer({ projectId, onAddImageUrl }: MaterialsDrawerPro
 
   const [activeBucket, setActiveBucket] = useState<KindBucket>("all");
   const [filter, setFilter] = useState("");
+  // When a room is active in the parent canvas, the user can opt-in to scope
+  // the library to just that room/category. Defaults to off so first-open
+  // behaviour is unchanged.
+  const [scopeToRoom, setScopeToRoom] = useState(false);
+  // If the active room is cleared, drop scope so the chip never strands on a
+  // value that's no longer focused.
+  useEffect(() => { if (!activeRoom) setScopeToRoom(false); }, [activeRoom]);
 
   const counts = useMemo(() => {
     const out: Record<KindBucket, number> = { all: items.length, paint: 0, material: 0, hardware: 0, product: 0, photo: 0 };
@@ -98,13 +114,18 @@ export function MaterialsDrawer({ projectId, onAddImageUrl }: MaterialsDrawerPro
 
   const visible = useMemo(() => items.filter((el: any) => {
     if (activeBucket !== "all" && bucketFor(el) !== activeBucket) return false;
+    if (scopeToRoom && activeRoom) {
+      const c = el.content || {};
+      const tagged = String(c.room || c.category || "").trim().toLowerCase();
+      if (tagged !== activeRoom.trim().toLowerCase()) return false;
+    }
     if (filter.trim()) {
       const c = el.content || {};
       const hay = `${c.name || ""} ${c.title || ""} ${c.caption || ""} ${c.brand || ""} ${c.supplier || ""} ${c.code || ""} ${el.boardName || ""}`.toLowerCase();
       if (!hay.includes(filter.toLowerCase().trim())) return false;
     }
     return true;
-  }), [items, activeBucket, filter]);
+  }), [items, activeBucket, filter, scopeToRoom, activeRoom]);
 
   const isLoading = loadingBoards || loadingElements;
 
@@ -133,6 +154,18 @@ export function MaterialsDrawer({ projectId, onAddImageUrl }: MaterialsDrawerPro
           className="h-9 text-sm"
           data-testid="input-materials-filter"
         />
+        {activeRoom && (
+          <button
+            type="button"
+            onClick={() => setScopeToRoom((v) => !v)}
+            className={`h-7 px-2.5 rounded-full text-[11px] font-medium transition-colors inline-flex items-center gap-1 ${scopeToRoom ? "bg-[#2f4a3a] text-white" : "bg-muted text-muted-foreground hover:bg-muted/70"}`}
+            data-testid="materials-scope-room"
+            aria-pressed={scopeToRoom}
+            title={scopeToRoom ? `Showing items tagged to ${activeRoom}` : `Show only items tagged to ${activeRoom}`}
+          >
+            {scopeToRoom ? `✓ ${activeRoomLabel || "Tag"}: ${activeRoom}` : `Filter to ${activeRoomLabel || "Tag"}: ${activeRoom}`}
+          </button>
+        )}
         <div className="flex flex-wrap gap-1.5">
           <button
             type="button"

@@ -553,6 +553,9 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
   const pendingHardwareDropRef = useRef<{ x: number; y: number } | null>(null);
   const [showPaletteDialog, setShowPaletteDialog] = useState(false);
   const [renderRoomName, setRenderRoomName] = useState<string | null>(null);
+  // Step 6 — per-room spec PDF export. While truthy, the Spec PDF button on
+  // the room tab strip shows "Building…" and is disabled.
+  const [exportingSpecRoom, setExportingSpecRoom] = useState<string | null>(null);
   const [palettePresetUrl, setPalettePresetUrl] = useState<string | null>(null);
   const palettePresetSourceRef = useRef<{ x: number; y: number; w: number; h: number } | null>(null);
   const [imageUrlInput, setImageUrlInput] = useState("");
@@ -6209,6 +6212,46 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                 ? (room) => setRenderRoomName(room)
                 : undefined
             }
+            onExportRoomSpec={
+              boardMode === "project" && (effectiveRole === "admin" || effectiveRole === "crew")
+                ? async (room) => {
+                    if (exportingSpecRoom) return;
+                    setExportingSpecRoom(room);
+                    try {
+                      const res = await fetch(`/api/projects/${projectId}/spec-sheet`, {
+                        method: "POST",
+                        credentials: "include",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ room }),
+                      });
+                      if (!res.ok) {
+                        let msg = "Couldn't generate spec sheet.";
+                        try { const data = await res.json(); if (data?.message) msg = data.message; } catch { /* ignore */ }
+                        toast({ title: "Spec sheet failed", description: msg, variant: "destructive" });
+                        return;
+                      }
+                      const blob = await res.blob();
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      const projectSafe = ((clientProject as any)?.name || "project")
+                        .replace(/[^a-z0-9-_ ]/gi, "")
+                        .replace(/\s+/g, "_");
+                      const roomSafe = room.replace(/[^a-z0-9-_ ]/gi, "").replace(/\s+/g, "_") || "room";
+                      a.download = `spec-sheet-${projectSafe}_${roomSafe}.pdf`;
+                      document.body.appendChild(a);
+                      a.click();
+                      a.remove();
+                      URL.revokeObjectURL(url);
+                    } catch (err: any) {
+                      toast({ title: "Spec sheet failed", description: err?.message || "Network error", variant: "destructive" });
+                    } finally {
+                      setExportingSpecRoom(null);
+                    }
+                  }
+                : undefined
+            }
+            isExportingRoomSpec={!!exportingSpecRoom}
           />
           {showSecondaryAxis && (
             <SecondaryAxisChips
@@ -8058,7 +8101,12 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
             </SheetTitle>
             <SheetDescription className="sr-only">All paints, materials, hardware, and products you've saved across this project. Tap or drag to add.</SheetDescription>
           </SheetHeader>
-          <MaterialsDrawer projectId={projectId} onAddImageUrl={handleAddImageByUrl} />
+          <MaterialsDrawer
+            projectId={projectId}
+            onAddImageUrl={handleAddImageByUrl}
+            activeRoom={activeRoom}
+            activeRoomLabel={boardMode === "library" ? "Category" : "Room"}
+          />
         </SheetContent>
       </Sheet>
 

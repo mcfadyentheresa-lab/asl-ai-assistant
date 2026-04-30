@@ -2544,7 +2544,8 @@ function templateCanvasToElements(canvasData: any, boardId: number, createdBy: s
         return res.status(400).json({ message: "Invalid project id" });
       }
       const { generateSpecSheetPdf } = await import("./spec-sheet");
-      await generateSpecSheetPdf(projectId, res);
+      const roomFilter = typeof req.body?.room === "string" ? req.body.room : null;
+      await generateSpecSheetPdf(projectId, res, { roomFilter });
     } catch (err: any) {
       console.error("Spec sheet error:", err?.message || err);
       if (!res.headersSent) {
