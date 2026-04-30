@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { usePlanningBoards } from "@/hooks/use-projects";
-import { Loader2, Layers, Plus, Palette, Shapes, Wrench, Armchair } from "lucide-react";
+import { Loader2, Layers, Plus, Palette, Shapes, Wrench, Armchair, Trash2, RefreshCw } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { useUpload } from "@/hooks/use-upload";
+import { useToast } from "@/hooks/use-toast";
 
 interface MaterialsDrawerProps {
   projectId: number;
@@ -80,6 +82,24 @@ export function MaterialsDrawer({ projectId, onAddImageUrl, activeRoom, activeRo
   const { data: boards, isLoading: loadingBoards } = usePlanningBoards(projectId);
   const allBoards = useMemo(() => boards || [], [boards]);
   const { data: elementsRaw, isLoading: loadingElements } = useAllProjectElements(allBoards);
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const { uploadFile } = useUpload();
+  // Per-tile pending state: which dedupe-group is currently mutating, and what kind of op.
+  const [busyKey, setBusyKey] = useState<string | null>(null);
+  // Hidden file input for the Replace flow. We share a single input across the
+  // grid, with the active dedupe key tracked in a ref so onChange knows which
+  // tile to patch when the user picks a file.
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const replaceTargetRef = useRef<{ key: string; ids: number[] } | null>(null);
+
+  const invalidateLibrary = () => {
+    queryClient.invalidateQueries({ queryKey: ["library-drawer", "all-elements"] });
+    // Boards' own element queries also feed here; invalidate broadly.
+    (allBoards || []).forEach((b: any) => {
+      queryClient.invalidateQueries({ queryKey: [`/api/planning-boards/${b.id}/elements`] });
+    });
+  };
 
   const items = useMemo(
     () => (elementsRaw || [])
@@ -126,6 +146,99 @@ export function MaterialsDrawer({ projectId, onAddImageUrl, activeRoom, activeRo
     }
     return true;
   }), [items, activeBucket, filter, scopeToRoom, activeRoom]);
+
+  // Map of dedupe-key -> every underlying element id, so Remove can purge every
+  // copy across boards (otherwise the de-duped tile would reappear after the
+  // first delete).
+  const idsByDedupeKey = useMemo(() => {
+    const map = new Map<string, number[]>();
+    (elementsRaw || []).forEach((el: any) => {
+      if (!LIBRARY_TYPES.has(el.type)) return;
+      const c = el.content || {};
+      const key = `${bucketFor(el)}|${(c.name || c.title || "").toLowerCase()}|${(c.hex || c.color || c.imageUrl || c.url || "").toLowerCase()}`;
+      const arr = map.get(key) || [];
+      arr.push(el.id);
+      map.set(key, arr);
+    });
+    return map;
+  }, [elementsRaw]);
+
+  const handleRemove = async (el: any) => {
+    const key: string = el._dedupeKey;
+    const ids = idsByDedupeKey.get(key) || [el.id];
+    const label = el.content?.name || el.content?.title || el.content?.caption || "this item";
+    const msg = ids.length > 1
+      ? `Remove \"${label}\" from your library? This deletes ${ids.length} copies across boards in this project.`
+      : `Remove \"${label}\" from your library? This deletes it from its board.`;
+    if (!window.confirm(msg)) return;
+    setBusyKey(key);
+    try {
+      // Delete every element in the dedupe group so the tile actually disappears.
+      const results = await Promise.all(ids.map((id) =>
+        fetch(`/api/canvas-elements/${id}`, { method: "DELETE", credentials: "include" })
+      ));
+      const failed = results.filter((r) => !r.ok).length;
+      if (failed > 0) {
+        toast({ title: "Some copies couldn't be removed", description: `${failed} of ${ids.length} failed. Try again.`, variant: "destructive" });
+      } else {
+        toast({ title: "Removed from library", description: `${ids.length} ${ids.length === 1 ? "copy" : "copies"} deleted.` });
+      }
+      invalidateLibrary();
+    } catch (e: any) {
+      toast({ title: "Remove failed", description: e?.message || "Network error", variant: "destructive" });
+    } finally {
+      setBusyKey(null);
+    }
+  };
+
+  const handleReplaceClick = (el: any) => {
+    const key: string = el._dedupeKey;
+    const ids = idsByDedupeKey.get(key) || [el.id];
+    replaceTargetRef.current = { key, ids };
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleReplaceFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    const target = replaceTargetRef.current;
+    if (!file || !target) return;
+    setBusyKey(target.key);
+    try {
+      const result = await uploadFile(file);
+      if (!result) throw new Error("Upload failed");
+      const newUrl = result.objectPath;
+      // PATCH every element in the dedupe group so all copies stay in sync.
+      // Look the existing content up in the already-loaded elementsRaw cache —
+      // there's no single-element GET endpoint, but we have the full list here.
+      const patchResults = await Promise.all(target.ids.map(async (id) => {
+        const existing = (elementsRaw || []).find((x: any) => x.id === id);
+        const nextContent = { ...(existing?.content || {}), imageUrl: newUrl, url: newUrl };
+        const res = await fetch(`/api/canvas-elements/${id}`, {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content: nextContent }),
+        });
+        return res.ok;
+      }));
+      const failed = patchResults.filter((ok) => !ok).length;
+      if (failed > 0) {
+        toast({ title: "Replace partially failed", description: `${failed} of ${target.ids.length} copies didn't update.`, variant: "destructive" });
+      } else {
+        toast({ title: "Image replaced", description: `${target.ids.length} ${target.ids.length === 1 ? "copy" : "copies"} updated.` });
+      }
+      invalidateLibrary();
+    } catch (err: any) {
+      toast({ title: "Replace failed", description: err?.message || "Upload error", variant: "destructive" });
+    } finally {
+      setBusyKey(null);
+      replaceTargetRef.current = null;
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
 
   const isLoading = loadingBoards || loadingElements;
 
@@ -209,6 +322,15 @@ export function MaterialsDrawer({ projectId, onAddImageUrl, activeRoom, activeRo
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-2">
+            {/* Shared hidden file input for the Replace flow. */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleReplaceFile}
+              data-testid="library-replace-file-input"
+            />
             {visible.map((el: any) => {
               const c = el.content || {};
               const url: string | undefined = c.imageUrl || c.url;
@@ -216,12 +338,14 @@ export function MaterialsDrawer({ projectId, onAddImageUrl, activeRoom, activeRo
               const label = c.name || c.title || c.caption || el.type;
               const sub = c.brand || c.supplier || c.code || el.boardName || "";
               const bucket = bucketFor(el);
+              const isBusy = busyKey === el._dedupeKey;
+              const groupSize = idsByDedupeKey.get(el._dedupeKey)?.length || 1;
 
               return (
                 <button
                   key={el.id}
                   type="button"
-                  draggable
+                  draggable={!isBusy}
                   onDragStart={(e) => {
                     // For paint swatches drag with full structured payload so SpatialCanvas can
                     // recreate a real paint card. For everything else, fall back to image-url drop.
@@ -259,9 +383,47 @@ export function MaterialsDrawer({ projectId, onAddImageUrl, activeRoom, activeRo
                   <span className="absolute top-1.5 left-1.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-sm bg-card/85 backdrop-blur text-[9px] font-mono uppercase tracking-[0.12em] text-foreground/70">
                     {bucket}
                   </span>
-                  <span className="absolute inset-0 flex items-center justify-center bg-foreground/0 group-hover:bg-foreground/30 transition-colors">
+                  <span className="absolute inset-0 flex items-center justify-center bg-foreground/0 group-hover:bg-foreground/30 transition-colors pointer-events-none">
                     <span className="opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center justify-center h-9 w-9 rounded-full bg-primary text-primary-foreground">
                       <Plus className="h-4 w-4" />
+                    </span>
+                  </span>
+                  {/* Hover affordances: Replace (image kinds only) and Remove. */}
+                  <span
+                    className="absolute top-1.5 right-1.5 flex gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {!swatchColor && (
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        aria-label="Replace image"
+                        title="Replace image"
+                        onClick={(e) => { e.stopPropagation(); e.preventDefault(); if (!isBusy) handleReplaceClick(el); }}
+                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); e.preventDefault(); if (!isBusy) handleReplaceClick(el); } }}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onDragStart={(e) => { e.stopPropagation(); e.preventDefault(); }}
+                        className={`inline-flex items-center justify-center h-6 w-6 rounded-md bg-card/95 backdrop-blur border border-border/60 text-foreground/80 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors ${isBusy ? "pointer-events-none opacity-50" : ""}`}
+                        data-testid={`library-replace-${el.id}`}
+                      >
+                        {isBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                      </span>
+                    )}
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      aria-label={groupSize > 1 ? `Remove from library (${groupSize} copies)` : "Remove from library"}
+                      title={groupSize > 1 ? `Remove from library — deletes ${groupSize} copies across boards` : "Remove from library"}
+                      onClick={(e) => { e.stopPropagation(); e.preventDefault(); if (!isBusy) handleRemove(el); }}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); e.preventDefault(); if (!isBusy) handleRemove(el); } }}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onDragStart={(e) => { e.stopPropagation(); e.preventDefault(); }}
+                      className={`inline-flex items-center justify-center h-6 w-6 rounded-md bg-card/95 backdrop-blur border border-border/60 text-foreground/80 hover:bg-destructive hover:text-destructive-foreground hover:border-destructive transition-colors ${isBusy ? "pointer-events-none opacity-50" : ""}`}
+                      data-testid={`library-remove-${el.id}`}
+                    >
+                      {isBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
                     </span>
                   </span>
                   <span className="absolute bottom-0 inset-x-0 bg-card/90 backdrop-blur px-2 py-1 text-[10px] flex flex-col gap-0.5">
