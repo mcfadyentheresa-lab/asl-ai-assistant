@@ -1489,6 +1489,22 @@ Respond with valid JSON only:
     }
   });
 
+  // Replace the tags array on a photo. Used by the Assets drawer's grouping
+  // feature — the first tag doubles as the asset group label.
+  app.patch("/api/photos/:id/tags", isAuthenticated, async (req: any, res) => {
+    try {
+      const photoId = Number(req.params.id);
+      const raw = req.body?.tags;
+      const tags = Array.isArray(raw)
+        ? raw.filter((t: any) => typeof t === "string").map((t: string) => t.trim()).filter(Boolean)
+        : [];
+      await storage.setPhotoTags(photoId, tags);
+      res.json({ success: true, tags });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update photo tags" });
+    }
+  });
+
   // Documents
   app.get(api.documents.list.path, isAuthenticated, asyncHandler(async (req, res) => {
     const docs = await storage.getDocuments(Number(req.params.projectId));

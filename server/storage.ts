@@ -55,6 +55,7 @@ export interface IStorage {
   createPhoto(photo: InsertPhoto): Promise<Photo>;
   deletePhoto(id: number): Promise<void>;
   tagPhoto(photoId: number, planningBoardId: number | null): Promise<void>;
+  setPhotoTags(photoId: number, tags: string[]): Promise<void>;
 
   // Documents
   getDocuments(projectId: number): Promise<Document[]>;
@@ -400,6 +401,12 @@ export class DatabaseStorage implements IStorage {
   }
   async tagPhoto(photoId: number, planningBoardId: number | null): Promise<void> {
     await db.update(photos).set({ planningBoardId }).where(eq(photos.id, photoId));
+  }
+  // Replace the tags array on a photo. Used by the Assets drawer's grouping
+  // feature — the first tag doubles as the asset group so photo uploads can be
+  // grouped alongside saved board cards (which use content.assetGroup).
+  async setPhotoTags(photoId: number, tags: string[]): Promise<void> {
+    await db.update(photos).set({ tags }).where(eq(photos.id, photoId));
   }
 
   // Documents
