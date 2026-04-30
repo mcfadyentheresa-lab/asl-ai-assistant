@@ -157,10 +157,15 @@ function PaintColorPicker({
 
   const queryUrl = `/api/paint-colors?brand=${encodeURIComponent(brand)}`;
 
-  const { data: allColors, isLoading } = useQuery<PaintColor[]>({
+  const { data: allColors, isLoading, isFetching } = useQuery<PaintColor[]>({
     queryKey: [queryUrl],
     enabled: open,
   });
+  // "Loading" for our purposes also means "the query is enabled but no data
+  // has arrived yet". Without this, switching brands causes a one-frame flash
+  // of "No colors found" before the fetch resolves — visible on every brand
+  // except Benjamin Moore (which is the default and already cached).
+  const showLoading = isLoading || isFetching || allColors === undefined;
 
   const filteredColors = (allColors ?? []).filter((c) => {
     if (family && c.colorFamily !== family) return false;
@@ -231,7 +236,7 @@ function PaintColorPicker({
               </button>
             ))}
           </div>
-          {isLoading ? (
+          {showLoading ? (
             <div className="flex items-center justify-center py-4">
               <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
             </div>
