@@ -5,6 +5,16 @@ import { Loader2, Layers, Plus, Palette, Shapes, Wrench, Armchair, Trash2, Refre
 import { Input } from "@/components/ui/input";
 import { useUpload } from "@/hooks/use-upload";
 import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface MaterialsDrawerProps {
   projectId: number;
@@ -93,12 +103,28 @@ export function MaterialsDrawer({ projectId, onAddImageUrl, activeRoom, activeRo
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const replaceTargetRef = useRef<{ key: string; ids: number[] } | null>(null);
 
-  const invalidateLibrary = () => {
-    queryClient.invalidateQueries({ queryKey: ["library-drawer", "all-elements"] });
-    // Boards' own element queries also feed here; invalidate broadly.
-    (allBoards || []).forEach((b: any) => {
-      queryClient.invalidateQueries({ queryKey: [`/api/planning-boards/${b.id}/elements`] });
+  // Confirmation dialog state for Remove. We use Radix AlertDialog instead of
+  // window.confirm because (a) some browsers/contexts can suppress the native
+  // confirm, and (b) it gives a much better UX matching the rest of the app.
+  const [pendingRemove, setPendingRemove] = useState<{
+    key: string;
+    ids: number[];
+    label: string;
+  } | null>(null);
+
+  const invalidateLibrary = async () => {
+    // Force-refetch every query that produces Library data. Prefix matching is
+    // the default but we use refetchType:'all' so even inactive queries are
+    // refetched — the badge counts and grid both depend on this returning fresh.
+    await queryClient.invalidateQueries({
+      queryKey: ["library-drawer", "all-elements"],
+      refetchType: "all",
     });
+    // The per-board elements queries used by SpatialCanvas also need to drop
+    // their cache so the deleted/replaced element disappears from canvases.
+    await Promise.all((allBoards || []).map((b: any) =>
+      queryClient.invalidateQueries({ queryKey: [`/api/planning-boards/${b.id}/elements`], refetchType: "all" })
+    ));
   };
 
   const items = useMemo(
@@ -163,14 +189,17 @@ export function MaterialsDrawer({ projectId, onAddImageUrl, activeRoom, activeRo
     return map;
   }, [elementsRaw]);
 
-  const handleRemove = async (el: any) => {
+  const requestRemove = (el: any) => {
     const key: string = el._dedupeKey;
     const ids = idsByDedupeKey.get(key) || [el.id];
     const label = el.content?.name || el.content?.title || el.content?.caption || "this item";
-    const msg = ids.length > 1
-      ? `Remove \"${label}\" from your library? This deletes ${ids.length} copies across boards in this project.`
-      : `Remove \"${label}\" from your library? This deletes it from its board.`;
-    if (!window.confirm(msg)) return;
+    setPendingRemove({ key, ids, label });
+  };
+
+  const confirmRemove = async () => {
+    if (!pendingRemove) return;
+    const { key, ids } = pendingRemove;
+    setPendingRemove(null);
     setBusyKey(key);
     try {
       // Delete every element in the dedupe group so the tile actually disappears.
@@ -183,7 +212,7 @@ export function MaterialsDrawer({ projectId, onAddImageUrl, activeRoom, activeRo
       } else {
         toast({ title: "Removed from library", description: `${ids.length} ${ids.length === 1 ? "copy" : "copies"} deleted.` });
       }
-      invalidateLibrary();
+      await invalidateLibrary();
     } catch (e: any) {
       toast({ title: "Remove failed", description: e?.message || "Network error", variant: "destructive" });
     } finally {
@@ -230,7 +259,7 @@ export function MaterialsDrawer({ projectId, onAddImageUrl, activeRoom, activeRo
       } else {
         toast({ title: "Image replaced", description: `${target.ids.length} ${target.ids.length === 1 ? "copy" : "copies"} updated.` });
       }
-      invalidateLibrary();
+      await invalidateLibrary();
     } catch (err: any) {
       toast({ title: "Replace failed", description: err?.message || "Upload error", variant: "destructive" });
     } finally {
@@ -415,8 +444,8 @@ export function MaterialsDrawer({ projectId, onAddImageUrl, activeRoom, activeRo
                       tabIndex={0}
                       aria-label={groupSize > 1 ? `Remove from library (${groupSize} copies)` : "Remove from library"}
                       title={groupSize > 1 ? `Remove from library — deletes ${groupSize} copies across boards` : "Remove from library"}
-                      onClick={(e) => { e.stopPropagation(); e.preventDefault(); if (!isBusy) handleRemove(el); }}
-                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); e.preventDefault(); if (!isBusy) handleRemove(el); } }}
+                      onClick={(e) => { e.stopPropagation(); e.preventDefault(); if (!isBusy) requestRemove(el); }}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); e.preventDefault(); if (!isBusy) requestRemove(el); } }}
                       onMouseDown={(e) => e.stopPropagation()}
                       onPointerDown={(e) => e.stopPropagation()}
                       onDragStart={(e) => { e.stopPropagation(); e.preventDefault(); }}
@@ -436,6 +465,28 @@ export function MaterialsDrawer({ projectId, onAddImageUrl, activeRoom, activeRo
           </div>
         )}
       </div>
+      <AlertDialog open={!!pendingRemove} onOpenChange={(v) => { if (!v) setPendingRemove(null); }}>
+        <AlertDialogContent data-testid="library-remove-confirm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove “{pendingRemove?.label}” from your library?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingRemove && pendingRemove.ids.length > 1
+                ? `This deletes ${pendingRemove.ids.length} copies across boards in this project. You can't undo this.`
+                : `This deletes it from its board. You can't undo this.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmRemove}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="library-remove-confirm-action"
+            >
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
