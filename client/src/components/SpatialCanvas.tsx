@@ -2432,6 +2432,14 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
   const holdSnapTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastMoveTimeRef = useRef(0);
   const handwritingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // Hold-to-snap for the modern pointer pipeline (Pencil, touch-draw, mouse via
+  // Add→Draw). When the user pauses mid-stroke for ~500ms and the points so far
+  // look like a recognisable shape (line / circle / rectangle / triangle / arrow),
+  // we replace the live stroke with the perfect shape — same UX as Canva's
+  // "hold to snap". This timer / flag are separate from the legacy mouse-only
+  // path so the two flows don't fight each other.
+  const pointerHoldSnapTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const pointerStrokeSnappedRef = useRef(false);
   const [autoTextConverting, setAutoTextConverting] = useState(false);
 
   const redrawOverlayCanvas = useCallback(() => {
@@ -3151,6 +3159,12 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
           color: drawColor,
           strokeWidth: drawStrokeWidth,
         };
+        // Reset hold-snap state for the new stroke.
+        pointerStrokeSnappedRef.current = false;
+        if (pointerHoldSnapTimerRef.current) {
+          clearTimeout(pointerHoldSnapTimerRef.current);
+          pointerHoldSnapTimerRef.current = null;
+        }
       }
     };
 
@@ -3194,6 +3208,47 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
           width: fs.strokeWidth * 2.4,
         });
         e.preventDefault();
+
+        // Hold-to-snap: every move resets the timer. If the pointer stops
+        // moving for ~500ms and we have a recognisable shape, commit the
+        // snapped version and end the stroke. Mirrors Canva's behaviour.
+        if (pointerHoldSnapTimerRef.current) {
+          clearTimeout(pointerHoldSnapTimerRef.current);
+        }
+        pointerHoldSnapTimerRef.current = setTimeout(() => {
+          const cur = pendingFreestandingDrawRef.current;
+          if (!cur || cur.points.length < 4) return;
+          const candidate = {
+            points: cur.points.map((p) => ({ x: p.x, y: p.y })),
+            color: cur.color,
+            strokeWidth: cur.strokeWidth,
+          };
+          // totalPathCount=1 so the size threshold doesn't reject small shapes.
+          const recognized = recognizeShape(candidate, 1);
+          if (!recognized) return;
+          // Commit the snapped path as a fresh entry in drawPathsRef.
+          const snappedPath = {
+            points: recognized.points,
+            color: cur.color,
+            strokeWidth: cur.strokeWidth,
+            shapeType: (recognized as any).shapeType,
+          };
+          drawPathsRef.current = [...drawPathsRef.current, snappedPath];
+          setDrawingPaths([...drawPathsRef.current]);
+          // Tear down the live preview — the user can lift the pointer when
+          // ready and pointerup will see snapped=true and skip its own commit.
+          pointerStrokeSnappedRef.current = true;
+          pendingFreestandingDrawRef.current = null;
+          setLiveFreestandingDraw(null);
+          if (drawingMode) redrawOverlayCanvas();
+          // Light haptic + visual cue: a tiny toast so the user understands
+          // their squiggle just became a perfect shape.
+          try {
+            if (typeof navigator !== "undefined" && (navigator as any).vibrate) {
+              (navigator as any).vibrate(15);
+            }
+          } catch {}
+        }, 500);
       }
     };
 
@@ -3223,6 +3278,18 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
       }
 
       const fs = pendingFreestandingDrawRef.current;
+      if (pointerHoldSnapTimerRef.current) {
+        clearTimeout(pointerHoldSnapTimerRef.current);
+        pointerHoldSnapTimerRef.current = null;
+      }
+      if (pointerStrokeSnappedRef.current) {
+        // Hold-snap already committed the shape during the move handler. Just
+        // make sure no leftover live preview survives, and reset the flag.
+        pointerStrokeSnappedRef.current = false;
+        pendingFreestandingDrawRef.current = null;
+        setLiveFreestandingDraw(null);
+        return;
+      }
       if (fs) {
         // Push into the existing drawing pipeline so legacy save / shape recognition keeps working.
         if (fs.points.length >= 2) {
@@ -3236,6 +3303,10 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
           setDrawingPaths([...drawPathsRef.current]);
           if (drawingMode) {
             redrawOverlayCanvas();
+            // Snap on pointer-up too: if the finished stroke happens to look
+            // like a recognisable shape (and the user lifted before the hold
+            // timer fired), pop it into the perfect version. Same recognizer.
+            trySnapLastPath();
             // Trigger handwriting auto-convert on idle, matching the legacy timer.
             if (handwritingTimerRef.current) clearTimeout(handwritingTimerRef.current);
             handwritingTimerRef.current = setTimeout(() => {
@@ -3258,6 +3329,11 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
         pendingFreestandingDrawRef.current = null;
         setLiveFreestandingDraw(null);
       }
+      if (pointerHoldSnapTimerRef.current) {
+        clearTimeout(pointerHoldSnapTimerRef.current);
+        pointerHoldSnapTimerRef.current = null;
+      }
+      pointerStrokeSnappedRef.current = false;
       let stillPen = false;
       activePointersRef.current.forEach((v) => { if (v.type === "pen") stillPen = true; });
       if (!stillPen) penActiveRef.current = false;
@@ -3273,7 +3349,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
       root.removeEventListener("pointerup", onPointerUp);
       root.removeEventListener("pointercancel", onPointerCancel);
     };
-  }, [pan, zoom, elements, elementHitAt, shouldPointerDraw, drawColor, drawStrokeWidth, drawingMode, touchDrawing, redrawOverlayCanvas, saveAnnotationStroke, tryAutoTextConvert, user]);
+  }, [pan, zoom, elements, elementHitAt, shouldPointerDraw, drawColor, drawStrokeWidth, drawingMode, touchDrawing, redrawOverlayCanvas, saveAnnotationStroke, tryAutoTextConvert, trySnapLastPath, user]);
 
   const selectedBoard = boards.find((b: PlanningBoardType) => b.id === selectedBoardId);
   const clientProject = allProjects.find((p: any) => p.id === projectId);
