@@ -544,6 +544,20 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
   useEffect(() => {
     try { window.localStorage.setItem("asl-board-add-palette-open", addPaletteOpen ? "1" : "0"); } catch {}
   }, [addPaletteOpen]);
+
+  // Coarse pointer = touch device (iPad/phone). Used to gate features that
+  // behave better as click-only on desktop but still work as hold-and-drag
+  // on touch — e.g. the +Add palette items.
+  const [isCoarsePointer, setIsCoarsePointer] = useState<boolean>(false);
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mql = window.matchMedia("(pointer: coarse)");
+    const update = () => setIsCoarsePointer(mql.matches);
+    update();
+    mql.addEventListener("change", update);
+    return () => mql.removeEventListener("change", update);
+  }, []);
+
   const [showHardwareDialog, setShowHardwareDialog] = useState(false);
   const pendingHardwareDropRef = useRef<{ x: number; y: number } | null>(null);
   const [showPaletteDialog, setShowPaletteDialog] = useState(false);
@@ -6355,7 +6369,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                   className="text-[10px] uppercase text-muted-foreground tracking-[0.2em]"
                   style={{ fontFamily: "var(--font-mono)" }}
                 >
-                  Tap once
+                  {isCoarsePointer ? "Tap or drag" : "Tap once"}
                 </span>
               </div>
               <div className="max-h-[70vh] overflow-y-auto py-1">
@@ -6374,11 +6388,18 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                           <button
                             key={it.type}
                             type="button"
-                            draggable
-                            onDragStart={(e) => {
+                            // Drag is only enabled on coarse-pointer (touch) devices like
+                            // iPad. On a mouse, accidentally moving a few pixels while
+                            // clicking would trigger an HTML5 drag, the popover would
+                            // close, and the click would never fire. So on desktop we
+                            // disable drag entirely and rely on click → createElement.
+                            // On touch, hold-and-drag is the natural way to place an
+                            // item at a precise spot.
+                            draggable={isCoarsePointer}
+                            onDragStart={isCoarsePointer ? (e) => {
                               e.dataTransfer.setData("tool-type", it.type);
                               e.dataTransfer.effectAllowed = "copy";
-                            }}
+                            } : undefined}
                             onClick={() => {
                               runTool(it.type);
                               if (it.type !== "connect") setAddPaletteOpen(false);
