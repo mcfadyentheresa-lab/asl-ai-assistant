@@ -1717,6 +1717,89 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
     }
   }, [patchElementContentSilently]);
 
+  // Re-host an external image URL through our /api/uploads/from-url proxy so
+  // it's served from our own bucket. Bypasses Referer-based hotlink protection
+  // (Houzz, Pinterest, many CDNs return blank/blocked when fetched cross-origin
+  // with the wrong Referer). Returns the final URL — either the rehosted
+  // /objects/... path on success, or null on failure (caller can decide to
+  // fall back to the original URL or skip).
+  // Skips the proxy if the URL is already pointing at our own /objects/ path.
+  const rehostExternalImageUrl = useCallback(async (url: string): Promise<string | null> => {
+    const trimmed = (url || "").trim();
+    if (!trimmed || !/^https?:\/\//i.test(trimmed)) return null;
+    const isAlreadyOurs =
+      trimmed.startsWith("/objects/") ||
+      trimmed.startsWith(`${window.location.origin}/objects/`);
+    if (isAlreadyOurs) return trimmed;
+    try {
+      const proxyRes = await fetch("/api/uploads/from-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ url: trimmed }),
+      });
+      if (!proxyRes.ok) return null;
+      const data = await proxyRes.json();
+      return data?.objectPath ?? null;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  // Background autofill for product cards. Given a product page URL, calls the
+  // server unfurl endpoint and quietly backfills BLANK content fields with
+  // og:title → name, og:site_name → supplier, og price → price, og:image →
+  // imageUrl (rehosted through our bucket so it actually loads).
+  //
+  // Never overwrites a field the user already typed.
+  const autofillProductFromUrl = useCallback(async (id: number, url: string) => {
+    if (!url || !/^https?:\/\//i.test(url)) return;
+    let data: { title?: string; image?: string; siteName?: string; price?: number; currency?: string } | null = null;
+    try {
+      const res = await fetch("/api/board/unfurl", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ url }),
+      });
+      if (!res.ok) return;
+      data = await res.json();
+    } catch {
+      return;
+    }
+    if (!data) return;
+    const el = useCanvasStore.getState().elements[id];
+    if (!el) return;
+    const c = (el.content || {}) as any;
+    const patch: Record<string, any> = {};
+    if (data.title && !c.name) patch.name = data.title;
+    if (data.siteName && !c.supplier) patch.supplier = data.siteName;
+    if (typeof data.price === "number" && Number.isFinite(data.price) && (c.price === undefined || c.price === null || c.price === "")) {
+      patch.price = data.price;
+      if (data.currency && !c.currency) patch.currency = data.currency;
+    }
+    if (data.image && !c.imageUrl) {
+      const rehosted = await rehostExternalImageUrl(data.image);
+      if (rehosted) patch.imageUrl = rehosted;
+    }
+    if (Object.keys(patch).length > 0) {
+      // Re-read at apply time in case the user typed in the meantime.
+      const fresh = useCanvasStore.getState().elements[id];
+      if (!fresh) return;
+      const freshContent = (fresh.content || {}) as any;
+      const finalPatch: Record<string, any> = {};
+      for (const [key, val] of Object.entries(patch)) {
+        if (freshContent[key] === undefined || freshContent[key] === null || freshContent[key] === "") {
+          finalPatch[key] = val;
+        }
+      }
+      if (Object.keys(finalPatch).length > 0) {
+        await patchElementContentSilently(id, finalPatch);
+        toast({ title: "Product details filled", description: "Prefilled blank fields from product page." });
+      }
+    }
+  }, [patchElementContentSilently, rehostExternalImageUrl, toast]);
+
   // Lazy backfill: any existing link element without imageUrl gets one unfurl attempt
   // per session. Result is cached on the element content so the next paint stays cheap.
   useEffect(() => {
@@ -5300,8 +5383,16 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                               onClick={() => {
                                 const current = (useCanvasStore.getState().elements[el.id]?.content || c) as any;
                                 const patch: Record<string, any> = { ...current, supplier: sup.name };
-                                if (!current.url || !String(current.url).trim()) patch.url = sup.url;
+                                const urlWasBlank = !current.url || !String(current.url).trim();
+                                if (urlWasBlank) patch.url = sup.url;
                                 handleUpdateContent(el.id, patch);
+                                // If we just prefilled the brand homepage, kick off a
+                                // background unfurl so og data fills any remaining blanks.
+                                // The user's actual product URL (when they paste one)
+                                // will trigger a richer autofill on its own onBlur.
+                                if (urlWasBlank) {
+                                  setTimeout(() => autofillProductFromUrl(el.id, sup.url), 0);
+                                }
                               }}
                               data-testid={`supplier-option-${el.id}-${sup.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}`}
                             >
@@ -5321,7 +5412,28 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                   className="w-full bg-transparent border-none text-xs text-primary outline-none"
                   defaultValue={c.imageUrl || ""}
                   placeholder="Image URL"
-                  onBlur={(e) => handleUpdateContent(el.id, { ...c, imageUrl: e.target.value })}
+                  onBlur={async (e) => {
+                    const raw = e.target.value.trim();
+                    if (!raw) {
+                      handleUpdateContent(el.id, { ...c, imageUrl: "" });
+                      return;
+                    }
+                    // External http(s) URL → rehost through our bucket so it
+                    // bypasses Referer-based hotlink protection (Houzz, Pinterest,
+                    // most shop CDNs return blank when fetched cross-origin).
+                    const isExternal = /^https?:\/\//i.test(raw)
+                      && !raw.startsWith(`${window.location.origin}/objects/`);
+                    if (isExternal) {
+                      const rehosted = await rehostExternalImageUrl(raw);
+                      if (rehosted) {
+                        handleUpdateContent(el.id, { ...c, imageUrl: rehosted });
+                        return;
+                      }
+                      // Rehost failed → fall back to whatever the user typed
+                      // so we don't silently drop their input.
+                    }
+                    handleUpdateContent(el.id, { ...c, imageUrl: raw });
+                  }}
                   data-testid={`input-product-image-${el.id}`}
                 />
                 <input
@@ -5329,7 +5441,16 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                   className="w-full bg-transparent border-none text-xs text-primary outline-none"
                   defaultValue={c.url}
                   placeholder="https://product-link..."
-                  onBlur={(e) => handleUpdateContent(el.id, { ...c, url: e.target.value })}
+                  onBlur={(e) => {
+                    const raw = e.target.value.trim();
+                    handleUpdateContent(el.id, { ...c, url: raw });
+                    // Background autofill — never blocks the input. Only fills
+                    // BLANK fields (name, supplier, price, imageUrl), so re-typing
+                    // the same URL won't clobber edits.
+                    if (raw && /^https?:\/\//i.test(raw)) {
+                      setTimeout(() => autofillProductFromUrl(el.id, raw), 0);
+                    }
+                  }}
                   data-testid={`input-product-url-${el.id}`}
                 />
                 <input
