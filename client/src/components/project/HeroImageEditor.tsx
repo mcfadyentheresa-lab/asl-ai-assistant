@@ -107,7 +107,7 @@ export function HeroImageEditor({
     const dx = e.clientX - dragState.current.startX;
     const dy = e.clientY - dragState.current.startY;
     // Drag moves the image, so focal point moves OPPOSITE the drag direction.
-    // Scale by zoom so the apparent travel matches finger movement.
+    // Scale by zoom so the apparent travel matches touch movement.
     const denom = Math.max(zoom, 0.0001);
     const nextX = clamp(dragState.current.startFocalX - dx / (rect.width * denom), 0, 1);
     const nextY = clamp(dragState.current.startFocalY - dy / (rect.height * denom), 0, 1);

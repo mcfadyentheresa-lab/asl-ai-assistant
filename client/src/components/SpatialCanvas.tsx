@@ -5,18 +5,18 @@
  *   - 'pen'   (Apple Pencil / stylus): always draws.
  *               • Pointerdown on an element → ink saved as `content.annotations` on that element.
  *               • Pointerdown on board background → freestanding `draw` element (legacy flow).
- *   - 'touch' (finger): pan/zoom by default.
- *               • One-finger drag on background = pan.
- *               • Two-finger pinch / drag = zoom & pan.
+ *   - 'touch' (touch): pan/zoom by default.
+ *               • One-touch drag on background = pan.
+ *               • Two-touch pinch / drag = zoom & pan.
  *               • Tap on element = select. Tap-and-drag does NOT move it.
  *               • Long-press (300ms, ≤6px slop) on a selected element arms drag, then drag moves it.
- *               • If "Finger drawing" toggle is ON, a single finger draws (two fingers still pan/zoom).
+ *               • If "Touch drawing" toggle is ON, a single touch draws (two touches still pan/zoom).
  *   - 'mouse' (desktop): selection / drag / panning unchanged. Drawing when the Draw tool is active.
  *
  * Discipline knobs:
  *   - Lock layout: when ON, no element can be moved/resized/deleted. Drawing & selection still work.
  *     Default ON for client view, OFF for admin/crew. Persisted per board in localStorage.
- *   - Finger drawing: toggle persisted in localStorage. Pencil ignores this toggle.
+ *   - Touch drawing: toggle persisted in localStorage. Pencil ignores this toggle.
  *   - Palm rejection: while a Pen pointer is active, all concurrent touch pointers are ignored.
  *
  * Annotations (`content.annotations: Stroke[]`) live inside the element's bounding box; coordinates
@@ -757,15 +757,15 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
     [statusFilterKey],
   );
 
-  // Finger-drawing toggle: persisted globally in localStorage. Pencil ignores this toggle.
-  const [fingerDrawing, setFingerDrawing] = useState<boolean>(() => {
+  // Touch-drawing toggle: persisted globally in localStorage. Pencil ignores this toggle.
+  const [touchDrawing, setTouchDrawing] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
-    return localStorage.getItem("asl-board-finger-drawing") === "1";
+    return localStorage.getItem("asl-board-touch-drawing") === "1";
   });
-  const toggleFingerDrawing = useCallback(() => {
-    setFingerDrawing((v) => {
+  const toggleTouchDrawing = useCallback(() => {
+    setTouchDrawing((v) => {
       const next = !v;
-      try { localStorage.setItem("asl-board-finger-drawing", next ? "1" : "0"); } catch {}
+      try { localStorage.setItem("asl-board-touch-drawing", next ? "1" : "0"); } catch {}
       return next;
     });
   }, []);
@@ -2047,7 +2047,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
 
   const handleCanvasTouchMove = (e: React.TouchEvent) => {
     if (drawingMode) return;
-    // Pinch-to-zoom with two fingers
+    // Pinch-to-zoom with two touches
     if (e.touches.length === 2 && pinchStartRef.current) {
       e.preventDefault();
       const t1 = e.touches[0];
@@ -2073,7 +2073,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
       clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
     }
-    // Cancel any pending long-press arm if finger moves beyond slop before timer fires
+    // Cancel any pending long-press arm if touch moves beyond slop before timer fires
     if (longPressArmRef.current && longPressArmRef.current.timer) {
       const dx = touch.clientX - longPressArmRef.current.startX;
       const dy = touch.clientY - longPressArmRef.current.startY;
@@ -2081,7 +2081,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
         cancelLongPress();
       }
     }
-    // Threshold-based drag: activate once finger moves > 8px from pending-drag start
+    // Threshold-based drag: activate once touch moves > 8px from pending-drag start
     if (pendingDragRef.current && draggingId === null && e.touches.length === 1) {
       const pdx = touch.clientX - pendingDragRef.current.x;
       const pdy = touch.clientY - pendingDragRef.current.y;
@@ -2867,7 +2867,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
   } | null>(null);
 
   // ---------------------------------------------------------------------------
-  // Pointer-based drawing (Pencil + finger-draw + mouse) — produces perfect-freehand strokes.
+  // Pointer-based drawing (Pencil + touch-draw + mouse) — produces perfect-freehand strokes.
   // Routes ink either to a per-element annotation layer (when pointerdown started over a card)
   // or to a freestanding board-level draw element (legacy flow).
   // Palm rejection: when a Pen pointer is active, all concurrent touch pointers are ignored.
@@ -2896,14 +2896,14 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
 
   // Should this pointer draw?
   // pen → always draws.
-  // touch → only if fingerDrawing toggle is on.
+  // touch → only if touchDrawing toggle is on.
   // mouse → only if drawingMode is on.
   const shouldPointerDraw = useCallback((pointerType: string): boolean => {
     if (connectMode) return false;
     if (pointerType === "pen") return true;
-    if (pointerType === "touch") return fingerDrawing && drawingMode;
+    if (pointerType === "touch") return touchDrawing && drawingMode;
     return drawingMode;
-  }, [fingerDrawing, drawingMode, connectMode]);
+  }, [touchDrawing, drawingMode, connectMode]);
 
   // Attach native DOM event listeners for drawing - works reliably on mouse, touch, and stylus
   useEffect(() => {
@@ -3079,7 +3079,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
 
   // Pointer-event pipeline. Attached to the canvas viewport. Branches by pointerType:
   //   pen → always ink (annotates element if pointerdown is over one, else freestanding draw)
-  //   touch → ink only when fingerDrawing toggle is on
+  //   touch → ink only when touchDrawing toggle is on
   //   mouse → existing handlers continue to drive selection/drag; this pipeline only inks if drawingMode is on
   // Palm rejection: any touch pointer that arrives while a pen pointer is active is ignored.
   useEffect(() => {
@@ -3116,7 +3116,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
       const hit = elementHitAt(e.clientX, e.clientY);
       const pressure = e.pressure && e.pressure > 0 ? e.pressure : (e.pointerType === "pen" ? 0.5 : 0.5);
 
-      if (hit && (e.pointerType === "pen" || (e.pointerType !== "pen" && (drawingMode || fingerDrawing)))) {
+      if (hit && (e.pointerType === "pen" || (e.pointerType !== "pen" && (drawingMode || touchDrawing)))) {
         // Annotate ON the element. Coordinates are stored relative to the element's top-left.
         const board = getBoardCoord(e.clientX, e.clientY);
         elementInkRef.current = {
@@ -3273,7 +3273,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
       root.removeEventListener("pointerup", onPointerUp);
       root.removeEventListener("pointercancel", onPointerCancel);
     };
-  }, [pan, zoom, elements, elementHitAt, shouldPointerDraw, drawColor, drawStrokeWidth, drawingMode, fingerDrawing, redrawOverlayCanvas, saveAnnotationStroke, tryAutoTextConvert, user]);
+  }, [pan, zoom, elements, elementHitAt, shouldPointerDraw, drawColor, drawStrokeWidth, drawingMode, touchDrawing, redrawOverlayCanvas, saveAnnotationStroke, tryAutoTextConvert, user]);
 
   const selectedBoard = boards.find((b: PlanningBoardType) => b.id === selectedBoardId);
   const clientProject = allProjects.find((p: any) => p.id === projectId);
@@ -5668,9 +5668,9 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
     ? (connectSourceId === null ? "Connect: tap source → tap target" : "Connect: tap target...")
     : lockLayout
       ? "Layout locked"
-      : fingerDrawing
-        ? "Fingers draw · 2-finger pan"
-        : "Pencil draws · Fingers pan";
+      : touchDrawing
+        ? "Touches draw · 2-touch pan"
+        : "Pencil draws · Touches pan";
 
   return (
     <div className="flex flex-col h-full overflow-hidden" data-testid="spatial-canvas-root">
@@ -6061,7 +6061,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
             </TooltipTrigger>
             <TooltipContent side="bottom" className="text-xs">Fit to Screen</TooltipContent>
           </Tooltip>
-          {/* "More" overflow menu — keeps Hand (finger drawing), Play
+          {/* "More" overflow menu — keeps Hand (touch drawing), Play
               (presentation), Sparkles (AI), History (versions) accessible without
               cluttering the toolbar. Keyboard shortcuts continue to work. */}
           <Separator orientation="vertical" className="h-4 mx-1" />
@@ -6084,11 +6084,11 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
             </Tooltip>
             <DropdownMenuContent align="end" className="min-w-[200px]">
               <DropdownMenuItem
-                onClick={toggleFingerDrawing}
-                data-testid="menu-finger-drawing"
+                onClick={toggleTouchDrawing}
+                data-testid="menu-touch-drawing"
               >
-                <Hand className={`h-4 w-4 mr-2 ${fingerDrawing ? "text-primary" : ""}`} />
-                {fingerDrawing ? "Finger drawing: On" : "Finger drawing: Off"}
+                <Hand className={`h-4 w-4 mr-2 ${touchDrawing ? "text-primary" : ""}`} />
+                {touchDrawing ? "Touch drawing: On" : "Touch drawing: Off"}
               </DropdownMenuItem>
               {(actualRole === "admin" || actualRole === "crew") && (
                 <>
@@ -6958,7 +6958,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
               style={{ fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }}
               data-testid="canvas-mode-indicator"
             >
-              {connectMode ? <Spline className="h-3 w-3" /> : lockLayout ? <Lock className="h-3 w-3" /> : fingerDrawing ? <Hand className="h-3 w-3" /> : <PenTool className="h-3 w-3" />}
+              {connectMode ? <Spline className="h-3 w-3" /> : lockLayout ? <Lock className="h-3 w-3" /> : touchDrawing ? <Hand className="h-3 w-3" /> : <PenTool className="h-3 w-3" />}
               <span className="leading-none">{modeIndicatorLabel}</span>
             </div>
 
@@ -7040,11 +7040,11 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                   {lockLayout ? <Lock className="h-[18px] w-[18px]" strokeWidth={1.5} /> : <LockOpen className="h-[18px] w-[18px]" strokeWidth={1.5} />}
                 </button>
                 <button
-                  className={`h-11 w-11 flex items-center justify-center rounded-full shrink-0 ${fingerDrawing ? "bg-primary/15 text-primary" : "text-foreground/60 active:bg-foreground/10"}`}
-                  onClick={(e) => { e.stopPropagation(); toggleFingerDrawing(); }}
-                  aria-pressed={fingerDrawing}
-                  data-testid="mobile-finger-drawing"
-                  aria-label="Finger drawing"
+                  className={`h-11 w-11 flex items-center justify-center rounded-full shrink-0 ${touchDrawing ? "bg-primary/15 text-primary" : "text-foreground/60 active:bg-foreground/10"}`}
+                  onClick={(e) => { e.stopPropagation(); toggleTouchDrawing(); }}
+                  aria-pressed={touchDrawing}
+                  data-testid="mobile-touch-drawing"
+                  aria-label="Touch drawing"
                 >
                   <Hand className="h-[18px] w-[18px]" strokeWidth={1.5} />
                 </button>
@@ -7256,7 +7256,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
       {boards.length > 0 && selectedBoardId && (
         <div className="flex items-center justify-between mt-1.5 px-1">
           <p className="text-[10px] text-muted-foreground">
-            Pencil draws · fingers pan · two-finger pinch zooms · long-press to move (when unlocked).
+            Pencil draws · touches pan · two-touch pinch zooms · long-press to move (when unlocked).
           </p>
           <p className="text-[10px] text-muted-foreground">{elementsList.length} element{elementsList.length !== 1 ? "s" : ""}</p>
         </div>
