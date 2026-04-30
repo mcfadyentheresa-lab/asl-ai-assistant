@@ -34,9 +34,12 @@ export function SidebarNav({ onNavigate, compact = false }: SidebarNavProps) {
 
   const { recentProjects } = useRecentProjects();
 
-  const clientProject = effectiveRole === "client" && projects && projects.length > 0
-    ? projects[0]
-    : null;
+  // Clients can have multiple projects (e.g. main reno + secondary suite, or two
+  // homes under one renovation contract). Show every project in the sidebar so
+  // they can switch between them. Falls back to a single link when there's
+  // only one. Projects are pre-filtered server-side to ones the client is
+  // assigned to, so listing them all here doesn't leak anyone else's project.
+  const clientProjects = effectiveRole === "client" && projects ? projects : [];
 
   if (!user) return null;
 
@@ -158,14 +161,19 @@ export function SidebarNav({ onNavigate, compact = false }: SidebarNavProps) {
                   />
                 ))}
 
-                {group === "Projects" && clientProject && (
-                  <NavLink
-                    path={`/project/${clientProject.id}`}
-                    icon={Home}
-                    label={clientProject.name}
-                    active={location.startsWith(`/project/${clientProject.id}`)}
-                    testId="sidebar-link-client-project"
-                  />
+                {group === "Projects" && clientProjects.length > 0 && (
+                  <>
+                    {clientProjects.map((p) => (
+                      <NavLink
+                        key={p.id}
+                        path={`/project/${p.id}`}
+                        icon={Home}
+                        label={p.name}
+                        active={location.startsWith(`/project/${p.id}`)}
+                        testId={`sidebar-link-client-project-${p.id}`}
+                      />
+                    ))}
+                  </>
                 )}
               </div>
             </div>

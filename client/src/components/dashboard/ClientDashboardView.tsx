@@ -91,9 +91,20 @@ interface CalendarEvent {
 interface ClientDashboardViewProps {
   project: Project;
   isAdminPreview?: boolean;
+  // Optional list of all projects this client belongs to. When >1, a chip
+  // switcher renders above the property photo band so a client with two
+  // active projects (e.g. main reno + secondary suite) can pick which one
+  // they're looking at without hunting in the sidebar.
+  allProjects?: Pick<Project, "id" | "name">[];
+  onSelectProject?: (id: number) => void;
 }
 
-export function ClientDashboardView({ project, isAdminPreview = false }: ClientDashboardViewProps) {
+export function ClientDashboardView({
+  project,
+  isAdminPreview = false,
+  allProjects,
+  onSelectProject,
+}: ClientDashboardViewProps) {
   const { data: milestones } = useQuery<Milestone[]>({
     queryKey: [api.milestones.list.path, project.id],
     queryFn: async () => {
@@ -228,6 +239,37 @@ export function ClientDashboardView({ project, isAdminPreview = false }: ClientD
         >
           Client view preview — this is what your client sees.
         </p>
+      )}
+
+      {allProjects && allProjects.length > 1 && (
+        <div
+          className="flex flex-wrap gap-2 px-4 md:px-8 lg:px-12 pt-4"
+          data-testid="client-project-switcher"
+        >
+          <span className="font-mono text-[10px] tracking-[0.14em] text-muted-foreground uppercase mr-1 self-center">
+            Your projects
+          </span>
+          {allProjects.map((p) => {
+            const isActive = p.id === project.id;
+            return (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => onSelectProject?.(p.id)}
+                className={
+                  "text-xs px-3 py-1 rounded-full border transition-colors " +
+                  (isActive
+                    ? "bg-foreground text-background border-foreground"
+                    : "bg-background text-foreground/70 border-border hover:border-foreground/40 hover:text-foreground")
+                }
+                aria-pressed={isActive}
+                data-testid={`client-project-chip-${p.id}`}
+              >
+                {p.name}
+              </button>
+            );
+          })}
+        </div>
       )}
 
       <PropertyPhotoBand
