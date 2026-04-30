@@ -931,6 +931,14 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
           setMaxZ(Math.max(...data.map((e) => e.zIndex)) + 1);
         }
         setLoading(false);
+        // Auto-fit a populated board on first open. Skips empty boards (so
+        // an empty canvas keeps its 100% / 0,0 default) and skips boards
+        // we've already auto-fit this session (so a second drawer open
+        // doesn't yank the viewport back to fit).
+        if (data.length > 0 && lastAutoFitBoardId.current !== selectedBoardId) {
+          lastAutoFitBoardId.current = selectedBoardId;
+          scheduleAutoFit();
+        }
       })
       .catch(() => setLoading(false));
   }, [selectedBoardId]);
@@ -2986,12 +2994,19 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
 
   const resetView = () => { setPan({ x: 0, y: 0 }); setZoom(1); };
 
-  // Auto fit-to-screen when a board is first opened on a touch device
-  useEffect(() => {
-    if (!selectedBoardId || !("ontouchstart" in window)) return;
-    const timer = setTimeout(() => fitToScreen(), 150);
-    return () => clearTimeout(timer);
-  }, [selectedBoardId]);
+  // Auto fit-to-screen when a populated board is first opened. We track the
+  // board id we've already auto-fit so switching boards re-fits, but every
+  // subsequent element add doesn't yank the viewport back. Used by the
+  // load-effect below — see `lastAutoFitBoardId.current = selectedBoardId`.
+  const lastAutoFitBoardId = useRef<number | null>(null);
+  // Schedule auto-fit on the next animation frame after layout settles. Two
+  // RAFs is the well-known pattern to ensure the container has measured its
+  // size after a board switch (drawer open/close, tab switch, etc).
+  const scheduleAutoFit = useCallback(() => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => fitToScreen());
+    });
+  }, []);
 
   const startResize = (id: number, handle: string, e: React.MouseEvent) => {
     if (lockLayout) return;
