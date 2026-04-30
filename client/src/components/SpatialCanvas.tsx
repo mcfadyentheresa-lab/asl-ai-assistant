@@ -3926,6 +3926,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
           className={`w-full bg-transparent border rounded text-xs outline-none px-1.5 py-0.5 ${
             isLibrary && !c.category ? "border-amber-400/60" : "border-border/50"
           }`}
+          key={`cat-${c.category ?? ""}`}
           defaultValue={c.category || ""}
           list={`category-suggestions-${el.id}`}
           placeholder={placeholder}
@@ -4202,6 +4203,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                 <input
                   className="w-full bg-transparent border-none text-sm font-serif font-semibold outline-none"
                   style={{ color: getContrastColor(c.color || "#f0ede8") }}
+                  key={`zone-title-${c.title}`}
                   defaultValue={c.title}
                   placeholder="Room name..."
                   onBlur={(e) => handleUpdateContent(el.id, { ...c, title: e.target.value })}
@@ -4211,6 +4213,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                 <div className="flex items-center gap-2">
                   <input
                     type="color"
+                    key={`zone-color-${c.color ?? ""}`}
                     defaultValue={c.color || "#f0ede8"}
                     onChange={(e) => handleUpdateContent(el.id, { ...c, color: e.target.value })}
                     className="h-6 w-8 border rounded cursor-pointer"
@@ -4343,6 +4346,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
               <input
                 className={`w-full bg-transparent border-none ${headerClass} outline-none pb-1`}
                 style={{ borderBottom: "1px solid hsl(var(--border))" }}
+                key={`head-title-${c.title}`}
                 defaultValue={c.title}
                 onBlur={(e) => handleUpdateContent(el.id, { ...c, title: e.target.value })}
                 autoFocus
@@ -4386,6 +4390,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                     <textarea
                       className="w-full bg-transparent border-none text-xs outline-none resize-none"
                       rows={2}
+                      key={`callout-text-${c.text}`}
                       defaultValue={c.text}
                       placeholder="Add note..."
                       onBlur={(e) => handleUpdateContent(el.id, { ...c, text: e.target.value })}
@@ -4449,6 +4454,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
               <div className="space-y-2">
                 <input
                   className="w-full bg-transparent border-none text-sm font-semibold outline-none placeholder:text-muted-foreground/50"
+                  key={`txt-title-${c.title}`}
                   defaultValue={c.title}
                   placeholder="Title (optional)"
                   onBlur={(e) => handleUpdateContent(el.id, { ...c, title: e.target.value })}
@@ -4457,6 +4463,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                 <textarea
                   ref={(ref) => { noteTextareaRefs.current[`${el.id}-note`] = ref; }}
                   className="w-full bg-transparent border-none text-sm resize-none outline-none min-h-[60px] placeholder:text-muted-foreground/50"
+                  key={`txt-text-${c.text}`}
                   defaultValue={c.text}
                   placeholder="Type your note..."
                   onBlur={(e) => handleUpdateContent(el.id, { ...c, text: e.target.value })}
@@ -4509,6 +4516,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
               {isSelected ? (
                 <input
                   className="flex-1 bg-transparent border-none text-sm font-semibold outline-none"
+                  key={`todo-title-${c.title}`}
                   defaultValue={c.title}
                   placeholder="To-do title"
                   onBlur={(e) => handleUpdateContent(el.id, { ...c, title: e.target.value })}
@@ -4537,6 +4545,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                     <input
                       ref={(ref) => { if (ref) noteTextareaRefs.current[`${el.id}-todo-${idx}`] = ref; }}
                       className="flex-1 bg-transparent border-none text-xs outline-none"
+                      key={`todo-item-${item.id ?? ""}-${item.text ?? ""}`}
                       defaultValue={item.text}
                       onFocus={() => setFocusedTodoItem({ elementId: el.id, itemIdx: idx })}
                       onBlur={(e) => {
@@ -4648,6 +4657,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
             {isSelected ? (
               <input
                 className="w-full bg-transparent border-none text-sm font-semibold text-center outline-none"
+                key={`col-title-${c.title}`}
                 defaultValue={c.title}
                 onBlur={(e) => handleUpdateContent(el.id, { ...c, title: e.target.value })}
                 data-testid={`input-column-title-${el.id}`}
@@ -4795,15 +4805,17 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                 <div className="space-y-2">
                   <input
                     className="w-full bg-transparent border-none text-sm font-medium outline-none"
+                    key={`surf-name-${c.name ?? ""}`}
                     defaultValue={c.name}
                     placeholder="Color name"
                     onBlur={(e) => handleUpdateContent(el.id, { ...c, name: e.target.value })}
                     data-testid={`input-surface-name-${el.id}`}
                   />
                   <div className="flex gap-2 items-center">
-                    <input type="color" defaultValue={c.color} onChange={(e) => handleUpdateContent(el.id, { ...c, color: e.target.value, hex: e.target.value })} className="h-7 w-10 border rounded cursor-pointer" data-testid={`input-surface-color-${el.id}`} />
+                    <input key={`surf-color-${c.color ?? ""}`} type="color" defaultValue={c.color} onChange={(e) => handleUpdateContent(el.id, { ...c, color: e.target.value, hex: e.target.value })} className="h-7 w-10 border rounded cursor-pointer" data-testid={`input-surface-color-${el.id}`} />
                     <input
                       className="flex-1 bg-transparent border-none text-xs font-mono outline-none"
+                      key={`surf-hex-${(c.hex ?? c.color) ?? ""}`}
                       defaultValue={c.hex || c.color}
                       placeholder="#000000"
                       onBlur={(e) => handleUpdateContent(el.id, { ...c, hex: e.target.value, color: e.target.value })}
@@ -4828,6 +4840,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                   <div className="grid grid-cols-2 gap-1.5">
                     <input
                       className="bg-transparent border border-border/50 rounded text-xs outline-none px-1.5 py-0.5"
+                      key={`surf-room-${c.room ?? ""}`}
                       defaultValue={c.room || ""}
                       placeholder="Room"
                       onBlur={(e) => handleUpdateContent(el.id, { ...c, room: e.target.value || undefined })}
@@ -4835,6 +4848,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                     />
                     <select
                       className="bg-transparent border border-border/50 rounded text-xs outline-none px-1.5 py-0.5"
+                      key={`surf-sheen-${c.sheen ?? ""}`}
                       defaultValue={c.sheen || ""}
                       onChange={(e) => handleUpdateContent(el.id, { ...c, sheen: e.target.value || undefined })}
                       data-testid={`select-surface-sheen-${el.id}`}
@@ -4947,6 +4961,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
               <div className="space-y-1.5">
                 <input
                   className="w-full bg-transparent border-none text-sm font-medium outline-none"
+                  key={`mat-name-${c.name ?? ""}`}
                   defaultValue={c.name}
                   placeholder="Material name"
                   onBlur={(e) => handleUpdateContent(el.id, { ...c, name: e.target.value })}
@@ -4954,6 +4969,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                 />
                 <input
                   className="w-full bg-transparent border-none text-xs text-muted-foreground outline-none"
+                  key={`mat-supplier-${c.supplier ?? ""}`}
                   defaultValue={c.supplier}
                   placeholder="Supplier / Brand"
                   onBlur={(e) => handleUpdateContent(el.id, { ...c, supplier: e.target.value })}
@@ -4961,6 +4977,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                 />
                 <input
                   className="w-full bg-transparent border-none text-xs font-mono text-muted-foreground outline-none"
+                  key={`mat-code-${c.code ?? ""}`}
                   defaultValue={c.code}
                   placeholder="Product code"
                   onBlur={(e) => handleUpdateContent(el.id, { ...c, code: e.target.value })}
@@ -4968,6 +4985,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                 />
                 <input
                   className="w-full bg-transparent border-none text-xs text-primary outline-none"
+                  key={`mat-img-${c.imageUrl ?? ""}`}
                   defaultValue={c.imageUrl}
                   placeholder="Image URL"
                   onBlur={(e) => handleUpdateContent(el.id, { ...c, imageUrl: e.target.value })}
@@ -4976,6 +4994,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                 {renderCategoryField(el)}
                 <input
                   className="w-full bg-transparent border-none text-xs text-primary outline-none"
+                  key={`mat-vendor-${c.vendorUrl ?? ""}`}
                   defaultValue={c.vendorUrl || ""}
                   placeholder="Vendor URL"
                   onBlur={(e) => handleUpdateContent(el.id, { ...c, vendorUrl: e.target.value || undefined })}
@@ -4984,6 +5003,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                 <textarea
                   className="w-full bg-transparent border border-border/50 rounded text-xs outline-none p-1.5 resize-none"
                   rows={2}
+                  key={`mat-notes-${c.notes}`}
                   defaultValue={c.notes}
                   placeholder="Notes..."
                   onBlur={(e) => handleUpdateContent(el.id, { ...c, notes: e.target.value })}
@@ -5450,6 +5470,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
               <div className="space-y-2">
                 <input
                   className="w-full bg-transparent border-none text-sm font-medium outline-none"
+                  key={`link-title-${c.title}`}
                   defaultValue={c.title}
                   placeholder="Link title"
                   onBlur={(e) => handleUpdateContent(el.id, { ...c, title: e.target.value })}
@@ -5457,6 +5478,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                 />
                 <input
                   className="w-full bg-transparent border-none text-xs text-primary outline-none"
+                  key={`link-url-${c.url}`}
                   defaultValue={c.url}
                   placeholder="https://..."
                   onBlur={(e) => {
@@ -5686,6 +5708,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                   <div className="flex gap-1.5">
                     <input
                       className="flex-1 bg-transparent border-none text-xs outline-none"
+                      key={`img-url-${c.url}`}
                       defaultValue={c.url}
                       placeholder="Image URL..."
                       onBlur={(e) => handleUpdateContent(el.id, { ...c, url: e.target.value })}
@@ -5704,6 +5727,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                   </div>
                   <input
                     className="w-full bg-transparent border-none text-xs text-muted-foreground outline-none"
+                    key={`caption-${c.caption}`}
                     defaultValue={c.caption}
                     placeholder="Caption (optional)"
                     onBlur={(e) => handleUpdateContent(el.id, { ...c, caption: e.target.value })}
@@ -5804,6 +5828,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
               <div className="w-full space-y-1">
                 <input
                   className="w-full bg-transparent border-none text-sm font-medium text-center outline-none"
+                  key={`title-${c.title}`}
                   defaultValue={c.title}
                   placeholder="Board name"
                   onBlur={(e) => handleUpdateContent(el.id, { ...c, title: e.target.value })}
