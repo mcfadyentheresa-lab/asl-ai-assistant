@@ -49,7 +49,9 @@ import {
   Spline, MoveRight, Slash, Droplet,
   Play, Globe, Star, History, AlertTriangle, Settings,
   Pin, Layers, Armchair, Image as ImageIcon, Grid3x3, Crop as CropIcon, RotateCcw,
+  ChevronDown,
 } from "lucide-react";
+import { DESIGNER_SUPPLIER_GROUPS } from "@/lib/designer-suppliers";
 import LibraryCollectionsView from "@/components/board/LibraryCollectionsView";
 import { FurnitureDrawer } from "@/components/board/FurnitureDrawer";
 import { MaterialsDrawer } from "@/components/board/MaterialsDrawer";
@@ -5231,13 +5233,66 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                   onBlur={(e) => handleUpdateContent(el.id, { ...c, price: e.target.value })}
                   data-testid={`input-product-price-${el.id}`}
                 />
-                <input
-                  className="w-full bg-transparent border-none text-xs text-muted-foreground outline-none"
-                  defaultValue={c.supplier}
-                  placeholder="Supplier"
-                  onBlur={(e) => handleUpdateContent(el.id, { ...c, supplier: e.target.value })}
-                  data-testid={`input-product-supplier-${el.id}`}
-                />
+                <div className="flex items-center gap-1">
+                  <input
+                    className="flex-1 bg-transparent border-none text-xs text-muted-foreground outline-none"
+                    defaultValue={c.supplier}
+                    placeholder="Supplier"
+                    onBlur={(e) => handleUpdateContent(el.id, { ...c, supplier: e.target.value })}
+                    data-testid={`input-product-supplier-${el.id}`}
+                  />
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        className="p-0.5 rounded text-muted-foreground/60 hover:text-primary hover:bg-muted transition-colors"
+                        onMouseDown={(e) => e.stopPropagation()}
+                        aria-label="Pick from designer suppliers"
+                        title="Pick from designer suppliers"
+                        data-testid={`btn-supplier-picker-${el.id}`}
+                      >
+                        <ChevronDown className="h-3 w-3" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      align="end"
+                      side="bottom"
+                      className="w-64 max-h-80 overflow-y-auto p-1"
+                      onMouseDown={(e) => e.stopPropagation()}
+                      data-testid={`popover-supplier-picker-${el.id}`}
+                    >
+                      <div className="px-2 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground/80" style={{ fontFamily: "var(--font-mono)" }}>
+                        Where designers shop
+                      </div>
+                      {DESIGNER_SUPPLIER_GROUPS.map((group) => (
+                        <div key={group.label} className="mb-1.5">
+                          <div className="px-2 pt-1 pb-0.5 text-[10px] font-medium text-foreground/70">
+                            {group.label}
+                          </div>
+                          {group.suppliers.map((sup) => (
+                            <button
+                              key={sup.name}
+                              type="button"
+                              className="w-full text-left px-2 py-1 rounded text-xs hover:bg-muted transition-colors flex items-center justify-between gap-2"
+                              onClick={() => {
+                                const current = (useCanvasStore.getState().elements[el.id]?.content || c) as any;
+                                const patch: Record<string, any> = { ...current, supplier: sup.name };
+                                if (!current.url || !String(current.url).trim()) patch.url = sup.url;
+                                handleUpdateContent(el.id, patch);
+                              }}
+                              data-testid={`supplier-option-${el.id}-${sup.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}`}
+                            >
+                              <span className="truncate">{sup.name}</span>
+                              <span className="text-[9px] text-muted-foreground/60 shrink-0" style={{ fontFamily: "var(--font-mono)" }}>
+                                {sup.url.replace(/^https?:\/\//, "").replace(/\/$/, "")}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      ))}
+                    </PopoverContent>
+                  </Popover>
+                </div>
                 <input
                   className="w-full bg-transparent border-none text-xs text-primary outline-none"
                   defaultValue={c.imageUrl || ""}
