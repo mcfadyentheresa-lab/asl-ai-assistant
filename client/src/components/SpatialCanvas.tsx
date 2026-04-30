@@ -104,21 +104,56 @@ import { useQuery } from "@tanstack/react-query";
 const SHEENS = ["Flat", "Eggshell", "Satin", "Semi-Gloss", "Gloss"] as const;
 type Sheen = typeof SHEENS[number];
 
-function BmColorPicker({
+// Brands available in the paint-colors DB. Server seeds Benjamin Moore +
+// Sherwin-Williams + Farrow & Ball + Para Paints on startup. The picker remembers
+// the last brand the user picked across sessions so painters don't re-select every time.
+const PAINT_BRANDS = [
+  "Benjamin Moore",
+  "Sherwin-Williams",
+  "Farrow & Ball",
+  "Para Paints",
+] as const;
+type PaintBrand = typeof PAINT_BRANDS[number];
+const PAINT_BRAND_STORAGE_KEY = "asl-board-paint-brand";
+function loadInitialBrand(): PaintBrand {
+  if (typeof window === "undefined") return "Benjamin Moore";
+  try {
+    const v = window.localStorage.getItem(PAINT_BRAND_STORAGE_KEY);
+    if (v && (PAINT_BRANDS as readonly string[]).includes(v)) return v as PaintBrand;
+  } catch {}
+  return "Benjamin Moore";
+}
+
+function PaintColorPicker({
   onSelect,
   initialRoom,
   initialSheen,
+  initialBrand,
 }: {
   onSelect: (color: PaintColor, extras: { room?: string; sheen?: Sheen }) => void;
   initialRoom?: string;
   initialSheen?: Sheen;
+  initialBrand?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [family, setFamily] = useState<string | null>(null);
   const [room, setRoom] = useState<string>(initialRoom ?? "");
   const [sheen, setSheen] = useState<Sheen | "">(initialSheen ?? "");
-  const brand = "Benjamin Moore";
+  // If the surface card was already tagged with a known brand (e.g. user picked
+  // "Sherwin-Williams" on it earlier), default the picker to that brand. Otherwise
+  // fall back to whatever brand the user picked most recently across the app.
+  const seedBrand: PaintBrand = (() => {
+    if (initialBrand && (PAINT_BRANDS as readonly string[]).includes(initialBrand)) {
+      return initialBrand as PaintBrand;
+    }
+    return loadInitialBrand();
+  })();
+  const [brand, setBrand] = useState<PaintBrand>(seedBrand);
+  // Persist brand selection so the next paint card opens to the same brand.
+  useEffect(() => {
+    try { window.localStorage.setItem(PAINT_BRAND_STORAGE_KEY, brand); } catch {}
+  }, [brand]);
 
   const queryUrl = `/api/paint-colors?brand=${encodeURIComponent(brand)}`;
 
@@ -141,28 +176,38 @@ function BmColorPicker({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" className="w-full gap-1.5 text-xs" data-testid="button-pick-bm-color">
+        <Button variant="outline" size="sm" className="w-full gap-1.5 text-xs" data-testid="button-pick-paint-color">
           <Palette className="w-3 h-3" />
-          Benjamin Moore
+          {brand}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-72 p-2" align="start" side="bottom">
         <div className="space-y-2">
+          <Select value={brand} onValueChange={(v) => { setBrand(v as PaintBrand); setFamily(null); setSearch(""); }}>
+            <SelectTrigger className="h-7 text-xs" data-testid="select-paint-brand">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PAINT_BRANDS.map((b) => (
+                <SelectItem key={b} value={b} data-testid={`option-paint-brand-${b.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}>{b}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <div className="grid grid-cols-2 gap-1.5">
             <Input
               value={room}
               onChange={(e) => setRoom(e.target.value)}
               placeholder="Room (e.g. Kitchen)"
               className="h-7 text-xs"
-              data-testid="input-bm-room"
+              data-testid="input-paint-room"
             />
             <Select value={sheen} onValueChange={(v) => setSheen(v as Sheen)}>
-              <SelectTrigger className="h-7 text-xs" data-testid="select-bm-sheen">
+              <SelectTrigger className="h-7 text-xs" data-testid="select-paint-sheen">
                 <SelectValue placeholder="Sheen" />
               </SelectTrigger>
               <SelectContent>
                 {SHEENS.map((s) => (
-                  <SelectItem key={s} value={s} data-testid={`option-bm-sheen-${s.toLowerCase()}`}>{s}</SelectItem>
+                  <SelectItem key={s} value={s} data-testid={`option-paint-sheen-${s.toLowerCase()}`}>{s}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -172,7 +217,7 @@ function BmColorPicker({
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search colors..."
             className="h-7 text-xs"
-            data-testid="input-bm-search"
+            data-testid="input-paint-search"
           />
           <div className="flex flex-wrap gap-1">
             {families.map((f) => (
@@ -180,7 +225,7 @@ function BmColorPicker({
                 key={f}
                 onClick={() => setFamily(family === f ? null : f)}
                 className={`text-[10px] px-1.5 py-0.5 rounded-md border transition-colors ${family === f ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover-elevate"}`}
-                data-testid={`bm-family-${f.toLowerCase()}`}
+                data-testid={`paint-family-${f.toLowerCase()}`}
               >
                 {f}
               </button>
@@ -202,7 +247,7 @@ function BmColorPicker({
                         className="w-full aspect-square rounded-sm border border-border/40 hover-elevate"
                         style={{ backgroundColor: pc.hex }}
                         onClick={() => { onSelect(pc, { room: room.trim() || undefined, sheen: sheen || undefined }); setOpen(false); }}
-                        data-testid={`bm-color-${pc.id}`}
+                        data-testid={`paint-color-${pc.id}`}
                       />
                     </TooltipTrigger>
                     <TooltipContent side="top" className="text-xs">
@@ -4905,9 +4950,10 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                       data-testid={`input-surface-hex-${el.id}`}
                     />
                   </div>
-                  <BmColorPicker
+                  <PaintColorPicker
                     initialRoom={c.room}
                     initialSheen={c.sheen}
+                    initialBrand={c.brand}
                     onSelect={(pc, extras) => handleUpdateContent(el.id, {
                       ...c,
                       color: pc.hex,
@@ -6080,14 +6126,14 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
       tint: "bg-[#f7f1e7]/70",
       accent: "text-[#2f4a3a]",
       items: [
-        { type: "text-note", icon: StickyNote, label: "Sticky note", hint: "Sticky thought with title", key: "N" },
-        { type: "text-clean", icon: FileText, label: "Plain text", hint: "No card, no border", key: "T" },
+        // Condensed: "Plain text" and "Callout" were folded into Note; keyboard shortcut
+        // T still maps to text-clean for power users via the global key bindings.
+        { type: "text-note", icon: StickyNote, label: "Note", hint: "Sticky note for any text", key: "N" },
         { type: "text-heading", icon: Type, label: "Heading", hint: "Section heading band" },
-        { type: "text-callout", icon: Sparkles, label: "Callout", hint: "Highlight with arrow" },
       ],
     },
     {
-      label: "Shape",
+      label: "Layout",
       tint: "bg-[#f1ece1]/70",
       accent: "text-[#2f4a3a]",
       items: [
