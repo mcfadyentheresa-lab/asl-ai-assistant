@@ -28,26 +28,22 @@ export function registerObjectStorageRoutes(app: Express): void {
    * to be able to curl it from anywhere when uploads are dead.
    */
   app.get("/api/uploads/diagnostic", async (_req, res) => {
+    // Reports presence (booleans) of every R2 env var plus echoes the bucket
+    // names so we can spot typos. Also keeps the legacy GCS keys visible — if
+    // the migration is incomplete on a deploy we'll see at a glance which
+    // backend it thinks it should be using.
     const env = {
-      GCS_PROJECT_ID: !!process.env.GCS_PROJECT_ID,
-      GCS_CREDENTIALS_JSON: !!process.env.GCS_CREDENTIALS_JSON,
-      GCS_KEY_FILE: !!process.env.GCS_KEY_FILE,
-      GOOGLE_APPLICATION_CREDENTIALS: !!process.env.GOOGLE_APPLICATION_CREDENTIALS,
-      PRIVATE_OBJECT_DIR: !!process.env.PRIVATE_OBJECT_DIR,
-      PUBLIC_OBJECT_SEARCH_PATHS: !!process.env.PUBLIC_OBJECT_SEARCH_PATHS,
-      credentials_json_valid: false as boolean,
-      credentials_project_id: "" as string,
-      private_object_dir_value: process.env.PRIVATE_OBJECT_DIR || "",
+      // R2 (current)
+      R2_ACCOUNT_ID: !!process.env.R2_ACCOUNT_ID,
+      R2_ACCESS_KEY_ID: !!process.env.R2_ACCESS_KEY_ID,
+      R2_SECRET_ACCESS_KEY: !!process.env.R2_SECRET_ACCESS_KEY,
+      R2_PRIVATE_BUCKET: process.env.R2_PRIVATE_BUCKET || "",
+      R2_PUBLIC_BUCKET: process.env.R2_PUBLIC_BUCKET || "",
+      R2_PUBLIC_URL: process.env.R2_PUBLIC_URL || "",
+      // Legacy (GCS) — still readable as a fallback
+      PRIVATE_OBJECT_DIR: process.env.PRIVATE_OBJECT_DIR || "",
+      PUBLIC_OBJECT_SEARCH_PATHS: process.env.PUBLIC_OBJECT_SEARCH_PATHS || "",
     };
-    if (process.env.GCS_CREDENTIALS_JSON) {
-      try {
-        const parsed = JSON.parse(process.env.GCS_CREDENTIALS_JSON);
-        env.credentials_json_valid = true;
-        env.credentials_project_id = String(parsed.project_id || "");
-      } catch {
-        env.credentials_json_valid = false;
-      }
-    }
     let sign: { ok: boolean; detail?: string; kind?: "config" | "auth" | "runtime" } = { ok: false };
     try {
       await objectStorageService.getObjectEntityUploadURL();
@@ -55,9 +51,9 @@ export function registerObjectStorageRoutes(app: Express): void {
     } catch (error: any) {
       const msg = String(error?.message || error || "unknown error");
       let kind: "config" | "auth" | "runtime" = "runtime";
-      if (/PRIVATE_OBJECT_DIR|GCS_CREDENTIALS_JSON|GCS_PROJECT_ID|PUBLIC_OBJECT_SEARCH_PATHS/.test(msg)) {
+      if (/R2_|PRIVATE_OBJECT_DIR|PUBLIC_OBJECT_SEARCH_PATHS/.test(msg)) {
         kind = "config";
-      } else if (/credential|permission|forbidden|403|401|invalid_grant|invalid_jwt/i.test(msg)) {
+      } else if (/credential|permission|forbidden|403|401|invalid_grant|invalid_jwt|signature|access ?denied/i.test(msg)) {
         kind = "auth";
       }
       sign = { ok: false, detail: msg, kind };
@@ -198,9 +194,9 @@ export function registerObjectStorageRoutes(app: Express): void {
       const msg = String(error?.message || error || "unknown error");
       console.error("[uploads/request-url] failed:", msg, error?.stack || "");
       let kind: "config" | "auth" | "runtime" = "runtime";
-      if (/PRIVATE_OBJECT_DIR|GCS_CREDENTIALS_JSON|GCS_PROJECT_ID|PUBLIC_OBJECT_SEARCH_PATHS/.test(msg)) {
+      if (/R2_|PRIVATE_OBJECT_DIR|PUBLIC_OBJECT_SEARCH_PATHS/.test(msg)) {
         kind = "config";
-      } else if (/credential|permission|forbidden|403|401|invalid_grant|invalid_jwt/i.test(msg)) {
+      } else if (/credential|permission|forbidden|403|401|invalid_grant|invalid_jwt|signature|access ?denied/i.test(msg)) {
         kind = "auth";
       }
       res.status(500).json({ error: "Failed to generate upload URL", detail: msg, kind });
@@ -229,9 +225,9 @@ export function registerObjectStorageRoutes(app: Express): void {
       const msg = String(error?.message || error || "unknown error");
       console.error("[objects/get] failed:", msg, error?.stack || "");
       let kind: "config" | "auth" | "runtime" = "runtime";
-      if (/PRIVATE_OBJECT_DIR|GCS_CREDENTIALS_JSON|GCS_PROJECT_ID|PUBLIC_OBJECT_SEARCH_PATHS/.test(msg)) {
+      if (/R2_|PRIVATE_OBJECT_DIR|PUBLIC_OBJECT_SEARCH_PATHS/.test(msg)) {
         kind = "config";
-      } else if (/credential|permission|forbidden|403|401|invalid_grant|invalid_jwt/i.test(msg)) {
+      } else if (/credential|permission|forbidden|403|401|invalid_grant|invalid_jwt|signature|access ?denied/i.test(msg)) {
         kind = "auth";
       }
       return res.status(500).json({ error: "Failed to serve object", detail: msg, kind });

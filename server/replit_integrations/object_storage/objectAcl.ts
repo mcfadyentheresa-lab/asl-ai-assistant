@@ -1,4 +1,7 @@
-import { File } from "@google-cloud/storage";
+// File is the small façade exported from ./objectStorage; it implements the
+// methods (.exists, .getMetadata, .setMetadata, .name) that this ACL helper
+// uses, regardless of whether the backing store is GCS or R2.
+import type { File } from "./objectStorage";
 
 const ACL_POLICY_METADATA_KEY = "custom:aclPolicy";
 
