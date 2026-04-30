@@ -70,7 +70,7 @@ import AIPartnerPanel from "@/components/board/AIPartnerPanel";
 import RoomTabStrip, { type BoardMode } from "@/components/board/RoomTabStrip";
 import SecondaryAxisChips from "@/components/board/SecondaryAxisChips";
 import VersionsPopover from "@/components/board/VersionsPopover";
-import { PinterestImportPopover } from "@/components/board/PinterestImportPopover";
+import { InspirationLinks } from "@/components/board/InspirationLinks";
 import VersionsCompareDialog from "@/components/board/VersionsCompareDialog";
 import CompareDrawer, { isComparable as isCompareEligible } from "@/components/board/CompareDrawer";
 import {
@@ -6090,10 +6090,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
               {lockLayout ? "Layout locked — tap to unlock" : "Lock layout"}
             </TooltipContent>
           </Tooltip>
-          <PinterestImportPopover
-            disabled={!selectedBoardId}
-            onImport={(imageUrl, title) => createImageFromUrl(imageUrl, title)}
-          />
+          <InspirationLinks />
           <div className="hidden md:flex items-center gap-0.5">
           <Separator orientation="vertical" className="h-4 mx-1" />
           <Tooltip>
@@ -7110,11 +7107,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                 >
                   <Hand className="h-[18px] w-[18px]" strokeWidth={1.5} />
                 </button>
-                <PinterestImportPopover
-                  variant="mobile"
-                  disabled={!selectedBoardId}
-                  onImport={(imageUrl, title) => createImageFromUrl(imageUrl, title)}
-                />
+                <InspirationLinks variant="mobile" />
                 {editingId && (
                   <>
                     <div className="h-5 w-px bg-border/40 mx-1 shrink-0" />
