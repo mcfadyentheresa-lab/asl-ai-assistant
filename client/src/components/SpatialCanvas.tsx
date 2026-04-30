@@ -1160,6 +1160,89 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
     }
   };
 
+  // Create a link element prefilled with a URL and immediately fetch its
+  // og:image / og:title preview. Used by the paste handler so a pasted URL
+  // becomes a complete card (image + title + domain) without the user having
+  // to type anything. Returns the created element id (or null on failure)
+  // so the caller can wire up a follow-up unfurl.
+  const createLinkFromUrl = async (
+    url: string,
+    pos?: { x: number; y: number },
+  ): Promise<number | null> => {
+    if (!selectedBoardId || !url.trim()) return null;
+    const def = ELEMENT_DEFAULTS["link"];
+    const desiredX = pos?.x ?? Math.round((-pan.x + (containerRef.current?.clientWidth || 800) / 2) / zoom - def.width / 2);
+    const desiredY = pos?.y ?? Math.round((-pan.y + (containerRef.current?.clientHeight || 600) / 2) / zoom - def.height / 2);
+    const { x: placedX, y: placedY } = (pos ? { x: desiredX, y: desiredY } : findFreeSlot(desiredX, desiredY, def.width, def.height));
+    const newZ = maxZ;
+    setMaxZ((z) => z + 1);
+    const baseContent: any = { ...def.content, url: url.trim() };
+    if (activeRoom) {
+      const targetField = (selectedBoard as any)?.mode === "library" ? "category" : "room";
+      if (targetField === "room") baseContent.room = activeRoom;
+      else baseContent.category = activeRoom;
+    }
+    try {
+      const apiUrl = buildUrl(api.canvasElements.create.path, { boardId: selectedBoardId });
+      const res = await fetch(apiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ type: "link", x: placedX, y: placedY, width: def.width, height: def.height, zIndex: newZ, content: baseContent }),
+      });
+      const el = await res.json();
+      addElement(el);
+      sendElementAdd(el);
+      pushUndo({ type: "create", elementId: el.id });
+      // Kick off the og preview fetch — the existing lazy-backfill effect will
+      // also catch this, but firing immediately keeps the UX snappy.
+      setTimeout(() => unfurlLink(el.id, url.trim()), 0);
+      return el.id as number;
+    } catch {
+      toast({ title: "Error", description: "Failed to add link", variant: "destructive" });
+      return null;
+    }
+  };
+
+  // Create a sticky-note element prefilled with pasted text. Mirrors
+  // createElement('text-note') but seeds the content's `text` field instead
+  // of leaving the placeholder. Auto-sizes height for long pastes so the
+  // first paste isn't clipped.
+  const createNoteFromText = async (
+    text: string,
+    pos?: { x: number; y: number },
+  ): Promise<number | null> => {
+    if (!selectedBoardId || !text.trim()) return null;
+    const def = ELEMENT_DEFAULTS["text-note"];
+    // Rough auto-height: ~16px per line, ~32 chars per line at 240px wide.
+    const trimmed = text.trim();
+    const lineCount = trimmed.split(/\n/).reduce((acc, line) => acc + Math.max(1, Math.ceil(line.length / 32)), 0);
+    const autoHeight = Math.min(420, Math.max(def.height, 60 + lineCount * 18));
+    const desiredX = pos?.x ?? Math.round((-pan.x + (containerRef.current?.clientWidth || 800) / 2) / zoom - def.width / 2);
+    const desiredY = pos?.y ?? Math.round((-pan.y + (containerRef.current?.clientHeight || 600) / 2) / zoom - autoHeight / 2);
+    const { x: placedX, y: placedY } = (pos ? { x: desiredX, y: desiredY } : findFreeSlot(desiredX, desiredY, def.width, autoHeight));
+    const newZ = maxZ;
+    setMaxZ((z) => z + 1);
+    const baseContent: any = { ...def.content, text: trimmed };
+    try {
+      const apiUrl = buildUrl(api.canvasElements.create.path, { boardId: selectedBoardId });
+      const res = await fetch(apiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ type: "text", x: placedX, y: placedY, width: def.width, height: autoHeight, zIndex: newZ, content: baseContent }),
+      });
+      const el = await res.json();
+      addElement(el);
+      sendElementAdd(el);
+      pushUndo({ type: "create", elementId: el.id });
+      return el.id as number;
+    } catch {
+      toast({ title: "Error", description: "Failed to add note", variant: "destructive" });
+      return null;
+    }
+  };
+
   // Create an image element prefilled with a remote URL (e.g. a Pinterest pin
   // thumbnail). Mirrors createElement('image') but injects the URL into
   // content so the user doesn't have to upload separately.
@@ -1647,6 +1730,94 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
       setTimeout(() => unfurlLink(el.id, c.url), 0);
     }
   }, [elements, linkUnfurlState, unfurlLink]);
+
+  // Paste-to-create. A single document-level paste listener turns clipboard
+  // contents into board elements:
+  //   • image bytes  → photo tile (uploads through R2, same as drag-drop)
+  //   • a URL       → link tile with auto-fetched og preview (image extension
+  //                    URLs are routed to the image-from-URL pipeline so a
+  //                    pasted Pinterest/Houzz photo URL becomes a real image)
+  //   • plain text  → sticky-note tile, auto-sized to fit the paste
+  //
+  // We deliberately do nothing when the user is editing inside a tile (input,
+  // textarea, contenteditable, or any board-tile element with [data-editing]).
+  // Pasting into a note should populate the note, not create a new card.
+  useEffect(() => {
+    if (!selectedBoardId) return;
+
+    const URL_RX = /^https?:\/\/[^\s]+$/i;
+    const IMG_EXT_RX = /\.(png|jpe?g|gif|webp|avif|bmp|svg)(\?|$)/i;
+
+    const isEditingContext = (target: EventTarget | null): boolean => {
+      if (!(target instanceof HTMLElement)) return false;
+      const tag = target.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return true;
+      if (target.isContentEditable) return true;
+      // A few of our inline editors live inside elements with role="textbox"
+      // or contenteditable on a parent — walk up to be safe.
+      if (target.closest('[contenteditable="true"], input, textarea, [role="textbox"]')) return true;
+      return false;
+    };
+
+    const onPaste = (e: ClipboardEvent) => {
+      // Skip when typing into a field. The browser's default paste handles it.
+      if (isEditingContext(e.target)) return;
+      const cd = e.clipboardData;
+      if (!cd) return;
+
+      // 1) Image bytes — take precedence over text. Some clipboards include
+      //    both an image and a text/html fallback (e.g. screenshot tools);
+      //    we want the image when it's there.
+      const imageItem = Array.from(cd.items).find((it) => it.kind === "file" && it.type.startsWith("image/"));
+      if (imageItem) {
+        const file = imageItem.getAsFile();
+        if (file) {
+          e.preventDefault();
+          handleFileUpload(file);
+          return;
+        }
+      }
+
+      // 2) URL or plain text. We trust the text payload only when there's no
+      //    file in the clipboard. Try text/uri-list first (drag-out URLs) then
+      //    text/plain (most paste sources).
+      const uriList = cd.getData("text/uri-list").trim();
+      const plain = cd.getData("text/plain").trim();
+      const candidate = uriList || plain;
+      if (!candidate) return;
+
+      // Single URL on its own → link or image-by-URL.
+      if (URL_RX.test(candidate)) {
+        e.preventDefault();
+        if (IMG_EXT_RX.test(candidate)) {
+          // Looks like a direct image URL — reuse the existing rehosting
+          // pipeline (proxies through our server to dodge hotlink protection).
+          handleAddImageByUrl(candidate);
+          toast({ title: "Pasted image" });
+        } else {
+          createLinkFromUrl(candidate).then((id) => {
+            if (id) toast({ title: "Pasted link", description: "Fetching preview…" });
+          });
+        }
+        return;
+      }
+
+      // 3) Plain text → sticky note. Cap at 5000 chars so an accidental paste
+      //    of a giant blob doesn't create a wall on the canvas.
+      e.preventDefault();
+      const capped = candidate.length > 5000 ? candidate.slice(0, 5000) + "…" : candidate;
+      createNoteFromText(capped).then((id) => {
+        if (id) toast({ title: "Pasted note" });
+      });
+    };
+
+    document.addEventListener("paste", onPaste);
+    return () => document.removeEventListener("paste", onPaste);
+    // handleFileUpload, handleAddImageByUrl, createLinkFromUrl, createNoteFromText
+    // close over selectedBoardId and viewport state but are stable enough across
+    // renders — we re-bind only when the board changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedBoardId]);
 
   const handleUndo = useCallback(async () => {
     if (!selectedBoardId) return;
