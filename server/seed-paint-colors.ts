@@ -396,18 +396,3 @@ export async function seedBenjaminMooreColors(): Promise<number> {
   }
   return count;
 }
-
-// Run as standalone script: `tsx server/seed-paint-colors.ts`
-const isMainModule = import.meta.url === `file://${process.argv[1]}`;
-if (isMainModule) {
-  console.log("Seeding Benjamin Moore paint colors...");
-  seedBenjaminMooreColors()
-    .then((count) => {
-      console.log(count > 0 ? `Done! Seeded ${count} Benjamin Moore colors.` : "Already seeded. Skipping.");
-      process.exit(0);
-    })
-    .catch((err) => {
-      console.error("Seed error:", err);
-      process.exit(1);
-    });
-}
