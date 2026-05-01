@@ -844,7 +844,7 @@ export function MaterialsDrawer({ projectId, onAddImageUrl, activeRoom, activeRo
 
               if (!groupBy) {
                 return (
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     {visible.map(renderTile)}
                   </div>
                 );
@@ -880,7 +880,7 @@ export function MaterialsDrawer({ projectId, onAddImageUrl, activeRoom, activeRo
                             <span className="text-[10px] font-mono text-muted-foreground">({tiles.length})</span>
                           </div>
                         </div>
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                           {tiles.map(renderTile)}
                         </div>
                       </div>
