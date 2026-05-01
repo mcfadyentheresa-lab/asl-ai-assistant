@@ -53,7 +53,7 @@ import {
 } from "lucide-react";
 import { DESIGNER_SUPPLIER_GROUPS } from "@/lib/designer-suppliers";
 import LibraryCollectionsView from "@/components/board/LibraryCollectionsView";
-import { FurnitureDrawer } from "@/components/board/FurnitureDrawer";
+import { FurnitureSidePanel } from "@/components/board/FurnitureSidePanel";
 import { MaterialsDrawer } from "@/components/board/MaterialsDrawer";
 import HardwarePickerDialog, { type HardwareDraft } from "@/components/board/HardwarePickerDialog";
 import { ImageCropDialog } from "@/components/ImageCropDialog";
@@ -8797,23 +8797,13 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
           remains interactive on the left half of the screen. modal=false keeps the
           backdrop off the canvas — pointer events on the canvas continue to work
           while a drawer is open. */}
-      <Sheet open={openDrawer === "furniture"} modal={false} onOpenChange={(open) => { if (!open) setOpenDrawer(null); }}>
-        <SheetContent
-          side="right"
-          className="w-[420px] sm:max-w-[420px] p-0 flex flex-col"
-          onInteractOutside={(e) => e.preventDefault()}
-          data-testid="sheet-drawer-furniture"
-        >
-          <SheetHeader className="px-4 py-3 border-b border-border/60">
-            <SheetTitle className="font-sans text-base font-semibold flex items-center gap-2">
-              <Armchair className="h-4 w-4 text-muted-foreground" />
-              Furniture
-            </SheetTitle>
-            <SheetDescription className="sr-only">Furniture inventory for this project.</SheetDescription>
-          </SheetHeader>
-          <FurnitureDrawer projectId={projectId} />
-        </SheetContent>
-      </Sheet>
+      <FurnitureSidePanel
+        boardId={selectedBoardId}
+        projectId={projectId}
+        projectName={_projectName}
+        open={openDrawer === "furniture"}
+        onClose={() => setOpenDrawer(null)}
+      />
 
       <Sheet open={openDrawer === "materials"} modal={false} onOpenChange={(open) => { if (!open) setOpenDrawer(null); }}>
         <SheetContent
