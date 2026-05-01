@@ -87,12 +87,13 @@ export function FurnitureSidePanel({
     try { localStorage.setItem(collapsedKey, collapsed ? "1" : "0"); } catch {}
   }, [collapsed, collapsedKey]);
 
-  // Drag-to-resize from the left edge handle.
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+  // Drag-to-resize from the left edge handle. Pointer events cover mouse,
+  // touch, and pencil — finger drag worked unreliably with mouse-only events.
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
     if (collapsed) return;
     e.preventDefault();
     dragRef.current = { startX: e.clientX, startW: width };
-    const onMove = (ev: MouseEvent) => {
+    const onMove = (ev: PointerEvent) => {
       if (!dragRef.current) return;
       const dx = dragRef.current.startX - ev.clientX; // dragging left = wider
       const next = Math.max(MIN_W, Math.min(MAX_W, dragRef.current.startW + dx));
@@ -100,16 +101,23 @@ export function FurnitureSidePanel({
     };
     const onUp = () => {
       dragRef.current = null;
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
     };
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
   }, [collapsed, width]);
 
   if (!open) return null;
 
-  const renderedWidth = collapsed ? COLLAPSED_W : width;
+  // On phones the saved/default width (420px) is wider than the screen.
+  // Cap to viewport - 40px so the board stays usable behind the panel.
+  const isNarrow = typeof window !== "undefined" && window.innerWidth <= 640;
+  const viewportCap = typeof window !== "undefined" ? Math.max(280, window.innerWidth - 40) : MAX_W;
+  const expandedWidth = isNarrow ? Math.min(width, viewportCap) : width;
+  const renderedWidth = collapsed ? COLLAPSED_W : expandedWidth;
 
   return (
     <aside
@@ -122,7 +130,8 @@ export function FurnitureSidePanel({
       {/* Drag-resize handle — only visible when expanded */}
       {!collapsed && (
         <div
-          onMouseDown={handleMouseDown}
+          onPointerDown={handlePointerDown}
+          style={{ touchAction: "none" }}
           className="w-1.5 h-full cursor-col-resize hover:bg-foreground/10 transition-colors flex-shrink-0 group"
           data-testid="furniture-panel-resize"
           role="separator"
