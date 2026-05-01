@@ -5,7 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/use-auth";
 import { usePresenceHeartbeat } from "@/hooks/use-presence";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, lazy, Suspense } from "react";
 import { Loader2 } from "lucide-react";
 import { ThemeProvider } from "next-themes";
 import { AppShell } from "@/components/layout/AppShell";
@@ -33,28 +33,38 @@ function BoardDrawerRedirect({ drawer, params }: { drawer: "photos" | "furniture
   return null;
 }
 
-import Dashboard from "@/pages/Dashboard";
-import ProjectDetails from "@/pages/ProjectDetails";
-import Profile from "@/pages/Profile";
-import ColorPortfolio from "@/pages/ColorPortfolio";
-import Timesheets from "@/pages/Timesheets";
-import Payroll from "@/pages/Payroll";
-import CrewAndTrade from "@/pages/CrewAndTrade";
-import SupplierPrices from "@/pages/SupplierPrices";
-import MasterCalendar from "@/pages/MasterCalendar";
-import SocialMediaGenerator from "@/pages/SocialMediaGenerator";
-import TableRedesignPlanner from "@/pages/TableRedesignPlanner";
-import CostEstimator from "@/pages/CostEstimator";
-import ProjectSettings from "@/pages/ProjectSettings";
-import InviteAccept from "@/pages/InviteAccept";
-import Login from "@/pages/Login";
-import ForgotPassword from "@/pages/ForgotPassword";
-import ResetPassword from "@/pages/ResetPassword";
-import AcceptInvite from "@/pages/AcceptInvite";
-import Welcome from "@/pages/Welcome";
-import LandingPage from "@/pages/LandingPage";
-import PublicPresentation from "@/pages/PublicPresentation";
-import NotFound from "@/pages/not-found";
+// Lazy-loaded pages — keeps initial JS bundle small for fast phone/cold loads.
+// Each page becomes its own chunk fetched on first navigation.
+const Dashboard = lazy(() => import("@/pages/Dashboard"));
+const ProjectDetails = lazy(() => import("@/pages/ProjectDetails"));
+const Profile = lazy(() => import("@/pages/Profile"));
+const ColorPortfolio = lazy(() => import("@/pages/ColorPortfolio"));
+const Timesheets = lazy(() => import("@/pages/Timesheets"));
+const Payroll = lazy(() => import("@/pages/Payroll"));
+const CrewAndTrade = lazy(() => import("@/pages/CrewAndTrade"));
+const SupplierPrices = lazy(() => import("@/pages/SupplierPrices"));
+const MasterCalendar = lazy(() => import("@/pages/MasterCalendar"));
+const SocialMediaGenerator = lazy(() => import("@/pages/SocialMediaGenerator"));
+const TableRedesignPlanner = lazy(() => import("@/pages/TableRedesignPlanner"));
+const CostEstimator = lazy(() => import("@/pages/CostEstimator"));
+const ProjectSettings = lazy(() => import("@/pages/ProjectSettings"));
+const InviteAccept = lazy(() => import("@/pages/InviteAccept"));
+const Login = lazy(() => import("@/pages/Login"));
+const ForgotPassword = lazy(() => import("@/pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
+const AcceptInvite = lazy(() => import("@/pages/AcceptInvite"));
+const Welcome = lazy(() => import("@/pages/Welcome"));
+const LandingPage = lazy(() => import("@/pages/LandingPage"));
+const PublicPresentation = lazy(() => import("@/pages/PublicPresentation"));
+const NotFound = lazy(() => import("@/pages/not-found"));
+
+function RouteFallback() {
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-background">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    </div>
+  );
+}
 
 function PresenceTracker() {
   usePresenceHeartbeat();
@@ -103,20 +113,22 @@ function Router() {
 
   if (!user) {
     return (
-      <Switch>
-        <Route path="/login" component={Login} />
-        <Route path="/forgot-password" component={ForgotPassword} />
-        <Route path="/reset-password/:token" component={ResetPassword} />
-        <Route path="/accept-invite/:token" component={AcceptInvite} />
-        <Route path="/invite/:token" component={InviteAccept} />
-        <Route path="/p/:token" component={PublicPresentation} />
-        <Route component={LandingPage} />
-      </Switch>
+      <Suspense fallback={<RouteFallback />}>
+        <Switch>
+          <Route path="/login" component={Login} />
+          <Route path="/forgot-password" component={ForgotPassword} />
+          <Route path="/reset-password/:token" component={ResetPassword} />
+          <Route path="/accept-invite/:token" component={AcceptInvite} />
+          <Route path="/invite/:token" component={InviteAccept} />
+          <Route path="/p/:token" component={PublicPresentation} />
+          <Route component={LandingPage} />
+        </Switch>
+      </Suspense>
     );
   }
 
   return (
-    <>
+    <Suspense fallback={<RouteFallback />}>
       <OnboardingGuard />
       <Switch>
         <Route path="/welcome" component={Welcome} />
@@ -181,7 +193,7 @@ function Router() {
           )}
         </Route>
       </Switch>
-    </>
+    </Suspense>
   );
 }
 
