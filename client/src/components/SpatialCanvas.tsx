@@ -1215,6 +1215,40 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
   // scanning left-to-right then top-to-bottom from the desired anchor. Falls
   // back to the desired position if nothing free is found within the search
   // window (so we never block element creation).
+  // Shape-aware sizing for new notes. Looks at the closest existing element
+  // to the desired drop point and picks a portrait / landscape / square shape
+  // that fits the open space, so a note dropped beside a card grows tall and
+  // narrow, dropped above/below grows short and wide, and dropped in open
+  // space falls back to a square. Width/height are in board coords.
+  const chooseNoteShape = (desiredX: number, desiredY: number): { width: number; height: number } => {
+    const PORTRAIT = { width: 220, height: 360 };
+    const LANDSCAPE = { width: 420, height: 180 };
+    const SQUARE = { width: 280, height: 240 };
+    const candidates = Object.values(elements).filter((el) =>
+      el.type !== "connector" && el.type !== "draw" && el.type !== "room_zone"
+    );
+    if (candidates.length === 0) return SQUARE;
+    // Find the nearest neighbor (by edge-to-point distance) within ~600px.
+    let best: { dx: number; dy: number; dist: number } | null = null;
+    for (const el of candidates) {
+      const ew = el.width || 200;
+      const eh = el.height || 60;
+      const cx = el.x + ew / 2;
+      const cy = el.y + eh / 2;
+      const dx = desiredX - cx;
+      const dy = desiredY - cy;
+      const dist = Math.hypot(dx, dy);
+      if (!best || dist < best.dist) best = { dx, dy, dist };
+    }
+    if (!best || best.dist > 600) return SQUARE;
+    // If horizontally offset more than vertically, the note sits beside the
+    // neighbor → portrait. Otherwise it sits above/below → landscape.
+    const ratio = Math.abs(best.dx) / Math.max(1, Math.abs(best.dy));
+    if (ratio > 1.4) return PORTRAIT;
+    if (ratio < 0.7) return LANDSCAPE;
+    return SQUARE;
+  };
+
   const findFreeSlot = (desiredX: number, desiredY: number, w: number, h: number): { x: number; y: number } => {
     const GUTTER = 24;
     const colStride = Math.max(GRID_SIZE, Math.ceil((w + GUTTER) / GRID_SIZE) * GRID_SIZE);
@@ -1247,14 +1281,23 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
     if (!selectedBoardId) return;
     const def = ELEMENT_DEFAULTS[type] || ELEMENT_DEFAULTS["text-note"];
     const persistedType = TOKEN_TO_TYPE[type] || type;
-    const desiredX = x ?? Math.round((-pan.x + (containerRef.current?.clientWidth || 800) / 2) / zoom - def.width / 2);
-    const desiredY = y ?? Math.round((-pan.y + (containerRef.current?.clientHeight || 600) / 2) / zoom - def.height / 2);
+    // Notes pick their shape from nearby elements so they fill open space.
+    const sized = type === "text-note"
+      ? (() => {
+          const dx0 = x ?? Math.round((-pan.x + (containerRef.current?.clientWidth || 800) / 2) / zoom - def.width / 2);
+          const dy0 = y ?? Math.round((-pan.y + (containerRef.current?.clientHeight || 600) / 2) / zoom - def.height / 2);
+          const s = chooseNoteShape(dx0 + def.width / 2, dy0 + def.height / 2);
+          return { width: s.width, height: s.height };
+        })()
+      : { width: def.width, height: def.height };
+    const desiredX = x ?? Math.round((-pan.x + (containerRef.current?.clientWidth || 800) / 2) / zoom - sized.width / 2);
+    const desiredY = y ?? Math.round((-pan.y + (containerRef.current?.clientHeight || 600) / 2) / zoom - sized.height / 2);
     // Auto-grid snap for newly added elements (no explicit drop coords). Finds a
     // column-aligned empty slot near the requested position so new cards don't
     // pile on top of existing ones. Existing positions are preserved — only
     // brand-new additions auto-place. Long-press drag still allows free move.
     const { x: placedX, y: placedY } = (x === undefined && y === undefined)
-      ? findFreeSlot(desiredX, desiredY, def.width, def.height)
+      ? findFreeSlot(desiredX, desiredY, sized.width, sized.height)
       : { x: desiredX, y: desiredY };
     const centerX = placedX;
     const centerY = placedY;
@@ -1281,7 +1324,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ type: persistedType, x: centerX, y: centerY, width: def.width, height: def.height, zIndex: newZ, content: baseContent }),
+        body: JSON.stringify({ type: persistedType, x: centerX, y: centerY, width: sized.width, height: sized.height, zIndex: newZ, content: baseContent }),
       });
       const el = await res.json();
       addElement(el);
@@ -1846,6 +1889,30 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
       setLinkUnfurlState((s) => ({ ...s, [id]: "error" }));
     }
   }, [patchElementContentSilently]);
+
+  // Upload a local file from the device and return the URL.
+  // Used by furniture cards (image upload) and notes (image attach).
+  const uploadImageFile = useCallback(async (file: File): Promise<string | null> => {
+    if (!file) return null;
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ title: "File too large", description: "Max 10MB.", variant: "destructive" });
+      return null;
+    }
+    try {
+      const fd = new FormData();
+      fd.append("image", file);
+      const res = await fetch("/api/upload", { method: "POST", credentials: "include", body: fd });
+      const data = await res.json();
+      if (!res.ok) {
+        toast({ title: "Upload failed", description: data?.message || "Try again.", variant: "destructive" });
+        return null;
+      }
+      return typeof data?.url === "string" ? data.url : null;
+    } catch (err) {
+      toast({ title: "Upload failed", description: "Network error.", variant: "destructive" });
+      return null;
+    }
+  }, [toast]);
 
   // Re-host an external image URL through our /api/uploads/from-url proxy so
   // it's served from our own bucket. Bypasses Referer-based hotlink protection
@@ -2414,9 +2481,14 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
     cancelLongPress();
   };
 
-  // Touch-based canvas handlers for drag, pan & pinch-to-zoom on mobile
+  // Touch-based canvas handlers for drag, pan & pinch-to-zoom on mobile.
+  // Finger always pans/moves — only the pencil draws (the pointer-event
+  // pipeline below handles pen ink). The legacy `touchDrawing` toggle still
+  // lets users opt in to finger-draw if they want, gated inside the pointer
+  // pipeline. We deliberately do NOT bail when drawingMode is on, so a pencil
+  // stroke does not lock out finger panning.
   const handleCanvasTouchStart = (e: React.TouchEvent) => {
-    if (drawingMode) return;
+    if (drawingMode && touchDrawing) return; // user explicitly asked finger-draw
     // Tapping the canvas background deselects and re-locks any element
     setEditingId(null);
     setMobileUnlockedId(null);
@@ -2441,7 +2513,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
   };
 
   const handleCanvasTouchMove = (e: React.TouchEvent) => {
-    if (drawingMode) return;
+    if (drawingMode && touchDrawing) return;
     // Pinch-to-zoom with two touches
     if (e.touches.length === 2 && pinchStartRef.current) {
       e.preventDefault();
@@ -4797,11 +4869,16 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                   data-testid={`input-text-${variant}-title-${el.id}`}
                 />
                 <textarea
-                  ref={(ref) => { noteTextareaRefs.current[`${el.id}-note`] = ref; }}
-                  className="w-full bg-transparent border-none text-sm resize-none outline-none min-h-[60px] placeholder:text-muted-foreground/50"
+                  ref={(ref) => {
+                    noteTextareaRefs.current[`${el.id}-note`] = ref;
+                    if (ref) autoGrowTextarea(ref);
+                  }}
+                  className="w-full bg-transparent border-none text-sm resize-none outline-none min-h-[60px] placeholder:text-muted-foreground/50 overflow-hidden"
                   key={`txt-text-${c.text}`}
                   defaultValue={c.text}
                   placeholder="Type your note..."
+                  rows={1}
+                  onInput={(e) => autoGrowTextarea(e.currentTarget)}
                   onBlur={(e) => handleUpdateContent(el.id, { ...c, text: e.target.value })}
                   data-testid={`input-text-${variant}-text-${el.id}`}
                 />
@@ -5560,20 +5637,33 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
           data-testid={`element-product-${el.id}`}
         >
           {renderStatusEdge(el)}
-          {/* Image-first product: 160h photo area on top, always rendered. Empty state gets warm-paper + glyph. */}
-          <div className="h-[160px] bg-muted overflow-hidden relative pointer-events-none select-none">
+          {/* Image-first product: 160h photo area on top. Tapping the image
+              when a vendor URL exists opens the source page in a new tab.
+              When the card is selected, an upload button appears so you can
+              swap the photo from your device. */}
+          <div className="h-[160px] bg-muted overflow-hidden relative select-none group">
             {c.imageUrl ? (
               <img
                 src={c.imageUrl}
                 alt={c.name || "Product"}
-                className="w-full h-full object-cover"
+                className={`w-full h-full object-cover ${c.url ? "cursor-pointer" : ""}`}
                 style={{ filter: "saturate(0.92) contrast(0.97)" }}
                 draggable={false}
                 onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                onMouseDown={(e) => {
+                  // Don't initiate a card drag from the image tap.
+                  if (c.url) e.stopPropagation();
+                }}
+                onClick={(e) => {
+                  if (!c.url) return;
+                  e.stopPropagation();
+                  try { window.open(c.url, "_blank", "noopener,noreferrer"); } catch {}
+                }}
+                data-testid={`product-image-${el.id}`}
               />
             ) : (
               <div
-                className="w-full h-full flex flex-col items-center justify-center gap-1"
+                className="w-full h-full flex flex-col items-center justify-center gap-1 pointer-events-none"
                 style={{ background: "linear-gradient(135deg, #f4ede0 0%, #ede4d3 100%)" }}
               >
                 <Armchair className="h-7 w-7 text-foreground/30" strokeWidth={1.5} />
@@ -5583,6 +5673,40 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                 >
                   Product photo
                 </span>
+              </div>
+            )}
+            {/* Upload overlay — shown on selection or on hover when no image. */}
+            {(isSelected || !c.imageUrl) && (
+              <label
+                className="absolute bottom-1.5 right-1.5 flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium uppercase tracking-wider bg-background/85 backdrop-blur-sm border border-border/60 hover:bg-background cursor-pointer transition-colors shadow-sm"
+                onMouseDown={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
+                style={{ fontFamily: "var(--font-mono)" }}
+                data-testid={`product-upload-${el.id}`}
+              >
+                <Upload className="h-3 w-3" />
+                {c.imageUrl ? "Replace" : "Upload"}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const url = await uploadImageFile(file);
+                    if (url) handleUpdateContent(el.id, { ...c, imageUrl: url });
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+            )}
+            {/* Tap-to-source hint when an image+url combo exists. */}
+            {c.imageUrl && c.url && !isSelected && (
+              <div
+                className="absolute top-1.5 right-1.5 flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium uppercase tracking-wider bg-background/80 backdrop-blur-sm text-muted-foreground pointer-events-none"
+                style={{ fontFamily: "var(--font-mono)" }}
+              >
+                <ExternalLink className="h-2.5 w-2.5" /> tap photo
               </div>
             )}
           </div>
