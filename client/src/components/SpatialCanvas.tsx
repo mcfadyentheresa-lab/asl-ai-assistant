@@ -1312,17 +1312,42 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
     if (!selectedBoardId) return;
     const def = ELEMENT_DEFAULTS[type] || ELEMENT_DEFAULTS["text-note"];
     const persistedType = TOKEN_TO_TYPE[type] || type;
-    // Notes pick their shape from nearby elements so they fill open space.
-    const sized = type === "text-note"
-      ? (() => {
-          const dx0 = x ?? Math.round((-pan.x + (containerRef.current?.clientWidth || 800) / 2) / zoom - def.width / 2);
-          const dy0 = y ?? Math.round((-pan.y + (containerRef.current?.clientHeight || 600) / 2) / zoom - def.height / 2);
-          const s = chooseNoteShape(dx0 + def.width / 2, dy0 + def.height / 2);
-          return { width: s.width, height: s.height };
-        })()
-      : { width: def.width, height: def.height };
-    const desiredX = x ?? Math.round((-pan.x + (containerRef.current?.clientWidth || 800) / 2) / zoom - sized.width / 2);
-    const desiredY = y ?? Math.round((-pan.y + (containerRef.current?.clientHeight || 600) / 2) / zoom - sized.height / 2);
+    // Default-place notes against the right edge of the visible viewport in
+    // long (portrait) form when the caller didn't specify a drop point.
+    // Matches the user's mental model of "a note lives on the side of the
+    // board". When a drop point IS given (drag-drop / paste / pencil tap),
+    // we run the full shape detector so the note adopts portrait/landscape
+    // based on edges and neighbors.
+    const noShellCoords = x === undefined && y === undefined;
+    const PORTRAIT_DEFAULT = { width: 240, height: 480 };
+    let sized: { width: number; height: number };
+    let centeredX: number;
+    let centeredY: number;
+    if (type === "text-note") {
+      const vw = containerRef.current?.clientWidth || 800;
+      const vh = containerRef.current?.clientHeight || 600;
+      const viewLeft = (-pan.x) / zoom;
+      const viewTop = (-pan.y) / zoom;
+      if (noShellCoords) {
+        // Long, hugged-right by default.
+        sized = PORTRAIT_DEFAULT;
+        centeredX = Math.round(viewLeft + (vw / zoom) - sized.width - 32);
+        centeredY = Math.round(viewTop + (vh / zoom) * 0.08);
+      } else {
+        const probeX = (x as number) + def.width / 2;
+        const probeY = (y as number) + def.height / 2;
+        const s = chooseNoteShape(probeX, probeY);
+        sized = { width: s.width, height: s.height };
+        centeredX = Math.round((x as number) + def.width / 2 - sized.width / 2);
+        centeredY = Math.round((y as number) + def.height / 2 - sized.height / 2);
+      }
+    } else {
+      sized = { width: def.width, height: def.height };
+      centeredX = x ?? Math.round((-pan.x + (containerRef.current?.clientWidth || 800) / 2) / zoom - sized.width / 2);
+      centeredY = y ?? Math.round((-pan.y + (containerRef.current?.clientHeight || 600) / 2) / zoom - sized.height / 2);
+    }
+    const desiredX = centeredX;
+    const desiredY = centeredY;
     // Auto-grid snap for newly added elements (no explicit drop coords). Finds a
     // column-aligned empty slot near the requested position so new cards don't
     // pile on top of existing ones. Existing positions are preserved — only
@@ -3203,13 +3228,20 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
     // because of the wide pad and the 2x cap; this lifts the cap to 1.6 for
     // fit (manual zoom can still go to 4) and floors at 0.55 so a wide board
     // never lands as a postage stamp.
-    const PAD = 48;
+    // Pad and floor scale with viewport width so the fit math behaves on
+    // every device. Phones get a tighter pad and a much lower floor so that
+    // boards wider than the screen can actually fit instead of being clipped
+    // by the previous 0.55 floor (which left content off the right side on
+    // <=640px screens — looked like the board wasn't centered).
+    const isPhone = cw <= 640;
+    const PAD = isPhone ? 16 : 48;
+    const ZOOM_FLOOR = isPhone ? 0.2 : 0.55;
     const contentW = Math.max(1, maxX - minX);
     const contentH = Math.max(1, maxY - minY);
     const fitZoom = Math.min((cw - PAD * 2) / contentW, (ch - PAD * 2) / contentH, 1.6);
     const cx = (minX + maxX) / 2;
     const cy = (minY + maxY) / 2;
-    const z = Math.max(0.55, fitZoom);
+    const z = Math.max(ZOOM_FLOOR, fitZoom);
     const targetPan = { x: cw / 2 - cx * z, y: ch / 2 - cy * z };
     if (opts?.landing) {
       // First-impression landing animation: start at a slightly tighter zoom
