@@ -1250,7 +1250,11 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
               type="submit"
               size="sm"
               className="h-8 text-xs gap-1 px-3 shadow-sm"
-              disabled={creatingTask || !newTaskTitle.trim() || !addingTask.milestoneId}
+              // Note: do NOT disable when milestoneId is missing. A disabled
+              // submit button blocks Enter-key submission in browsers, so the
+              // 'Pick a section' validation toast in handleAddTask never
+              // fires. Let the form submit and surface the toast instead.
+              disabled={creatingTask || !newTaskTitle.trim()}
               data-testid="button-confirm-add-task"
             >
               <Plus className="h-3 w-3" />

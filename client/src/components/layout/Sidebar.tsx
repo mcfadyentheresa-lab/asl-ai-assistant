@@ -270,12 +270,20 @@ export function DesktopSidebar() {
       >
         <div className="flex flex-col px-5 py-4 shrink-0 border-b border-sidebar-border/50">
           <Link href="/" data-testid="link-sidebar-logo">
-            <span className="font-serif text-lg font-bold tracking-tight text-sidebar-primary leading-none select-none">
-              Aster & Spruce
+            {/* E.L.M = Execution · Logistics · Management.
+                The wordmark identifies the SOFTWARE; the caption underneath
+                identifies the BUSINESS that uses it. Geist Mono in heavy
+                weight reads as a strong, masculine PM/build tool wordmark
+                (vs. the soft serif of the company name). */}
+            <span
+              className="font-mono text-[19px] font-bold tracking-[0.05em] text-sidebar-primary leading-none select-none"
+              style={{ fontFamily: "'Geist Mono', 'JetBrains Mono', ui-monospace, monospace" }}
+            >
+              E.L.M
             </span>
           </Link>
-          <span className="text-[9px] font-semibold tracking-[0.18em] uppercase text-sidebar-foreground/35 mt-0.5 select-none">
-            Living
+          <span className="text-[9px] font-semibold tracking-[0.18em] uppercase text-sidebar-foreground/35 mt-1 select-none">
+            Aster &amp; Spruce Living
           </span>
         </div>
         <SidebarNav compact={false} />

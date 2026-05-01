@@ -57,12 +57,15 @@ export function AppShell({ children }: AppShellProps) {
               <SheetTitle asChild>
                 <div>
                   <Link href="/" onClick={() => setDrawerOpen(false)} data-testid="link-mobile-sidebar-logo">
-                    <span className="font-serif text-lg font-bold tracking-tight text-sidebar-primary leading-none block select-none">
-                      Aster & Spruce
+                    <span
+                      className="font-mono text-[19px] font-bold tracking-[0.05em] text-sidebar-primary leading-none block select-none"
+                      style={{ fontFamily: "'Geist Mono', 'JetBrains Mono', ui-monospace, monospace" }}
+                    >
+                      E.L.M
                     </span>
                   </Link>
-                  <span className="text-[9px] font-semibold tracking-[0.18em] uppercase text-sidebar-foreground/35 mt-0.5 block select-none">
-                    Living
+                  <span className="text-[9px] font-semibold tracking-[0.18em] uppercase text-sidebar-foreground/35 mt-1 block select-none">
+                    Aster &amp; Spruce Living
                   </span>
                 </div>
               </SheetTitle>
