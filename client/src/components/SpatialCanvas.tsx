@@ -3002,8 +3002,13 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
     (e: React.WheelEvent) => {
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
-        const delta = -e.deltaY / 300;
-        const newZoom = Math.max(0.15, Math.min(4, zoom + delta));
+        // Exponential (multiplicative) zoom feels natural at every scale.
+        // The previous additive delta caused 17% jumps at zoom 0.3 and only
+        // 1.7% jumps at zoom 3 — jerky at low zooms, sluggish at high.
+        // Trackpad pinch-to-zoom delivers small deltaY values; mouse wheel
+        // delivers larger discrete steps. Both feel right with this formula.
+        const factor = Math.exp(-e.deltaY / 240);
+        const newZoom = Math.max(0.15, Math.min(4, zoom * factor));
         const rect = containerRef.current?.getBoundingClientRect();
         if (rect) {
           const mx = e.clientX - rect.left;
@@ -3053,8 +3058,34 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
   // a stale `elements` closure. Used by both the toolbar fit-to-screen button
   // (which reads from the store at call time) and the auto-fit-on-load effect
   // (which passes the freshly fetched array, before React has re-rendered).
-  const fitElementsToScreen = useCallback((els: { x: number; y: number; width: number; height: number }[]) => {
-    if (els.length === 0) { setPan({ x: 0, y: 0 }); setZoom(1); return; }
+  // Flag for the transformed canvas layer to apply a CSS transition. We turn
+  // it on for one-shot programmatic moves (auto-fit, resetView, zoom buttons,
+  // landing animation) and back off for drag/pan/wheel so live input stays
+  // 1:1 responsive.
+  const [animatingViewport, setAnimatingViewport] = useState(false);
+  const animatingTimerRef = useRef<number | null>(null);
+  const animateViewport = useCallback((nextPan: { x: number; y: number }, nextZoom: number, durationMs = 380) => {
+    setAnimatingViewport(true);
+    setPan(nextPan);
+    setZoom(nextZoom);
+    if (animatingTimerRef.current) {
+      window.clearTimeout(animatingTimerRef.current);
+    }
+    animatingTimerRef.current = window.setTimeout(() => {
+      setAnimatingViewport(false);
+      animatingTimerRef.current = null;
+    }, durationMs + 30);
+  }, []);
+
+  const fitElementsToScreen = useCallback((
+    els: { x: number; y: number; width: number; height: number }[],
+    opts?: { animate?: boolean; landing?: boolean },
+  ) => {
+    if (els.length === 0) {
+      if (opts?.animate) animateViewport({ x: 0, y: 0 }, 1);
+      else { setPan({ x: 0, y: 0 }); setZoom(1); }
+      return;
+    }
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     els.forEach((e) => {
       minX = Math.min(minX, e.x);
@@ -3064,22 +3095,44 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
     });
     const cw = containerRef.current?.clientWidth || 800;
     const ch = containerRef.current?.clientHeight || 600;
-    const PAD = 80;
+    // Tighter padding (used to be 80 = 160 wasted px) so the board fills more
+    // of the viewport on landing. Sparse content used to land at ~30% zoom
+    // because of the wide pad and the 2x cap; this lifts the cap to 1.6 for
+    // fit (manual zoom can still go to 4) and floors at 0.55 so a wide board
+    // never lands as a postage stamp.
+    const PAD = 48;
     const contentW = Math.max(1, maxX - minX);
     const contentH = Math.max(1, maxY - minY);
-    const newZoom = Math.min((cw - PAD * 2) / contentW, (ch - PAD * 2) / contentH, 2);
+    const fitZoom = Math.min((cw - PAD * 2) / contentW, (ch - PAD * 2) / contentH, 1.6);
     const cx = (minX + maxX) / 2;
     const cy = (minY + maxY) / 2;
-    const z = Math.max(0.15, newZoom);
-    setPan({ x: cw / 2 - cx * z, y: ch / 2 - cy * z });
-    setZoom(z);
-  }, []);
+    const z = Math.max(0.55, fitZoom);
+    const targetPan = { x: cw / 2 - cx * z, y: ch / 2 - cy * z };
+    if (opts?.landing) {
+      // First-impression landing animation: start at a slightly tighter zoom
+      // and pan offset, then ease out to the fit. Feels like the board is
+      // "settling in" rather than appearing as a static frame.
+      const preZoom = z * 0.92;
+      const prePan = { x: cw / 2 - cx * preZoom, y: ch / 2 - cy * preZoom };
+      setAnimatingViewport(false); // ensure no transition for the pre-state
+      setPan(prePan);
+      setZoom(preZoom);
+      requestAnimationFrame(() => requestAnimationFrame(() => animateViewport(targetPan, z, 600)));
+    } else if (opts?.animate) {
+      animateViewport(targetPan, z, 380);
+    } else {
+      setPan(targetPan);
+      setZoom(z);
+    }
+  }, [animateViewport]);
 
+  // Toolbar fit button: animated, so users see where the viewport went.
   const fitToScreen = () => {
-    fitElementsToScreen(Object.values(elements));
+    fitElementsToScreen(Object.values(elements), { animate: true });
   };
 
-  const resetView = () => { setPan({ x: 0, y: 0 }); setZoom(1); };
+  // Reset view: animated for the same reason.
+  const resetView = () => animateViewport({ x: 0, y: 0 }, 1);
 
   // Auto fit-to-screen when a populated board is first opened. We track the
   // board id we've already auto-fit so switching boards re-fits, but every
@@ -3097,12 +3150,18 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
   // RAFs is the well-known pattern to ensure the container has measured its
   // size after a board switch (drawer open/close, tab switch, etc).
   const scheduleAutoFit = useCallback((els: { x: number; y: number; width: number; height: number }[]) => {
+    // Two RAFs to let the container measure after the drawer/tab/board switch,
+    // then trigger the landing animation.
     requestAnimationFrame(() => {
-      requestAnimationFrame(() => fitElementsToScreen(els));
+      requestAnimationFrame(() => fitElementsToScreen(els, { landing: true }));
     });
   }, [fitElementsToScreen]);
 
-  const startResize = (id: number, handle: string, e: React.MouseEvent) => {
+  // Accepts both Mouse and Pointer events. Pointer events fire for mouse,
+  // touch, AND pen on iPad/iPhone, so a single handler covers all input
+  // sources reliably (the previous mouse-only handler made resize handles
+  // unresponsive to finger and pencil).
+  const startResize = (id: number, handle: string, e: React.MouseEvent | React.PointerEvent) => {
     if (lockLayout) return;
     e.stopPropagation();
     e.preventDefault();
@@ -3117,6 +3176,31 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
       handle,
     };
   };
+
+  // Global pointer listeners during resize. Touch / pencil events do not
+  // bubble up to the canvas div as mouse events on iPad, so we listen on
+  // window with pointer events while a resize is in progress. We keep refs
+  // to the latest handlers so the attached listeners always see fresh state.
+  const canvasMoveRef = useRef(handleCanvasMouseMove);
+  const canvasUpRef = useRef(handleCanvasMouseUp);
+  canvasMoveRef.current = handleCanvasMouseMove;
+  canvasUpRef.current = handleCanvasMouseUp;
+  useEffect(() => {
+    if (resizingId === null) return;
+    const onMove = (e: PointerEvent) => {
+      // Synthesize the minimal shape handleCanvasMouseMove reads.
+      canvasMoveRef.current({ clientX: e.clientX, clientY: e.clientY } as unknown as React.MouseEvent);
+    };
+    const onUp = () => canvasUpRef.current();
+    window.addEventListener("pointermove", onMove, { passive: true });
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+    };
+  }, [resizingId]);
 
   const startDrag = (id: number, e: React.MouseEvent) => {
     if (lockLayout) {
@@ -4381,16 +4465,17 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
       if (lockLayout) return null;
       const handleStyle = "absolute opacity-0 hover:opacity-100 transition-opacity z-20";
       const dotStyle = "w-2.5 h-2.5 rounded-full bg-primary/60 border border-primary/80";
+      const handleTouch = { touchAction: "none" as const };
       return (
         <>
-          <div className={`${handleStyle} -right-1 top-1/2 -translate-y-1/2 cursor-e-resize p-1`} onMouseDown={(e) => startResize(elId, "r", e)} data-testid={`resize-r-${elId}`}><div className={dotStyle} /></div>
-          <div className={`${handleStyle} -bottom-1 left-1/2 -translate-x-1/2 cursor-s-resize p-1`} onMouseDown={(e) => startResize(elId, "b", e)} data-testid={`resize-b-${elId}`}><div className={dotStyle} /></div>
-          <div className={`${handleStyle} -right-1 -bottom-1 cursor-se-resize p-1`} onMouseDown={(e) => startResize(elId, "br", e)} data-testid={`resize-br-${elId}`}><div className={dotStyle} /></div>
-          <div className={`${handleStyle} -left-1 top-1/2 -translate-y-1/2 cursor-w-resize p-1`} onMouseDown={(e) => startResize(elId, "l", e)} data-testid={`resize-l-${elId}`}><div className={dotStyle} /></div>
-          <div className={`${handleStyle} left-1/2 -top-1 -translate-x-1/2 cursor-n-resize p-1`} onMouseDown={(e) => startResize(elId, "t", e)} data-testid={`resize-t-${elId}`}><div className={dotStyle} /></div>
-          <div className={`${handleStyle} -left-1 -top-1 cursor-nw-resize p-1`} onMouseDown={(e) => startResize(elId, "tl", e)} data-testid={`resize-tl-${elId}`}><div className={dotStyle} /></div>
-          <div className={`${handleStyle} -right-1 -top-1 cursor-ne-resize p-1`} onMouseDown={(e) => startResize(elId, "tr", e)} data-testid={`resize-tr-${elId}`}><div className={dotStyle} /></div>
-          <div className={`${handleStyle} -left-1 -bottom-1 cursor-sw-resize p-1`} onMouseDown={(e) => startResize(elId, "bl", e)} data-testid={`resize-bl-${elId}`}><div className={dotStyle} /></div>
+          <div className={`${handleStyle} -right-1 top-1/2 -translate-y-1/2 cursor-e-resize p-1`} style={handleTouch} onPointerDown={(e) => startResize(elId, "r", e)} data-testid={`resize-r-${elId}`}><div className={dotStyle} /></div>
+          <div className={`${handleStyle} -bottom-1 left-1/2 -translate-x-1/2 cursor-s-resize p-1`} style={handleTouch} onPointerDown={(e) => startResize(elId, "b", e)} data-testid={`resize-b-${elId}`}><div className={dotStyle} /></div>
+          <div className={`${handleStyle} -right-1 -bottom-1 cursor-se-resize p-1`} style={handleTouch} onPointerDown={(e) => startResize(elId, "br", e)} data-testid={`resize-br-${elId}`}><div className={dotStyle} /></div>
+          <div className={`${handleStyle} -left-1 top-1/2 -translate-y-1/2 cursor-w-resize p-1`} style={handleTouch} onPointerDown={(e) => startResize(elId, "l", e)} data-testid={`resize-l-${elId}`}><div className={dotStyle} /></div>
+          <div className={`${handleStyle} left-1/2 -top-1 -translate-x-1/2 cursor-n-resize p-1`} style={handleTouch} onPointerDown={(e) => startResize(elId, "t", e)} data-testid={`resize-t-${elId}`}><div className={dotStyle} /></div>
+          <div className={`${handleStyle} -left-1 -top-1 cursor-nw-resize p-1`} style={handleTouch} onPointerDown={(e) => startResize(elId, "tl", e)} data-testid={`resize-tl-${elId}`}><div className={dotStyle} /></div>
+          <div className={`${handleStyle} -right-1 -top-1 cursor-ne-resize p-1`} style={handleTouch} onPointerDown={(e) => startResize(elId, "tr", e)} data-testid={`resize-tr-${elId}`}><div className={dotStyle} /></div>
+          <div className={`${handleStyle} -left-1 -bottom-1 cursor-sw-resize p-1`} style={handleTouch} onPointerDown={(e) => startResize(elId, "bl", e)} data-testid={`resize-bl-${elId}`}><div className={dotStyle} /></div>
         </>
       );
     };
@@ -6669,7 +6754,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
           <Separator orientation="vertical" className="h-4 mx-1" />
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-primary/10 hover:text-primary" onClick={() => setZoom((z) => Math.max(0.15, z - 0.1))} data-testid="button-zoom-out">
+              <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-primary/10 hover:text-primary" onClick={() => animateViewport(pan, Math.max(0.15, zoom * 0.85), 220)} data-testid="button-zoom-out">
                 <ZoomOut className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
@@ -6680,7 +6765,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
           </button>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-primary/10 hover:text-primary" onClick={() => setZoom((z) => Math.min(4, z + 0.1))} data-testid="button-zoom-in">
+              <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-primary/10 hover:text-primary" onClick={() => animateViewport(pan, Math.min(4, zoom * 1.18), 220)} data-testid="button-zoom-in">
                 <ZoomIn className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
@@ -7143,18 +7228,50 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
             data-testid="spatial-canvas-viewport"
           >
             {/* Dot grid background — toggleable. Default ON for admin/crew, OFF for client.
-                Visualizes the snap grid that PR #54's auto-grid uses. Charcoal dots at
-                low opacity work over the warm paper bg as well as image-heavy areas. */}
-            {showDotGrid && (
-              <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ opacity: 0.55, color: "#1f1d1a" }}>
-                <defs>
-                  <pattern id="dot-grid" x={pan.x % (GRID_SIZE * zoom)} y={pan.y % (GRID_SIZE * zoom)} width={GRID_SIZE * zoom} height={GRID_SIZE * zoom} patternUnits="userSpaceOnUse">
-                    <circle cx={1} cy={1} r={0.8} fill="currentColor" />
-                  </pattern>
-                </defs>
-                <rect width="100%" height="100%" fill="url(#dot-grid)" />
-              </svg>
-            )}
+                Visualizes the snap grid that PR #54's auto-grid uses.
+
+                Design notes (revised):
+                  • Opacity dropped from 0.55 to a zoom-aware curve so the grid
+                    recedes into the background when the board fills with
+                    content. At low zoom (zoomed out) dots cluster densely on
+                    screen and used to feel heavy; the curve fades them out
+                    further when grid spacing on screen is tight.
+                  • Color shifted from pure charcoal (#1f1d1a) to a warm muted
+                    neutral that sits on the paper bg without competing with
+                    image-heavy areas.
+                  • Dot radius dropped from 0.8 to 0.6 — still visible, less
+                    inky-feeling. */}
+            {showDotGrid && (() => {
+              const screenSpacing = GRID_SIZE * zoom;
+              // Below ~14px on-screen spacing the dots get visually noisy. Fade
+              // them aggressively in that range so they don't intensify on dense
+              // / zoomed-out boards.
+              const baseOpacity = 0.18;
+              const fade = screenSpacing < 14
+                ? Math.max(0, screenSpacing / 14)
+                : 1;
+              const finalOpacity = baseOpacity * fade;
+              return (
+                <svg
+                  className="absolute inset-0 w-full h-full pointer-events-none"
+                  style={{ opacity: finalOpacity, color: "#5a5650" }}
+                >
+                  <defs>
+                    <pattern
+                      id="dot-grid"
+                      x={pan.x % screenSpacing}
+                      y={pan.y % screenSpacing}
+                      width={screenSpacing}
+                      height={screenSpacing}
+                      patternUnits="userSpaceOnUse"
+                    >
+                      <circle cx={1} cy={1} r={0.6} fill="currentColor" />
+                    </pattern>
+                  </defs>
+                  <rect width="100%" height="100%" fill="url(#dot-grid)" />
+                </svg>
+              );
+            })()}
 
             {loading && (
               <div className="absolute inset-0 flex items-center justify-center z-50">
@@ -7214,7 +7331,12 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
               </div>
             )}
 
-            {/* Transformed canvas layer */}
+            {/* Transformed canvas layer.
+                 The CSS transition is applied ONLY when animatingViewport is
+                 true — which is set by animateViewport() for one-shot moves
+                 (auto-fit, reset, zoom buttons, landing animation). It is
+                 cleared before any drag/pan/wheel sequence so live input
+                 stays 1:1 responsive (no smear). */}
             <div
               className="absolute"
               style={{
@@ -7222,6 +7344,10 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                 transformOrigin: "0 0",
                 width: "1px",
                 height: "1px",
+                transition: animatingViewport
+                  ? "transform 380ms cubic-bezier(0.22, 0.61, 0.36, 1)"
+                  : "none",
+                willChange: "transform",
               }}
               data-testid="spatial-canvas-transform"
             >
@@ -7636,7 +7762,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                 <div className="h-5 w-px bg-border/40 mx-1 shrink-0" />
                 <button
                   className="h-11 w-11 flex items-center justify-center rounded-full text-foreground/60 active:bg-foreground/10 shrink-0"
-                  onClick={(e) => { e.stopPropagation(); setZoom((z) => Math.max(0.15, z - 0.15)); }}
+                  onClick={(e) => { e.stopPropagation(); animateViewport(pan, Math.max(0.15, zoom * 0.82), 220); }}
                   data-testid="mobile-zoom-out"
                 >
                   <ZoomOut className="h-[18px] w-[18px]" strokeWidth={1.5} />
@@ -7650,7 +7776,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                 </button>
                 <button
                   className="h-11 w-11 flex items-center justify-center rounded-full text-foreground/60 active:bg-foreground/10 shrink-0"
-                  onClick={(e) => { e.stopPropagation(); setZoom((z) => Math.min(4, z + 0.15)); }}
+                  onClick={(e) => { e.stopPropagation(); animateViewport(pan, Math.min(4, zoom * 1.22), 220); }}
                   data-testid="mobile-zoom-in"
                 >
                   <ZoomIn className="h-[18px] w-[18px]" strokeWidth={1.5} />
