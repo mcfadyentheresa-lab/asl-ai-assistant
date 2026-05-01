@@ -1,5 +1,5 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import GanttChart from "@/components/GanttChart";
+import ProjectTimeline from "@/components/timeline/ProjectTimeline";
 import CalendarPanel from "@/components/CalendarPanel";
 import { useAuth } from "@/hooks/use-auth";
 import { useViewMode } from "@/hooks/use-view-mode";
@@ -42,7 +42,13 @@ export function ProgressTab({ projectId, milestones = [], sections = [], tasks =
       </div>
 
       {subTab === "gantt" && (
-        <GanttChart projectId={projectId} milestones={milestones} sections={sections || []} tasks={tasks} userRole={userRole} />
+        <ProjectTimeline
+          projectId={projectId}
+          milestones={milestones}
+          sections={sections || []}
+          tasks={tasks}
+          userRole={userRole}
+        />
       )}
       {subTab === "calendar" && (
         <CalendarPanel projectId={projectId} effectiveRole={effectiveRole} />
