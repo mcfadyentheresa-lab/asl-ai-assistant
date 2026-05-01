@@ -1215,20 +1215,52 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
   // scanning left-to-right then top-to-bottom from the desired anchor. Falls
   // back to the desired position if nothing free is found within the search
   // window (so we never block element creation).
-  // Shape-aware sizing for new notes. Looks at the closest existing element
-  // to the desired drop point and picks a portrait / landscape / square shape
-  // that fits the open space, so a note dropped beside a card grows tall and
-  // narrow, dropped above/below grows short and wide, and dropped in open
-  // space falls back to a square. Width/height are in board coords.
+  // Shape-aware sizing for new notes. Two signals decide the shape:
+  //   1. Where in the visible viewport the note is being dropped — near a
+  //      side edge → tall portrait, near top/bottom edge → wide landscape.
+  //   2. The nearest existing element — sitting beside it → portrait,
+  //      sitting above/below it → landscape.
+  // The viewport check runs first because it matches the user's mental
+  // model ("if i positioned it to the side it would be long"). Falls back
+  // to a generous square in open space.
   const chooseNoteShape = (desiredX: number, desiredY: number): { width: number; height: number } => {
-    const PORTRAIT = { width: 220, height: 360 };
-    const LANDSCAPE = { width: 420, height: 180 };
-    const SQUARE = { width: 280, height: 240 };
+    const PORTRAIT = { width: 240, height: 480 };
+    const LANDSCAPE = { width: 520, height: 200 };
+    const SQUARE = { width: 360, height: 280 };
+
+    // Visible viewport in board coords — lets us tell whether the drop point
+    // is hugging a side / edge of what the user is currently looking at.
+    const vw = containerRef.current?.clientWidth || 1200;
+    const vh = containerRef.current?.clientHeight || 800;
+    const viewLeft = (-pan.x) / zoom;
+    const viewTop = (-pan.y) / zoom;
+    const viewRight = viewLeft + vw / zoom;
+    const viewBottom = viewTop + vh / zoom;
+    const viewW = viewRight - viewLeft;
+    const viewH = viewBottom - viewTop;
+
+    const fromLeft = (desiredX - viewLeft) / viewW;
+    const fromTop = (desiredY - viewTop) / viewH;
+    // Edge band = outer 25% of the visible viewport on each side.
+    const nearLeft = fromLeft < 0.25;
+    const nearRight = fromLeft > 0.75;
+    const nearTop = fromTop < 0.25;
+    const nearBottom = fromTop > 0.75;
+    const nearVerticalEdge = nearLeft || nearRight;
+    const nearHorizontalEdge = nearTop || nearBottom;
+
+    // Prefer the dominant edge — if it's clearly a side (not a corner), go
+    // portrait; clearly top/bottom, go landscape. Corners use the neighbor
+    // signal below.
+    if (nearVerticalEdge && !nearHorizontalEdge) return PORTRAIT;
+    if (nearHorizontalEdge && !nearVerticalEdge) return LANDSCAPE;
+
     const candidates = Object.values(elements).filter((el) =>
       el.type !== "connector" && el.type !== "draw" && el.type !== "room_zone"
     );
     if (candidates.length === 0) return SQUARE;
-    // Find the nearest neighbor (by edge-to-point distance) within ~600px.
+
+    // Find the nearest neighbor by center-to-point distance, capped at 500px.
     let best: { dx: number; dy: number; dist: number } | null = null;
     for (const el of candidates) {
       const ew = el.width || 200;
@@ -1240,12 +1272,11 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
       const dist = Math.hypot(dx, dy);
       if (!best || dist < best.dist) best = { dx, dy, dist };
     }
-    if (!best || best.dist > 600) return SQUARE;
-    // If horizontally offset more than vertically, the note sits beside the
-    // neighbor → portrait. Otherwise it sits above/below → landscape.
+    if (!best || best.dist > 500) return SQUARE;
+    // Looser ratios so we're more likely to land on a directional shape.
     const ratio = Math.abs(best.dx) / Math.max(1, Math.abs(best.dy));
-    if (ratio > 1.4) return PORTRAIT;
-    if (ratio < 0.7) return LANDSCAPE;
+    if (ratio > 1.2) return PORTRAIT;
+    if (ratio < 0.8) return LANDSCAPE;
     return SQUARE;
   };
 
