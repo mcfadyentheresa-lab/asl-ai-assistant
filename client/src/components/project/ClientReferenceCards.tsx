@@ -188,7 +188,7 @@ export function ClientReferenceCards({
   const primaryContactSub =
     primaryContact && primaryContact.firstName
       ? `${primaryContact.firstName} · ${
-          primaryContact.role === "admin" ? "Lead designer" : "On the crew"
+          primaryContact.role === "admin" ? "Project lead" : "On the crew"
         }`
       : null;
 

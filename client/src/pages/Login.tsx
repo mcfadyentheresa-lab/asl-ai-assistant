@@ -44,8 +44,16 @@ export default function Login() {
       <Card className="max-w-md w-full">
         <CardContent className="pt-8 pb-8 space-y-6">
           <div className="text-center space-y-2">
-            <h1 className="font-serif text-3xl font-semibold text-primary">Aster &amp; Spruce</h1>
-            <p className="text-muted-foreground text-sm">Sign in to your workspace</p>
+            <h1
+              className="font-mono text-4xl font-bold tracking-[0.05em] text-primary"
+              style={{ fontFamily: "'Geist Mono', 'JetBrains Mono', ui-monospace, monospace" }}
+            >
+              E.L.M
+            </h1>
+            <p className="text-[10px] font-semibold tracking-[0.18em] uppercase text-muted-foreground/70">
+              Aster &amp; Spruce Living
+            </p>
+            <p className="text-muted-foreground text-sm pt-2">Sign in to your workspace</p>
           </div>
           <form onSubmit={onSubmit} className="space-y-4" data-testid="form-login">
             <div className="space-y-1">
