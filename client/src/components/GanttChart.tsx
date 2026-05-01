@@ -8,6 +8,7 @@ import { ChevronLeft, ChevronDown, ChevronUp, ChevronRight, ZoomIn, ZoomOut, Plu
 import type { PaintColor } from "@shared/schema";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -680,6 +681,10 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
 
   const handleAddTask = () => {
     if (!addingTask || !newTaskTitle.trim()) return;
+    if (!addingTask.milestoneId) {
+      toast({ title: "Pick a section", description: "Choose which section this task belongs to before saving.", variant: "destructive" });
+      return;
+    }
     let taskStart = newTaskStartDate || null;
     let taskEnd = newTaskDueDate || null;
     if (taskStart && taskEnd && taskStart > taskEnd) {
@@ -692,6 +697,39 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
         onError: () => toast({ title: "Failed to add task", variant: "destructive" }),
       }
     );
+  };
+
+  // True when there's pending input the user could lose. Used to:
+  //  1) warn before tab/window close (beforeunload)
+  //  2) show a small "Unsaved" badge inside the inline form
+  //  3) ask before discarding via Cancel/Escape
+  const hasUnsavedTaskInput =
+    addingTask !== null && (
+      newTaskTitle.trim() !== "" ||
+      newTaskStartDate !== "" ||
+      newTaskDueDate !== ""
+    );
+  useEffect(() => {
+    if (!hasUnsavedTaskInput) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      // Modern browsers ignore the message but still show their native
+      // "changes you made may not be saved" prompt as long as we
+      // call preventDefault and set returnValue.
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [hasUnsavedTaskInput]);
+  const cancelAddTask = () => {
+    if (hasUnsavedTaskInput) {
+      const ok = window.confirm("Discard this unsaved task? Anything you typed will be lost.");
+      if (!ok) return;
+    }
+    setAddingTask(null);
+    setNewTaskTitle("");
+    setNewTaskStartDate("");
+    setNewTaskDueDate("");
   };
 
   const startNewTask = (milestoneId: number, sectionId: number | null = null) => {
@@ -1008,8 +1046,27 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
               Section
             </Button>
           )}
-          {isAdmin && drillLevel === "tasks" && selectedBuildingId && (
-            <Button variant="default" size="sm" className="h-7 text-xs gap-1 shadow-sm" onClick={() => { setAddingTask({ milestoneId: selectedBuildingId, sectionId: selectedRoomId === -1 ? null : selectedRoomId }); setNewTaskTitle(""); setNewTaskStartDate(""); setNewTaskDueDate(""); }} data-testid="button-add-task-timeline">
+          {isAdmin && (
+            // Always show the Task button so it's reachable from any drill
+            // level. If we're already drilled into a milestone, prefill that
+            // milestone (and room, if drilled). If not, the inline form will
+            // render a milestone picker so the user picks one before saving.
+            <Button
+              variant="default"
+              size="sm"
+              className="h-7 text-xs gap-1 shadow-sm"
+              onClick={() => {
+                const presetMilestoneId = drillLevel === "tasks" && selectedBuildingId ? selectedBuildingId : null;
+                const presetSectionId = drillLevel === "tasks" && selectedBuildingId && selectedRoomId !== -1 ? selectedRoomId : null;
+                setAddingTask({ milestoneId: presetMilestoneId as any, sectionId: presetSectionId });
+                setNewTaskTitle("");
+                setNewTaskStartDate("");
+                setNewTaskDueDate("");
+              }}
+              disabled={milestones.length === 0}
+              title={milestones.length === 0 ? "Add a Section first" : undefined}
+              data-testid="button-add-task-timeline"
+            >
               <Plus className="h-3 w-3" />
               Task
             </Button>
@@ -1136,8 +1193,43 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
       )}
 
       {addingTask !== null && isAdmin && (
-        <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 px-2 py-1.5" data-testid="form-add-task-inline" onKeyDown={e => { if (e.key === "Escape") setAddingTask(null); }}>
-          <Input placeholder="Task title" value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)} className="flex-1 h-8 text-xs sm:min-w-0" autoFocus data-testid="input-task-title" onKeyDown={e => { if (e.key === "Enter") handleAddTask(); if (e.key === "Escape") setAddingTask(null); }} />
+        // <form onSubmit> means Enter from any focused field inside the form
+        // submits — not just the title input. Previously you had to either
+        // click the Add button or only press Enter while focused on the
+        // title; tabbing into the date pickers and hitting Enter did nothing.
+        <form
+          className="flex flex-col sm:flex-row sm:items-center gap-1.5 px-2 py-1.5"
+          data-testid="form-add-task-inline"
+          onSubmit={e => { e.preventDefault(); handleAddTask(); }}
+          onKeyDown={e => { if (e.key === "Escape") cancelAddTask(); }}
+        >
+          {/* Section picker shows when the user opened the form without */}
+          {/* drilling into a section first. Required before save. */}
+          {!addingTask.milestoneId && (
+            <div className="sm:shrink-0">
+              <Select
+                value={addingTask.milestoneId ? String(addingTask.milestoneId) : ""}
+                onValueChange={(v: string) => setAddingTask(prev => prev ? { ...prev, milestoneId: Number(v) } : prev)}
+              >
+                <SelectTrigger className="h-8 text-xs sm:w-44" data-testid="select-task-milestone">
+                  <SelectValue placeholder="Section" />
+                </SelectTrigger>
+                <SelectContent>
+                  {milestones.map((m: any) => (
+                    <SelectItem key={m.id} value={String(m.id)}>{m.title}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          <Input
+            placeholder="Task title"
+            value={newTaskTitle}
+            onChange={e => setNewTaskTitle(e.target.value)}
+            className="flex-1 h-8 text-xs sm:min-w-0"
+            autoFocus
+            data-testid="input-task-title"
+          />
           <div className="sm:shrink-0">
             <DateField label="Start date" value={newTaskStartDate} onChange={setNewTaskStartDate} placeholder="Start date" testId="button-task-start-date" />
           </div>
@@ -1145,15 +1237,35 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
             <DateField label="Due date" value={newTaskDueDate} onChange={setNewTaskDueDate} placeholder="Due date" testId="button-task-due-date" />
           </div>
           <div className="flex items-center gap-1.5">
-            <Button size="sm" className="h-8 text-xs gap-1 px-3 shadow-sm" onClick={handleAddTask} disabled={creatingTask || !newTaskTitle.trim()} data-testid="button-confirm-add-task">
+            {hasUnsavedTaskInput && (
+              <span
+                className="text-[10px] uppercase tracking-wide text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 font-medium"
+                data-testid="badge-task-unsaved"
+                title="You have unsaved input. Press Enter to save."
+              >
+                Unsaved
+              </span>
+            )}
+            <Button
+              type="submit"
+              size="sm"
+              className="h-8 text-xs gap-1 px-3 shadow-sm"
+              disabled={creatingTask || !newTaskTitle.trim() || !addingTask.milestoneId}
+              data-testid="button-confirm-add-task"
+            >
               <Plus className="h-3 w-3" />
               Add
             </Button>
-            <button type="button" className="text-xs text-muted-foreground hover:text-foreground transition-colors px-1" onClick={() => setAddingTask(null)} data-testid="button-cancel-add-task">
+            <button
+              type="button"
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors px-1"
+              onClick={cancelAddTask}
+              data-testid="button-cancel-add-task"
+            >
               Cancel
             </button>
           </div>
-        </div>
+        </form>
       )}
 
       {currentRows.length === 0 && !addingBuilding && !addingRoomFor && !addingTask ? (
