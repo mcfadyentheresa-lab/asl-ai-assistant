@@ -553,6 +553,13 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
 
   const [draggingId, setDraggingId] = useState<number | null>(null);
   const dragStartRef = useRef<{ x: number; y: number; elX: number; elY: number } | null>(null);
+  // rAF coalescing for drag/resize — the move handler can fire 100+ times per
+  // second on touch devices. Without this, every event triggers a Zustand
+  // store update + full canvas re-render, which freezes the UI on phones.
+  // We stash the latest pointer position in a ref and apply it at most once
+  // per animation frame.
+  const dragRafRef = useRef<number | null>(null);
+  const dragLatestRef = useRef<{ clientX: number; clientY: number } | null>(null);
   const zoneChildrenRef = useRef<{ id: number; offsetX: number; offsetY: number }[]>([]);
   const [droppingIds, setDroppingIds] = useState<Set<number>>(new Set());
   const droppingTimersRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
@@ -2618,26 +2625,16 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
     }
     if (draggingId !== null && dragStartRef.current) {
       e.preventDefault();
-      const dx = (touch.clientX - dragStartRef.current.x) / zoom;
-      const dy = (touch.clientY - dragStartRef.current.y) / zoom;
-      const newX = dragStartRef.current.elX + dx;
-      const newY = dragStartRef.current.elY + dy;
-      const draggedEl = elements[draggingId];
-      const prevX = draggedEl?.x ?? newX;
-      const prevY = draggedEl?.y ?? newY;
-      moveElement(draggingId, newX, newY);
-      if (draggedEl?.type === "column") {
-        const childDx = newX - prevX;
-        const childDy = newY - prevY;
-        Object.values(elements).forEach((child) => {
-          if (child.parentColumnId === draggingId) {
-            moveElement(child.id, child.x + childDx, child.y + childDy);
-          }
-        });
-      }
-      if (draggedEl?.type === "room_zone") {
-        zoneChildrenRef.current.forEach((zc) => {
-          moveElement(zc.id, newX + zc.offsetX, newY + zc.offsetY);
+      // Same rAF coalescing as the mouse path — stash the latest touch and
+      // flush at most once per frame. Re-uses applyPointerMove which reads
+      // live store state via getState() so we don't pay for a stale closure.
+      dragLatestRef.current = { clientX: touch.clientX, clientY: touch.clientY };
+      if (dragRafRef.current == null) {
+        dragRafRef.current = requestAnimationFrame(() => {
+          dragRafRef.current = null;
+          const p = dragLatestRef.current;
+          if (!p) return;
+          applyPointerMove(p.clientX, p.clientY);
         });
       }
     } else if (isPanning && panStartRef.current && e.touches.length === 1) {
@@ -2648,6 +2645,15 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
   };
 
   const handleCanvasTouchEnd = () => {
+    // Flush any pending coalesced drag/resize frame so the final position is
+    // applied before we snap-to-grid + persist.
+    if (dragRafRef.current != null) {
+      cancelAnimationFrame(dragRafRef.current);
+      dragRafRef.current = null;
+      const p = dragLatestRef.current;
+      if (p) applyPointerMove(p.clientX, p.clientY);
+    }
+    dragLatestRef.current = null;
     pinchStartRef.current = null;
     pendingDragRef.current = null;
     if (isPanning) {
@@ -3009,10 +3015,12 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
 
   const lastCursorSentRef = useRef(0);
 
-  const handleCanvasMouseMove = (e: React.MouseEvent) => {
+  // The actual drag/resize/pan work — split out so we can call it from a rAF
+  // and read the freshest store state via getState() instead of stale closures.
+  const applyPointerMove = (clientX: number, clientY: number) => {
     if (connectMode && containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
-      setConnectCursor({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+      setConnectCursor({ x: clientX - rect.left, y: clientY - rect.top });
     }
     if (drawingMode) return;
 
@@ -3021,34 +3029,37 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
       if (now - lastCursorSentRef.current > 50) {
         lastCursorSentRef.current = now;
         const rect = containerRef.current.getBoundingClientRect();
-        const canvasX = (e.clientX - rect.left - pan.x) / zoom;
-        const canvasY = (e.clientY - rect.top - pan.y) / zoom;
+        const canvasX = (clientX - rect.left - pan.x) / zoom;
+        const canvasY = (clientY - rect.top - pan.y) / zoom;
         sendCursorMove(canvasX, canvasY);
       }
     }
 
     if (isPanning && panStartRef.current) {
-      const dx = e.clientX - panStartRef.current.x;
-      const dy = e.clientY - panStartRef.current.y;
+      const dx = clientX - panStartRef.current.x;
+      const dy = clientY - panStartRef.current.y;
       setPan({ x: panStartRef.current.px + dx, y: panStartRef.current.py + dy });
     }
     if (draggingId !== null && dragStartRef.current) {
-      const dx = (e.clientX - dragStartRef.current.x) / zoom;
-      const dy = (e.clientY - dragStartRef.current.y) / zoom;
+      const dx = (clientX - dragStartRef.current.x) / zoom;
+      const dy = (clientY - dragStartRef.current.y) / zoom;
       const newX = dragStartRef.current.elX + dx;
       const newY = dragStartRef.current.elY + dy;
-      const draggedEl = elements[draggingId];
+      // Read live store state — avoids stale closures and lets us skip the
+      // dependency that was busting the global pointer effect every frame.
+      const liveElements = useCanvasStore.getState().elements;
+      const draggedEl = liveElements[draggingId];
       const prevX = draggedEl?.x ?? newX;
       const prevY = draggedEl?.y ?? newY;
       moveElement(draggingId, newX, newY);
       if (draggedEl?.type === "column") {
         const childDx = newX - prevX;
         const childDy = newY - prevY;
-        Object.values(elements).forEach((child) => {
+        for (const child of Object.values(liveElements)) {
           if (child.parentColumnId === draggingId) {
             moveElement(child.id, child.x + childDx, child.y + childDy);
           }
-        });
+        }
       }
       if (draggedEl?.type === "room_zone") {
         zoneChildrenRef.current.forEach((zc) => {
@@ -3058,8 +3069,8 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
     }
     if (resizingId !== null && resizeStartRef.current) {
       const r = resizeStartRef.current;
-      const dx = (e.clientX - r.x) / zoom;
-      const dy = (e.clientY - r.y) / zoom;
+      const dx = (clientX - r.x) / zoom;
+      const dy = (clientY - r.y) / zoom;
       let newW = r.elW;
       let newH = r.elH;
       let newX = r.elX;
@@ -3073,7 +3084,30 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
     }
   };
 
+  // Public mouse-move handler — just stashes the latest position and schedules
+  // a single rAF flush. This is what makes drag/resize feel smooth on phones:
+  // we coalesce N events per frame down to one store update + one render.
+  const handleCanvasMouseMove = (e: React.MouseEvent) => {
+    dragLatestRef.current = { clientX: e.clientX, clientY: e.clientY };
+    if (dragRafRef.current != null) return;
+    dragRafRef.current = requestAnimationFrame(() => {
+      dragRafRef.current = null;
+      const p = dragLatestRef.current;
+      if (!p) return;
+      applyPointerMove(p.clientX, p.clientY);
+    });
+  };
+
   const handleCanvasMouseUp = () => {
+    // Flush any pending coalesced drag/resize frame so the final position is
+    // applied before we snap-to-grid + persist.
+    if (dragRafRef.current != null) {
+      cancelAnimationFrame(dragRafRef.current);
+      dragRafRef.current = null;
+      const p = dragLatestRef.current;
+      if (p) applyPointerMove(p.clientX, p.clientY);
+    }
+    dragLatestRef.current = null;
     if (isPanning) {
       setIsPanning(false);
       panStartRef.current = null;
@@ -3815,7 +3849,10 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
 
       const ink = elementInkRef.current;
       if (ink && ink.pointerId === e.pointerId) {
-        const el = elements[ink.elementId];
+        // Read live store state — keeping `elements` in this effect's deps
+        // would re-register all four window pointer listeners on every drag
+        // tick, which is the main reason drag/resize froze on phones.
+        const el = useCanvasStore.getState().elements[ink.elementId];
         if (!el) return;
         const board = getBoardCoord(e.clientX, e.clientY);
         ink.points.push([board.x - el.x, board.y - el.y, pressure]);
@@ -3985,7 +4022,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
       root.removeEventListener("pointerup", onPointerUp);
       root.removeEventListener("pointercancel", onPointerCancel);
     };
-  }, [pan, zoom, elements, elementHitAt, shouldPointerDraw, drawColor, drawStrokeWidth, drawingMode, touchDrawing, redrawOverlayCanvas, saveAnnotationStroke, tryAutoTextConvert, trySnapLastPath, user]);
+  }, [pan, zoom, elementHitAt, shouldPointerDraw, drawColor, drawStrokeWidth, drawingMode, touchDrawing, redrawOverlayCanvas, saveAnnotationStroke, tryAutoTextConvert, trySnapLastPath, user]);
 
   const selectedBoard = boards.find((b: PlanningBoardType) => b.id === selectedBoardId);
   const clientProject = allProjects.find((p: any) => p.id === projectId);
