@@ -28,11 +28,31 @@ export default function InviteAccept() {
   const [confirm, setConfirm] = useState("");
   const [pwError, setPwError] = useState<string | null>(null);
 
+  // We have two parallel invite systems: client invites live under
+  // /api/invites and crew invites live under /api/auth/invite. Email
+  // links route the user to the correct page directly, but if a token
+  // ends up at the wrong page (typo, copy-paste, old link) we transparently
+  // bounce to the other route instead of showing "Invite unavailable".
+  const [crossRedirected, setCrossRedirected] = useState(false);
   const { data: invite, isLoading, error } = useQuery<InviteValidation>({
     queryKey: ["/api/invites", token, "validate"],
     queryFn: async () => {
       const res = await fetch(`/api/invites/${token}/validate`);
-      if (!res.ok) throw new Error("Invite not found");
+      if (!res.ok) {
+        // Try the crew invite system. If that token exists, send the user there.
+        try {
+          const crew = await fetch(`/api/auth/invite/${token}`);
+          if (crew.ok) {
+            const data = await crew.json();
+            if (data?.valid) {
+              setCrossRedirected(true);
+              navigate(`/accept-invite/${token}`);
+              throw new Error("redirecting");
+            }
+          }
+        } catch (_err) { /* fall through to invite-not-found */ }
+        throw new Error("Invite not found");
+      }
       return res.json();
     },
     enabled: !!token,
@@ -60,7 +80,7 @@ export default function InviteAccept() {
     acceptMutation.mutate({ password });
   }
 
-  if (isLoading || authLoading) {
+  if (isLoading || authLoading || crossRedirected) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />

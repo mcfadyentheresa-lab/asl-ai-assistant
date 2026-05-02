@@ -27,18 +27,43 @@ export default function AcceptInvite() {
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
 
+  // We have two parallel invite systems: crew invites live here under
+  // /api/auth/invite and client invites live under /api/invites. If a token
+  // arrives at this page but actually belongs to the client system, we
+  // transparently bounce the user to the client invite page instead of
+  // showing "Invite unavailable".
   useEffect(() => {
     if (!token) return;
-    fetch(`/api/auth/invite/${token}`)
-      .then((r) => r.json())
-      .then((data: InviteInfo) => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch(`/api/auth/invite/${token}`);
+        const data: InviteInfo = await r.json();
+        if (cancelled) return;
+        if (!data?.valid && data?.reason === "not_found") {
+          // Cross-check the client invite system before giving up.
+          try {
+            const cli = await fetch(`/api/invites/${token}/validate`);
+            if (cli.ok) {
+              const cd = await cli.json();
+              if (cd?.valid) {
+                navigate(`/invite/${token}`);
+                return;
+              }
+            }
+          } catch (_err) { /* fall through */ }
+        }
         setInfo(data);
         if (data.firstName) setFirstName(data.firstName);
         if (data.lastName) setLastName(data.lastName);
-      })
-      .catch(() => setInfo({ valid: false, reason: "not_found" }))
-      .finally(() => setLoading(false));
-  }, [token]);
+      } catch {
+        if (!cancelled) setInfo({ valid: false, reason: "not_found" });
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [token, navigate]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
