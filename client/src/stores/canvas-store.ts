@@ -211,10 +211,27 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
 
 let saveTimeout: ReturnType<typeof setTimeout> | null = null;
 
+export function cancelPendingSave() {
+  if (saveTimeout) {
+    clearTimeout(saveTimeout);
+    saveTimeout = null;
+  }
+}
+
 export function debouncedSavePositions(boardId: number, delay = 800) {
   if (saveTimeout) clearTimeout(saveTimeout);
   saveTimeout = setTimeout(async () => {
+    saveTimeout = null;
     const store = useCanvasStore.getState();
+    // If the user has switched boards by the time the timeout fires, drop
+    // the save. Without this, a pending save scheduled for board A could
+    // PATCH board A's positions URL with elements that now belong to B (or
+    // worse, with B's currently-loaded elements). Belt-and-suspenders
+    // alongside the WS guards in use-board-realtime.ts.
+    if (store.boardId !== boardId) {
+      store.clearDirty();
+      return;
+    }
     const updates = store.getDirtyUpdates();
     if (updates.length === 0) return;
     store.clearDirty();
