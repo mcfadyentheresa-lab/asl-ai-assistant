@@ -22,8 +22,11 @@ export default function Welcome() {
   const [lastName, setLastName] = useState(user?.lastName || "");
   const [email, setEmail] = useState(user?.email || "");
   const [phone, setPhone] = useState(user?.phone || "");
-  const [smsNotifications, setSmsNotifications] = useState(true);
-  const [emailNotifications, setEmailNotifications] = useState(true);
+  // SMS opt-in UI is hidden (feature paused). We don't send smsNotifications
+  // in the payload at all so the server treats it as the existing value /
+  // schema default rather than silently flipping it to true. Email
+  // notifications stay on by default and the API treats the field as
+  // optional, so it's also omitted here until a real preferences UI exists.
 
   const completeMutation = useMutation({
     mutationFn: async () => {
@@ -32,8 +35,6 @@ export default function Welcome() {
         lastName: lastName.trim(),
         email: email.trim() || undefined,
         phone: phone.trim() || null,
-        smsNotifications,
-        emailNotifications,
       });
       return res.json();
     },
@@ -123,12 +124,12 @@ export default function Welcome() {
                 </p>
               </div>
 
-              {/* Notification preferences: SMS UI is hidden for now (the SMS
-                  feature is paused). Email notifications stay on by default;
-                  we don't render a dedicated section for a single toggle. The
-                  underlying smsNotifications/emailNotifications state is still
-                  posted on submit so this can be re-enabled by un-hiding
-                  this block. */}
+              {/* Notification preferences UI is hidden while the SMS feature
+                  is paused. The payload above intentionally omits
+                  smsNotifications/emailNotifications so we don't silently
+                  overwrite a user's stored preference with a hard-coded value
+                  from a control they never saw. Re-add the controls + payload
+                  fields together when notifications ship. */}
             </div>
 
             <Button
