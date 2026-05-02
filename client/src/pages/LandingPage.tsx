@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { ArrowRight, ShieldCheck, Zap, Eye } from "lucide-react";
+
 import { motion } from "framer-motion";
 import heroImg from "@/assets/images/hero-cottage.png";
 import craftImg from "@/assets/images/craft-interior.png";
@@ -25,14 +26,6 @@ export default function LandingPage() {
           <span className="font-serif text-2xl font-semibold text-white tracking-tight" data-testid="text-logo">
             Aster & Spruce
           </span>
-          <Button
-            onClick={handleLogin}
-            variant="outline"
-            className="bg-white/10 backdrop-blur-md text-white border-white/20"
-            data-testid="button-login"
-          >
-            Log In
-          </Button>
         </nav>
 
         <div className="relative z-10 flex-1 flex items-center">
