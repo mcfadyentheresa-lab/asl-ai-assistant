@@ -174,13 +174,29 @@ export async function registerRoutes(
     });
   });
 
+  // Change a user's role. Admins only — previously this endpoint was open to
+  // any authenticated caller and updated *the caller's own* role, which let a
+  // logged-in client promote themselves to admin. Now: requires the caller to
+  // already be an admin, requires an explicit target userId, and forbids the
+  // caller from changing their own role here (use a second admin if a swap
+  // is needed). This is the only role-mutation endpoint in the API.
   app.patch("/api/auth/role", isAuthenticated, async (req: any, res) => {
     try {
-      const { role } = req.body;
+      const requesterId = req.user.claims.sub;
+      const requester = await authStorage.getUser(requesterId);
+      if (requester?.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can change roles" });
+      }
+      const { userId, role } = req.body || {};
+      if (typeof userId !== "string" || !userId) {
+        return res.status(400).json({ message: "userId is required" });
+      }
       if (!["client", "crew", "admin"].includes(role)) {
         return res.status(400).json({ message: "Invalid role" });
       }
-      const userId = req.user.claims.sub;
+      if (userId === requesterId) {
+        return res.status(400).json({ message: "You cannot change your own role" });
+      }
       const user = await authStorage.updateUserRole(userId, role);
       if (!user) return res.status(404).json({ message: "User not found" });
       res.json(user);
