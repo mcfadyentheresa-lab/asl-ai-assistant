@@ -18,6 +18,7 @@ if (missingVars.length > 0) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 import express, { type Request, Response, NextFunction } from "express";
+import helmet from "helmet";
 import { registerRoutes } from "./routes";
 import { storage } from "./storage";
 import { serveStatic } from "./static";
@@ -31,6 +32,38 @@ import { seedAdditionalBrands } from "./seed-additional-brands";
 
 const app = express();
 const httpServer = createServer(app);
+
+// ─── Security headers ─────────────────────────────────────────────────────
+// Helmet adds HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy,
+// Cross-Origin-Resource-Policy, and friends. We deliberately disable Helmet's
+// default Content-Security-Policy because the SPA loads Google Fonts, R2
+// public CDN images, OpenAI/Houzz/Pinterest images, and inline Vite shims —
+// authoring a correct CSP without breaking those flows is its own change.
+// Track that as a follow-up; the rest of the headers ship now.
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+    // The app is reached by name (app.asl-portal.ca). Telling browsers HSTS
+    // for two years with subdomain inclusion is the standard for a Railway
+    // app behind Let's Encrypt — TLS is already enforced at the edge.
+    strictTransportSecurity: {
+      maxAge: 63072000,
+      includeSubDomains: true,
+      preload: false,
+    },
+    // Public presentation pages embed in iframes (e.g. share previews) — keep
+    // SAMEORIGIN to block clickjacking but not break our own UI.
+    frameguard: { action: "sameorigin" },
+    referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+    // Cross-Origin-Resource-Policy: same-site lets our own pages load images
+    // from /api/public-assets but blocks third-party hotlinking.
+    crossOriginResourcePolicy: { policy: "same-site" },
+    // We don't use COEP/COOP advanced isolation today; default same-origin
+    // would block third-party iframes (e.g. embedded Houzz boards).
+    crossOriginOpenerPolicy: false,
+    crossOriginEmbedderPolicy: false,
+  }),
+);
 
 declare module "http" {
   interface IncomingMessage {
