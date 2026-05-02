@@ -199,18 +199,24 @@ function ProjectDetailsInner() {
     clientRequiresInvite?: boolean;
   };
 
-  // Photos and Furniture are no longer top-level tabs — they live as drawers inside the
-  // Planning Board (see SpatialCanvas drawers). Materials drawer also lives there.
+  // Client tab model (per docs/PRODUCT_PHILOSOPHY.md): clients see exactly
+  // Plan / Design Board / Documents / Messages inside a project. Progress,
+  // Decisions, Selections, Change Orders, Site Visits remain admin/crew only.
+  // Tab labels are role-aware so clients see "Plan" / "Design Board" while
+  // crew keep the operational labels ("Overview" / "Planning Board").
+  // Photos and Furniture are not top-level tabs — they live as drawers inside
+  // the Planning Board (see SpatialCanvas drawers). Materials drawer too.
+  const isClientView = userRole === "client";
   const tabConfig: TabConfig[] = [
-    { id: "overview", label: "Overview", icon: Clock, roles: ["admin", "crew", "client"] },
-    { id: "checklist", label: "Progress", icon: BarChart3, roles: ["admin", "crew", "client"] },
+    { id: "overview", label: isClientView ? "Plan" : "Overview", icon: Clock, roles: ["admin", "crew", "client"] },
+    { id: "checklist", label: "Progress", icon: BarChart3, roles: ["admin", "crew"] },
     { id: "docs", label: "Documents", icon: FileText, roles: ["admin", "client"] },
     { id: "chat", label: "Messages", icon: MessageSquare, roles: ["admin", "crew", "client"] },
-    { id: "decisions", label: "Decisions", icon: ScrollText, roles: ["admin", "crew", "client"] },
-    { id: "selections", label: "Selections", icon: Package, roles: ["admin", "crew", "client"] },
-    { id: "change-orders", label: "Change Orders", icon: FileSignature, roles: ["admin", "crew", "client"] },
-    { id: "site-visits", label: "Site Visits", icon: Footprints, roles: ["admin", "crew", "client"] },
-    { id: "board", label: "Planning Board", icon: Palette, roles: ["admin", "crew", "client"], clientRequiresInvite: true },
+    { id: "decisions", label: "Decisions", icon: ScrollText, roles: ["admin", "crew"] },
+    { id: "selections", label: "Selections", icon: Package, roles: ["admin", "crew"] },
+    { id: "change-orders", label: "Change Orders", icon: FileSignature, roles: ["admin", "crew"] },
+    { id: "site-visits", label: "Site Visits", icon: Footprints, roles: ["admin", "crew"] },
+    { id: "board", label: isClientView ? "Design Board" : "Planning Board", icon: Palette, roles: ["admin", "crew", "client"], clientRequiresInvite: true },
   ];
 
   const canViewTab = (tab: TabConfig) => {
