@@ -45,6 +45,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Progress } from "@/components/ui/progress";
 import {
   Select,
@@ -178,12 +179,30 @@ function dateRange(start: string | null, end: string | null): string {
 
 // -------------------- DueDate pill --------------------
 
-function DueDatePill({ task }: { task: Task }) {
+function DueDatePill({
+  task,
+  isAdmin,
+  onDueDateSave,
+}: {
+  task: Task;
+  isAdmin?: boolean;
+  onDueDateSave?: (taskId: number, dueDate: string | null) => void;
+}) {
   const bucket = bucketForTask(task);
   const due = safeParse(task.dueDate);
+  const [open, setOpen] = useState(false);
+  // Stage edits so the user can clear, type, and confirm before we save.
+  // dueDate is stored as ISO yyyy-MM-dd; the native picker uses the same.
+  const [draft, setDraft] = useState<string>(task.dueDate?.slice(0, 10) || "");
 
+  useEffect(() => {
+    setDraft(task.dueDate?.slice(0, 10) || "");
+  }, [task.dueDate, open]);
+
+  // Build the visual badge that gets rendered — click target wraps it for admin.
+  let badge: React.ReactNode;
   if (bucket === "done") {
-    return (
+    badge = (
       <Badge
         variant="outline"
         className="font-mono text-[10px] tracking-wider uppercase border-emerald-600/30 bg-emerald-50/50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400"
@@ -191,20 +210,18 @@ function DueDatePill({ task }: { task: Task }) {
         Done
       </Badge>
     );
-  }
-  if (!due) {
-    return (
+  } else if (!due) {
+    badge = (
       <Badge
         variant="outline"
         className="font-mono text-[10px] tracking-wider uppercase border-muted-foreground/20 text-muted-foreground"
       >
-        No date
+        {isAdmin ? "Set date" : "No date"}
       </Badge>
     );
-  }
-  if (bucket === "overdue") {
+  } else if (bucket === "overdue") {
     const days = Math.abs(differenceInDays(due, TODAY));
-    return (
+    badge = (
       <Badge
         variant="outline"
         className="font-mono text-[10px] tracking-wider uppercase border-rose-600/40 bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-400"
@@ -214,9 +231,8 @@ function DueDatePill({ task }: { task: Task }) {
         {days}d late
       </Badge>
     );
-  }
-  if (bucket === "thisweek") {
-    return (
+  } else if (bucket === "thisweek") {
+    badge = (
       <Badge
         variant="outline"
         className="font-mono text-[10px] tracking-wider uppercase border-amber-500/40 bg-amber-50 text-amber-800 dark:bg-amber-950/30 dark:text-amber-400"
@@ -225,14 +241,98 @@ function DueDatePill({ task }: { task: Task }) {
         {format(due, "EEE MMM d")}
       </Badge>
     );
+  } else {
+    badge = (
+      <Badge
+        variant="outline"
+        className="font-mono text-[10px] tracking-wider uppercase border-muted-foreground/20 text-muted-foreground"
+      >
+        {format(due, "MMM d")}
+      </Badge>
+    );
   }
+
+  // Non-admins (or rows missing a save handler) get the read-only pill.
+  if (!isAdmin || !onDueDateSave || bucket === "done") return <>{badge}</>;
+
+  const save = () => {
+    const next = draft.trim() || null;
+    const current = task.dueDate?.slice(0, 10) || null;
+    if (next !== current) onDueDateSave(task.id, next);
+    setOpen(false);
+  };
+
   return (
-    <Badge
-      variant="outline"
-      className="font-mono text-[10px] tracking-wider uppercase border-muted-foreground/20 text-muted-foreground"
-    >
-      {format(due, "MMM d")}
-    </Badge>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+          aria-label={due ? `Change due date (currently ${format(due, "MMM d")})` : "Set due date"}
+          data-testid={`task-duedate-trigger-${task.id}`}
+        >
+          {badge}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="end"
+        className="w-auto p-3 space-y-2"
+        onOpenAutoFocus={(e) => {
+          // Keep keyboard focus inside the popover — native date pickers are
+          // finicky on iOS Safari without an explicit focus pass.
+          e.preventDefault();
+          const inp = (e.currentTarget as HTMLElement).querySelector(
+            'input[type="date"]',
+          ) as HTMLInputElement | null;
+          inp?.focus();
+        }}
+      >
+        <label className="font-mono text-[10px] tracking-[0.18em] uppercase text-muted-foreground">
+          Due date
+        </label>
+        <Input
+          type="date"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              save();
+            }
+            if (e.key === "Escape") setOpen(false);
+          }}
+          className="h-9 w-44"
+          data-testid={`task-duedate-input-${task.id}`}
+        />
+        <div className="flex items-center gap-2 pt-1">
+          <Button
+            type="button"
+            size="sm"
+            className="h-8 flex-1"
+            onClick={save}
+            data-testid={`task-duedate-save-${task.id}`}
+          >
+            Save
+          </Button>
+          {due && (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-8 px-2 text-muted-foreground"
+              onClick={() => {
+                setDraft("");
+                onDueDateSave(task.id, null);
+                setOpen(false);
+              }}
+              data-testid={`task-duedate-clear-${task.id}`}
+            >
+              Clear
+            </Button>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -317,6 +417,7 @@ function SectionCard({
   onToggle,
   isAdmin,
   onTaskStatusToggle,
+  onTaskDueDateSave,
   onAddTask,
   onTaskTitleSave,
 }: {
@@ -327,6 +428,7 @@ function SectionCard({
   onToggle: () => void;
   isAdmin: boolean;
   onTaskStatusToggle: (task: Task) => void;
+  onTaskDueDateSave: (taskId: number, dueDate: string | null) => void;
   onAddTask: (sectionId: number, milestoneId: number) => void;
   onTaskTitleSave: (taskId: number, newTitle: string) => void;
 }) {
@@ -406,6 +508,7 @@ function SectionCard({
                   isAdmin={isAdmin}
                   onStatusToggle={() => onTaskStatusToggle(t)}
                   onTitleSave={(newTitle) => onTaskTitleSave(t.id, newTitle)}
+                  onDueDateSave={onTaskDueDateSave}
                 />
               ))}
             </ul>
@@ -436,11 +539,13 @@ function TaskRow({
   isAdmin,
   onStatusToggle,
   onTitleSave,
+  onDueDateSave,
 }: {
   task: Task;
   isAdmin: boolean;
   onStatusToggle: () => void;
   onTitleSave: (newTitle: string) => void;
+  onDueDateSave: (taskId: number, dueDate: string | null) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(task.title);
@@ -501,7 +606,7 @@ function TaskRow({
         )}
       </div>
 
-      <DueDatePill task={task} />
+      <DueDatePill task={task} isAdmin={isAdmin} onDueDateSave={onDueDateSave} />
     </li>
   );
 }
@@ -899,7 +1004,23 @@ export default function ProjectTimeline({
   const [viewMode, setViewMode] = useState<ViewMode>("stack");
   const [filter, setFilter] = useState<FilterChip>("all");
   const [milestoneFilter, setMilestoneFilter] = useState<number | "all">("all");
-  const [expanded, setExpanded] = useState<Set<number>>(new Set());
+  // Default every section to expanded so tasks are immediately visible —
+  // users were stuck on a list of section cards with no obvious way to
+  // interact with the underlying tasks.
+  const [expanded, setExpanded] = useState<Set<number>>(
+    () => new Set(sections.map((s) => s.id)),
+  );
+  // Keep the expansion set in sync as sections load in. We add new section ids
+  // to the expanded set but never remove ones the user has manually collapsed.
+  const sectionIdsKey = sections.map((s) => s.id).join(",");
+  useEffect(() => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      sections.forEach((s) => next.add(s.id));
+      return next;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sectionIdsKey]);
   const [addOpen, setAddOpen] = useState(false);
   const [addPreset, setAddPreset] = useState<{ sectionId: number | null; milestoneId: number | null }>({
     sectionId: null,
@@ -932,6 +1053,21 @@ export default function ProjectTimeline({
     },
     onError: () =>
       toast({ title: "Couldn't rename task", variant: "destructive" }),
+  });
+
+  // Due-date save mutation — used by the editable pill on each task row.
+  // Sending `null` clears the date.
+  const dueDateMut = useMutation({
+    mutationFn: async ({ id, dueDate }: { id: number; dueDate: string | null }) => {
+      const r = await apiRequest("PUT", `/api/tasks/${id}`, { dueDate });
+      if (!r.ok) throw new Error(await r.text().catch(() => "Save failed"));
+      return r.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [`/api/projects/${projectId}/tasks`] });
+    },
+    onError: () =>
+      toast({ title: "Couldn't update due date", variant: "destructive" }),
   });
 
   // Filter tasks
@@ -1186,6 +1322,9 @@ export default function ProjectTimeline({
                   }
                   onTaskTitleSave={(taskId, title) =>
                     titleMut.mutate({ id: taskId, title })
+                  }
+                  onTaskDueDateSave={(taskId, dueDate) =>
+                    dueDateMut.mutate({ id: taskId, dueDate })
                   }
                 />
               ))}

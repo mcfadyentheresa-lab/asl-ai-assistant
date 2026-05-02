@@ -269,8 +269,8 @@ export interface IStorage {
   getAllTasksWithProject(): Promise<(Task & { projectName: string; projectColor: string | null })[]>;
 
   // Recent Project Views
-  getRecentProjectViews(userId: string): Promise<{ id: number; name: string }[]>;
-  trackRecentProjectView(userId: string, projectId: number): Promise<void>;
+  getRecentProjectViews(userId: string): Promise<{ id: number; name: string; lastBoardId: number | null }[]>;
+  trackRecentProjectView(userId: string, projectId: number, lastBoardId?: number | null): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1265,9 +1265,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Recent Project Views
-  async getRecentProjectViews(userId: string): Promise<{ id: number; name: string }[]> {
+  async getRecentProjectViews(userId: string): Promise<{ id: number; name: string; lastBoardId: number | null }[]> {
     const rows = await db
-      .select({ id: projects.id, name: projects.name })
+      .select({ id: projects.id, name: projects.name, lastBoardId: recentProjectViews.lastBoardId })
       .from(recentProjectViews)
       .innerJoin(projects, eq(recentProjectViews.projectId, projects.id))
       .where(eq(recentProjectViews.userId, userId))
@@ -1276,13 +1276,19 @@ export class DatabaseStorage implements IStorage {
     return rows;
   }
 
-  async trackRecentProjectView(userId: string, projectId: number): Promise<void> {
+  async trackRecentProjectView(userId: string, projectId: number, lastBoardId?: number | null): Promise<void> {
+    // Only update lastBoardId when explicitly provided. A bare project visit
+    // (just opening the project page) should NOT clear an existing lastBoardId
+    // — we want "Jump back in" to keep pointing at the last board the user
+    // actually opened, even if they later return to the project landing.
+    const setOnConflict: Record<string, unknown> = { viewedAt: new Date() };
+    if (typeof lastBoardId === "number") setOnConflict.lastBoardId = lastBoardId;
     await db
       .insert(recentProjectViews)
-      .values({ userId, projectId, viewedAt: new Date() })
+      .values({ userId, projectId, lastBoardId: typeof lastBoardId === "number" ? lastBoardId : null, viewedAt: new Date() })
       .onConflictDoUpdate({
         target: [recentProjectViews.userId, recentProjectViews.projectId],
-        set: { viewedAt: new Date() },
+        set: setOnConflict,
       });
 
     // Prune to keep only the 3 most recent per user

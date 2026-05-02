@@ -1001,10 +1001,15 @@ export type RoomRender = typeof roomRenders.$inferSelect;
 export type InsertRoomRender = z.infer<typeof insertRoomRenderSchema>;
 
 // Recent Project Views (server-side per-user history)
+// lastBoardId remembers the planning board the user was on when they last
+// opened the project, so "Jump back in" can land them inside that board
+// instead of just on the project landing tab. Nullable on purpose: not
+// every visit involves a board, and the project may have zero boards.
 export const recentProjectViews = pgTable("recent_project_views", {
   id: serial("id").primaryKey(),
   userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   projectId: integer("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  lastBoardId: integer("last_board_id"),
   viewedAt: timestamp("viewed_at").defaultNow().notNull(),
 }, (table) => [
   uniqueIndex("recent_project_views_user_project_idx").on(table.userId, table.projectId),

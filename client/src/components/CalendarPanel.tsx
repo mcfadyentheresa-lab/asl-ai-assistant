@@ -161,13 +161,17 @@ export default function CalendarPanel({ projectId, compact = false, readOnly = f
     });
 
     tasksList.forEach((t) => {
-      if (t.startDate && t.dueDate) {
+      // Show tasks on the calendar whenever they have a due date.
+      // Quick-add only sets dueDate (not startDate), so requiring both was
+      // silently hiding most tasks from the calendar view. If startDate is
+      // missing, render the task as a single-day pin on its due date.
+      if (t.dueDate) {
         const parent = milestonesList.find((m) => m.id === t.milestoneId);
         const parentIdx = parent ? milestonesList.indexOf(parent) : 0;
         items.push({
           id: `task-${t.id}`,
           title: t.title,
-          startDate: t.startDate,
+          startDate: t.startDate || t.dueDate,
           endDate: t.dueDate,
           color: parent?.colorHex || CALENDAR_BUILDING_COLORS[parentIdx % CALENDAR_BUILDING_COLORS.length],
           layer: "timeline",
