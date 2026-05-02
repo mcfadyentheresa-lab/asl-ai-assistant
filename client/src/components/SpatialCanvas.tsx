@@ -5006,7 +5006,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                 {isSelected ? (
                   <div className="space-y-2">
                     <textarea
-                      className="w-full bg-transparent border-none text-xs outline-none resize-none"
+                      className="font-hand w-full bg-transparent border-none text-sm outline-none resize-none leading-relaxed"
                       rows={2}
                       key={`callout-text-${c.text}`}
                       defaultValue={c.text}
@@ -5028,7 +5028,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                     </div>
                   </div>
                 ) : (
-                  <p className="text-xs leading-relaxed" data-testid={`text-callout-${el.id}`}>
+                  <p className="font-hand text-sm leading-relaxed" data-testid={`text-callout-${el.id}`}>
                     {c.text || "Add note..."}
                   </p>
                 )}
@@ -5075,7 +5075,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
             {isSelected ? (
               <div className="space-y-2">
                 <input
-                  className="w-full bg-transparent border-none text-sm font-semibold outline-none placeholder:text-muted-foreground/50"
+                  className="font-hand w-full bg-transparent border-none text-base font-semibold outline-none placeholder:text-muted-foreground/50"
                   key={`txt-title-${c.title}`}
                   defaultValue={c.title}
                   placeholder="Title (optional)"
@@ -5087,7 +5087,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                     noteTextareaRefs.current[`${el.id}-note`] = ref;
                     if (ref) autoGrowTextarea(ref);
                   }}
-                  className="w-full bg-transparent border-none text-sm resize-none outline-none min-h-[60px] placeholder:text-muted-foreground/50 overflow-hidden"
+                  className="font-hand w-full bg-transparent border-none text-base resize-none outline-none min-h-[60px] placeholder:text-muted-foreground/50 overflow-hidden leading-relaxed"
                   key={`txt-text-${c.text}`}
                   defaultValue={c.text}
                   placeholder="Type your note..."
@@ -5099,8 +5099,8 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
               </div>
             ) : (
               <>
-                {c.title && <div className="text-sm font-semibold mb-1">{c.title}</div>}
-                <div className="text-sm text-muted-foreground whitespace-pre-wrap">{c.text || "Type your note here..."}</div>
+                {c.title && <div className="font-hand text-base font-semibold mb-1">{c.title}</div>}
+                <div className="font-hand text-base text-foreground/80 whitespace-pre-wrap leading-relaxed">{c.text || "Type your note here..."}</div>
               </>
             )}
           </div>

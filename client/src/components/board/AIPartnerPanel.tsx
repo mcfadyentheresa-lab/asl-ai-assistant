@@ -562,7 +562,7 @@ function ChatBubble({ turn, onApplyAction }: ChatBubbleProps) {
                     >
                       Note for the board
                     </div>
-                    <p className="text-[13px] text-foreground/80 leading-snug" style={{ fontFamily: "var(--font-serif)" }}>
+                    <p className="font-hand text-sm text-foreground/85 leading-relaxed">
                       {a.text}
                     </p>
                   </div>
