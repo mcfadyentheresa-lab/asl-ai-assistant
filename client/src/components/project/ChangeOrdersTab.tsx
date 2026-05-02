@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -21,7 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Loader2, Archive, ArchiveRestore } from "lucide-react";
+import { Plus, Loader2, Archive, ArchiveRestore, Paperclip, FileText, X } from "lucide-react";
 import { apiRequest, queryClient as qc } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -72,12 +72,26 @@ interface ChangeOrdersTabProps {
   userRole: string; // "admin" | "crew" | "client"
 }
 
+// Tracks an attachment that's either already in this project's documents library
+// (existing) or a fresh File the user just picked (new — uploaded on save).
+type FormAttachment =
+  | { kind: "existing"; documentId: number; title: string; url: string }
+  | { kind: "new"; file: File }
+  | null;
+
 const EMPTY_FORM = {
   title: "",
   description: "",
   amount: "",
   status: "draft",
   notes: "",
+};
+
+type ProjectDocument = {
+  id: number;
+  title: string;
+  url: string;
+  type: string;
 };
 
 function formatAmount(raw: string): string {
@@ -99,6 +113,28 @@ export function ChangeOrdersTab({ projectId, userRole }: ChangeOrdersTabProps) {
 
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<typeof EMPTY_FORM>(EMPTY_FORM);
+  const [attachment, setAttachment] = useState<FormAttachment>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Project documents — used both to render attachment names on saved COs and
+  // to power the "pick existing" picker in the form.
+  const { data: projectDocs } = useQuery<ProjectDocument[]>({
+    queryKey: ["/api/projects", projectId, "documents"],
+    queryFn: async () => {
+      const res = await fetch(`/api/projects/${projectId}/documents`, {
+        credentials: "include",
+      });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!projectId,
+  });
+  const docById = useMemo(() => {
+    const m = new Map<number, ProjectDocument>();
+    (projectDocs || []).forEach((d) => m.set(d.id, d));
+    return m;
+  }, [projectDocs]);
 
   const { data: changeOrders, isLoading } = useQuery<ChangeOrderRecord[]>({
     queryKey: ["/api/projects", projectId, "change-orders", { includeDrafts: true, includeArchived: true }],
@@ -114,7 +150,39 @@ export function ChangeOrdersTab({ projectId, userRole }: ChangeOrdersTabProps) {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (data: typeof EMPTY_FORM) => {
+    mutationFn: async ({
+      data,
+      attach,
+    }: {
+      data: typeof EMPTY_FORM;
+      attach: FormAttachment;
+    }) => {
+      // If the user picked a fresh file, upload it to the project's documents
+      // library first. The returned doc id becomes attachmentDocumentId.
+      let attachmentDocumentId: number | null = null;
+      if (attach?.kind === "existing") {
+        attachmentDocumentId = attach.documentId;
+      } else if (attach?.kind === "new") {
+        const fd = new FormData();
+        fd.append("file", attach.file);
+        fd.append("title", attach.file.name);
+        fd.append("type", "change-order");
+        const upRes = await fetch(
+          `/api/projects/${projectId}/documents/upload`,
+          { method: "POST", body: fd, credentials: "include" },
+        );
+        if (!upRes.ok) {
+          const errBody = await upRes.json().catch(() => ({}));
+          throw new Error(errBody?.message || "Couldn't upload attachment");
+        }
+        const doc = await upRes.json();
+        attachmentDocumentId = doc?.id ?? null;
+        // Refresh the documents list so the picker / link rendering see it.
+        qc.invalidateQueries({
+          queryKey: ["/api/projects", projectId, "documents"],
+        });
+      }
+
       const payload: Record<string, unknown> = {
         title: data.title.trim(),
         amount: data.amount.trim(),
@@ -122,6 +190,7 @@ export function ChangeOrdersTab({ projectId, userRole }: ChangeOrdersTabProps) {
       };
       if (data.description.trim()) payload.description = data.description.trim();
       if (data.notes.trim()) payload.notes = data.notes.trim();
+      if (attachmentDocumentId) payload.attachmentDocumentId = attachmentDocumentId;
       const res = await apiRequest(
         "POST",
         `/api/projects/${projectId}/change-orders`,
@@ -136,6 +205,7 @@ export function ChangeOrdersTab({ projectId, userRole }: ChangeOrdersTabProps) {
       });
       setOpen(false);
       setForm(EMPTY_FORM);
+      setAttachment(null);
       qc.invalidateQueries({
         queryKey: ["/api/projects", projectId, "change-orders"],
       });
@@ -299,6 +369,22 @@ export function ChangeOrdersTab({ projectId, userRole }: ChangeOrdersTabProps) {
                             {co.notes}
                           </p>
                         )}
+                        {co.attachmentDocumentId && (() => {
+                          const doc = docById.get(co.attachmentDocumentId!);
+                          if (!doc) return null;
+                          return (
+                            <a
+                              href={doc.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 mt-2 text-xs text-foreground/80 hover:text-foreground underline-offset-2 hover:underline"
+                              data-testid={`link-co-attachment-${co.id}`}
+                            >
+                              <FileText className="h-3.5 w-3.5" />
+                              <span className="truncate max-w-[260px]">{doc.title}</span>
+                            </a>
+                          );
+                        })()}
                       </div>
                       {canEdit && (
                         <div className="flex flex-col items-end gap-1.5 shrink-0">
@@ -378,6 +464,8 @@ export function ChangeOrdersTab({ projectId, userRole }: ChangeOrdersTabProps) {
             setOpen(o);
             if (!o) {
               setForm(EMPTY_FORM);
+              setAttachment(null);
+              setPickerOpen(false);
             }
           }}
         >
@@ -389,7 +477,14 @@ export function ChangeOrdersTab({ projectId, userRole }: ChangeOrdersTabProps) {
                 sent when ready for the client.
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-3">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!formValid || createMutation.isPending) return;
+                createMutation.mutate({ data: form, attach: attachment });
+              }}
+              className="space-y-3"
+            >
               <div className="space-y-1.5">
                 <Label htmlFor="co-title">Title</Label>
                 <Input
@@ -463,27 +558,125 @@ export function ChangeOrdersTab({ projectId, userRole }: ChangeOrdersTabProps) {
                   data-testid="input-co-notes"
                 />
               </div>
-            </div>
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setOpen(false)}
-                disabled={createMutation.isPending}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={() => createMutation.mutate(form)}
-                disabled={!formValid || createMutation.isPending}
-                data-testid="button-save-change-order"
-              >
-                {createMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
+
+              {/* Attachment — upload a new file or pick one already in this project's docs.
+                  Saved to documents library on submit; FK lives on the change order. */}
+              <div className="space-y-1.5">
+                <Label>Attachment <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                {attachment ? (
+                  <div className="flex items-center justify-between gap-2 rounded-md border bg-muted/40 px-2.5 py-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <span className="text-sm truncate" data-testid="co-attachment-name">
+                        {attachment.kind === "existing" ? attachment.title : attachment.file.name}
+                      </span>
+                      {attachment.kind === "new" && (
+                        <Badge variant="outline" className="text-[9px] uppercase tracking-wider no-default-hover-elevate no-default-active-elevate shrink-0">
+                          New
+                        </Badge>
+                      )}
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 shrink-0"
+                      onClick={() => setAttachment(null)}
+                      aria-label="Remove attachment"
+                      data-testid="button-co-remove-attachment"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
                 ) : (
-                  "Save change order"
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fileInputRef.current?.click()}
+                      data-testid="button-co-upload-attachment"
+                    >
+                      <Paperclip className="h-3.5 w-3.5 mr-1.5" />
+                      Upload file
+                    </Button>
+                    {(projectDocs?.length || 0) > 0 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setPickerOpen((v) => !v)}
+                        data-testid="button-co-pick-existing"
+                      >
+                        <FileText className="h-3.5 w-3.5 mr-1.5" />
+                        Pick from documents
+                      </Button>
+                    )}
+                  </div>
                 )}
-              </Button>
-            </DialogFooter>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) setAttachment({ kind: "new", file: f });
+                    // reset so picking the same file twice still triggers change
+                    e.target.value = "";
+                  }}
+                  data-testid="input-co-file"
+                />
+                {pickerOpen && !attachment && (projectDocs?.length || 0) > 0 && (
+                  <div className="mt-1 max-h-44 overflow-y-auto rounded-md border bg-popover">
+                    <ul className="py-1">
+                      {(projectDocs || []).map((d) => (
+                        <li key={d.id}>
+                          <button
+                            type="button"
+                            className="w-full flex items-center gap-2 px-2.5 py-1.5 text-left text-sm hover:bg-muted"
+                            onClick={() => {
+                              setAttachment({
+                                kind: "existing",
+                                documentId: d.id,
+                                title: d.title,
+                                url: d.url,
+                              });
+                              setPickerOpen(false);
+                            }}
+                            data-testid={`button-co-pick-doc-${d.id}`}
+                          >
+                            <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                            <span className="truncate">{d.title}</span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setOpen(false)}
+                  disabled={createMutation.isPending}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={!formValid || createMutation.isPending}
+                  data-testid="button-save-change-order"
+                >
+                  {createMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    "Save change order"
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
           </DialogContent>
         </Dialog>
       )}

@@ -9,6 +9,9 @@ const MAX_RECENT = 3;
 export interface RecentProject {
   id: number;
   name: string;
+  // Optional id of the last planning board the user opened on this project.
+  // Used by "Jump back in" so re-entry lands on the exact board they left.
+  lastBoardId?: number | null;
 }
 
 function loadRecent(): RecentProject[] {
@@ -45,22 +48,38 @@ export function useRecentProjects() {
   }, [isSuccess, serverProjects]);
 
   const mutation = useMutation({
-    mutationFn: (projectId: number) =>
-      apiRequest("POST", "/api/recent-projects", { projectId }),
+    mutationFn: (vars: { projectId: number; boardId?: number }) =>
+      apiRequest("POST", "/api/recent-projects", {
+        projectId: vars.projectId,
+        ...(typeof vars.boardId === "number" ? { boardId: vars.boardId } : {}),
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/recent-projects"] });
     },
   });
 
+  // Track a project visit. Pass `boardId` only when the user actually opened a
+  // planning board — otherwise we keep whatever lastBoardId the server already
+  // has (so a bare project visit doesn't wipe out the board the user wants to
+  // jump back into).
   const trackProject = useCallback(
-    (project: RecentProject) => {
+    (project: RecentProject, boardId?: number) => {
       setLocalProjects((prev) => {
+        const existing = prev.find((p) => p.id === project.id);
+        const merged: RecentProject = {
+          id: project.id,
+          name: project.name,
+          lastBoardId:
+            typeof boardId === "number"
+              ? boardId
+              : project.lastBoardId ?? existing?.lastBoardId ?? null,
+        };
         const filtered = prev.filter((p) => p.id !== project.id);
-        const next = [project, ...filtered].slice(0, MAX_RECENT);
+        const next = [merged, ...filtered].slice(0, MAX_RECENT);
         saveRecent(next);
         return next;
       });
-      mutation.mutate(project.id);
+      mutation.mutate({ projectId: project.id, boardId });
     },
     [mutation],
   );

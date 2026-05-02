@@ -127,7 +127,11 @@ export default function PresentationMode({
     const product = elements.filter((e) => e.type === "product");
     const notes = elements.filter((e) =>
       e.type === "note" || e.type === "plain_text" ||
-      (e.type === "text" && ((e.content as any)?.variant === "note" || (e.content as any)?.variant === "clean"))
+      // Treat any "text" element as a note unless it has been explicitly
+      // marked as a callout/heading variant. Older elements were saved
+      // without a variant field at all, so we must include them by default
+      // — otherwise long-form notes silently disappear from Present mode.
+      (e.type === "text" && (e.content as any)?.variant !== "callout" && (e.content as any)?.variant !== "heading")
     );
     const sectionHeaders = elements.filter((e) =>
       e.type === "section_header" || (e.type === "text" && (e.content as any)?.variant === "heading")

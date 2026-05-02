@@ -192,7 +192,11 @@ export function SidebarNav({ onNavigate, compact = false }: SidebarNavProps) {
               {recentProjects.map((p) => (
                 <NavLink
                   key={p.id}
-                  path={`/project/${p.id}`}
+                  path={
+                    p.lastBoardId
+                      ? `/project/${p.id}?tab=planning&board=${p.lastBoardId}`
+                      : `/project/${p.id}`
+                  }
                   icon={Clock}
                   label={p.name}
                   active={location.startsWith(`/project/${p.id}`)}

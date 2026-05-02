@@ -43,8 +43,12 @@ export function CrewDashboardView({
   const { recentProjects } = useRecentProjects();
 
   const recentWithData = recentProjects
-    .map((r) => projects?.find((p) => p.id === r.id))
-    .filter((p): p is Project => p !== undefined)
+    .map((r) => {
+      const project = projects?.find((p) => p.id === r.id);
+      if (!project) return null;
+      return { project, lastBoardId: r.lastBoardId ?? null };
+    })
+    .filter((x): x is { project: Project; lastBoardId: number | null } => x !== null)
     .slice(0, 3);
 
   const todayStr = new Date().toISOString().split("T")[0];
@@ -75,7 +79,7 @@ export function CrewDashboardView({
             <span className="text-xs font-medium tracking-widest uppercase text-muted-foreground">Jump back in</span>
           </div>
           <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1">
-            {recentWithData.map((project, idx) => (
+            {recentWithData.map(({ project, lastBoardId }, idx) => (
               <motion.div
                 key={project.id}
                 initial={{ opacity: 0, y: 10 }}
@@ -83,7 +87,14 @@ export function CrewDashboardView({
                 transition={{ delay: idx * 0.06 }}
                 className="flex-shrink-0 w-56"
               >
-                <Link href={`/project/${project.id}`} data-testid={`link-crew-recent-project-${project.id}`}>
+                <Link
+                  href={
+                    lastBoardId
+                      ? `/project/${project.id}?tab=planning&board=${lastBoardId}`
+                      : `/project/${project.id}`
+                  }
+                  data-testid={`link-crew-recent-project-${project.id}`}
+                >
                   <div
                     className="group flex flex-col rounded-xl border border-border/60 bg-card hover:bg-muted/30 hover:border-border transition-colors cursor-pointer overflow-hidden"
                     data-testid={`card-crew-recent-project-${project.id}`}

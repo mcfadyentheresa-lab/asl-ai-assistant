@@ -173,14 +173,16 @@ export default function MasterCalendar() {
     });
 
     data.tasks.forEach((t) => {
-      if (t.startDate && t.dueDate) {
+      // Show tasks whenever they have a due date — don't require startDate
+      // (quick-add doesn't set it, so tasks were being silently hidden).
+      if (t.dueDate) {
         items.push({
           id: `task-${t.id}`,
           title: t.title,
           projectName: t.projectName,
           projectId: t.projectId,
           projectColor: t.projectColor,
-          startDate: t.startDate,
+          startDate: t.startDate || t.dueDate,
           endDate: t.dueDate,
           color: milestoneColorMap.get(t.milestoneId ?? 0) || BUILDING_COLORS[0],
           layer: "timeline",

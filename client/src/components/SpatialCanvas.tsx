@@ -86,6 +86,7 @@ import {
 } from "@/lib/board-rooms";
 import { useToast } from "@/hooks/use-toast";
 import { usePlanningBoards, useCreatePlanningBoard, useDeletePlanningBoard, useUpdatePlanningBoard, useUploadImage, useUsers, useProjects, useMilestones, useChecklistItems, useCalendarEvents, useUpdateCalendarEvent, useDeleteCalendarEvent, useCreateCalendarEvent, useCreateMilestone, useCreateChecklistItem, useSuggestedCategories } from "@/hooks/use-projects";
+import { useRecentProjects } from "@/hooks/use-recent-projects";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -478,7 +479,21 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
   // a clean iconic tile when this map yields undefined for a template id.
   const templatePreviewById: Record<string, string> = {};
 
-  const [selectedBoardId, setSelectedBoardId] = useState<number | null>(null);
+  // ?board=<id> deep link — used by "Jump back in" so the user lands directly on
+  // the last board they had open. Read once on mount; we still defensively
+  // re-validate against the actual boards list once it loads.
+  const initialBoardFromUrl = (() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const raw = params.get("board");
+      const n = raw ? Number(raw) : NaN;
+      return Number.isFinite(n) && n > 0 ? n : null;
+    } catch {
+      return null;
+    }
+  })();
+  const [selectedBoardId, setSelectedBoardId] = useState<number | null>(initialBoardFromUrl);
+  const consumedUrlBoardRef = useRef<boolean>(false);
   const justCreatedBoardId = useRef<number | null>(null);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -683,6 +698,49 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
     todoResizeObservers.current.clear();
     todoResizeRafs.current.forEach((id) => cancelAnimationFrame(id));
     todoResizeRafs.current.clear();
+    noteResizeObservers.current.forEach((ob) => ob.disconnect());
+    noteResizeObservers.current.clear();
+    noteResizeRafs.current.forEach((id) => cancelAnimationFrame(id));
+    noteResizeRafs.current.clear();
+  }, []);
+
+  // Same observer pattern for note/text elements: when the rendered text
+  // overflows the persisted height, bump el.height up so resize handles,
+  // export tooling, and presentation see the actual size. Notes only ever
+  // grow this way — manual shrink still wins, and the snap is gentle to
+  // avoid feedback loops with the textarea autoGrow.
+  const noteResizeObservers = useRef<Map<number, ResizeObserver>>(new Map());
+  const noteResizeRafs = useRef<Map<number, number>>(new Map());
+  const detachNoteResizeObserver = useCallback((elementId: number) => {
+    const ob = noteResizeObservers.current.get(elementId);
+    if (ob) { ob.disconnect(); noteResizeObservers.current.delete(elementId); }
+    const raf = noteResizeRafs.current.get(elementId);
+    if (raf) { cancelAnimationFrame(raf); noteResizeRafs.current.delete(elementId); }
+  }, []);
+  const attachNoteResizeObserver = useCallback((elementId: number, node: HTMLElement) => {
+    if (noteResizeObservers.current.has(elementId)) return;
+    const ob = new ResizeObserver(() => {
+      const measured = node.offsetHeight;
+      const prev = noteResizeRafs.current.get(elementId);
+      if (prev) cancelAnimationFrame(prev);
+      const rafId = requestAnimationFrame(() => {
+        noteResizeRafs.current.delete(elementId);
+        const current = useCanvasStore.getState().elements[elementId];
+        if (!current) return;
+        const isNoteish =
+          current.type === "note" || current.type === "plain_text" || current.type === "text";
+        if (!isNoteish) return;
+        const snapped = Math.max(80, Math.round(measured / GRID_SIZE) * GRID_SIZE);
+        // Only grow — never auto-shrink (would fight the user's manual resize).
+        if (snapped <= (current.height ?? 0) + 4) return;
+        useCanvasStore.getState().updateElement(elementId, { height: snapped });
+        const boardId = useCanvasStore.getState().boardId;
+        if (boardId) debouncedSavePositions(boardId);
+      });
+      noteResizeRafs.current.set(elementId, rafId);
+    });
+    ob.observe(node);
+    noteResizeObservers.current.set(elementId, ob);
   }, []);
   const [drawingMode, setDrawingMode] = useState(false);
   const [drawTool, setDrawTool] = useState<"pen" | "eraser">("pen");
@@ -981,15 +1039,47 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
       justCreatedBoardId.current = null;
       return;
     }
-    if (boards.length > 0 && !selectedBoardId) {
+    if (boards.length === 0) return;
+    // Honor the ?board= URL param exactly once — only if it actually exists in
+    // the loaded boards list. Otherwise fall back to the first board.
+    if (!consumedUrlBoardRef.current) {
+      consumedUrlBoardRef.current = true;
+      if (initialBoardFromUrl && (boards as any[]).some((b: any) => b.id === initialBoardFromUrl)) {
+        if (selectedBoardId !== initialBoardFromUrl) setSelectedBoardId(initialBoardFromUrl);
+        return;
+      }
+    }
+    if (!selectedBoardId) {
       setSelectedBoardId(boards[0].id);
     }
-  }, [boards, selectedBoardId]);
+  }, [boards, selectedBoardId, initialBoardFromUrl]);
+
+  // Track lastBoardId on "recent projects" whenever the user lands on / switches
+  // to a board. Only fires for non-client roles (clients don't get the
+  // "Jump back in" rail).
+  const { trackProject: trackRecentProject } = useRecentProjects();
+  const trackedBoardRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!selectedBoardId) return;
+    if (user?.role === "client") return;
+    if (trackedBoardRef.current === selectedBoardId) return;
+    const proj = (allProjects as any[]).find((p) => p.id === projectId);
+    if (!proj) return;
+    trackedBoardRef.current = selectedBoardId;
+    trackRecentProject({ id: proj.id, name: proj.name }, selectedBoardId);
+  }, [selectedBoardId, projectId, allProjects, user?.role, trackRecentProject]);
 
   useEffect(() => {
     if (!selectedBoardId) return;
     setBoardId(selectedBoardId);
     setLoading(true);
+    // CRITICAL: clear elements immediately when switching boards. Without
+    // this, the previous board's elements keep rendering for the 200-800ms
+    // it takes to fetch the new board's data — then they're abruptly
+    // replaced. To the user this looks like "the previous board populates
+    // my new board, then disappears." Clearing on switch makes the new
+    // board appear empty (correct) until its real data arrives.
+    setElements([]);
     const url = buildUrl(api.canvasElements.list.path, { boardId: selectedBoardId });
     fetch(url, { credentials: "include" })
       .then((r) => r.json())
@@ -2169,17 +2259,18 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
     const action = popUndo();
     if (!action) return;
 
-    switch (action.type) {
-      case "create": {
-        removeElement(action.elementId);
-        try {
+    let succeeded = false;
+    try {
+      switch (action.type) {
+        case "create": {
+          removeElement(action.elementId);
           const url = buildUrl(api.canvasElements.delete.path, { id: action.elementId });
-          await fetch(url, { method: "DELETE", credentials: "include" });
-        } catch {}
-        break;
-      }
-      case "delete": {
-        try {
+          const res = await fetch(url, { method: "DELETE", credentials: "include" });
+          // 404 is acceptable — the element may already be gone server-side.
+          succeeded = res.ok || res.status === 404;
+          break;
+        }
+        case "delete": {
           const url = buildUrl(api.canvasElements.create.path, { boardId: selectedBoardId });
           const res = await fetch(url, {
             method: "POST",
@@ -2196,35 +2287,54 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
               parentColumnId: action.element.parentColumnId,
             }),
           });
-          const restored = await res.json();
-          addElement(restored);
-          sendElementAdd(restored);
-        } catch {}
-        break;
-      }
-      case "move": {
-        moveElement(action.elementId, action.prevX, action.prevY);
-        debouncedSavePositions(selectedBoardId);
-        break;
-      }
-      case "update": {
-        const el = elements[action.elementId];
-        if (el) {
-          updateElement(action.elementId, action.prevUpdates);
-          try {
+          if (res.ok) {
+            const restored = await res.json();
+            if (restored && typeof restored.id === "number") {
+              addElement(restored);
+              sendElementAdd(restored);
+              succeeded = true;
+            }
+          }
+          break;
+        }
+        case "move": {
+          moveElement(action.elementId, action.prevX, action.prevY);
+          debouncedSavePositions(selectedBoardId);
+          succeeded = true;
+          break;
+        }
+        case "update": {
+          const el = elements[action.elementId];
+          if (el) {
+            updateElement(action.elementId, action.prevUpdates);
             const url = buildUrl(api.canvasElements.update.path, { id: action.elementId });
-            await fetch(url, {
+            const res = await fetch(url, {
               method: "PATCH",
               headers: { "Content-Type": "application/json" },
               credentials: "include",
               body: JSON.stringify(action.prevUpdates),
             });
-          } catch {}
+            succeeded = res.ok;
+          }
+          break;
         }
-        break;
       }
+    } catch {
+      succeeded = false;
     }
-    toast({ title: "Undone", description: "Last action reversed." });
+
+    if (succeeded) {
+      toast({ title: "Undone", description: "Last action reversed." });
+    } else {
+      // Pull the truth from the server so the canvas matches reality —
+      // never silently lie that something was undone.
+      try { await refreshCanvasFromServer(); } catch {}
+      toast({
+        title: "Couldn't undo",
+        description: "That action couldn't be reversed. The board has been refreshed.",
+        variant: "destructive",
+      });
+    }
   }, [selectedBoardId, elements]);
 
   // Unified action dispatcher used by the Add palette, mobile bar, and shortcuts.
@@ -4941,6 +5051,10 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
       return (
         <div
           key={el.id}
+          ref={(node) => {
+            if (node) attachNoteResizeObserver(el.id, node);
+            else detachNoteResizeObserver(el.id);
+          }}
           className={`${cardBase} ${isClean ? "bg-transparent border-0 shadow-none" : "bg-card border border-border"} cursor-grab`}
           style={{ left: el.x, top: el.y, width: el.width, minHeight: el.height, zIndex: effectiveZ }}
           onMouseDown={(e) => {
@@ -9407,6 +9521,9 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
           boardId={selectedBoardId}
           elements={Object.values(elements)}
           hasClient={Boolean(allProjects.find((p: any) => p.id === projectId)?.clientId)}
+          // Bridge: when the co-designer proposes a note and the user taps
+          // "Add", drop a real text element on this board's canvas.
+          onAddNote={(text) => createNoteFromText(text)}
         />
       )}
 

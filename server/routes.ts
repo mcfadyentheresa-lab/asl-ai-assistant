@@ -470,16 +470,23 @@ export async function registerRoutes(
 
   app.post("/api/recent-projects", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub;
-    const parseResult = z.object({ projectId: z.number().int().positive() }).safeParse(req.body);
+    // boardId is optional — the client passes it when the user actually opens
+    // a planning board so "Jump back in" can land them back inside that board.
+    // A bare project-landing visit posts without boardId and we keep the
+    // previous lastBoardId untouched.
+    const parseResult = z.object({
+      projectId: z.number().int().positive(),
+      boardId: z.number().int().positive().optional(),
+    }).safeParse(req.body);
     if (!parseResult.success) return res.status(400).json({ message: "Invalid request body", errors: parseResult.error.errors });
-    const { projectId } = parseResult.data;
+    const { projectId, boardId } = parseResult.data;
     const project = await storage.getProject(projectId);
     if (!project) return res.status(404).json({ message: "Project not found" });
     const dbUser = await authStorage.getUser(userId);
     if (dbUser?.role === "client" && project.clientId !== userId) {
       return res.status(403).json({ message: "Forbidden" });
     }
-    await storage.trackRecentProjectView(userId, projectId);
+    await storage.trackRecentProjectView(userId, projectId, boardId);
     res.json({ success: true });
   }));
 
@@ -3321,8 +3328,16 @@ Respond with ONLY a JSON object: { "suggestions": Suggestion[] } where Suggestio
     }
   }));
 
+  // Conversation messages are passed as a flat array. Wire-shape mirrors
+  // OpenAI: { role: "user" | "assistant", content: string }. Server caps the
+  // total turns to keep prompts bounded.
+  const ChatMessageSchema = z.object({
+    role: z.enum(["user", "assistant"]),
+    content: z.string().min(1).max(2000),
+  });
   const BoardPromptSchema = PulseDigestSchema.extend({
     prompt: z.string().min(1).max(500),
+    messages: z.array(ChatMessageSchema).max(40).optional(),
   });
 
   app.post("/api/ai/board-prompt", isAuthenticated, asyncHandler(async (req: any, res) => {
@@ -3368,7 +3383,17 @@ Respond with ONLY a JSON object: { "suggestions": Suggestion[] } where Suggestio
     }
     const summary = lines.join("\n");
 
-    const systemPrompt = `You are an interior designer responding to a co-designer's question about their working moodboard. Reply in 1-3 short sentences (≤ 280 characters total), conversational and specific. Reference items by name when relevant. Do not list. Just talk.`;
+    // Teammate tone, not assistant tone — the user is explicit about this.
+    // The model speaks as a fellow designer working alongside them. It can
+    // optionally propose a single "add a note to the board" action by
+    // emitting a strict JSON tail block that the client parses out.
+    const systemPrompt = [
+      "You are an interior designer working SIDE BY SIDE with another designer on a shared moodboard. You are teammates, not an assistant. Use language like \"let's\", \"what if we\", \"I'm thinking\", \"could we\". Never say \"let me help you\", \"happy to help\", \"as an AI\", or anything subservient.",
+      "Reply naturally in 1–3 short sentences (≤ 320 characters of prose), conversational and specific. Reference items by name when relevant. No bullet lists, no headers.",
+      "If — and only if — a short sticky note would genuinely help capture a decision, reminder, or design direction worth keeping on the board, append EXACTLY ONE additional line at the very end of your reply, on its own line, in this exact format:",
+      "<<ACTION>>{\"kind\":\"add_note\",\"text\":\"… ≤ 240 chars…\"}<<END>>",
+      "Otherwise, omit the action block entirely. Never propose more than one note. Never invent images, paint colors, or supplier names you weren't given. The action block, if present, must be valid JSON.",
+    ].join("\n\n");
 
     try {
       const OpenAI = (await import("openai")).default;
@@ -3377,16 +3402,62 @@ Respond with ONLY a JSON object: { "suggestions": Suggestion[] } where Suggestio
         baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || process.env.OPENAI_BASE_URL,
       });
 
+      // Build the OpenAI messages: system + board context + prior turns + current prompt.
+      // Prior turns let the model remember what we just decided in this thread
+      // — that's the single-thread Perplexity-style behavior the user asked for.
+      const oiMessages: { role: "system" | "user" | "assistant"; content: string }[] = [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: `Board state right now:\n${summary}` },
+      ];
+      const history = digest.messages || [];
+      // Drop the trailing user turn from history if it duplicates `prompt` so
+      // we don't send the same message twice.
+      const tail = history[history.length - 1];
+      const trimmed = tail && tail.role === "user" && tail.content === digest.prompt
+        ? history.slice(0, -1)
+        : history;
+      for (const m of trimmed) {
+        oiMessages.push({ role: m.role, content: m.content });
+      }
+      oiMessages.push({ role: "user", content: digest.prompt });
+
       const response = await client.chat.completions.create({
         model: "gpt-5-mini",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: `Board state:\n${summary}\n\nMy question: ${digest.prompt}` },
-        ],
+        messages: oiMessages,
       } as any);
 
-      const text = response.choices[0]?.message?.content?.trim() || "Couldn't read the board well enough — try again?";
-      res.json({ text, generatedAt: new Date().toISOString() });
+      const raw = response.choices[0]?.message?.content?.trim() || "Couldn't read the board well enough — try again?";
+
+      // Parse out an optional <<ACTION>>{...}<<END>> tail. If present and well
+      // formed, surface it as `actions`; the prose part stays in `text`.
+      let text = raw;
+      const actions: { kind: string; text: string }[] = [];
+      const actionMatch = raw.match(/<<ACTION>>([\s\S]*?)<<END>>/);
+      if (actionMatch) {
+        try {
+          const parsedAction = JSON.parse(actionMatch[1].trim());
+          if (
+            parsedAction &&
+            parsedAction.kind === "add_note" &&
+            typeof parsedAction.text === "string" &&
+            parsedAction.text.trim().length > 0
+          ) {
+            actions.push({
+              kind: "add_note",
+              text: parsedAction.text.trim().slice(0, 240),
+            });
+          }
+        } catch {
+          // Bad JSON — ignore. Prose still ships.
+        }
+        text = raw.replace(/<<ACTION>>[\s\S]*?<<END>>/, "").trim();
+      }
+
+      res.json({
+        text,
+        actions: actions.length ? actions : undefined,
+        generatedAt: new Date().toISOString(),
+      });
     } catch (error: any) {
       console.error("Board prompt error:", error?.status, error?.message, error?.response?.data || error);
       const detail = error?.message || "Unknown error";

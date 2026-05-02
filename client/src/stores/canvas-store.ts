@@ -93,6 +93,11 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   setLoading: (loading) => set({ loading }),
 
   addElement: (element) => {
+    // Guard against malformed responses (e.g. server error JSON like
+    // { message: "..." }) that would land an entry under key `undefined`
+    // in the elements map. Such entries silently break undo (the undo
+    // stack would then point to a non-existent id) and pollute renders.
+    if (!element || typeof (element as any).id !== "number") return;
     const migrated = migrateElement(element);
     set((s) => ({ elements: { ...s.elements, [migrated.id]: migrated } }));
   },
@@ -130,6 +135,15 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   },
 
   pushUndo: (action) => {
+    // Reject malformed actions — an undo entry whose target id is
+    // undefined will appear to "work" (the button enables, the toast
+    // shows) but actually removes nothing, which is exactly the kind of
+    // ghost behavior the user has flagged.
+    if (!action) return;
+    if (action.type === "create" && typeof action.elementId !== "number") return;
+    if (action.type === "delete" && (!action.element || typeof (action.element as any).id !== "number")) return;
+    if (action.type === "move" && typeof action.elementId !== "number") return;
+    if (action.type === "update" && typeof action.elementId !== "number") return;
     set((s) => ({
       undoStack: [...s.undoStack.slice(-MAX_UNDO + 1), action],
     }));
