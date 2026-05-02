@@ -256,14 +256,16 @@ export async function setupAuth(app: Express) {
       if (err) return next(err);
       if (!user) return res.status(401).json({ message: info?.message || "Invalid email or password" });
 
-      // MFA gate (lightweight scaffold — real TOTP verify lives in PR follow-up).
+      // MFA gate. TOTP verification isn't wired yet, so we cannot enforce a
+      // code — but we also must not brick accounts that have mfaEnabled=true
+      // sitting in the database. Until TOTP ships we log a warning and let
+      // the password-only login through, equivalent to MFA being disabled.
+      // When TOTP lands this branch will verify parsed.mfaCode against
+      // user.mfaSecret and return mfaRequired:true if missing.
       if (user.mfaEnabled && user.mfaSecret) {
-        if (!parsed.mfaCode) {
-          return res.status(401).json({ message: "MFA code required", mfaRequired: true });
-        }
-        // TODO: verify TOTP against user.mfaSecret. For now reject any code so
-        // accounts with mfaEnabled=true cannot log in until verification is wired.
-        return res.status(401).json({ message: "MFA verification not yet enabled" });
+        console.warn(
+          `[auth] User ${user.id} has mfaEnabled=true but TOTP verification is not yet implemented \u2014 allowing password-only login.`,
+        );
       }
 
       req.logIn(user, async (loginErr) => {
