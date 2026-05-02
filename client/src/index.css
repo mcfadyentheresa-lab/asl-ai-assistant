@@ -60,6 +60,8 @@ html {
   --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
   --font-serif: 'Inter Tight', 'Inter', ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+  /* Drafting print — hand-drawn feel for notes/headings on the board */
+  --font-hand: 'Architects Daughter', 'Caveat', ui-rounded, system-ui, sans-serif;
 
   /* 8px to match mockup --radius-md */
   --radius: 0.5rem;
@@ -298,16 +300,22 @@ html {
   }
 }
 
-/* Designer typography for board section headers — Inter Tight reads as "designed" vs. plain Inter */
+/* Drafting-print typography for board section headers — reads as hand-drawn on a board */
 .board-section-header {
-  font-family: 'Inter Tight', 'Inter', ui-sans-serif, system-ui, sans-serif;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  line-height: 1.1;
+  font-family: var(--font-hand);
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  line-height: 1.15;
 }
-.board-section-header.tracking-tight { letter-spacing: -0.035em; }
-.board-section-header.tracking-normal { letter-spacing: -0.015em; }
-.board-section-header.tracking-wide { letter-spacing: 0.04em; }
+.board-section-header.tracking-tight { letter-spacing: -0.01em; }
+.board-section-header.tracking-normal { letter-spacing: 0.01em; }
+.board-section-header.tracking-wide { letter-spacing: 0.06em; }
+
+/* Drafting-print body for hand notes — a touch larger than the sans default for legibility */
+.font-hand {
+  font-family: var(--font-hand);
+  letter-spacing: 0.005em;
+}
 
 ::-webkit-scrollbar {
   width: 8px;
