@@ -2989,11 +2989,38 @@ function templateCanvasToElements(canvasData: any, boardId: number, createdBy: s
     if (!board) return res.status(404).json({ error: "Not found" });
 
     const elements = await storage.getCanvasElements(board.id);
+    // Stamp the share token onto any /objects/* image URLs so the public
+    // presentation page can read them without being logged in. /objects/*
+    // is now auth-gated; the ?pt=<token> grants scoped read access for the
+    // duration the share link is alive.
+    const stampPt = (val: any): any => {
+      if (typeof val !== "string") return val;
+      if (!val.startsWith("/objects/")) return val;
+      return val.includes("?") ? `${val}&pt=${token}` : `${val}?pt=${token}`;
+    };
+    const stampedElements = (elements as any[]).map((el) => {
+      if (!el || typeof el !== "object") return el;
+      const next = { ...el };
+      for (const k of ["imageUrl", "image_url", "url", "src", "thumbnailUrl"]) {
+        if (k in next) next[k] = stampPt(next[k]);
+      }
+      // Some elements nest the image inside `data` / `props` / `content`.
+      for (const wrapper of ["data", "props", "content"]) {
+        if (next[wrapper] && typeof next[wrapper] === "object") {
+          const w = { ...next[wrapper] };
+          for (const k of ["imageUrl", "image_url", "url", "src", "thumbnailUrl"]) {
+            if (k in w) w[k] = stampPt(w[k]);
+          }
+          next[wrapper] = w;
+        }
+      }
+      return next;
+    });
     res.json({
       projectId: board.projectId,
       boardId: board.id,
       boardName: board.name,
-      elements,
+      elements: stampedElements,
     });
   }));
 
