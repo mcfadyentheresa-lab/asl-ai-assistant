@@ -495,19 +495,16 @@ export default function PresentationMode({
               const text = (c.text || c.content || "").toString().trim();
               if (!text) return null;
               return (
-                <blockquote
+                <div
                   key={n.id}
-                  className="text-2xl md:text-3xl text-foreground leading-[1.5]"
-                  style={{ fontFamily: "var(--font-serif)", fontWeight: 500, letterSpacing: "-0.015em" }}
+                  className="font-hand uppercase text-2xl md:text-3xl text-foreground leading-[1.4] tracking-wide"
                   data-testid={`presentation-note-${n.id}`}
                 >
-                  <span aria-hidden className="text-primary/40 mr-2">&ldquo;</span>
                   {text}
-                  <span aria-hidden className="text-primary/40 ml-1">&rdquo;</span>
-                  <footer className="mt-4 text-[10px] uppercase text-muted-foreground" style={{ fontFamily: "var(--font-mono)", letterSpacing: "0.2em", fontWeight: 400 }}>
+                  <div className="mt-4 text-[10px] uppercase text-muted-foreground" style={{ fontFamily: "var(--font-mono)", letterSpacing: "0.2em", fontWeight: 400 }}>
                     — {projectName}
-                  </footer>
-                </blockquote>
+                  </div>
+                </div>
               );
             })}
           </div>

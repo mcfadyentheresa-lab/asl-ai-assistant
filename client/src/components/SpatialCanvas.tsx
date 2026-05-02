@@ -720,7 +720,10 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
   const attachNoteResizeObserver = useCallback((elementId: number, node: HTMLElement) => {
     if (noteResizeObservers.current.has(elementId)) return;
     const ob = new ResizeObserver(() => {
-      const measured = node.offsetHeight;
+      // Use scrollHeight so we read intrinsic content height even when the
+      // outer card has an explicit height (which is required for the user
+      // to manually resize the block down).
+      const measured = Math.max(node.scrollHeight, node.offsetHeight);
       const prev = noteResizeRafs.current.get(elementId);
       if (prev) cancelAnimationFrame(prev);
       const rafId = requestAnimationFrame(() => {
@@ -5055,8 +5058,8 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
             if (node) attachNoteResizeObserver(el.id, node);
             else detachNoteResizeObserver(el.id);
           }}
-          className={`${cardBase} ${isClean ? "bg-transparent border-0 shadow-none" : "bg-card border border-border"} cursor-grab`}
-          style={{ left: el.x, top: el.y, width: el.width, minHeight: el.height, zIndex: effectiveZ }}
+          className={`${cardBase} ${isClean ? "bg-transparent border-0 shadow-none" : "bg-card border border-border"} cursor-grab overflow-hidden`}
+          style={{ left: el.x, top: el.y, width: el.width, height: el.height, minHeight: 60, zIndex: effectiveZ }}
           onMouseDown={(e) => {
             const tag = (e.target as HTMLElement).tagName.toLowerCase();
             if (tag === "input" || tag === "textarea" || tag === "button" || (e.target as HTMLElement).closest("button")) return;
@@ -5071,11 +5074,11 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
           data-testid={`element-text-${variant}-${el.id}`}
         >
           {variantPicker}
-          <div className={isClean ? "p-0" : "p-3.5"}>
+          <div className={`${isClean ? "p-0" : "p-3.5"} h-full overflow-auto`}>
             {isSelected ? (
               <div className="space-y-2">
                 <input
-                  className="font-hand w-full bg-transparent border-none text-base font-semibold outline-none placeholder:text-muted-foreground/50"
+                  className="font-hand uppercase tracking-wide w-full bg-transparent border-none text-base font-semibold outline-none placeholder:text-muted-foreground/50"
                   key={`txt-title-${c.title}`}
                   defaultValue={c.title}
                   placeholder="Title (optional)"
@@ -5087,7 +5090,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                     noteTextareaRefs.current[`${el.id}-note`] = ref;
                     if (ref) autoGrowTextarea(ref);
                   }}
-                  className="font-hand w-full bg-transparent border-none text-base resize-none outline-none min-h-[60px] placeholder:text-muted-foreground/50 overflow-hidden leading-relaxed"
+                  className="font-hand uppercase tracking-wide w-full bg-transparent border-none text-base resize-none outline-none min-h-[60px] placeholder:text-muted-foreground/50 overflow-hidden leading-relaxed"
                   key={`txt-text-${c.text}`}
                   defaultValue={c.text}
                   placeholder="Type your note..."
@@ -5099,19 +5102,22 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
               </div>
             ) : (
               <>
-                {c.title && <div className="font-hand text-base font-semibold mb-1">{c.title}</div>}
-                <div className="font-hand text-base text-foreground/80 whitespace-pre-wrap leading-relaxed">{c.text || "Type your note here..."}</div>
+                {c.title && <div className="font-hand uppercase tracking-wide text-base font-semibold mb-1">{c.title}</div>}
+                <div className="font-hand uppercase tracking-wide text-base text-foreground/80 whitespace-pre-wrap leading-relaxed">{c.text || "Type your note here..."}</div>
               </>
             )}
           </div>
           {isSelected && (
-            <div className="absolute -top-8 right-0 flex gap-1">
-              {renderFormattingChip(el.id)}
-              {renderOpenButton()}
-              <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleDeleteElement(el.id)} data-testid={`button-delete-${el.id}`}>
-                <Trash2 className="h-3 w-3" />
-              </Button>
-            </div>
+            <>
+              <div className="absolute -top-8 right-0 flex gap-1">
+                {renderFormattingChip(el.id)}
+                {renderOpenButton()}
+                <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleDeleteElement(el.id)} data-testid={`button-delete-${el.id}`}>
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              </div>
+              {resizeHandles(el.id)}
+            </>
           )}
         </div>
       );
