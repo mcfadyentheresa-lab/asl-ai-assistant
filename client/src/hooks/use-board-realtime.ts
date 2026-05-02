@@ -125,6 +125,16 @@ export function useBoardRealtime(
     wsRef.current = ws;
 
     ws.onopen = () => {
+      // If the user has already switched to a different board between the
+      // time we kicked off this WS and the time it connected, bail out.
+      // Without this guard, the late `onopen` for the old board fetches
+      // its elements and overwrites the new board's (empty) canvas with
+      // the old board's content — exactly the "first board populates the
+      // new board" bug.
+      if (wsRef.current !== ws) {
+        try { ws.close(); } catch {}
+        return;
+      }
       isConnectedRef.current = true;
       lastPongRef.current = Date.now();
       ws.send(JSON.stringify({
@@ -136,12 +146,18 @@ export function useBoardRealtime(
         role: user.role || "",
         profileImageUrl: user.profileImageUrl || null,
       }));
-      fetch(`/api/planning-boards/${boardId}/elements`)
+      fetch(`/api/planning-boards/${boardId}/elements`, { credentials: "include" })
         .then((r) => r.json())
         .then((els: CanvasElement[]) => {
-          if (Array.isArray(els)) {
-            useCanvasStore.getState().setElements(els);
-          }
+          if (!Array.isArray(els)) return;
+          // Double-guard against the race: by the time the fetch resolves
+          // the user may have moved to another board. Only write into the
+          // store if (a) this WS is still the active one AND (b) the
+          // store's currently-loaded boardId matches the boardId we
+          // fetched for.
+          if (wsRef.current !== ws) return;
+          if (useCanvasStore.getState().boardId !== boardId) return;
+          useCanvasStore.getState().setElements(els);
         })
         .catch(() => {});
     };
@@ -160,15 +176,24 @@ export function useBoardRealtime(
         const srcLast = msg.sourceLastName || "";
         const srcId = msg.sourceUserId || "";
 
+        // Drop any element-mutation messages that arrive on a stale WS
+        // (one whose boardId no longer matches the active board). Without
+        // this, late messages from a previous board would mutate the new
+        // board's store.
+        const isStale =
+          wsRef.current !== ws ||
+          useCanvasStore.getState().boardId !== boardId;
+
         switch (msg.type) {
           case "presence:update": {
             const otherUsers = (msg.users as BoardUser[]).filter((u) => u.userId !== user.id);
             otherUsers.forEach((u) => getUserColor(u.userId, colorMapRef.current));
-            setCollaborators(otherUsers);
+            if (!isStale) setCollaborators(otherUsers);
             break;
           }
 
           case "element:add":
+            if (isStale) break;
             if (msg.element) {
               store.addElement(msg.element as CanvasElement);
               if (srcId) trackEdit(msg.element.id, srcId, srcName, srcLast);
@@ -176,6 +201,7 @@ export function useBoardRealtime(
             break;
 
           case "element:update":
+            if (isStale) break;
             if (msg.elementId && msg.updates) {
               store.updateElement(msg.elementId, msg.updates);
               if (srcId) trackEdit(msg.elementId, srcId, srcName, srcLast);
@@ -183,12 +209,14 @@ export function useBoardRealtime(
             break;
 
           case "element:remove":
+            if (isStale) break;
             if (msg.elementId) {
               store.removeElement(msg.elementId);
             }
             break;
 
           case "element:move":
+            if (isStale) break;
             if (msg.elementId != null && msg.x != null && msg.y != null) {
               store.moveElement(msg.elementId, msg.x, msg.y);
               if (srcId) trackEdit(msg.elementId, srcId, srcName, srcLast);
@@ -196,6 +224,7 @@ export function useBoardRealtime(
             break;
 
           case "elements:positions":
+            if (isStale) break;
             if (msg.updates && Array.isArray(msg.updates)) {
               msg.updates.forEach((u: any) => {
                 const el = store.elements[u.id];
@@ -220,6 +249,7 @@ export function useBoardRealtime(
             // echoes cursor messages back to the sender by default, so we
             // filter on the client side here.
             if (msg.userId === user.id) break;
+            if (isStale) break;
             const cursorColor = getUserColor(msg.userId, colorMapRef.current);
             setCursors((prev) => ({
               ...prev,

@@ -91,7 +91,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import CalendarPanel from "@/components/CalendarPanel";
-import { useCanvasStore, debouncedSavePositions } from "@/stores/canvas-store";
+import { useCanvasStore, debouncedSavePositions, cancelPendingSave } from "@/stores/canvas-store";
 import { isTextHeading, isPaintSurface } from "@/lib/board-element-migration";
 import { useBoardRealtime } from "@/hooks/use-board-realtime";
 import { useAuth } from "@/hooks/use-auth";
@@ -1074,6 +1074,11 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
 
   useEffect(() => {
     if (!selectedBoardId) return;
+    // Drop any pending debounced position save scheduled against the
+    // previous board before we change the active boardId. Without this,
+    // a save queued for board A could fire after we switch to board B
+    // and silently PATCH the wrong board's positions endpoint.
+    cancelPendingSave();
     setBoardId(selectedBoardId);
     setLoading(true);
     // CRITICAL: clear elements immediately when switching boards. Without
@@ -1114,6 +1119,12 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
   };
 
   const handleCreateBoard = async () => {
+    // Cancel any in-flight debounced save against the current board
+    // before we kick off the create. Once the new board is selected, a
+    // late save for the old board would either no-op (good) or, in a
+    // worst case race, PATCH the wrong board's positions URL. Cheap to
+    // be safe.
+    cancelPendingSave();
     try {
       const selectedTemplate = selectedTemplateId ? templateCatalogue.find((template) => template.id === selectedTemplateId) : null;
       const boardName = newBoardName.trim() || (selectedTemplate?.name || "Untitled Board");
