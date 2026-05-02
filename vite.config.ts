@@ -1,24 +1,33 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
-import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
+
+// Replit-only dev plugins. We load them dynamically and gate on REPL_ID so
+// production builds (Railway) do not require these packages or their
+// transitive deps to resolve at build time.
+const isReplit = process.env.REPL_ID !== undefined;
+const isDev = process.env.NODE_ENV !== "production";
+
+const replitPlugins = isReplit
+  ? [
+      await import("@replit/vite-plugin-runtime-error-modal").then((m) =>
+        m.default(),
+      ),
+      ...(isDev
+        ? [
+            await import("@replit/vite-plugin-cartographer").then((m) =>
+              m.cartographer(),
+            ),
+            await import("@replit/vite-plugin-dev-banner").then((m) =>
+              m.devBanner(),
+            ),
+          ]
+        : []),
+    ]
+  : [];
 
 export default defineConfig({
-  plugins: [
-    react(),
-    runtimeErrorOverlay(),
-    ...(process.env.NODE_ENV !== "production" &&
-    process.env.REPL_ID !== undefined
-      ? [
-          await import("@replit/vite-plugin-cartographer").then((m) =>
-            m.cartographer(),
-          ),
-          await import("@replit/vite-plugin-dev-banner").then((m) =>
-            m.devBanner(),
-          ),
-        ]
-      : []),
-  ],
+  plugins: [react(), ...replitPlugins],
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "client", "src"),
