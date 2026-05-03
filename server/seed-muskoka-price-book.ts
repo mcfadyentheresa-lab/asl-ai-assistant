@@ -14,7 +14,7 @@
  */
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { db } from "./db";
 import {
   costCategories,
@@ -23,6 +23,19 @@ import {
   marketRates,
   regionalModifiers,
 } from "@shared/schema";
+
+// Real local/national suppliers we trust for Muskoka pricing. Phantom
+// suppliers introduced by earlier research-blob CSV rows (e.g.
+// "Ontario / Canada range") get cleaned out at seed time. New entries
+// here MUST also exist in muskoka_materials_prices.csv or muskoka_lumber_receipts.csv.
+const REAL_SUPPLIER_NAMES: ReadonlyArray<string> = [
+  "Chamberlain Timber Mart (Muskoka-Gravenhurst)",
+  "Home Depot Canada",
+  "RONA Canada",
+  "Canadian Tire",
+  "Benjamin Moore Canada store",
+  "Muskoka Lumber",
+];
 
 const MANUAL_EDIT_MARKER = "[manual-edit]";
 // Resolve relative to repo root so this works in both dev (tsx) and prod
@@ -248,8 +261,9 @@ function csvUnitToDb(unit: string): string {
   if (u === "gal" || u === "gallon" || u === "per gal" || u === "per gallon") return "gallon";
   if (u === "bag") return "bag";
   if (u === "pail" || u === "5gal pail") return "pail";
-  if (u === "roll") return "roll";
+  if (u === "roll" || u === "rl") return "roll";
   if (u === "square" || u === "per square") return "square";
+  if (u === "lb" || u === "lbs" || u === "per lb") return "lb";
   if (u === "lump_sum" || u === "lump sum" || u === "ls") return "lump_sum";
   if (u === "hour" || u === "per hour" || u === "hr") return "hour";
   if (u === "day" || u === "per day") return "day";
@@ -317,6 +331,7 @@ async function seedSupplierPrices(
       categoryId,
       unitPrice: priceStr,
       unitType: csvUnitToDb(r.unit ?? ""),
+      productCode: (r.product_code || "").trim() || null,
       productUrl: r.source_url || null,
       notes: r.notes
         ? `Source: ${r.source_url || "n/a"}\nVerified ${r.last_verified || "n/a"}\n${r.notes}`
@@ -506,6 +521,145 @@ async function seedRegionalModifiers(): Promise<{ inserted: number; skipped: num
 }
 
 // ----------------------------------------------------------------------
+// Phantom-supplier cleanup — removes legacy supplier_prices rows whose
+// supplier name is NOT in REAL_SUPPLIER_NAMES (e.g. "Ontario / Canada
+// range", "Home Depot Canada (fallback)"). Manual-edited rows are
+// preserved. Suppliers left with zero prices are then deleted.
+// Idempotent: subsequent runs find nothing to clean and return zeros.
+// ----------------------------------------------------------------------
+async function cleanupPhantomSuppliers(): Promise<{
+  deletedPrices: number;
+  deletedSuppliers: number;
+  manualEditPreserved: number;
+}> {
+  const allSuppliers = await db.select().from(suppliers);
+  const realSet = new Set(REAL_SUPPLIER_NAMES);
+  const phantomSupplierIds = allSuppliers
+    .filter((s) => !realSet.has(s.name))
+    .map((s) => s.id);
+
+  if (phantomSupplierIds.length === 0) {
+    return { deletedPrices: 0, deletedSuppliers: 0, manualEditPreserved: 0 };
+  }
+
+  // Fetch phantom prices so we can preserve manual-edited rows.
+  const phantomPrices = await db
+    .select()
+    .from(supplierPrices)
+    .where(inArray(supplierPrices.supplierId, phantomSupplierIds));
+
+  const preservedPriceIds: number[] = [];
+  const deletePriceIds: number[] = [];
+  for (const p of phantomPrices) {
+    if ((p.notes ?? "").includes(MANUAL_EDIT_MARKER)) {
+      preservedPriceIds.push(p.id);
+    } else {
+      deletePriceIds.push(p.id);
+    }
+  }
+
+  let deletedPrices = 0;
+  if (deletePriceIds.length > 0) {
+    await db.delete(supplierPrices).where(inArray(supplierPrices.id, deletePriceIds));
+    deletedPrices = deletePriceIds.length;
+  }
+
+  // Delete suppliers that have no remaining prices AND no preserved
+  // manual-edited rows. (The supplier_prices.supplierId has
+  // onDelete:"cascade" but we never want to drop a supplier that still
+  // has a human-touched row underneath it.)
+  const remainingPrices = await db
+    .select()
+    .from(supplierPrices)
+    .where(inArray(supplierPrices.supplierId, phantomSupplierIds));
+  const stillUsedSupplierIds = new Set(remainingPrices.map((p) => p.supplierId));
+  const supplierIdsToDelete = phantomSupplierIds.filter(
+    (id) => !stillUsedSupplierIds.has(id),
+  );
+
+  let deletedSuppliers = 0;
+  if (supplierIdsToDelete.length > 0) {
+    await db.delete(suppliers).where(inArray(suppliers.id, supplierIdsToDelete));
+    deletedSuppliers = supplierIdsToDelete.length;
+  }
+
+  return {
+    deletedPrices,
+    deletedSuppliers,
+    manualEditPreserved: preservedPriceIds.length,
+  };
+}
+
+// ----------------------------------------------------------------------
+// Market rates from "range" rows (formerly mis-filed in materials CSV).
+// Each row becomes one market_rates entry, keyed by category + name marker
+// (same convention as labour seeding).
+// ----------------------------------------------------------------------
+async function seedMarketRatesFromMaterialRanges(
+  rows: Array<Record<string, string>>,
+  categoryIdByName: Map<string, number>,
+): Promise<{ inserted: number; skipped: number; manualEditPreserved: number }> {
+  let inserted = 0;
+  let skipped = 0;
+  let manualEditPreserved = 0;
+
+  for (const r of rows) {
+    const name = r.name?.trim();
+    const typical = r.unit_price_cad_typical?.trim();
+    if (!name || !typical || Number.isNaN(Number(typical))) {
+      skipped += 1;
+      continue;
+    }
+    const csvCat = (r.category ?? "").trim();
+    const displayCat = CSV_CATEGORY_TO_DISPLAY[csvCat];
+    const categoryId = displayCat ? categoryIdByName.get(displayCat) : undefined;
+    if (!categoryId) {
+      skipped += 1;
+      continue;
+    }
+
+    const nameMarker = `[role: ${name}]`;
+    const existing = await db
+      .select()
+      .from(marketRates)
+      .where(eq(marketRates.categoryId, categoryId));
+    const match = existing.find((m) => (m.notes ?? "").includes(nameMarker));
+    if (match) {
+      if ((match.notes ?? "").includes(MANUAL_EDIT_MARKER)) {
+        manualEditPreserved += 1;
+        continue;
+      }
+      skipped += 1;
+      continue;
+    }
+
+    const low = (r.unit_price_cad_low ?? "").trim();
+    const high = (r.unit_price_cad_high ?? "").trim();
+    const sourceLine = r.source_url ? `Source: ${r.source_url}` : "";
+    const notesPieces = [
+      nameMarker,
+      sourceLine,
+      r.last_verified ? `Verified ${r.last_verified}` : "",
+      r.notes ?? "",
+    ].filter(Boolean);
+
+    await db.insert(marketRates).values({
+      categoryId,
+      unitType: csvUnitToDb(r.unit ?? ""),
+      lowRate: low || typical,
+      typicalRate: typical,
+      highRate: high || typical,
+      effectiveDate: r.last_verified || new Date().toISOString().slice(0, 10),
+      isActive: true,
+      notes: notesPieces.join("\n"),
+    });
+    inserted += 1;
+  }
+
+  return { inserted, skipped, manualEditPreserved };
+}
+
+// ----------------------------------------------------------------------
 // Public entry point.
 // ----------------------------------------------------------------------
 export interface MuskokaSeedSummary {
@@ -514,32 +668,51 @@ export interface MuskokaSeedSummary {
   supplierPrices: { inserted: number; skipped: number; manualEditPreserved: number };
   marketRates: { inserted: number; skipped: number; manualEditPreserved: number };
   regionalModifiers: { inserted: number; skipped: number; manualEditPreserved: number };
+  cleanup: { deletedPrices: number; deletedSuppliers: number; manualEditPreserved: number };
 }
 
 export async function seedMuskokaPriceBook(): Promise<MuskokaSeedSummary> {
   const materialsPath = path.join(MUSKOKA_DATA_DIR, "muskoka_materials_prices.csv");
   const labourPath = path.join(MUSKOKA_DATA_DIR, "muskoka_labour_rates.csv");
+  const lumberPath = path.join(MUSKOKA_DATA_DIR, "muskoka_lumber_receipts.csv");
+  const marketRatesPath = path.join(MUSKOKA_DATA_DIR, "muskoka_market_rates.csv");
 
   const materialsRaw = fs.existsSync(materialsPath) ? fs.readFileSync(materialsPath, "utf8") : "";
   const labourRaw = fs.existsSync(labourPath) ? fs.readFileSync(labourPath, "utf8") : "";
+  const lumberRaw = fs.existsSync(lumberPath) ? fs.readFileSync(lumberPath, "utf8") : "";
+  const marketRatesRaw = fs.existsSync(marketRatesPath) ? fs.readFileSync(marketRatesPath, "utf8") : "";
 
   const materialRows = rowsToObjects(parseCsv(materialsRaw));
   const labourRows = rowsToObjects(parseCsv(labourRaw));
+  const lumberRows = rowsToObjects(parseCsv(lumberRaw));
+  const materialMarketRows = rowsToObjects(parseCsv(marketRatesRaw));
+
+  // Combined supplier-price source rows (materials CSV + lumber receipts).
+  // Suppliers are derived from the union so "Muskoka Lumber" gets a row.
+  const allPriceRows = [...materialRows, ...lumberRows];
 
   const beforeCategories = (await db.select().from(costCategories)).length;
   const categoryIdByName = await seedCategories();
   const afterCategories = categoryIdByName.size;
 
   const beforeSuppliers = (await db.select().from(suppliers)).length;
-  const supplierIdByName = await seedSuppliers(materialRows);
+  const supplierIdByName = await seedSuppliers(allPriceRows);
   const afterSuppliers = supplierIdByName.size;
 
+  // Drop legacy phantom suppliers BEFORE inserting new prices so the
+  // Supplier Price Book renders cleanly on first boot after merge.
+  const cleanupResult = await cleanupPhantomSuppliers();
+
   const supplierPriceResult = await seedSupplierPrices(
-    materialRows,
+    allPriceRows,
     supplierIdByName,
     categoryIdByName,
   );
-  const marketRateResult = await seedMarketRates(labourRows, categoryIdByName);
+  const labourMarketRateResult = await seedMarketRates(labourRows, categoryIdByName);
+  const materialMarketRateResult = await seedMarketRatesFromMaterialRanges(
+    materialMarketRows,
+    categoryIdByName,
+  );
   const regionalResult = await seedRegionalModifiers();
 
   return {
@@ -552,7 +725,14 @@ export async function seedMuskokaPriceBook(): Promise<MuskokaSeedSummary> {
       created: afterSuppliers - beforeSuppliers,
     },
     supplierPrices: supplierPriceResult,
-    marketRates: marketRateResult,
+    marketRates: {
+      inserted: labourMarketRateResult.inserted + materialMarketRateResult.inserted,
+      skipped: labourMarketRateResult.skipped + materialMarketRateResult.skipped,
+      manualEditPreserved:
+        labourMarketRateResult.manualEditPreserved +
+        materialMarketRateResult.manualEditPreserved,
+    },
     regionalModifiers: regionalResult,
+    cleanup: cleanupResult,
   };
 }

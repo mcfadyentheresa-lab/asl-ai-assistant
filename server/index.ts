@@ -151,13 +151,18 @@ app.use((req, res, next) => {
       result.supplierPrices.inserted +
       result.marketRates.inserted +
       result.regionalModifiers.inserted;
-    if (newRows > 0) {
+    const cleaned =
+      result.cleanup.deletedPrices + result.cleanup.deletedSuppliers;
+    if (newRows > 0 || cleaned > 0) {
       log(
         `Seeded Muskoka price book: +${result.categories.created} categories, ` +
           `+${result.suppliers.created} suppliers, ` +
           `+${result.supplierPrices.inserted} prices, ` +
           `+${result.marketRates.inserted} market rates, ` +
-          `+${result.regionalModifiers.inserted} regional modifiers.`,
+          `+${result.regionalModifiers.inserted} regional modifiers, ` +
+          `cleaned ${result.cleanup.deletedPrices} phantom prices / ` +
+          `${result.cleanup.deletedSuppliers} phantom suppliers ` +
+          `(${result.cleanup.manualEditPreserved} manual-edit preserved).`,
       );
     }
   } catch (err) {
