@@ -29,6 +29,7 @@ import { bootstrapAdminFromEnv } from "./bootstrap-admin";
 import { startLinkHealthJob } from "./link-health";
 import { seedBenjaminMooreColors } from "./seed-paint-colors";
 import { seedAdditionalBrands } from "./seed-additional-brands";
+import { seedMuskokaPriceBook } from "./seed-muskoka-price-book";
 
 const app = express();
 const httpServer = createServer(app);
@@ -136,6 +137,31 @@ app.use((req, res, next) => {
     if (additional > 0) log(`Seeded ${additional} additional brand paint colors.`);
   } catch (err) {
     console.error("Paint-color seed error (non-fatal):", err);
+  }
+
+  // Idempotent Muskoka price-book seed (cost categories, suppliers,
+  // supplier prices, market rates, regional modifiers). Skips rows whose
+  // notes/description contain the [manual-edit] marker so admin overrides
+  // are never overwritten. Errors are logged but don't block startup.
+  try {
+    const result = await seedMuskokaPriceBook();
+    const newRows =
+      result.categories.created +
+      result.suppliers.created +
+      result.supplierPrices.inserted +
+      result.marketRates.inserted +
+      result.regionalModifiers.inserted;
+    if (newRows > 0) {
+      log(
+        `Seeded Muskoka price book: +${result.categories.created} categories, ` +
+          `+${result.suppliers.created} suppliers, ` +
+          `+${result.supplierPrices.inserted} prices, ` +
+          `+${result.marketRates.inserted} market rates, ` +
+          `+${result.regionalModifiers.inserted} regional modifiers.`,
+      );
+    }
+  } catch (err) {
+    console.error("Muskoka price-book seed error (non-fatal):", err);
   }
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
