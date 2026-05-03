@@ -373,8 +373,29 @@ export default function SupplierPrices() {
                     <div className="text-sm text-muted-foreground" data-testid={`text-code-${price.id}`}>
                       {price.productCode || "—"}
                     </div>
-                    <div className="text-xs text-muted-foreground" data-testid={`text-updated-${price.id}`}>
-                      {price.lastUpdated ? new Date(price.lastUpdated).toLocaleDateString() : "—"}
+                    <div className="flex items-center gap-1.5 text-xs" data-testid={`text-updated-${price.id}`}>
+                      <span className="text-muted-foreground">
+                        {price.lastUpdated ? new Date(price.lastUpdated).toLocaleDateString() : "—"}
+                      </span>
+                      {(() => {
+                        if (!price.lastUpdated) return null;
+                        const ageDays = Math.floor(
+                          (Date.now() - new Date(price.lastUpdated).getTime()) / (1000 * 60 * 60 * 24),
+                        );
+                        if (ageDays > 90) {
+                          return (
+                            <Badge
+                              variant="outline"
+                              className="border-amber-500 bg-amber-50 px-1.5 py-0 text-[10px] font-normal text-amber-700"
+                              data-testid={`badge-stale-${price.id}`}
+                              title={`This price hasn't been verified in ${ageDays} days. Confirm before quoting.`}
+                            >
+                              Stale
+                            </Badge>
+                          );
+                        }
+                        return null;
+                      })()}
                     </div>
                     <div className="flex items-center gap-0.5">
                       {price.productUrl && (

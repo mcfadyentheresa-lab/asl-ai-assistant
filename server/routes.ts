@@ -2,7 +2,9 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
-import { insertSubMilestoneSchema, insertSectionSchema, insertTimeEntrySchema, insertCostCategorySchema, insertMarketRateSchema, insertProjectEstimateSchema, insertEstimateItemSchema, insertReceiptSchema, insertCrewRateSchema, insertSubcontractorSchema, insertSupplierSchema, insertSupplierPriceSchema, insertTableRedesignPlanSchema, insertTableRedesignMaterialSchema } from "@shared/schema";
+import { insertSubMilestoneSchema, insertSectionSchema, insertTimeEntrySchema, insertCostCategorySchema, insertMarketRateSchema, insertProjectEstimateSchema, insertEstimateItemSchema, insertReceiptSchema, insertCrewRateSchema, insertSubcontractorSchema, insertSupplierSchema, insertSupplierPriceSchema, insertRegionalModifierSchema, insertTableRedesignPlanSchema, insertTableRedesignMaterialSchema, regionalModifiers } from "@shared/schema";
+import { db } from "./db";
+import { eq as eqSql } from "drizzle-orm";
 import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
@@ -5478,6 +5480,71 @@ Rules:
     if (!extracted.price) return res.status(422).json({ message: "Could not detect a price on that page", confidence: extracted.confidence });
     const updated = await storage.updateSupplierPrice(priceId, { unitPrice: String(extracted.price) });
     res.json({ ...updated, fetchedPrice: extracted.price, currency: extracted.currency, confidence: extracted.confidence });
+  }));
+
+  // ==================== REGIONAL MODIFIERS ====================
+  // Read: any authenticated user (estimator UI needs them).
+  // Write: admin only — these affect every quote that gets generated.
+
+  app.get("/api/regional-modifiers", isAuthenticated, asyncHandler(async (req: any, res) => {
+    const region = typeof req.query.region === "string" ? req.query.region : "muskoka";
+    const rows = await db
+      .select()
+      .from(regionalModifiers)
+      .where(eqSql(regionalModifiers.region, region));
+    res.json(rows);
+  }));
+
+  app.post("/api/regional-modifiers", isAuthenticated, asyncHandler(async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const user = await authStorage.getUser(userId);
+    if (!user || user.role !== "admin") {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+    const parsed = insertRegionalModifierSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: "Invalid modifier data", errors: parsed.error.errors });
+    }
+    const [created] = await db.insert(regionalModifiers).values(parsed.data).returning();
+    res.status(201).json(created);
+  }));
+
+  app.patch("/api/regional-modifiers/:id", isAuthenticated, asyncHandler(async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const user = await authStorage.getUser(userId);
+    if (!user || user.role !== "admin") {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+    const id = parseInt(req.params.id, 10);
+    if (Number.isNaN(id)) return res.status(400).json({ message: "Invalid id" });
+    const parsed = insertRegionalModifierSchema.partial().safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: "Invalid modifier data", errors: parsed.error.errors });
+    }
+    // Stamp [manual-edit] into description so future seed runs leave it alone.
+    const incomingDescription = parsed.data.description ?? "";
+    const description = incomingDescription.includes("[manual-edit]")
+      ? incomingDescription
+      : `${incomingDescription} [manual-edit]`.trim();
+    const [updated] = await db
+      .update(regionalModifiers)
+      .set({ ...parsed.data, description })
+      .where(eqSql(regionalModifiers.id, id))
+      .returning();
+    if (!updated) return res.status(404).json({ message: "Not found" });
+    res.json(updated);
+  }));
+
+  app.delete("/api/regional-modifiers/:id", isAuthenticated, asyncHandler(async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const user = await authStorage.getUser(userId);
+    if (!user || user.role !== "admin") {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+    const id = parseInt(req.params.id, 10);
+    if (Number.isNaN(id)) return res.status(400).json({ message: "Invalid id" });
+    await db.delete(regionalModifiers).where(eqSql(regionalModifiers.id, id));
+    res.json({ message: "Regional modifier deleted" });
   }));
 
   // ==================== TABLE REDESIGN PLANNER ====================

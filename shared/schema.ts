@@ -783,6 +783,29 @@ export const supplierPrices = pgTable("supplier_prices", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Regional Modifiers — % adders, permit formulas, travel rules.
+// Used by the estimator to apply Muskoka-specific surcharges (boat-access,
+// winter, etc.) and by the AI generator to compute permit allowances. One
+// row per modifier; modifierType disambiguates how value/percent are read.
+export const regionalModifiers = pgTable("regional_modifiers", {
+  id: serial("id").primaryKey(),
+  region: text("region").notNull().default("muskoka"),
+  // surcharge_percent | permit_formula | travel_rule | season_premium
+  modifierType: text("modifier_type").notNull(),
+  name: text("name").notNull(), // e.g. "Boat-access cottage premium"
+  // For surcharge_percent / season_premium: a percentage as a decimal string
+  // ("15" means 15%). For permit_formula: "$11.00 per $1000" stored as the
+  // per-thousand rate ("11.00"). For travel_rule: per-km rate.
+  value: text("value"),
+  unit: text("unit"), // "percent" | "per_thousand_value" | "per_km" | "flat_per_day"
+  appliesTo: text("applies_to"), // "materials" | "labour" | "both" | "permit" | "travel"
+  description: text("description"),
+  sourceUrl: text("source_url"),
+  lastVerified: date("last_verified"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Table Redesign Plans
 export const tableRedesignPlans = pgTable("table_redesign_plans", {
   id: serial("id").primaryKey(),
@@ -869,6 +892,7 @@ export const insertSubcontractorSchema = createInsertSchema(subcontractors).omit
 export const insertSupplierSchema = createInsertSchema(suppliers).omit({ id: true, createdAt: true });
 export const insertClientInviteSchema = createInsertSchema(clientInvites).omit({ id: true, createdAt: true });
 export const insertSupplierPriceSchema = createInsertSchema(supplierPrices).omit({ id: true, createdAt: true, lastUpdated: true });
+export const insertRegionalModifierSchema = createInsertSchema(regionalModifiers).omit({ id: true, createdAt: true });
 export const insertSocialPostSchema = createInsertSchema(socialPosts).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertTableRedesignPlanSchema = createInsertSchema(tableRedesignPlans).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertTableRedesignMaterialSchema = createInsertSchema(tableRedesignMaterials).omit({ id: true, createdAt: true });
@@ -941,6 +965,8 @@ export type Supplier = typeof suppliers.$inferSelect;
 export type InsertSupplier = z.infer<typeof insertSupplierSchema>;
 export type SupplierPrice = typeof supplierPrices.$inferSelect;
 export type InsertSupplierPrice = z.infer<typeof insertSupplierPriceSchema>;
+export type RegionalModifier = typeof regionalModifiers.$inferSelect;
+export type InsertRegionalModifier = z.infer<typeof insertRegionalModifierSchema>;
 export type ClientInvite = typeof clientInvites.$inferSelect;
 export type InsertClientInvite = z.infer<typeof insertClientInviteSchema>;
 export type SocialPost = typeof socialPosts.$inferSelect;
