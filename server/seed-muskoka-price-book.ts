@@ -25,7 +25,11 @@ import {
 } from "@shared/schema";
 
 const MANUAL_EDIT_MARKER = "[manual-edit]";
-const MUSKOKA_DATA_DIR = path.join(import.meta.dirname, "data");
+// Resolve relative to repo root so this works in both dev (tsx) and prod
+// (esbuild CJS bundle, where import.meta.dirname is empty). Railway runs
+// `node dist/index.cjs` from the repo root, so process.cwd() points at
+// the project root in both environments.
+const MUSKOKA_DATA_DIR = path.join(process.cwd(), "server", "data");
 
 // ----------------------------------------------------------------------
 // Tiny CSV parser \u2014 handles quoted fields with embedded commas/newlines
