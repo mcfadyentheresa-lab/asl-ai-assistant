@@ -149,22 +149,30 @@ export default function AcceptInvite() {
                   <Input value={lastName} onChange={(e) => setLastName(e.target.value)} required />
                 </div>
               </div>
-              <Input
-                type="password"
-                autoComplete="new-password"
-                placeholder="Password (min 8 characters)"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-              <Input
-                type="password"
-                autoComplete="new-password"
-                placeholder="Confirm password"
-                value={confirm}
-                onChange={(e) => setConfirm(e.target.value)}
-                required
-              />
+              <div className="space-y-1">
+                <label htmlFor="accept-invite-password" className="text-sm font-medium">Password</label>
+                <Input
+                  id="accept-invite-password"
+                  type="password"
+                  autoComplete="new-password"
+                  placeholder="At least 8 characters"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-1">
+                <label htmlFor="accept-invite-confirm" className="text-sm font-medium">Confirm password</label>
+                <Input
+                  id="accept-invite-confirm"
+                  type="password"
+                  autoComplete="new-password"
+                  placeholder="Re-enter your password"
+                  value={confirm}
+                  onChange={(e) => setConfirm(e.target.value)}
+                  required
+                />
+              </div>
               {error && <p className="text-sm text-destructive">{error}</p>}
               <Button type="submit" className="w-full" disabled={submitting} data-testid="button-submit">
                 {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Create account"}

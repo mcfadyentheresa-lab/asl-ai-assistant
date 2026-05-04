@@ -183,22 +183,30 @@ export default function InviteAccept() {
             ) : (
               <div className="space-y-3">
                 <p className="text-sm text-muted-foreground text-center">Create a password to access your portal:</p>
-                <Input
-                  type="password"
-                  autoComplete="new-password"
-                  placeholder="Password (min 8 characters)"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  data-testid="input-invite-password"
-                />
-                <Input
-                  type="password"
-                  autoComplete="new-password"
-                  placeholder="Confirm password"
-                  value={confirm}
-                  onChange={(e) => setConfirm(e.target.value)}
-                  data-testid="input-invite-confirm"
-                />
+                <div className="space-y-1">
+                  <label htmlFor="invite-accept-password" className="text-sm font-medium">Password</label>
+                  <Input
+                    id="invite-accept-password"
+                    type="password"
+                    autoComplete="new-password"
+                    placeholder="At least 8 characters"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    data-testid="input-invite-password"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label htmlFor="invite-accept-confirm" className="text-sm font-medium">Confirm password</label>
+                  <Input
+                    id="invite-accept-confirm"
+                    type="password"
+                    autoComplete="new-password"
+                    placeholder="Re-enter your password"
+                    value={confirm}
+                    onChange={(e) => setConfirm(e.target.value)}
+                    data-testid="input-invite-confirm"
+                  />
+                </div>
                 {pwError && <p className="text-sm text-destructive">{pwError}</p>}
                 <Button
                   className="w-full"

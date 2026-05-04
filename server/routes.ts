@@ -283,6 +283,46 @@ export async function registerRoutes(
     });
   });
 
+  // Self-service password change. Requires the user to provide their current
+  // password (verified against the bcrypt hash). Rejects accounts that have no
+  // local password set (e.g. SSO-only) so we never silently overwrite.
+  app.post("/api/auth/change-password", isAuthenticated, async (req: any, res) => {
+    try {
+      const currentPassword = typeof req.body?.currentPassword === "string" ? req.body.currentPassword : "";
+      const newPassword = typeof req.body?.newPassword === "string" ? req.body.newPassword : "";
+      if (!currentPassword) {
+        return res.status(400).json({ message: "Current password is required" });
+      }
+      if (!newPassword || newPassword.length < 8) {
+        return res.status(400).json({ message: "New password must be at least 8 characters" });
+      }
+      if (newPassword === currentPassword) {
+        return res.status(400).json({ message: "New password must be different from current password" });
+      }
+      const userId = req.user.claims.sub;
+      const { db } = await import("./db");
+      const { users } = await import("@shared/models/auth");
+      const { eq } = await import("drizzle-orm");
+      const [row] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+      if (!row) return res.status(404).json({ message: "User not found" });
+      if (!row.passwordHash) {
+        return res.status(400).json({ message: "This account has no password set. Contact an admin to reset it." });
+      }
+      const bcryptMod = await import("bcrypt");
+      const ok = await bcryptMod.default.compare(currentPassword, row.passwordHash);
+      if (!ok) return res.status(401).json({ message: "Current password is incorrect" });
+      const newHash = await bcryptMod.default.hash(newPassword, 12);
+      await db
+        .update(users)
+        .set({ passwordHash: newHash, updatedAt: new Date() })
+        .where(eq(users.id, userId));
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error changing password:", error);
+      res.status(500).json({ message: "Failed to change password" });
+    }
+  });
+
   app.patch("/api/users/:id/phone", isAuthenticated, async (req: any, res) => {
     try {
       const requesterId = req.user.claims.sub;

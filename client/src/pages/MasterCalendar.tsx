@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, ChevronLeft, ChevronRight, CalendarIcon, ArrowLeft } from "lucide-react";
+import { Loader2, ChevronLeft, ChevronRight, CalendarIcon, ArrowLeft, CalendarDays } from "lucide-react";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
@@ -281,6 +281,21 @@ export default function MasterCalendar() {
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
+            {/* P2-1 — quick jump back to current month after navigating away. */}
+            <Button
+              size="sm"
+              variant="outline"
+              className="ml-1 h-8"
+              onClick={() => {
+                const now = new Date();
+                setCurrentMonth(now);
+                setSelectedDate(now);
+              }}
+              data-testid="button-master-today"
+            >
+              <CalendarDays className="h-3.5 w-3.5 mr-1.5" />
+              Today
+            </Button>
           </div>
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
             <Select value={projectFilter} onValueChange={setProjectFilter}>
@@ -434,9 +449,27 @@ export default function MasterCalendar() {
                             </div>
                           </div>
                         ))}
-                        {spanBars.length > 4 && (
-                          <p className="text-[10px] text-muted-foreground px-2 pb-0.5">+{spanBars.length - 4} more</p>
-                        )}
+                        {spanBars.length > 4 && (() => {
+                          // P2-2 — "+N more" used to be a non-interactive <p>. Make it a
+                          // real button that opens the day-detail dialog for the first day
+                          // of this week so users can actually see the hidden items.
+                          const firstDayOfWeek = week.find((d): d is Date => d !== null);
+                          if (!firstDayOfWeek) return null;
+                          return (
+                            <button
+                              type="button"
+                              className="text-[10px] text-muted-foreground hover:text-foreground hover:underline px-2 pb-0.5 text-left w-full"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedDate(firstDayOfWeek);
+                              }}
+                              data-testid={`master-week-more-${format(firstDayOfWeek, "yyyy-MM-dd")}`}
+                              aria-label={`Show ${spanBars.length - 4} more items for the week of ${format(firstDayOfWeek, "MMMM d")}`}
+                            >
+                              +{spanBars.length - 4} more
+                            </button>
+                          );
+                        })()}
                       </div>
                     )}
                   </div>
