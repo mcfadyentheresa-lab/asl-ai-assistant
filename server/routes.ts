@@ -441,8 +441,16 @@ export async function registerRoutes(
     try {
       const userId = req.user.claims.sub;
       const dbUser = await authStorage.getUser(userId);
+      // Project creation is an admin operation. Crew were previously able to
+      // create projects via the Timesheets inline "Create one" escape hatch —
+      // a labourer spawning projects is unexpected and confusing for admin.
+      // Lock both UI (Timesheets.tsx) and API to admin only. Clients are also
+      // denied (separate message kept for clarity).
       if (dbUser?.role === "client") {
         return res.status(403).json({ message: "Clients cannot create projects" });
+      }
+      if (dbUser?.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can create projects" });
       }
       const input = api.projects.create.input.parse(req.body);
       const project = await storage.createProject({ ...input, clientId: input.clientId || null });

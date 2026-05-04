@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/use-auth";
 import { usePresenceHeartbeat } from "@/hooks/use-presence";
+import { toast } from "@/hooks/use-toast";
 import { useEffect, useRef, lazy, Suspense } from "react";
 import { Loader2 } from "lucide-react";
 import { ThemeProvider } from "next-themes";
@@ -16,6 +17,14 @@ function RoleGuard({ component: Component, allowedRoles }: { component: React.Co
   const [, navigate] = useLocation();
   useEffect(() => {
     if (user && !allowedRoles.includes(user.role)) {
+      // Surface why the user is being bounced — a silent navigate("/") reads as
+      // a bug. Use the imperative `toast` helper so we can fire it from inside
+      // the effect without forcing a re-render of the guard.
+      toast({
+        title: "Access restricted",
+        description: "That page isn't available for your account.",
+        variant: "destructive",
+      });
       navigate("/");
     }
   }, [user]);
