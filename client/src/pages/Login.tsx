@@ -4,8 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
+import { useTenantBrand } from "@/hooks/use-tenant-brand";
 
 export default function Login() {
+  const brand = useTenantBrand();
   const [, navigate] = useLocation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -51,7 +53,7 @@ export default function Login() {
               E.L.M
             </h1>
             <p className="text-[10px] font-semibold tracking-[0.18em] uppercase text-muted-foreground/70">
-              Aster &amp; Spruce Living
+              {brand.legalName}
             </p>
             <p className="text-muted-foreground text-sm pt-2">Sign in to your workspace</p>
           </div>

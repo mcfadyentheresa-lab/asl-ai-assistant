@@ -27,6 +27,8 @@ import {
   notifyBoardLinked,
 } from "./sms";
 import { notifyTeamEmail } from "./email";
+import { getTenantSettings, getBrand, invalidateTenantSettingsCache } from "./tenant-settings";
+import { tenantSettings } from "@shared/schema";
 import { heartbeat, getOnlineUsers, setVisibility, getVisibility } from "./presence";
 import { broadcastProjectChange } from "./websocket";
 import { getTemplateCatalogue, getTemplateCanvasData } from "./board-templates";
@@ -320,6 +322,93 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error changing password:", error);
       res.status(500).json({ message: "Failed to change password" });
+    }
+  });
+
+  // ==========================================================================
+  // PR N — Tenant brand / settings (white-label Phase 4, demo-safe).
+  //
+  // Public read endpoint exposes ONLY display fields (no SMS/quiet-hours/etc).
+  // Admin endpoints expose the full row and allow editing the brand fields.
+  // No data isolation — there is still only one row.
+  // ==========================================================================
+  app.get("/api/tenant/brand", async (_req, res) => {
+    try {
+      const brand = await getBrand();
+      res.json(brand);
+    } catch (error) {
+      console.error("Error fetching tenant brand:", error);
+      // Never fail the public endpoint — the client falls back to baked-in
+      // defaults when this returns an error.
+      res.status(200).json({
+        brandName: "Aster & Spruce",
+        legalName: "Aster & Spruce Living",
+        brandWebsite: "https://asterandspruceliving.ca",
+        supportEmail: "info@asterandspruceliving.ca",
+        appUrl: null,
+        logoUrl: null,
+        primaryColor: null,
+      });
+    }
+  });
+
+  app.get("/api/admin/tenant-settings", isAuthenticated, async (req: any, res) => {
+    try {
+      const requester = await authStorage.getUser(req.user.claims.sub);
+      if (requester?.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can view tenant settings" });
+      }
+      const settings = await getTenantSettings();
+      res.json(settings ?? null);
+    } catch (error) {
+      console.error("Error fetching tenant settings:", error);
+      res.status(500).json({ message: "Failed to fetch tenant settings" });
+    }
+  });
+
+  // Editable brand fields. Other tenant_settings columns (SMS gating, quiet
+  // hours) are NOT editable through this endpoint — they live in the existing
+  // SMS admin surface to keep concerns separate.
+  const tenantBrandUpdateSchema = z.object({
+    brandName: z.string().trim().min(1).max(100).optional(),
+    legalName: z.string().trim().max(120).nullable().optional(),
+    brandWebsite: z.string().trim().url().max(255).nullable().optional(),
+    supportEmail: z.string().trim().email().max(255).nullable().optional(),
+    logoUrl: z.string().trim().url().max(500).nullable().optional(),
+    primaryColor: z.string().trim().regex(/^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})$/, "Must be a hex colour like #1a3a2a").nullable().optional(),
+    appUrl: z.string().trim().url().max(255).nullable().optional(),
+  });
+
+  app.patch("/api/admin/tenant-settings/brand", isAuthenticated, async (req: any, res) => {
+    try {
+      const requester = await authStorage.getUser(req.user.claims.sub);
+      if (requester?.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can edit tenant settings" });
+      }
+      const parsed = tenantBrandUpdateSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid input", errors: parsed.error.flatten().fieldErrors });
+      }
+      // Upsert against tenantKey="default" so a fresh DB without the row still
+      // accepts the first edit.
+      const existing = await getTenantSettings();
+      const patch = { ...parsed.data, updatedAt: new Date() } as Record<string, any>;
+      if (!existing) {
+        await db
+          .insert(tenantSettings)
+          .values({ tenantKey: "default", ...parsed.data });
+      } else {
+        await db
+          .update(tenantSettings)
+          .set(patch)
+          .where(eqSql(tenantSettings.tenantKey, "default"));
+      }
+      invalidateTenantSettingsCache();
+      const next = await getTenantSettings();
+      res.json(next);
+    } catch (error) {
+      console.error("Error updating tenant brand settings:", error);
+      res.status(500).json({ message: "Failed to update tenant settings" });
     }
   });
 
@@ -1245,7 +1334,8 @@ export async function registerRoutes(
             });
             const projectPhotos = await storage.getPhotos(project.id);
             const pairedPhoto = projectPhotos.find((p: any) => p.isShowcase) || projectPhotos[0] || null;
-            const milestonePrompt = `You are a social media copywriter for Aster & Spruce Living, a high-end Muskoka cottage renovation company.
+            const brand = await getBrand();
+            const milestonePrompt = `You are a social media copywriter for ${brand.legalName}, a high-end Muskoka cottage renovation company.
 Always use Canadian English spelling (colour, favourite, centre, etc.).
 Brand voice: Warm minimalist, premium quality, nature-inspired.
 
@@ -4848,7 +4938,8 @@ The post should reference visual content where appropriate (e.g., "see the stunn
         baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || process.env.OPENAI_BASE_URL,
       });
 
-      const systemPrompt = `You are a social media copywriter for Aster & Spruce Living, a high-end Muskoka cottage renovation company based in Ontario, Canada. 
+      const brand = await getBrand();
+      const systemPrompt = `You are a social media copywriter for ${brand.legalName}, a high-end Muskoka cottage renovation company based in Ontario, Canada. 
 You write engaging, authentic posts that showcase beautiful renovation work and the Muskoka lifestyle.
 
 Brand voice: Warm minimalist, premium quality, nature-inspired, community-focused.
@@ -5052,7 +5143,8 @@ Respond with valid JSON only, no markdown:
         baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || process.env.OPENAI_BASE_URL,
       });
 
-      const batchPrompt = `You are a social media copywriter for Aster & Spruce Living, a high-end Muskoka cottage renovation company based in Ontario, Canada.
+      const brand = await getBrand();
+      const batchPrompt = `You are a social media copywriter for ${brand.legalName}, a high-end Muskoka cottage renovation company based in Ontario, Canada.
 Brand voice: Warm minimalist, premium quality, nature-inspired, community-focused.
 Always use Canadian English spelling (colour, favourite, centre, etc.).
 
@@ -5149,7 +5241,8 @@ Respond with valid JSON only:
         baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || process.env.OPENAI_BASE_URL,
       });
 
-      const prompt = `You are a social media copywriter for Aster & Spruce Living, a high-end Muskoka cottage renovation company.
+      const brand = await getBrand();
+      const prompt = `You are a social media copywriter for ${brand.legalName}, a high-end Muskoka cottage renovation company.
 Always use Canadian English spelling (colour, favourite, centre, etc.).
 Brand voice: Warm minimalist, premium quality, nature-inspired.
 
@@ -5265,7 +5358,8 @@ Respond with valid JSON only:
         baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || process.env.OPENAI_BASE_URL,
       });
 
-      const prompt = `You are a social media copywriter for Aster & Spruce Living, a high-end Muskoka cottage renovation company.
+      const brand = await getBrand();
+      const prompt = `You are a social media copywriter for ${brand.legalName}, a high-end Muskoka cottage renovation company.
 Always use Canadian English spelling (colour, favourite, centre, etc.).
 Brand voice: Warm minimalist, premium quality, nature-inspired.
 

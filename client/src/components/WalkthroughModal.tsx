@@ -18,6 +18,7 @@ import {
   ChevronRight,
   X,
 } from "lucide-react";
+import { useTenantBrand } from "@/hooks/use-tenant-brand";
 
 interface Step {
   icon: React.ReactNode;
@@ -25,7 +26,7 @@ interface Step {
   description: string;
 }
 
-function getSteps(role: string, firstName?: string | null): Step[] {
+function getSteps(role: string, firstName: string | null | undefined, brandName: string): Step[] {
   const name = firstName ? `, ${firstName}` : "";
 
   if (role === "admin") {
@@ -34,7 +35,7 @@ function getSteps(role: string, firstName?: string | null): Step[] {
         icon: <Home className="h-12 w-12" />,
         title: `Welcome to ASL Connect${name}`,
         description:
-          "Your all-in-one portal for managing Aster & Spruce projects. Everything your team and clients need — delivered from one place.",
+          `Your all-in-one portal for managing ${brandName} projects. Everything your team and clients need — delivered from one place.`,
       },
       {
         icon: <LayoutDashboard className="h-12 w-12" />,
@@ -81,7 +82,7 @@ function getSteps(role: string, firstName?: string | null): Step[] {
         icon: <Home className="h-12 w-12" />,
         title: `Welcome to ASL Connect${name}`,
         description:
-          "Your team portal for Aster & Spruce projects. See your daily assignments, log your hours, and stay in sync with the team from any device.",
+          `Your team portal for ${brandName} projects. See your daily assignments, log your hours, and stay in sync with the team from any device.`,
       },
       {
         icon: <CheckSquare className="h-12 w-12" />,
@@ -116,7 +117,7 @@ function getSteps(role: string, firstName?: string | null): Step[] {
       icon: <Home className="h-12 w-12" />,
       title: `Welcome to your renovation portal${name}`,
       description:
-        "Aster & Spruce has set up this space just for your project. Five surfaces make up your portal: Plan, Updates, Design Board, Documents, and Messages — that's it.",
+        `${brandName} has set up this space just for your project. Five surfaces make up your portal: Plan, Updates, Design Board, Documents, and Messages — that's it.`,
     },
     {
       icon: <LayoutDashboard className="h-12 w-12" />,
@@ -146,7 +147,7 @@ function getSteps(role: string, firstName?: string | null): Step[] {
       icon: <MessageSquare className="h-12 w-12" />,
       title: "Messages",
       description:
-        "Send a note directly to your Aster & Spruce team. Photos and replies live with the project, so context never gets lost in a thread.",
+        `Send a note directly to your ${brandName} team. Photos and replies live with the project, so context never gets lost in a thread.`,
     },
   ];
 }
@@ -159,7 +160,8 @@ interface WalkthroughModalProps {
 }
 
 export function WalkthroughModal({ open, onClose, role, firstName }: WalkthroughModalProps) {
-  const steps = getSteps(role, firstName);
+  const brand = useTenantBrand();
+  const steps = getSteps(role, firstName, brand.brandName);
   const [current, setCurrent] = useState(0);
 
   const step = steps[current];

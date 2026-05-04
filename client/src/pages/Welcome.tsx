@@ -9,8 +9,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, ArrowRight, Home } from "lucide-react";
 import { motion } from "framer-motion";
+import { useTenantBrand } from "@/hooks/use-tenant-brand";
 
 export default function Welcome() {
+  const brand = useTenantBrand();
   const { user } = useAuth();
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
@@ -59,7 +61,7 @@ export default function Welcome() {
           <CardContent className="pt-8 pb-8 space-y-8">
             <div className="text-center space-y-3">
               <span className="font-serif text-2xl font-bold text-primary tracking-tight">
-                Aster & Spruce
+                {brand.brandName}
               </span>
               <h1
                 className="font-serif text-3xl font-bold"

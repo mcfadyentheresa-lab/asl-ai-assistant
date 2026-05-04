@@ -13,6 +13,7 @@ import { RecentSiteVisitsCard } from "@/components/client/RecentSiteVisitsCard";
 import { YourActionItemsCard } from "@/components/client/YourActionItemsCard";
 import { BudgetPulseCard } from "@/components/client/BudgetPulseCard";
 import { DocumentsShelfCard } from "@/components/client/DocumentsShelfCard";
+import { useTenantBrand } from "@/hooks/use-tenant-brand";
 
 interface Project {
   id: number;
@@ -105,6 +106,7 @@ export function ClientDashboardView({
   allProjects,
   onSelectProject,
 }: ClientDashboardViewProps) {
+  const brand = useTenantBrand();
   const { data: milestones } = useQuery<Milestone[]>({
     queryKey: [api.milestones.list.path, project.id],
     queryFn: async () => {
@@ -217,7 +219,7 @@ export function ClientDashboardView({
     },
     {
       label: "Messages",
-      caption: "Talk with the Aster & Spruce team.",
+      caption: `Talk with the ${brand.brandName} team.`,
       href: `/project/${project.id}?tab=chat`,
       testId: "ref-card-messages",
     },
@@ -320,7 +322,7 @@ export function ClientDashboardView({
 
       <footer className="px-4 md:px-8 lg:px-12 py-6 border-t border-border/60">
         <p className="font-mono text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
-          Aster &amp; Spruce Living{project.city ? ` · ${project.city}` : project.address ? ` · ${project.address}` : ""}
+          {brand.legalName}{project.city ? ` · ${project.city}` : project.address ? ` · ${project.address}` : ""}
         </p>
       </footer>
     </motion.div>

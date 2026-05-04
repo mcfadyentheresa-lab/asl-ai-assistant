@@ -17,12 +17,14 @@ import { useTheme } from "next-themes";
 import { WalkthroughModal } from "@/components/WalkthroughModal";
 import { useAppShell } from "@/contexts/app-shell-context";
 import { ClientTabsNav } from "@/components/client/ClientTabsNav";
+import { useTenantBrand } from "@/hooks/use-tenant-brand";
 
 interface NavbarShellProps {
   onMenuToggle?: () => void;
 }
 
 export function NavbarShell({ onMenuToggle }: NavbarShellProps) {
+  const brand = useTenantBrand();
   const { user, logout } = useAuth();
   const { viewMode, setViewMode } = useViewMode();
   const { theme, setTheme } = useTheme();
@@ -87,7 +89,7 @@ export function NavbarShell({ onMenuToggle }: NavbarShellProps) {
           >
             <div className="flex flex-col">
               <span className="font-serif text-lg font-bold tracking-tight text-foreground leading-none select-none">
-                Aster &amp; Spruce
+                {brand.brandName}
               </span>
               <span className="text-[9px] font-semibold tracking-[0.18em] uppercase text-muted-foreground mt-0.5 select-none">
                 Living

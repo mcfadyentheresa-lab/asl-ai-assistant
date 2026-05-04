@@ -6,6 +6,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useTenantBrand } from "@/hooks/use-tenant-brand";
 
 interface ClientProjectFooterProps {
   projectName: string;
@@ -19,6 +20,7 @@ function deriveProjectCode(id: number): string {
 export { deriveProjectCode };
 
 export function ClientProjectFooter({ projectName, projectCode }: ClientProjectFooterProps) {
+  const brand = useTenantBrand();
   const [openDoc, setOpenDoc] = useState<null | "privacy" | "terms">(null);
   const year = new Date().getFullYear();
 
@@ -50,7 +52,7 @@ export function ClientProjectFooter({ projectName, projectCode }: ClientProjectF
                 className="text-xs text-muted-foreground"
                 data-testid="text-footer-credit"
               >
-                Designed by Aster &amp; Spruce Living • Muskoka, Ontario
+                Designed by {brand.legalName} • Muskoka, Ontario
               </div>
             </div>
 
@@ -114,7 +116,7 @@ export function ClientProjectFooter({ projectName, projectCode }: ClientProjectF
                 <p>
                   This client portal is private to your project. We share
                   documents, photos, and updates only with people invited to
-                  this project by Aster &amp; Spruce Living.
+                  this project by {brand.legalName}.
                 </p>
                 <p>
                   We don't sell or share your information with third parties.
@@ -137,7 +139,7 @@ export function ClientProjectFooter({ projectName, projectCode }: ClientProjectF
               <>
                 <p>
                   This portal is provided to you as part of your design and
-                  build engagement with Aster &amp; Spruce Living. Content
+                  build engagement with {brand.legalName}. Content
                   here — drawings, finishes, schedules — is for your project
                   and is not licensed for redistribution.
                 </p>

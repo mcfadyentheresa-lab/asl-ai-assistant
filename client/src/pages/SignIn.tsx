@@ -1,13 +1,15 @@
 import { Button } from "@/components/ui/button";
 import { LogIn } from "lucide-react";
+import { useTenantBrand } from "@/hooks/use-tenant-brand";
 
 export default function SignIn() {
+  const brand = useTenantBrand();
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background px-6" data-testid="page-sign-in">
       <div className="w-full max-w-sm text-center space-y-8">
         <div className="space-y-2">
           <h1 className="font-serif text-3xl md:text-4xl font-bold tracking-tight text-foreground" data-testid="text-brand">
-            Aster &amp; Spruce
+            {brand.brandName}
           </h1>
           <p className="text-sm text-muted-foreground uppercase tracking-widest" data-testid="text-tagline">
             Connect
@@ -30,7 +32,7 @@ export default function SignIn() {
       </div>
 
       <p className="absolute bottom-6 text-xs text-muted-foreground/60" data-testid="text-footer">
-        &copy; {new Date().getFullYear()} Aster &amp; Spruce Living
+        &copy; {new Date().getFullYear()} {brand.legalName}
       </p>
     </div>
   );
