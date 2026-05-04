@@ -1,4 +1,4 @@
-import { Link } from "wouter";
+import { useState } from "react";
 
 type Decision = {
   id: number;
@@ -26,10 +26,12 @@ export function RecentDecisionsCard({
   decisions,
   limit = 3,
 }: RecentDecisionsCardProps) {
+  const [showAll, setShowAll] = useState(false);
+
   if (!decisions || decisions.length === 0) return null;
 
-  const sliced = decisions.slice(0, limit);
   const hasMore = decisions.length > limit;
+  const sliced = showAll ? decisions : decisions.slice(0, limit);
 
   return (
     <section
@@ -40,13 +42,16 @@ export function RecentDecisionsCard({
         <h2 className="text-sm font-semibold tracking-tight uppercase">
           Recent decisions
         </h2>
-        <Link
-          href={`/project/${projectId}?tab=decisions`}
-          className="font-mono text-[10px] tracking-[0.14em] text-muted-foreground uppercase hover:text-foreground transition-colors"
-          data-testid="link-all-decisions"
-        >
-          {hasMore ? "View all" : "Open log"}
-        </Link>
+        {hasMore && (
+          <button
+            type="button"
+            onClick={() => setShowAll((v) => !v)}
+            className="font-mono text-[10px] tracking-[0.14em] text-muted-foreground uppercase hover:text-foreground transition-colors"
+            data-testid="button-toggle-all-decisions"
+          >
+            {showAll ? "Show fewer" : `Show all ${decisions.length}`}
+          </button>
+        )}
       </div>
 
       <ul className="divide-y divide-border/60 border-y border-border/60">

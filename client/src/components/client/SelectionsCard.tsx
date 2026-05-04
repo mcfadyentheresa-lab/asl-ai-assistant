@@ -1,4 +1,4 @@
-import { Link } from "wouter";
+import { useState } from "react";
 
 type Selection = {
   id: number;
@@ -48,6 +48,8 @@ export function SelectionsCard({
   selections,
   limit = 5,
 }: SelectionsCardProps) {
+  const [showAll, setShowAll] = useState(false);
+
   const inFlight = (selections || []).filter((s) => IN_FLIGHT.has(s.status));
 
   if (inFlight.length === 0) return null;
@@ -64,8 +66,8 @@ export function SelectionsCard({
     return 0;
   });
 
-  const sliced = sorted.slice(0, limit);
   const hasMore = sorted.length > limit;
+  const sliced = showAll ? sorted : sorted.slice(0, limit);
 
   return (
     <section
@@ -76,13 +78,16 @@ export function SelectionsCard({
         <h2 className="text-sm font-semibold tracking-tight uppercase">
           Selections in flight
         </h2>
-        <Link
-          href={`/project/${projectId}?tab=selections`}
-          className="font-mono text-[10px] tracking-[0.14em] text-muted-foreground uppercase hover:text-foreground transition-colors"
-          data-testid="link-all-selections"
-        >
-          {hasMore ? "View all" : "Open ledger"}
-        </Link>
+        {hasMore && (
+          <button
+            type="button"
+            onClick={() => setShowAll((v) => !v)}
+            className="font-mono text-[10px] tracking-[0.14em] text-muted-foreground uppercase hover:text-foreground transition-colors"
+            data-testid="button-toggle-all-selections"
+          >
+            {showAll ? "Show fewer" : `Show all ${sorted.length}`}
+          </button>
+        )}
       </div>
 
       <ul className="divide-y divide-border/60 border-y border-border/60">

@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "wouter";
+import { useState } from "react";
 
 type SiteVisit = {
   id: number;
@@ -32,6 +32,7 @@ export function RecentSiteVisitsCard({
   projectId,
   limit = 3,
 }: RecentSiteVisitsCardProps) {
+  const [showAll, setShowAll] = useState(false);
   const { data: visits, isLoading } = useQuery<SiteVisit[]>({
     queryKey: ["/api/projects", projectId, "site-visits"],
     queryFn: async () => {
@@ -56,8 +57,8 @@ export function RecentSiteVisitsCard({
     return b.id - a.id;
   });
 
-  const sliced = sorted.slice(0, limit);
   const hasMore = sorted.length > limit;
+  const sliced = showAll ? sorted : sorted.slice(0, limit);
 
   return (
     <section
@@ -68,13 +69,16 @@ export function RecentSiteVisitsCard({
         <h2 className="text-sm font-semibold tracking-tight uppercase">
           Recent site visits
         </h2>
-        <Link
-          href={`/project/${projectId}?tab=site-visits`}
-          className="font-mono text-[10px] tracking-[0.14em] text-muted-foreground uppercase hover:text-foreground transition-colors"
-          data-testid="link-all-site-visits"
-        >
-          {hasMore ? "View all" : "Open log"}
-        </Link>
+        {hasMore && (
+          <button
+            type="button"
+            onClick={() => setShowAll((v) => !v)}
+            className="font-mono text-[10px] tracking-[0.14em] text-muted-foreground uppercase hover:text-foreground transition-colors"
+            data-testid="button-toggle-all-site-visits"
+          >
+            {showAll ? "Show fewer" : `Show all ${sorted.length}`}
+          </button>
+        )}
       </div>
 
       <ul className="divide-y divide-border/60 border-y border-border/60">

@@ -7,6 +7,12 @@ interface ProjectStub {
   status?: string | null;
 }
 
+interface PlanningBoardStub {
+  id: number;
+  projectId: number;
+  linkedUserIds: string[] | null;
+}
+
 interface ClientTab {
   label: string;
   /** Path resolver: receives the project id to deep-link against (the project
@@ -19,8 +25,11 @@ interface ClientTab {
 
 const TABS: ClientTab[] = [
   {
-    label: "The Plan",
-    // The Plan is the project root with no `?tab=` parameter. If we know which
+    // "Plan" matches MobileBottomNav and the in-page tab labels so the same
+    // surface is named the same way everywhere. The product philosophy doc
+    // uses "The Plan" descriptively; the nav label stays short for fit.
+    label: "Plan",
+    // Plan is the project root with no `?tab=` parameter. If we know which
     // project the user is viewing we deep-link to it; otherwise we send them
     // home and let the dashboard pick a project.
     resolve: (id) => (id ? `/project/${id}` : "/"),
@@ -95,16 +104,44 @@ export function ClientTabsNav() {
     (projects || []).find((p) => p.status !== "archived") || null;
   const projectId = currentProjectId ?? primaryProject?.id ?? null;
 
+  // Design Board tab is hidden until the client has been invited to a board
+  // for this project. Mirrors `clientRequiresInvite` gating in ProjectDetails
+  // so the top nav never shows a tab that would silently fall back to Plan.
+  const { data: boards } = useQuery<PlanningBoardStub[]>({
+    queryKey: ["/api/projects", projectId, "planning-boards"],
+    queryFn: async () => {
+      const res = await fetch(`/api/projects/${projectId}/planning-boards`, {
+        credentials: "include",
+      });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!projectId,
+    staleTime: 60_000,
+  });
+
+  // userId from the auth hook would be cleaner, but ClientTabsNav already
+  // works without the auth context — we infer invitation by "any board exists
+  // and at least one links to a user". When boards exist but the user isn't
+  // linked to any, we still hide the tab (the in-page guard will block them).
+  const hasBoardInvite = (boards || []).some(
+    (b) => Array.isArray(b.linkedUserIds) && b.linkedUserIds.length > 0,
+  );
+
+  const visibleTabs = TABS.filter(
+    (t) => t.label !== "Design Board" || hasBoardInvite,
+  );
+
   return (
     <nav
       className="hidden md:flex items-center gap-7 lg:gap-8 h-14"
       data-testid="client-tabs-nav"
       aria-label="Primary"
     >
-      {TABS.map((t) => {
+      {visibleTabs.map((t) => {
         const active = t.isActiveFor(location);
         const href = t.resolve(projectId);
-        const disabled = !projectId && t.label !== "The Plan";
+        const disabled = !projectId && t.label !== "Plan";
 
         return (
           <Link

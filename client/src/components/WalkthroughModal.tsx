@@ -13,7 +13,6 @@ import {
   CalendarDays,
   CheckSquare,
   MessageSquare,
-  ImageIcon,
   BarChart3,
   ChevronLeft,
   ChevronRight,
@@ -117,31 +116,37 @@ function getSteps(role: string, firstName?: string | null): Step[] {
       icon: <Home className="h-12 w-12" />,
       title: `Welcome to your renovation portal${name}`,
       description:
-        "Aster & Spruce has set up this space just for your project. Track progress, view the latest updates, and stay connected with your team — all in one place.",
+        "Aster & Spruce has set up this space just for your project. Five surfaces make up your portal: Plan, Updates, Design Board, Documents, and Messages — that's it.",
+    },
+    {
+      icon: <LayoutDashboard className="h-12 w-12" />,
+      title: "Plan",
+      description:
+        "Your home page. A calm, vertical view of where your project is right now: current focus, milestones, recent decisions, selections in flight, and any change orders awaiting your approval.",
     },
     {
       icon: <BarChart3 className="h-12 w-12" />,
-      title: "Your Project Overview",
+      title: "Updates",
       description:
-        "The Overview tab shows your project's current phase, key milestones, and a high-level snapshot of where things stand — including the budget summary when your team shares it.",
+        "The weekly editorial-style update from your team — what just happened on site, what it means, and what's coming next. This is why most clients open the portal.",
     },
     {
-      icon: <CheckSquare className="h-12 w-12" />,
-      title: "Progress & Milestones",
+      icon: <Palette className="h-12 w-12" />,
+      title: "Design Board",
       description:
-        "The Progress tab breaks your renovation into phases and tasks. Watch each step move from To Do to Done as your team works — so you always know what's happening on site.",
+        "A shared visual canvas your designer composes. Pin your own inspiration to the wishlist zone, comment on items, and watch finishes come together. Appears in your nav once you've been invited to a board.",
     },
     {
-      icon: <ImageIcon className="h-12 w-12" />,
-      title: "Photos & Documents",
+      icon: <FolderOpen className="h-12 w-12" />,
+      title: "Documents",
       description:
-        "View site photos as your project progresses and access shared documents — contracts, specs, and reports — all in one place, any time.",
+        "Drawings, contracts, permits, warranties, and shared specs — all kept in one place so you never have to dig through email.",
     },
     {
       icon: <MessageSquare className="h-12 w-12" />,
-      title: "Stay in Touch",
+      title: "Messages",
       description:
-        "Use Messages to chat directly with your Aster & Spruce team. Ask questions, share feedback, and stay informed every step of the way.",
+        "Send a note directly to your Aster & Spruce team. Photos and replies live with the project, so context never gets lost in a thread.",
     },
   ];
 }

@@ -1,5 +1,3 @@
-import { Link } from "wouter";
-
 type ActionItem = {
   id: number;
   title: string;
@@ -46,13 +44,6 @@ export function YourActionItemsCard({
         <h2 className="text-sm font-semibold tracking-tight uppercase">
           Your action items
         </h2>
-        <Link
-          href={`/project/${projectId}?tab=checklist`}
-          className="font-mono text-[10px] tracking-[0.14em] text-muted-foreground uppercase hover:text-foreground transition-colors"
-          data-testid="link-all-action-items"
-        >
-          Open progress
-        </Link>
       </div>
 
       <ul

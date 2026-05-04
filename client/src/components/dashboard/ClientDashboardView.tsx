@@ -212,13 +212,13 @@ export function ClientDashboardView({
     {
       label: "Documents",
       caption: "Drawings, contracts, permits, and warranties.",
-      href: `/project/${project.id}?tab=documents`,
+      href: `/project/${project.id}?tab=docs`,
       testId: "ref-card-documents",
     },
     {
       label: "Messages",
       caption: "Talk with the Aster & Spruce team.",
-      href: `/project/${project.id}?tab=messages`,
+      href: `/project/${project.id}?tab=chat`,
       testId: "ref-card-messages",
     },
   ];
