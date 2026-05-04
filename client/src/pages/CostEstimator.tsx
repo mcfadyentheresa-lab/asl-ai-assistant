@@ -520,18 +520,18 @@ export default function CostEstimator() {
                     ${grandTotalWithHST.toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
                   {totalMarkup > 0 && (
-                    <div className="text-xs text-muted-foreground">incl. ${totalMarkup.toLocaleString("en-CA", { minimumFractionDigits: 2 })} markup</div>
+                    <div className="text-xs text-muted-foreground">incl. ${totalMarkup.toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} markup</div>
                   )}
                   {contingencyAmount > 0 && (
-                    <div className="text-xs text-muted-foreground">incl. ${contingencyAmount.toLocaleString("en-CA", { minimumFractionDigits: 2 })} contingency</div>
+                    <div className="text-xs text-muted-foreground">incl. ${contingencyAmount.toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} contingency</div>
                   )}
                   {managementFeeAmount > 0 && (
-                    <div className="text-xs text-muted-foreground">incl. ${managementFeeAmount.toLocaleString("en-CA", { minimumFractionDigits: 2 })} management fee ({activeEstimate?.managementFeePercent || "25"}%)</div>
+                    <div className="text-xs text-muted-foreground">incl. ${managementFeeAmount.toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} management fee ({activeEstimate?.managementFeePercent || "25"}%)</div>
                   )}
-                  <div className="text-xs text-muted-foreground">incl. ${hstAmount.toLocaleString("en-CA", { minimumFractionDigits: 2 })} HST (13%)</div>
+                  <div className="text-xs text-muted-foreground">incl. ${hstAmount.toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} HST (13%)</div>
                   {(() => {
                     const totalLabor = items.reduce((s, i) => s + (parseFloat(i.laborCost) || 0), 0);
-                    return totalLabor > 0 ? <div className="text-xs text-muted-foreground">Labour: ${totalLabor.toLocaleString("en-CA", { minimumFractionDigits: 2 })}</div> : null;
+                    return totalLabor > 0 ? <div className="text-xs text-muted-foreground">Labour: ${totalLabor.toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div> : null;
                   })()}
                 </CardContent>
               </Card>
@@ -632,8 +632,8 @@ export default function CostEstimator() {
                           </span>
                           <span className={`text-sm font-medium ${overBudget ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`} data-testid="text-budget-remaining">
                             {overBudget
-                              ? `$${Math.abs(budgetRemaining).toLocaleString("en-CA", { minimumFractionDigits: 2 })} over budget`
-                              : `$${budgetRemaining.toLocaleString("en-CA", { minimumFractionDigits: 2 })} remaining`}
+                              ? `$${Math.abs(budgetRemaining).toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} over budget`
+                              : `$${budgetRemaining.toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} remaining`}
                           </span>
                         </div>
                         <Progress
@@ -643,7 +643,7 @@ export default function CostEstimator() {
                         />
                         <div className="flex items-center justify-between text-xs text-muted-foreground">
                           <span>{budgetUsedPercent.toFixed(0)}% of budget used</span>
-                          <span>Estimate: ${grandTotalWithHST.toLocaleString("en-CA", { minimumFractionDigits: 2 })} (incl. HST)</span>
+                          <span>Estimate: ${grandTotalWithHST.toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (incl. HST)</span>
                         </div>
                         {overBudget && canEdit && items.length > 0 && (
                           <Button
@@ -1167,7 +1167,7 @@ export default function CostEstimator() {
                                 {lineItems && lineItems.length > 0 && ` · ${lineItems.length} items`}
                               </div>
                             </div>
-                            <div className="text-sm font-semibold">${parseFloat(r.amount).toLocaleString("en-CA", { minimumFractionDigits: 2 })}</div>
+                            <div className="text-sm font-semibold">${parseFloat(r.amount).toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                             {canEdit && (
                               <Button variant="ghost" size="sm" className="h-11 w-11 md:h-7 md:w-7 p-0" onClick={() => deleteReceiptMutation.mutate(r.id)} data-testid={`button-delete-receipt-${r.id}`}>
                                 <Trash2 className="h-3 w-3" />
@@ -1197,7 +1197,7 @@ export default function CostEstimator() {
                     })}
                     <div className="flex justify-between pt-3 border-t">
                       <span className="text-sm font-semibold">Total Actual Spend</span>
-                      <span className="text-sm font-semibold" data-testid="text-total-actual">${totalReceipts.toLocaleString("en-CA", { minimumFractionDigits: 2 })}</span>
+                      <span className="text-sm font-semibold" data-testid="text-total-actual">${totalReceipts.toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
                   </div>
                 )}
@@ -1777,7 +1777,7 @@ export default function CostEstimator() {
                   <div className="flex items-center gap-2 p-3 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800">
                     <ArrowDownRight className="h-4 w-4 text-green-600" />
                     <span className="text-sm font-medium text-green-700 dark:text-green-400" data-testid="text-total-savings">
-                      Potential savings: up to ${parseFloat(alternativesResults.totalPotentialSavings).toLocaleString("en-CA", { minimumFractionDigits: 2 })}
+                      Potential savings: up to ${parseFloat(alternativesResults.totalPotentialSavings).toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </div>
                 )}
@@ -1797,7 +1797,7 @@ export default function CostEstimator() {
                           </div>
                           {parseFloat(sug.estimatedSavings) > 0 && (
                             <Badge variant="outline" className="text-green-600 border-green-300 shrink-0">
-                              Save ${parseFloat(sug.estimatedSavings).toLocaleString("en-CA", { minimumFractionDigits: 2 })}
+                              Save ${parseFloat(sug.estimatedSavings).toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </Badge>
                           )}
                         </div>
