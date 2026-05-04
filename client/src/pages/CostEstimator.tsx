@@ -28,7 +28,7 @@ import {
   Calculator, Plus, Trash2, AlertTriangle, CheckCircle2,
   DollarSign, ArrowLeft, Receipt as ReceiptIcon, EyeOff, Pencil,
   TrendingUp, TrendingDown, Minus, Loader2, Sparkles, Shapes, ChevronDown, ChevronRight,
-  Wallet, Lightbulb, ArrowDownRight, ExternalLink, Home, Store
+  Wallet, Lightbulb, ArrowDownRight, ExternalLink, Home, Store, Lock, Send, GitBranch
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
@@ -103,6 +103,16 @@ export default function CostEstimator() {
   const activeEstimate =
     estimates.find((e) => e.id === selectedEstimateId) ?? estimates[0];
 
+  // An estimate is locked once it leaves 'draft'. Locked estimates are part of
+  // the paper trail — to make changes, click Revise to clone into a new draft.
+  // canEditEstimate is the lock-aware version of canEdit and gates ALL
+  // estimate/item mutation UI (add line item, edit budget/markup/etc, AI
+  // analyzer, delete). canEdit alone (role check) still applies to things
+  // outside the estimate, e.g. crew rates / subcontractors / price book.
+  const isEstimateLocked =
+    activeEstimate?.status === "approved" || activeEstimate?.status === "sent";
+  const canEditEstimate = canEdit && !isEstimateLocked;
+
   const { data: items = [] } = useQuery<EstimateItem[]>({
     queryKey: ["/api/estimates", activeEstimate?.id, "items"],
     enabled: !!activeEstimate,
@@ -161,6 +171,53 @@ export default function CostEstimator() {
     },
     onError: () => {
       toast({ title: "Could not delete estimate", variant: "destructive" });
+    },
+  });
+
+  // PR C — Approval flow. Status moves draft → approved → sent. Once it
+  // leaves draft it's locked (read-only paper trail). To make changes the
+  // admin clicks Revise which clones the estimate into a new draft.
+  const approveEstimateMutation = useMutation({
+    mutationFn: async (estimateId: number) => {
+      const res = await apiRequest("POST", `/api/estimates/${estimateId}/approve`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "estimates"] });
+      toast({ title: "Estimate approved", description: "This estimate is now locked. Click Revise to make changes." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Could not approve estimate", description: err?.message || "", variant: "destructive" });
+    },
+  });
+
+  const markSentMutation = useMutation({
+    mutationFn: async (estimateId: number) => {
+      const res = await apiRequest("POST", `/api/estimates/${estimateId}/mark-sent`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "estimates"] });
+      toast({ title: "Estimate marked as sent" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Could not mark estimate as sent", description: err?.message || "Estimate must be approved first", variant: "destructive" });
+    },
+  });
+
+  const reviseEstimateMutation = useMutation({
+    mutationFn: async (estimateId: number) => {
+      const res = await apiRequest("POST", `/api/estimates/${estimateId}/revise`);
+      return res.json();
+    },
+    onSuccess: (created: ProjectEstimate) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "estimates"] });
+      // Auto-select the new draft so the user lands on the editable copy.
+      if (created?.id) setSelectedEstimateId(created.id);
+      toast({ title: "New draft created", description: created?.name || "" });
+    },
+    onError: () => {
+      toast({ title: "Could not create revision", variant: "destructive" });
     },
   });
 
@@ -590,6 +647,22 @@ export default function CostEstimator() {
                         ))}
                       </SelectContent>
                     </Select>
+                    {/* Status badge — reflects approval-flow state. */}
+                    {activeEstimate.status === "approved" && (
+                      <Badge variant="default" className="gap-1" data-testid="badge-estimate-status">
+                        <Lock className="h-3 w-3" /> Approved
+                      </Badge>
+                    )}
+                    {activeEstimate.status === "sent" && (
+                      <Badge variant="outline" className="gap-1" data-testid="badge-estimate-status">
+                        <Send className="h-3 w-3" /> Sent
+                      </Badge>
+                    )}
+                    {(!activeEstimate.status || activeEstimate.status === "draft") && (
+                      <Badge variant="secondary" data-testid="badge-estimate-status">
+                        Draft
+                      </Badge>
+                    )}
                     {canEdit && (
                       <>
                         <Button
@@ -601,18 +674,22 @@ export default function CostEstimator() {
                         >
                           <Plus className="h-4 w-4 mr-1" /> New estimate
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setEstimateNameInput(activeEstimate.name || "");
-                            setRenamingEstimate(true);
-                          }}
-                          data-testid="button-rename-estimate"
-                        >
-                          <Pencil className="h-4 w-4 mr-1" /> Rename
-                        </Button>
-                        {estimates.length > 1 && (
+                        {/* Rename / Delete: only on drafts. Locked estimates are
+                            part of the paper trail and must stay immutable. */}
+                        {!isEstimateLocked && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setEstimateNameInput(activeEstimate.name || "");
+                              setRenamingEstimate(true);
+                            }}
+                            data-testid="button-rename-estimate"
+                          >
+                            <Pencil className="h-4 w-4 mr-1" /> Rename
+                          </Button>
+                        )}
+                        {!isEstimateLocked && estimates.length > 1 && (
                           <Button
                             variant="ghost"
                             size="sm"
@@ -625,6 +702,48 @@ export default function CostEstimator() {
                             data-testid="button-delete-estimate"
                           >
                             <Trash2 className="h-4 w-4 mr-1" /> Delete
+                          </Button>
+                        )}
+                        {/* Approval-flow buttons. Approve appears on drafts.
+                            Mark as Sent appears once approved. Revise clones
+                            into a new draft — allowed on any status. */}
+                        {(!activeEstimate.status || activeEstimate.status === "draft") && (
+                          <Button
+                            variant="default"
+                            size="sm"
+                            onClick={() => {
+                              if (!window.confirm(`Approve "${activeEstimate.name || "this estimate"}"? Once approved it becomes read-only. To make changes, click Revise to create a new draft.`)) return;
+                              approveEstimateMutation.mutate(activeEstimate.id);
+                            }}
+                            disabled={approveEstimateMutation.isPending}
+                            data-testid="button-approve-estimate"
+                          >
+                            <CheckCircle2 className="h-4 w-4 mr-1" /> Approve
+                          </Button>
+                        )}
+                        {activeEstimate.status === "approved" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => markSentMutation.mutate(activeEstimate.id)}
+                            disabled={markSentMutation.isPending}
+                            data-testid="button-mark-sent-estimate"
+                          >
+                            <Send className="h-4 w-4 mr-1" /> Mark as Sent
+                          </Button>
+                        )}
+                        {(activeEstimate.status === "approved" || activeEstimate.status === "sent") && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              if (!window.confirm(`Create a new draft based on "${activeEstimate.name || "this estimate"}"? The original stays locked as a paper trail.`)) return;
+                              reviseEstimateMutation.mutate(activeEstimate.id);
+                            }}
+                            disabled={reviseEstimateMutation.isPending}
+                            data-testid="button-revise-estimate"
+                          >
+                            <GitBranch className="h-4 w-4 mr-1" /> Revise
                           </Button>
                         )}
                       </>
@@ -668,6 +787,25 @@ export default function CostEstimator() {
                 )}
               </CardContent>
             </Card>
+
+            {/* Read-only banner when the active estimate is locked. Tells the
+                admin why edit controls are gone and points them at Revise. */}
+            {isEstimateLocked && (
+              <Card className="border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/30" data-testid="banner-estimate-locked">
+                <CardContent className="py-3 flex items-start gap-3">
+                  <Lock className="h-4 w-4 mt-0.5 text-amber-700 dark:text-amber-400 shrink-0" />
+                  <div className="text-sm text-amber-900 dark:text-amber-100">
+                    {activeEstimate.status === "sent" ? "Sent" : "Approved"}
+                    {activeEstimate.approvedAt && (
+                      <> on {new Date(activeEstimate.approvedAt as any).toLocaleDateString("en-CA", { month: "short", day: "numeric", year: "numeric" })}</>
+                    )}
+                    {" — read-only. Click "}
+                    <span className="font-semibold">Revise</span>
+                    {" to create an editable copy. The original stays locked as a paper trail."}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <Card>
@@ -740,7 +878,7 @@ export default function CostEstimator() {
                         <Wallet className="h-4 w-4 text-muted-foreground" />
                         <span className="text-sm font-medium">Client Budget</span>
                       </div>
-                      {canEdit && !editingBudget && (
+                      {canEditEstimate && !editingBudget && (
                         <Button
                           variant="outline"
                           size="sm"
@@ -802,7 +940,7 @@ export default function CostEstimator() {
                           <span>{budgetUsedPercent.toFixed(0)}% of budget used</span>
                           <span>Estimate: ${grandTotalWithHST.toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (incl. HST)</span>
                         </div>
-                        {overBudget && canEdit && items.length > 0 && (
+                        {overBudget && canEditEstimate && items.length > 0 && (
                           <Button
                             variant="outline"
                             size="sm"
@@ -829,7 +967,7 @@ export default function CostEstimator() {
               );
             })()}
 
-            {canEdit && (
+            {canEditEstimate && (
               <div className="flex gap-2 flex-wrap">
                 <Button variant="outline" onClick={() => setShowBoardImport(true)} data-testid="button-import-board">
                   <Shapes className="h-4 w-4 mr-2" /> Import from Board
@@ -840,7 +978,7 @@ export default function CostEstimator() {
               </div>
             )}
 
-            {canEdit && (
+            {canEditEstimate && (
               <Card>
                 <CardContent className="py-3 flex items-center justify-between flex-wrap gap-3">
                   <div className="flex items-center gap-3">
@@ -867,7 +1005,7 @@ export default function CostEstimator() {
               </Card>
             )}
 
-            {canEdit && (
+            {canEditEstimate && (
               <Card data-testid="card-contingency">
                 <CardContent className="py-3 flex items-center justify-between flex-wrap gap-3">
                   <div className="flex items-center gap-3">
@@ -906,7 +1044,7 @@ export default function CostEstimator() {
               </Card>
             )}
 
-            {canEdit && (
+            {canEditEstimate && (
               <Card data-testid="card-management-fee">
                 <CardContent className="py-3 flex items-center justify-between flex-wrap gap-3">
                   <div className="flex items-center gap-3">
@@ -1009,7 +1147,7 @@ export default function CostEstimator() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-3">
                 <CardTitle className="text-lg">Estimate Line Items</CardTitle>
-                {canEdit && (
+                {canEditEstimate && (
                   <Button size="sm" onClick={() => setShowAddItem(true)} data-testid="button-add-line-item">
                     <Plus className="h-4 w-4 mr-1" /> Add Item
                   </Button>
@@ -1037,7 +1175,7 @@ export default function CostEstimator() {
                         const itemWarnings = warnings.filter(w => w.estimateItemId === item.id && !w.ignored);
                         const isEditing = editingItemId === item.id;
 
-                        if (isEditing && canEdit) {
+                        if (isEditing && canEditEstimate) {
                           const saveEdit = () => {
                             updateItemMutation.mutate({
                               id: item.id,
@@ -1118,7 +1256,7 @@ export default function CostEstimator() {
                         const borderClass = itemWarnings.length > 0
                           ? 'border-amber-300 bg-amber-50/50 dark:border-amber-700 dark:bg-amber-950/30'
                           : 'border-border';
-                        const editActions = canEdit ? (
+                        const editActions = canEditEstimate ? (
                           <div className="flex items-center gap-0.5 shrink-0">
                             <Button variant="ghost" size="sm" className="h-11 w-11 md:h-7 md:w-7 p-0" onClick={() => {
                               setEditingItemId(item.id);

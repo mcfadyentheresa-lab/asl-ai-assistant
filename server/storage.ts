@@ -184,6 +184,10 @@ export interface IStorage {
   createEstimate(estimate: InsertProjectEstimate): Promise<ProjectEstimate>;
   updateEstimate(id: number, updates: Partial<InsertProjectEstimate>): Promise<ProjectEstimate>;
   deleteEstimate(id: number): Promise<void>;
+  // Clone an existing estimate (incl. all line items) as a new draft. Used by
+  // the "Revise" flow on locked (approved/sent) estimates so the original stays
+  // immutable as a paper trail.
+  cloneEstimate(sourceId: number, opts: { name?: string; createdBy: string }): Promise<ProjectEstimate>;
 
   // Estimate Items
   getEstimateItems(estimateId: number): Promise<EstimateItem[]>;
@@ -970,6 +974,89 @@ export class DatabaseStorage implements IStorage {
   }
   async deleteEstimate(id: number): Promise<void> {
     await db.delete(projectEstimates).where(eq(projectEstimates.id, id));
+  }
+  async cloneEstimate(
+    sourceId: number,
+    opts: { name?: string; createdBy: string },
+  ): Promise<ProjectEstimate> {
+    return await db.transaction(async (tx) => {
+      const [source] = await tx
+        .select()
+        .from(projectEstimates)
+        .where(eq(projectEstimates.id, sourceId));
+      if (!source) throw new Error("Source estimate not found");
+
+      // Auto-name as "<source-base> v<N>". If the source already ends in " vN",
+      // strip that and bump. Otherwise use " v2". Then walk N upward until
+      // there's no name collision among this project's estimates.
+      const sourceBase = (source.name || "Main Estimate").replace(/ v\d+$/i, "");
+      const projectEstimatesList = await tx
+        .select({ name: projectEstimates.name })
+        .from(projectEstimates)
+        .where(eq(projectEstimates.projectId, source.projectId));
+      const existingNames = new Set(projectEstimatesList.map((r) => r.name));
+      let candidate = opts.name?.trim();
+      if (!candidate) {
+        let n = 2;
+        // If source itself was "X v3", start from v4
+        const m = (source.name || "").match(/ v(\d+)$/i);
+        if (m) n = parseInt(m[1], 10) + 1;
+        candidate = `${sourceBase} v${n}`;
+        while (existingNames.has(candidate)) {
+          n += 1;
+          candidate = `${sourceBase} v${n}`;
+        }
+      }
+
+      const [cloned] = await tx
+        .insert(projectEstimates)
+        .values({
+          projectId: source.projectId,
+          name: candidate,
+          status: "draft",
+          markupEnabled: source.markupEnabled,
+          markupPercent: source.markupPercent,
+          budget: source.budget,
+          contingencyPercent: source.contingencyPercent,
+          managementFeeEnabled: source.managementFeeEnabled,
+          managementFeePercent: source.managementFeePercent,
+          createdBy: opts.createdBy,
+          revisedFromId: source.id,
+        })
+        .returning();
+
+      // Clone line items. We deliberately do NOT clone receipts or warnings:
+      // receipts are project-level (already linked to the project, not the
+      // estimate), and warnings are derived from items + market rates and will
+      // get regenerated naturally on the new estimate.
+      const sourceItems = await tx
+        .select()
+        .from(estimateItems)
+        .where(eq(estimateItems.estimateId, sourceId));
+      if (sourceItems.length > 0) {
+        await tx.insert(estimateItems).values(
+          sourceItems.map((it) => ({
+            estimateId: cloned.id,
+            categoryId: it.categoryId,
+            customCategory: it.customCategory,
+            room: it.room,
+            productUrl: it.productUrl,
+            unitType: it.unitType,
+            quantity: it.quantity,
+            unitCost: it.unitCost,
+            materialCost: it.materialCost,
+            laborCost: it.laborCost,
+            isCustomRate: it.isCustomRate,
+            marketRateId: it.marketRateId,
+            notes: it.notes,
+            crewRateId: it.crewRateId,
+            subcontractorId: it.subcontractorId,
+          })),
+        );
+      }
+
+      return cloned;
+    });
   }
 
   // Estimate Items
