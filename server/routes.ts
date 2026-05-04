@@ -4259,7 +4259,7 @@ Prefer faces, architectural focal subjects, strong compositional anchors (a fire
       return res.status(403).json({ message: "Admin or crew only" });
     }
 
-    const { description } = req.body;
+    const { description, answers } = req.body;
     if (!description || typeof description !== "string") {
       return res.status(400).json({ message: "Project description is required" });
     }
@@ -4269,6 +4269,11 @@ Prefer faces, architectural focal subjects, strong compositional anchors (a fire
     if (!estimate) {
       return res.status(404).json({ message: "Estimate not found" });
     }
+
+    // Project context (name, address, city, description, total budget) — used by the AI
+    // to be Muskoka-aware (e.g., boat-access cottages on Lake Joseph) and to size scope
+    // realistically given the booked budget.
+    const project = await storage.getProject(estimate.projectId);
 
     const categories = await storage.getCostCategories();
     const allRates = await storage.getAllMarketRates();
@@ -4287,29 +4292,73 @@ Prefer faces, architectural focal subjects, strong compositional anchors (a fire
       };
     });
 
+    // Real supplier prices (Muskoka Lumber receipts + other suppliers).
+    // We pass these to the AI so it can itemize against actual SKUs when confident,
+    // instead of always falling back to category-typical rates.
+    const allSuppliers = await storage.getSuppliers();
+    const supplierById = new Map(allSuppliers.map(s => [s.id, s]));
+    const allSupplierPrices = await storage.getSupplierPrices();
+    // Token-conscious: cap to first 80 SKUs (currently ~58 from Muskoka Lumber + a handful
+    // from other suppliers). Sorted by category so AI can scan by trade.
+    const supplierPriceLines = allSupplierPrices
+      .slice(0, 80)
+      .map(p => {
+        const supplierName = supplierById.get(p.supplierId)?.name || "Unknown";
+        const cat = categories.find(c => c.id === p.categoryId);
+        const catName = cat ? cat.name : "Uncategorized";
+        const code = p.productCode ? ` [${p.productCode}]` : "";
+        return `- ${supplierName}: ${p.productName}${code} — $${p.unitPrice}/${p.unitType} (${catName})`;
+      });
+
+    const projectContextLines: string[] = [];
+    if (project) {
+      projectContextLines.push(`- Project name: ${project.name}`);
+      if (project.address) projectContextLines.push(`- Address: ${project.address}${project.city ? ", " + project.city : ""}`);
+      else if (project.city) projectContextLines.push(`- City: ${project.city}`);
+      if (project.description) projectContextLines.push(`- Project description: ${project.description}`);
+      if (project.totalBudget && project.totalBudget > 0) {
+        projectContextLines.push(`- Booked total budget (CAD): $${project.totalBudget.toLocaleString("en-CA")}`);
+      }
+      if (project.phase) projectContextLines.push(`- Current phase: ${project.phase}`);
+    }
+
+    // Optional: if the user already answered clarifying questions in a previous round,
+    // pass them through so the AI doesn't re-ask.
+    const answersBlock = Array.isArray(answers) && answers.length > 0
+      ? `\n\nClarifying answers from the previous round (treat as authoritative):\n${answers.map((a: any, i: number) => `${i + 1}. Q: ${a?.question ?? ""}\n   A: ${a?.answer ?? ""}`).join("\n")}`
+      : "";
+
     const OpenAI = (await import("openai")).default;
     const openai = new OpenAI({
       apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY,
       baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || process.env.OPENAI_BASE_URL,
     });
 
-    const systemPrompt = `You are an expert construction estimator specializing in high-end Muskoka, Ontario cottage renovations. 
+    const systemPrompt = `You are an expert construction estimator specializing in high-end Muskoka, Ontario cottage renovations (Port Carling, Bracebridge, Bala, MacTier, Huntsville). About 20% of work is boat-access / island cottages on Lakes Muskoka, Rosseau, and Joseph.
 Given a project description, analyze the scope and estimate square footage or unit quantities for each relevant trade category.
 
-Available categories with current market rates (CAD):
+${projectContextLines.length > 0 ? `Project context (this estimate is for the project below):\n${projectContextLines.join("\n")}\n\n` : ""}Available categories with current market rates (CAD):
 ${categoryInfo.map(c => `- ${c.name} (ID: ${c.id}, Unit: ${c.unitType === "sq_ft" ? "per sq ft" : "per unit"}${c.typicalRate ? `, Typical: $${c.typicalRate}` : ""}): ${c.description}`).join("\n")}
 
-Rules:
+${supplierPriceLines.length > 0 ? `Real supplier prices on file (use these as a sanity check and reference them in notes when applicable):\n${supplierPriceLines.join("\n")}\n\n` : ""}Rules:
 - Only include categories that are relevant to the described project scope
 - For sq_ft categories, estimate the square footage that would need that trade work
 - For unit-based categories (Windows & Doors, Cabinetry, Septic & Well), estimate the number of units
 - Use the typical market rate for unit cost unless the description suggests premium or budget finishes
 - If premium/luxury is mentioned, use a rate between typical and high
-- If budget-conscious is mentioned, use a rate between low and typical  
-- Provide a brief note explaining your quantity estimate for each line
-- Be realistic for Muskoka cottage renovation context
+- If budget-conscious is mentioned, use a rate between low and typical
+- When confident about specific materials (e.g. framing lumber, insulation, drywall), reference the supplier prices above in your notes (format: "Muskoka Lumber 2x4x8 SPF @ $X.XX/each")
+- Be realistic for Muskoka cottage renovation context — boat-access projects carry a 15-25% premium for materials and labour due to barge/crane logistics
+- Notes should be specific and verbose: explain assumptions about quantities, finish level, and any Muskoka-specific factors (boat access, winter premium, septic/well, shoreline regulations)
 
-Respond with valid JSON only, no markdown. Format:
+If the description is missing structurally critical information that would materially change the estimate (e.g. total square footage, number of bedrooms/bathrooms, finish level, boat-access vs road-access), DO NOT guess — instead return a JSON object with up to 3 short clarifying questions and an empty items array:
+{
+  "items": [],
+  "questions": ["<short question 1>", "<short question 2>"],
+  "summary": "<1 sentence: what's missing>"
+}
+
+Otherwise, respond with valid JSON only, no markdown. Format:
 {
   "items": [
     {
@@ -4319,11 +4368,11 @@ Respond with valid JSON only, no markdown. Format:
       "quantity": "<string number>",
       "unitCost": "<string number>",
       "materialCost": "<string number - estimate 30-40% of line total for material>",
-      "notes": "<brief explanation of quantity estimate>"
+      "notes": "<verbose explanation: quantity reasoning, finish level, supplier SKU reference if applicable, Muskoka factors>"
     }
   ],
-  "summary": "<1-2 sentence summary of scope>"
-}`;
+  "summary": "<2-3 sentence summary of scope, finish level, and key assumptions>"
+}${answersBlock}`;
 
     try {
       const response = await openai.chat.completions.create({
@@ -4346,6 +4395,15 @@ Respond with valid JSON only, no markdown. Format:
         return res.status(422).json({ message: "AI returned invalid format" });
       }
 
+      // If the AI asked clarifying questions, return them so the UI can prompt the user
+      // for answers and call this endpoint again with the answers in the body.
+      const questions = Array.isArray(parsed.questions)
+        ? parsed.questions
+            .filter((q: any) => typeof q === "string" && q.trim().length > 0)
+            .slice(0, 5)
+            .map((q: any) => String(q))
+        : [];
+
       const validItems = parsed.items
         .filter((item: any) => item.categoryId && item.quantity && item.unitCost)
         .map((item: any) => ({
@@ -4358,7 +4416,11 @@ Respond with valid JSON only, no markdown. Format:
           notes: item.notes ? String(item.notes) : null,
         }));
 
-      res.json({ items: validItems, summary: String(parsed.summary || "") });
+      res.json({
+        items: validItems,
+        questions,
+        summary: String(parsed.summary || ""),
+      });
     } catch (error: any) {
       console.error("AI analysis error:", error);
       res.status(500).json({ message: "Failed to analyze project scope" });
