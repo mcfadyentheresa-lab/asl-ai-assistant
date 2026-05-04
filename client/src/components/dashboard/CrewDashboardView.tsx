@@ -3,10 +3,11 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Clock, CalendarDays, CheckCircle2, Circle, PlayCircle, Calendar, History, ArrowRight, Image } from "lucide-react";
+import { Clock, CalendarDays, CheckCircle2, Circle, PlayCircle, Calendar, History, ArrowRight, Image, Users, Palette } from "lucide-react";
 import type { Task, CalendarEvent, Project } from "@shared/schema";
 import { useRecentProjects } from "@/hooks/use-recent-projects";
 import { heroImageStyle } from "@/lib/hero-frame";
+import { ReceiptCaptureCard } from "@/components/crew/ReceiptCaptureCard";
 
 type TaskWithProject = Task & { projectName: string };
 type EventWithProject = CalendarEvent & { projectName: string };
@@ -138,7 +139,7 @@ export function CrewDashboardView({
         </div>
       )}
 
-      <div className="flex items-center gap-3 flex-wrap">
+      <div className="flex items-center gap-2 flex-wrap">
         <Link href="/timesheets">
           <Button variant="default" size="sm" data-testid="button-crew-timesheets">
             <Clock className="mr-2 h-4 w-4" />
@@ -151,7 +152,21 @@ export function CrewDashboardView({
             Master Calendar
           </Button>
         </Link>
+        <Link href="/crew-and-trade">
+          <Button variant="outline" size="sm" data-testid="button-crew-contacts">
+            <Users className="mr-2 h-4 w-4" />
+            Contacts
+          </Button>
+        </Link>
+        <Link href="/colors">
+          <Button variant="outline" size="sm" data-testid="button-crew-colours">
+            <Palette className="mr-2 h-4 w-4" />
+            Colours
+          </Button>
+        </Link>
       </div>
+
+      <ReceiptCaptureCard projects={projects} />
 
       <Card>
         <CardContent className="py-4">

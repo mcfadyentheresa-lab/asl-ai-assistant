@@ -313,6 +313,20 @@ export default function CrewAndTrade() {
             </TabsList>
           </div>
 
+          {/*
+            Crew see only the Trade Contacts tab — the single-tab state can
+            otherwise look like the page is broken. This subheader explains
+            why other tabs are absent.
+          */}
+          {isCrew && (
+            <p
+              className="text-xs text-muted-foreground mb-4 -mt-1"
+              data-testid="text-crew-tabs-explainer"
+            >
+              You have access to Trade Contacts. Crew pay rates and market benchmarks are managed by admin.
+            </p>
+          )}
+
           {/* ── CREW TAB ─────────────────────────────────────── */}
           {isAdmin && (
             <TabsContent value="crew">
