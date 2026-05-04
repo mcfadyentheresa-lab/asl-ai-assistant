@@ -52,6 +52,9 @@ export default function CostEstimator() {
   const [expandedBoards, setExpandedBoards] = useState<Set<number>>(new Set());
   const [aiDescription, setAiDescription] = useState("");
   const [aiResults, setAiResults] = useState<any>(null);
+  const [selectedEstimateId, setSelectedEstimateId] = useState<number | null>(null);
+  const [renamingEstimate, setRenamingEstimate] = useState(false);
+  const [estimateNameInput, setEstimateNameInput] = useState("");
   const [showAlternatives, setShowAlternatives] = useState(false);
   const [alternativesResults, setAlternativesResults] = useState<any>(null);
   const [editingBudget, setEditingBudget] = useState(false);
@@ -93,7 +96,11 @@ export default function CostEstimator() {
     enabled: showBoardImport,
   });
 
-  const activeEstimate = estimates[0];
+  // Default to the first estimate (most-recently-created, since storage orders by
+  // createdAt desc). User can pick a different one from the dropdown; if the picked
+  // one disappears (e.g. deleted), fall back to the first.
+  const activeEstimate =
+    estimates.find((e) => e.id === selectedEstimateId) ?? estimates[0];
 
   const { data: items = [] } = useQuery<EstimateItem[]>({
     queryKey: ["/api/estimates", activeEstimate?.id, "items"],
@@ -108,11 +115,52 @@ export default function CostEstimator() {
   });
 
   const createEstimateMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", `/api/projects/${projectId}/estimates`, { name: "Main Estimate" });
+    mutationFn: async (name?: string) => {
+      const finalName = (name && name.trim()) || (estimates.length === 0 ? "Main Estimate" : `Estimate ${estimates.length + 1}`);
+      const res = await apiRequest("POST", `/api/projects/${projectId}/estimates`, { name: finalName });
       return res.json();
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "estimates"] }),
+    onSuccess: (created: ProjectEstimate) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "estimates"] });
+      // Auto-select the new estimate so the user sees what they just created.
+      if (created?.id) setSelectedEstimateId(created.id);
+      toast({ title: "Estimate created", description: created?.name || "" });
+    },
+    onError: () => {
+      toast({ title: "Could not create estimate", variant: "destructive" });
+    },
+  });
+
+  const renameEstimateMutation = useMutation({
+    mutationFn: async (name: string) => {
+      if (!activeEstimate) throw new Error("No active estimate");
+      const res = await apiRequest("PATCH", `/api/estimates/${activeEstimate.id}`, { name });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "estimates"] });
+      setRenamingEstimate(false);
+      toast({ title: "Estimate renamed" });
+    },
+    onError: () => {
+      toast({ title: "Could not rename estimate", variant: "destructive" });
+    },
+  });
+
+  const deleteEstimateMutation = useMutation({
+    mutationFn: async (estimateId: number) => {
+      await apiRequest("DELETE", `/api/estimates/${estimateId}`);
+    },
+    onSuccess: (_data, estimateId) => {
+      // If the user deleted the active one, clear the selection so the fallback
+      // (estimates[0]) kicks in after the query refetches.
+      if (selectedEstimateId === estimateId) setSelectedEstimateId(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "estimates"] });
+      toast({ title: "Estimate deleted" });
+    },
+    onError: () => {
+      toast({ title: "Could not delete estimate", variant: "destructive" });
+    },
   });
 
   const updateEstimateMutation = useMutation({
@@ -503,7 +551,7 @@ export default function CostEstimator() {
             <CardContent className="py-8 text-center">
               <Calculator className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
               <p className="text-muted-foreground mb-4">No estimate has been created for this project yet.</p>
-              <Button onClick={() => createEstimateMutation.mutate()} disabled={createEstimateMutation.isPending} data-testid="button-create-estimate">
+              <Button onClick={() => createEstimateMutation.mutate(undefined)} disabled={createEstimateMutation.isPending} data-testid="button-create-estimate">
                 <Plus className="h-4 w-4 mr-2" /> Create Estimate
               </Button>
             </CardContent>
@@ -512,6 +560,107 @@ export default function CostEstimator() {
 
         {activeEstimate && (
           <>
+            {/* Estimate selector + manage controls. Renders even when there's only
+                one estimate so the New / Rename / Delete buttons are always reachable. */}
+            <Card>
+              <CardContent className="py-3 flex flex-wrap items-center gap-2">
+                <span className="text-xs text-muted-foreground uppercase tracking-wide mr-1">Estimate</span>
+                {!renamingEstimate && (
+                  <>
+                    <Select
+                      value={String(activeEstimate.id)}
+                      onValueChange={(val) => setSelectedEstimateId(parseInt(val))}
+                    >
+                      <SelectTrigger className="w-[260px]" data-testid="select-active-estimate">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {estimates.map((e) => (
+                          <SelectItem key={e.id} value={String(e.id)} data-testid={`select-estimate-option-${e.id}`}>
+                            {e.name || `Estimate #${e.id}`}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {canEdit && (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => createEstimateMutation.mutate(undefined)}
+                          disabled={createEstimateMutation.isPending}
+                          data-testid="button-new-estimate"
+                        >
+                          <Plus className="h-4 w-4 mr-1" /> New estimate
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setEstimateNameInput(activeEstimate.name || "");
+                            setRenamingEstimate(true);
+                          }}
+                          data-testid="button-rename-estimate"
+                        >
+                          <Pencil className="h-4 w-4 mr-1" /> Rename
+                        </Button>
+                        {estimates.length > 1 && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              if (!window.confirm(`Delete "${activeEstimate.name || "this estimate"}"? This will remove all of its line items. This cannot be undone.`)) return;
+                              deleteEstimateMutation.mutate(activeEstimate.id);
+                            }}
+                            disabled={deleteEstimateMutation.isPending}
+                            className="text-destructive hover:text-destructive"
+                            data-testid="button-delete-estimate"
+                          >
+                            <Trash2 className="h-4 w-4 mr-1" /> Delete
+                          </Button>
+                        )}
+                      </>
+                    )}
+                  </>
+                )}
+                {renamingEstimate && (
+                  <>
+                    <Input
+                      value={estimateNameInput}
+                      onChange={(e) => setEstimateNameInput(e.target.value)}
+                      placeholder="Estimate name"
+                      className="w-[260px]"
+                      autoFocus
+                      data-testid="input-rename-estimate"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && estimateNameInput.trim()) {
+                          renameEstimateMutation.mutate(estimateNameInput.trim());
+                        } else if (e.key === "Escape") {
+                          setRenamingEstimate(false);
+                        }
+                      }}
+                    />
+                    <Button
+                      size="sm"
+                      onClick={() => renameEstimateMutation.mutate(estimateNameInput.trim())}
+                      disabled={!estimateNameInput.trim() || renameEstimateMutation.isPending}
+                      data-testid="button-rename-estimate-save"
+                    >
+                      Save
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setRenamingEstimate(false)}
+                      data-testid="button-rename-estimate-cancel"
+                    >
+                      Cancel
+                    </Button>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <Card>
                 <CardContent className="pt-4 pb-3">
