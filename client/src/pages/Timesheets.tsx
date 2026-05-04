@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Navbar } from "@/components/layout/Navbar";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -142,6 +142,51 @@ export default function Timesheets() {
     },
   });
 
+  // Persist the in-progress time entry locally so a network blip on submit
+  // does not lose what crew typed (P2-8 from UX walkthrough). The draft is
+  // restored on mount if no entry has been started yet, and cleared on a
+  // successful submission.
+  const TIME_ENTRY_DRAFT_KEY = `asl:time-entry-draft:${user?.id ?? "anon"}`;
+  const draftRestoredRef = useRef(false);
+
+  useEffect(() => {
+    if (draftRestoredRef.current) return;
+    draftRestoredRef.current = true;
+    try {
+      const raw = window.localStorage.getItem(TIME_ENTRY_DRAFT_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw) as {
+        selectedDate?: string;
+        selectedProjectId?: string;
+        startTime?: string;
+        endTime?: string;
+        description?: string;
+        selectedMilestoneId?: string;
+        selectedCalendarEventId?: string;
+      };
+      if (saved.selectedDate) setSelectedDate(saved.selectedDate);
+      if (saved.selectedProjectId) setSelectedProjectId(saved.selectedProjectId);
+      if (saved.startTime) setStartTime(saved.startTime);
+      if (saved.endTime) setEndTime(saved.endTime);
+      if (saved.description) setDescription(saved.description);
+      if (saved.selectedMilestoneId) setSelectedMilestoneId(saved.selectedMilestoneId);
+      if (saved.selectedCalendarEventId) setSelectedCalendarEventId(saved.selectedCalendarEventId);
+      if (saved.description || saved.endTime) {
+        toast({
+          title: "Draft restored",
+          description: "We brought back your last unsubmitted time entry.",
+        });
+      }
+    } catch {
+      // ignore corrupt storage
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function clearTimeEntryDraft() {
+    try { window.localStorage.removeItem(TIME_ENTRY_DRAFT_KEY); } catch { /* ignore */ }
+  }
+
   const createEntry = useMutation({
     mutationFn: async (data: Record<string, unknown>) => {
       const res = await apiRequest("POST", "/api/time-entries", data);
@@ -150,6 +195,7 @@ export default function Timesheets() {
     onSuccess: () => {
       toast({ title: "Entry added", description: "Time entry saved as draft." });
       queryClient.invalidateQueries({ queryKey: [entriesQueryKey] });
+      clearTimeEntryDraft();
       setTimeout(() => {
         setStartTime("");
         setEndTime("");
@@ -159,7 +205,26 @@ export default function Timesheets() {
       }, 2000);
     },
     onError: (err: Error) => {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      // Persist what they typed so a flaky job-site connection doesn't lose it.
+      try {
+        window.localStorage.setItem(
+          TIME_ENTRY_DRAFT_KEY,
+          JSON.stringify({
+            selectedDate,
+            selectedProjectId,
+            startTime,
+            endTime,
+            description,
+            selectedMilestoneId,
+            selectedCalendarEventId,
+          })
+        );
+      } catch { /* ignore */ }
+      toast({
+        title: "Couldn't save entry",
+        description: `${err.message} — we kept your entry so you can retry.`,
+        variant: "destructive",
+      });
     },
   });
 
@@ -739,37 +804,63 @@ function TimePicker({ value, onChange, testId }: { value: string; onChange: (v: 
   }
 
   return (
-    <div className="flex items-center gap-1.5 mt-1.5" data-testid={`timepicker-${testId}`}>
-      <Select value={value ? String(hour12) : ""} onValueChange={(v) => update(parseInt(v), minute, ampm)}>
-        <SelectTrigger className="w-[70px]" data-testid={`select-${testId}-hour`}>
-          <SelectValue placeholder="Hr" />
-        </SelectTrigger>
-        <SelectContent>
-          {[12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((hr) => (
-            <SelectItem key={hr} value={String(hr)}>{hr}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <span className="text-muted-foreground font-bold">:</span>
-      <Select value={value ? String(minute) : ""} onValueChange={(v) => update(hour12 || 12, parseInt(v), ampm)}>
-        <SelectTrigger className="w-[70px]" data-testid={`select-${testId}-min`}>
-          <SelectValue placeholder="Min" />
-        </SelectTrigger>
-        <SelectContent>
-          {[0, 15, 30, 45].map((min) => (
-            <SelectItem key={min} value={String(min)}>{String(min).padStart(2, "0")}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <Select value={value ? ampm : ""} onValueChange={(v) => update(hour12 || 12, minute, v)}>
-        <SelectTrigger className="w-[72px]" data-testid={`select-${testId}-ampm`}>
-          <SelectValue placeholder="AM" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="AM">AM</SelectItem>
-          <SelectItem value="PM">PM</SelectItem>
-        </SelectContent>
-      </Select>
+    <div data-testid={`timepicker-${testId}`}>
+      {/*
+        Touch devices use the native <input type="time"> (iOS/Android time spinner).
+        Fine-pointer devices fall back to the three-Select picker, which is more
+        precise with a mouse. Selection is driven by `pointer:coarse` / `pointer:fine`
+        media queries set inline below — Tailwind arbitrary variants for these are
+        not configured in this codebase.
+      */}
+      <style>{`
+        .timepicker-native-${testId} { display: block; }
+        .timepicker-fallback-${testId} { display: none; }
+        @media (pointer: fine) {
+          .timepicker-native-${testId} { display: none; }
+          .timepicker-fallback-${testId} { display: flex; }
+        }
+      `}</style>
+      <div className={`timepicker-native-${testId} mt-1.5`}>
+        <Input
+          type="time"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-full"
+          data-testid={`input-${testId}-time-native`}
+        />
+      </div>
+      <div className={`timepicker-fallback-${testId} items-center gap-1.5 mt-1.5`}>
+        <Select value={value ? String(hour12) : ""} onValueChange={(v) => update(parseInt(v), minute, ampm)}>
+          <SelectTrigger className="w-[70px]" data-testid={`select-${testId}-hour`}>
+            <SelectValue placeholder="Hr" />
+          </SelectTrigger>
+          <SelectContent>
+            {[12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((hr) => (
+              <SelectItem key={hr} value={String(hr)}>{hr}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <span className="text-muted-foreground font-bold">:</span>
+        <Select value={value ? String(minute) : ""} onValueChange={(v) => update(hour12 || 12, parseInt(v), ampm)}>
+          <SelectTrigger className="w-[70px]" data-testid={`select-${testId}-min`}>
+            <SelectValue placeholder="Min" />
+          </SelectTrigger>
+          <SelectContent>
+            {[0, 15, 30, 45].map((min) => (
+              <SelectItem key={min} value={String(min)}>{String(min).padStart(2, "0")}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={value ? ampm : ""} onValueChange={(v) => update(hour12 || 12, minute, v)}>
+          <SelectTrigger className="w-[72px]" data-testid={`select-${testId}-ampm`}>
+            <SelectValue placeholder="AM" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="AM">AM</SelectItem>
+            <SelectItem value="PM">PM</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
     </div>
   );
 }

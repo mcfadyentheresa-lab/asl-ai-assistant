@@ -130,6 +130,22 @@ export default function Profile() {
             <CardContent>
               <div className="flex items-center gap-6">
                 <div className="relative group">
+                  {/*
+                    On touch devices the hover overlay is invisible, so we also
+                    show a small persistent camera badge in the bottom-right of
+                    the avatar. Fine-pointer devices keep the original
+                    full-overlay-on-hover behaviour. The hidden file input is
+                    triggered by either button.
+                  */}
+                  <style>{`
+                    .profile-photo-overlay { opacity: 0; transition: opacity 200ms; }
+                    .group:hover .profile-photo-overlay { opacity: 1; }
+                    .profile-photo-badge { display: none; }
+                    @media (pointer: coarse) {
+                      .profile-photo-overlay { opacity: 0; }
+                      .profile-photo-badge { display: flex; }
+                    }
+                  `}</style>
                   <Avatar className="h-24 w-24">
                     <AvatarImage
                       src={user.profileImageUrl || undefined}
@@ -138,15 +154,31 @@ export default function Profile() {
                     <AvatarFallback className="text-2xl">{initials}</AvatarFallback>
                   </Avatar>
                   <button
-                    className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                    className="profile-photo-overlay absolute inset-0 flex items-center justify-center rounded-full bg-black/40 cursor-pointer"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={uploadingPhoto}
                     data-testid="button-change-photo"
+                    aria-label="Change profile photo"
                   >
                     {uploadingPhoto ? (
                       <Loader2 className="h-6 w-6 text-white animate-spin" />
                     ) : (
                       <Camera className="h-6 w-6 text-white" />
+                    )}
+                  </button>
+                  {/* Persistent badge for touch users — same target file input. */}
+                  <button
+                    className="profile-photo-badge absolute bottom-0 right-0 h-8 w-8 items-center justify-center rounded-full bg-foreground text-background shadow-md ring-2 ring-background cursor-pointer"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploadingPhoto}
+                    data-testid="button-change-photo-badge"
+                    aria-label="Change profile photo"
+                    type="button"
+                  >
+                    {uploadingPhoto ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Camera className="h-4 w-4" />
                     )}
                   </button>
                   <input
@@ -166,7 +198,7 @@ export default function Profile() {
                     {roleLabel}
                   </Badge>
                   <p className="text-xs text-muted-foreground mt-2">
-                    Click on the photo to change it
+                    Tap the photo or camera badge to change it
                   </p>
                 </div>
               </div>

@@ -370,6 +370,16 @@ export default function ColorPortfolio() {
         .group:hover [data-swatch-actions] {
           visibility: visible !important;
         }
+        /*
+          Touch devices have no hover — keep the action menu visible by default
+          so crew on phones / tablets can copy hex/info without first opening the
+          detail dialog. Fine-pointer devices keep the hover-only behaviour.
+        */
+        @media (pointer: coarse) {
+          [data-swatch-actions] {
+            visibility: visible !important;
+          }
+        }
       `}</style>
       <Navbar />
 
