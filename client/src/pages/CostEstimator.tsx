@@ -55,6 +55,7 @@ export default function CostEstimator() {
   const [selectedEstimateId, setSelectedEstimateId] = useState<number | null>(null);
   const [renamingEstimate, setRenamingEstimate] = useState(false);
   const [estimateNameInput, setEstimateNameInput] = useState("");
+  const [aiAnswers, setAiAnswers] = useState<Record<number, string>>({});
   const [showAlternatives, setShowAlternatives] = useState(false);
   const [alternativesResults, setAlternativesResults] = useState<any>(null);
   const [editingBudget, setEditingBudget] = useState(false);
@@ -240,13 +241,20 @@ export default function CostEstimator() {
   });
 
   const aiAnalyzeMutation = useMutation({
-    mutationFn: async (description: string) => {
-      const res = await apiRequest("POST", `/api/estimates/${activeEstimate?.id}/ai-analyze`, { description });
+    mutationFn: async (payload: { description: string; answers?: { question: string; answer: string }[] }) => {
+      const res = await apiRequest("POST", `/api/estimates/${activeEstimate?.id}/ai-analyze`, payload);
       return res.json();
     },
     onSuccess: (data) => {
       setAiResults(data);
-      toast({ title: "AI analysis complete", description: data.summary });
+      const hasQuestions = Array.isArray(data?.questions) && data.questions.length > 0;
+      const hasItems = Array.isArray(data?.items) && data.items.length > 0;
+      if (hasQuestions && !hasItems) {
+        setAiAnswers({});
+        toast({ title: "More info needed", description: "Answer the clarifying questions to continue." });
+      } else {
+        toast({ title: "AI analysis complete", description: data.summary });
+      }
     },
     onError: () => {
       toast({ title: "Analysis failed", description: "Could not analyze project scope", variant: "destructive" });
@@ -2025,7 +2033,7 @@ export default function CostEstimator() {
 
             {!aiResults && (
               <Button
-                onClick={() => aiAnalyzeMutation.mutate(aiDescription)}
+                onClick={() => aiAnalyzeMutation.mutate({ description: aiDescription })}
                 disabled={!aiDescription.trim() || aiAnalyzeMutation.isPending}
                 className="w-full"
                 data-testid="button-run-ai-analysis"
@@ -2038,23 +2046,79 @@ export default function CostEstimator() {
               </Button>
             )}
 
-            {aiResults && (
+            {aiResults && Array.isArray(aiResults.questions) && aiResults.questions.length > 0 && (!aiResults.items || aiResults.items.length === 0) && (
+              <div className="space-y-3" data-testid="ai-questions-block">
+                <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-900">
+                  <div className="font-medium mb-1">A few quick questions before I estimate:</div>
+                  <div className="text-xs text-amber-800">{aiResults.summary}</div>
+                </div>
+                <div className="space-y-3">
+                  {aiResults.questions.map((q: string, idx: number) => (
+                    <div key={idx} className="space-y-1" data-testid={`ai-question-${idx}`}>
+                      <Label className="text-sm">{idx + 1}. {q}</Label>
+                      <Textarea
+                        rows={2}
+                        value={aiAnswers[idx] || ""}
+                        onChange={(e) => setAiAnswers((prev) => ({ ...prev, [idx]: e.target.value }))}
+                        placeholder="Your answer"
+                        data-testid={`textarea-ai-answer-${idx}`}
+                      />
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-2 flex-wrap">
+                  <Button
+                    onClick={() => {
+                      const answers = aiResults.questions.map((q: string, i: number) => ({
+                        question: q,
+                        answer: (aiAnswers[i] || "").trim(),
+                      })).filter((a: any) => a.answer.length > 0);
+                      aiAnalyzeMutation.mutate({ description: aiDescription, answers });
+                    }}
+                    disabled={
+                      aiAnalyzeMutation.isPending ||
+                      aiResults.questions.every((_: string, i: number) => !(aiAnswers[i] || "").trim())
+                    }
+                    className="flex-1"
+                    data-testid="button-continue-ai-analysis"
+                  >
+                    {aiAnalyzeMutation.isPending ? (
+                      <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Continuing...</>
+                    ) : (
+                      <><Sparkles className="h-4 w-4 mr-2" /> Continue Analysis</>
+                    )}
+                  </Button>
+                  <Button variant="outline" onClick={() => { setAiResults(null); setAiAnswers({}); }} data-testid="button-cancel-ai-questions">
+                    Start Over
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {aiResults && Array.isArray(aiResults.items) && aiResults.items.length > 0 && (
               <div className="space-y-3">
-                <div className="p-3 rounded-lg bg-muted/50 text-sm" data-testid="text-ai-summary">
+                <div className="p-3 rounded-lg bg-muted/50 text-sm whitespace-pre-wrap" data-testid="text-ai-summary">
                   {aiResults.summary}
                 </div>
-                <div className="max-h-64 overflow-y-auto space-y-1">
+                <div className="max-h-80 overflow-y-auto space-y-2">
                   {aiResults.items?.map((item: any, idx: number) => (
-                    <div key={idx} className="flex items-center justify-between gap-3 p-2 rounded border text-sm" data-testid={`ai-item-${idx}`}>
-                      <div>
-                        <span className="font-medium">{item.categoryName}</span>
-                        <span className="text-muted-foreground ml-2">
-                          {item.quantity} {item.unitType === "sq_ft" ? "sq ft" : "units"} @ ${parseFloat(item.unitCost).toFixed(2)}
-                        </span>
+                    <div key={idx} className="p-2 rounded border text-sm" data-testid={`ai-item-${idx}`}>
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <span className="font-medium">{item.categoryName}</span>
+                          <span className="text-muted-foreground ml-2">
+                            {item.quantity} {item.unitType === "sq_ft" ? "sq ft" : "units"} @ ${parseFloat(item.unitCost).toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="font-medium shrink-0">
+                          ${(parseFloat(item.quantity) * parseFloat(item.unitCost)).toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </div>
                       </div>
-                      <div className="font-medium shrink-0">
-                        ${(parseFloat(item.quantity) * parseFloat(item.unitCost)).toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </div>
+                      {item.notes && (
+                        <div className="mt-1 text-xs text-muted-foreground" data-testid={`ai-item-notes-${idx}`}>
+                          {item.notes}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -2072,7 +2136,7 @@ export default function CostEstimator() {
                       <><CheckCircle2 className="h-4 w-4 mr-2" /> Apply to Estimate</>
                     )}
                   </Button>
-                  <Button variant="outline" onClick={() => { setAiResults(null); }} data-testid="button-retry-ai">
+                  <Button variant="outline" onClick={() => { setAiResults(null); setAiAnswers({}); }} data-testid="button-retry-ai">
                     Re-analyze
                   </Button>
                 </div>
