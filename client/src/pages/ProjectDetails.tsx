@@ -14,7 +14,7 @@ import { useViewMode } from "@/hooks/use-view-mode";
 import { useProjectRealtime } from "@/hooks/use-project-realtime";
 import { Navbar } from "@/components/layout/Navbar";
 import SpatialCanvas from "@/components/SpatialCanvas";
-import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, Upload, Download, X, Paperclip, ZoomIn, Palette, Check, Archive, ArchiveRestore, PanelRightOpen, MoreVertical, Flag, BarChart3, ArrowUpRight, Building2, Sparkles, Armchair, ScrollText, Package, FileSignature, Footprints } from "lucide-react";
+import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, Upload, Download, X, Paperclip, ZoomIn, Palette, Check, Archive, ArchiveRestore, PanelRightOpen, MoreVertical, Flag, BarChart3, ArrowUpRight, Building2, Sparkles, Armchair, ScrollText, Package, FileSignature, Footprints, DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -70,6 +70,7 @@ import { DecisionsTab } from "@/components/project/DecisionsTab";
 import { SelectionsTab } from "@/components/project/SelectionsTab";
 import { ChangeOrdersTab } from "@/components/project/ChangeOrdersTab";
 import { SiteVisitsTab } from "@/components/project/SiteVisitsTab";
+import { ClientEstimatesTab } from "@/components/project/ClientEstimatesTab";
 import { ClientProjectHeader } from "@/components/project/ClientProjectHeader";
 import { ClientProjectFooter, deriveProjectCode as deriveFooterProjectCode } from "@/components/project/ClientProjectFooter";
 import { HeroImageEditor } from "@/components/project/HeroImageEditor";
@@ -211,6 +212,8 @@ function ProjectDetailsInner() {
     { id: "overview", label: isClientView ? "Updates" : "Overview", icon: Clock, roles: ["admin", "crew", "client"] },
     { id: "checklist", label: "Progress", icon: BarChart3, roles: ["admin", "crew"] },
     { id: "docs", label: "Documents", icon: FileText, roles: ["admin", "client"] },
+    // Client-only tab (PR G). Admin/crew already have the full /project/:id/estimate page.
+    { id: "estimates", label: "Estimates", icon: DollarSign, roles: ["client"] },
     { id: "chat", label: "Messages", icon: MessageSquare, roles: ["admin", "crew", "client"] },
     { id: "decisions", label: "Decisions", icon: ScrollText, roles: ["admin", "crew"] },
     { id: "selections", label: "Selections", icon: Package, roles: ["admin", "crew"] },
@@ -790,6 +793,11 @@ function ProjectDetailsInner() {
 
           <TabsContent value="docs">
             <DocumentsTab projectId={projectId} />
+          </TabsContent>
+
+          {/* Client-only estimates tab (PR G). Hidden from admin/crew tabConfig. */}
+          <TabsContent value="estimates">
+            <ClientEstimatesTab projectId={projectId} />
           </TabsContent>
 
           <TabsContent value="decisions">

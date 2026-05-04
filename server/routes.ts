@@ -4637,6 +4637,90 @@ Prefer faces, architectural focal subjects, strong compositional anchors (a fire
     res.json(updated);
   });
 
+  // -------------------------------------------------------------------------
+  // Client portal: estimates (PR G)
+  //
+  // Read-only endpoints under /api/client/* so the surface area for clients
+  // is explicit and never accidentally widened. A client only sees estimates
+  // that are status === "approved" or "sent" on a project they own
+  // (projects.client_id === userId). Drafts and revisions are hidden.
+  // -------------------------------------------------------------------------
+  async function requireClientOwnsProject(
+    req: any,
+    res: any,
+    projectId: number,
+  ): Promise<boolean> {
+    const userId = req.user?.claims?.sub as string | undefined;
+    if (!userId) {
+      res.status(401).json({ message: "Unauthorized" });
+      return false;
+    }
+    if (!Number.isFinite(projectId)) {
+      res.status(400).json({ message: "Invalid project id" });
+      return false;
+    }
+    const dbUser = await authStorage.getUser(userId);
+    if (!dbUser || dbUser.role !== "client") {
+      // Admin/crew should use the admin endpoints; this is the client portal.
+      res.status(403).json({ message: "Client access only" });
+      return false;
+    }
+    const project = await storage.getProject(projectId);
+    if (!project) {
+      res.status(404).json({ message: "Project not found" });
+      return false;
+    }
+    if (project.clientId !== userId) {
+      res.status(403).json({ message: "Forbidden" });
+      return false;
+    }
+    return true;
+  }
+
+  // Visible-to-client filter: only approved or sent (i.e. estimates the
+  // admin has actually shared). Drafts must never leak to clients.
+  function isClientVisibleEstimate(status: string | null | undefined): boolean {
+    return status === "approved" || status === "sent";
+  }
+
+  // GET list of approved/sent estimates for a project the client owns.
+  app.get("/api/client/projects/:projectId/estimates", isAuthenticated, asyncHandler(async (req: any, res) => {
+    const projectId = parseInt(req.params.projectId);
+    if (!(await requireClientOwnsProject(req, res, projectId))) return;
+    const all = await storage.getProjectEstimates(projectId);
+    const visible = all.filter((e) => isClientVisibleEstimate(e.status));
+    res.json(visible);
+  }));
+
+  // GET single estimate (must be approved/sent and on a project the client owns).
+  app.get("/api/client/estimates/:id", isAuthenticated, asyncHandler(async (req: any, res) => {
+    const estimateId = parseInt(req.params.id);
+    const est = await storage.getEstimate(estimateId);
+    if (!est) return res.status(404).json({ message: "Estimate not found" });
+    if (!isClientVisibleEstimate(est.status)) {
+      // Treat hidden estimates as 404 rather than 403 so we don't leak
+      // existence/status of internal drafts.
+      return res.status(404).json({ message: "Estimate not found" });
+    }
+    if (est.projectId == null) {
+      return res.status(404).json({ message: "Estimate not found" });
+    }
+    if (!(await requireClientOwnsProject(req, res, est.projectId))) return;
+    res.json(est);
+  }));
+
+  // GET line items for a client-visible estimate.
+  app.get("/api/client/estimates/:id/items", isAuthenticated, asyncHandler(async (req: any, res) => {
+    const estimateId = parseInt(req.params.id);
+    const est = await storage.getEstimate(estimateId);
+    if (!est || !isClientVisibleEstimate(est.status) || est.projectId == null) {
+      return res.status(404).json({ message: "Estimate not found" });
+    }
+    if (!(await requireClientOwnsProject(req, res, est.projectId))) return;
+    const items = await storage.getEstimateItems(estimateId);
+    res.json(items);
+  }));
+
   // Board Materials (import materials/products from planning boards into estimates)
   app.get("/api/projects/:id/board-materials", isAuthenticated, async (req: any, res) => {
     try {

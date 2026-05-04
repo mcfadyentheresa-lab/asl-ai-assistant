@@ -53,6 +53,14 @@ const TABS: ClientTab[] = [
     isActiveFor: (loc) => loc.includes("tab=docs"),
   },
   {
+    // PR G: read-only estimates tab. Only approved/sent estimates are
+    // returned by /api/client/projects/:id/estimates, so an empty state
+    // is normal until the admin shares one.
+    label: "Estimates",
+    resolve: (id) => (id ? `/project/${id}?tab=estimates` : "/"),
+    isActiveFor: (loc) => loc.includes("tab=estimates"),
+  },
+  {
     label: "Messages",
     resolve: (id) => (id ? `/project/${id}?tab=chat` : "/"),
     isActiveFor: (loc) => loc.includes("tab=chat"),
