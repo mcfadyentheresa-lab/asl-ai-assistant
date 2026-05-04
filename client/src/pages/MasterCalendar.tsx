@@ -18,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Loader2, ChevronLeft, ChevronRight, CalendarIcon, ArrowLeft, CalendarDays } from "lucide-react";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -31,10 +32,18 @@ import {
   getDay,
   addMonths,
   subMonths,
+  addWeeks,
+  subWeeks,
+  addDays,
+  subDays,
+  startOfWeek,
+  endOfWeek,
   isSameDay,
   parseISO,
   isWithinInterval,
 } from "date-fns";
+
+type CalView = "month" | "week" | "day";
 
 const BUILDING_COLORS = [
   "#173B2F", "#2E6B4F", "#3F8A66", "#B87333", "#4D7A68",
@@ -119,6 +128,20 @@ export default function MasterCalendar() {
   const [showTeam, setShowTeam] = useState(true);
   const [showPersonal, setShowPersonal] = useState(true);
   const [projectFilter, setProjectFilter] = useState<string>("all");
+
+  // PR M — view mode for mobile readability. Default to "week" on small screens
+  // (≤ 640px) where the month grid produces unreadable day cells; "month" on
+  // larger screens to preserve the existing experience. The user can toggle.
+  const [view, setView] = useState<CalView>(() => {
+    if (typeof window === "undefined") return "month";
+    return window.matchMedia("(max-width: 640px)").matches ? "week" : "month";
+  });
+  // "focusDate" is the anchor for week/day views; in month view we ignore it
+  // and use currentMonth. Initialised to today.
+  const [focusDate, setFocusDate] = useState<Date>(new Date());
+
+  // Only the initial default is responsive — once the user picks a view we
+  // don't second-guess them on resize. Matches the rest of the app's behaviour.
 
   if (!user || !canAccess) {
     return (
@@ -260,28 +283,66 @@ export default function MasterCalendar() {
           </h1>
         </div>
 
+        {/* PR M — view toggle. "Week" and "Day" are mobile-friendly defaults
+            that avoid the unreadable 7-col month grid on ≤ 375px screens. */}
+        <div className="flex items-center justify-end">
+          <ToggleGroup
+            type="single"
+            size="sm"
+            value={view}
+            onValueChange={(v) => { if (v === "month" || v === "week" || v === "day") setView(v); }}
+            data-testid="toggle-master-view"
+          >
+            <ToggleGroupItem value="month" data-testid="toggle-master-view-month">Month</ToggleGroupItem>
+            <ToggleGroupItem value="week" data-testid="toggle-master-view-week">Week</ToggleGroupItem>
+            <ToggleGroupItem value="day" data-testid="toggle-master-view-day">Day</ToggleGroupItem>
+          </ToggleGroup>
+        </div>
+
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="flex items-center gap-3">
             <Button
               size="icon"
               variant="ghost"
-              onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
+              onClick={() => {
+                if (view === "month") {
+                  setCurrentMonth(subMonths(currentMonth, 1));
+                } else if (view === "week") {
+                  setFocusDate(subWeeks(focusDate, 1));
+                } else {
+                  setFocusDate(subDays(focusDate, 1));
+                }
+              }}
               data-testid="button-master-prev-month"
+              aria-label={view === "month" ? "Previous month" : view === "week" ? "Previous week" : "Previous day"}
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <h3 className="font-serif text-xl font-bold text-foreground min-w-[160px] text-center" data-testid="text-master-current-month">
-              {format(currentMonth, "MMMM yyyy")}
+              {view === "month"
+                ? format(currentMonth, "MMMM yyyy")
+                : view === "week"
+                ? `${format(startOfWeek(focusDate), "MMM d")} – ${format(endOfWeek(focusDate), "MMM d, yyyy")}`
+                : format(focusDate, "EEEE, MMM d, yyyy")}
             </h3>
             <Button
               size="icon"
               variant="ghost"
-              onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
+              onClick={() => {
+                if (view === "month") {
+                  setCurrentMonth(addMonths(currentMonth, 1));
+                } else if (view === "week") {
+                  setFocusDate(addWeeks(focusDate, 1));
+                } else {
+                  setFocusDate(addDays(focusDate, 1));
+                }
+              }}
               data-testid="button-master-next-month"
+              aria-label={view === "month" ? "Next month" : view === "week" ? "Next week" : "Next day"}
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
-            {/* P2-1 — quick jump back to current month after navigating away. */}
+            {/* P2-1 — quick jump back to today across all views. */}
             <Button
               size="sm"
               variant="outline"
@@ -289,7 +350,8 @@ export default function MasterCalendar() {
               onClick={() => {
                 const now = new Date();
                 setCurrentMonth(now);
-                setSelectedDate(now);
+                setFocusDate(now);
+                if (view === "month") setSelectedDate(now);
               }}
               data-testid="button-master-today"
             >
@@ -334,6 +396,120 @@ export default function MasterCalendar() {
           <div className="flex justify-center py-10">
             <Loader2 className="animate-spin text-muted-foreground" data-testid="loader-master-calendar" />
           </div>
+        ) : view === "day" ? (
+          // PR M — Day view: single column, full list, large touch targets.
+          (() => {
+            const items = getItemsForDate(focusDate).slice().sort((a, b) => {
+              // single-day items first, then spanning items
+              const aSpan = a.startDate !== a.endDate ? 1 : 0;
+              const bSpan = b.startDate !== b.endDate ? 1 : 0;
+              if (aSpan !== bSpan) return aSpan - bSpan;
+              return a.title.localeCompare(b.title);
+            });
+            const isToday = isSameDay(focusDate, new Date());
+            return (
+              <div className="rounded-md border border-border bg-card" data-testid="master-calendar-day-view">
+                <div className={`flex items-center gap-3 px-4 py-3 border-b border-border ${isToday ? "bg-primary/5" : ""}`}>
+                  <span className={`inline-flex items-center justify-center w-10 h-10 rounded-full ${isToday ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"} font-serif text-lg font-bold`}>
+                    {format(focusDate, "d")}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">{format(focusDate, "EEEE")}</p>
+                    <p className="text-xs text-muted-foreground">{format(focusDate, "MMMM d, yyyy")}</p>
+                  </div>
+                  <span className="ml-auto text-xs text-muted-foreground">
+                    {items.length} {items.length === 1 ? "item" : "items"}
+                  </span>
+                </div>
+                {items.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">No items on this day.</p>
+                ) : (
+                  <div className="divide-y divide-border/50">
+                    {items.map((item) => (
+                      <div key={item.id} className="flex items-start gap-3 px-4 py-3 min-h-[56px]" data-testid={`master-day-item-${item.id}`}>
+                        <div className="w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0" style={{ backgroundColor: item.color }} />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-foreground">{item.title}</p>
+                          {item.description && (
+                            <p className="text-xs text-muted-foreground mt-0.5">{item.description}</p>
+                          )}
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
+                            <Badge variant="outline" className="text-[10px]">{item.kind}</Badge>
+                            <Link href={`/project/${item.projectId}`}>
+                              <Badge variant="secondary" className="text-[10px] cursor-pointer hover:bg-secondary/80">{item.projectName}</Badge>
+                            </Link>
+                            {item.layer === "timeline" && item.startDate !== item.endDate && (
+                              <span className="text-[10px] text-muted-foreground">
+                                {format(parseISO(item.startDate), "MMM d")} — {format(parseISO(item.endDate), "MMM d")}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()
+        ) : view === "week" ? (
+          // PR M — Week view: 7 day columns, vertically tall enough for several
+          // items per cell. Day cells are tappable to open the same day-detail
+          // dialog used in month view.
+          (() => {
+            const weekStart = startOfWeek(focusDate);
+            const days: Date[] = [];
+            for (let i = 0; i < 7; i++) days.push(addDays(weekStart, i));
+            return (
+              <div className="rounded-md overflow-hidden border border-border" data-testid="master-calendar-week-view">
+                <div className="grid grid-cols-7 gap-px bg-border">
+                  {days.map((d) => (
+                    <div key={`hdr-${d.toISOString()}`} className="bg-muted text-center py-2">
+                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{format(d, "EEE")}</p>
+                      <p className={`text-sm font-medium ${isSameDay(d, new Date()) ? "text-primary" : "text-foreground"}`}>{format(d, "d")}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="grid grid-cols-7 gap-px bg-border">
+                  {days.map((day) => {
+                    const dayItems = getItemsForDate(day);
+                    const dateStr = format(day, "yyyy-MM-dd");
+                    const isToday = isSameDay(day, new Date());
+                    return (
+                      <button
+                        type="button"
+                        key={day.toISOString()}
+                        className={`bg-card min-h-[160px] p-1.5 text-left transition-colors hover:bg-muted/30 ${isToday ? "ring-1 ring-primary/40 ring-inset" : ""}`}
+                        onClick={() => setSelectedDate(day)}
+                        data-testid={`master-week-day-${dateStr}`}
+                        aria-label={`${format(day, "EEEE, MMMM d")} — ${dayItems.length} ${dayItems.length === 1 ? "item" : "items"}`}
+                      >
+                        <div className="space-y-0.5">
+                          {dayItems.slice(0, 6).map((item) => (
+                            <div
+                              key={item.id}
+                              className="text-[10px] leading-tight truncate rounded px-1 py-0.5 text-white/90"
+                              style={{ backgroundColor: item.color, opacity: item.layer === "timeline" ? 0.85 : 1 }}
+                              title={`${item.projectName}: ${item.title}`}
+                              data-testid={`master-week-item-${item.id}`}
+                            >
+                              {item.title}
+                            </div>
+                          ))}
+                          {dayItems.length > 6 && (
+                            <p className="text-[10px] text-muted-foreground px-1">+{dayItems.length - 6} more</p>
+                          )}
+                          {dayItems.length === 0 && (
+                            <p className="text-[10px] text-muted-foreground/60 px-1">—</p>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()
         ) : (() => {
           const allDays: (Date | null)[] = [];
           for (let i = 0; i < startDayOfWeek; i++) allDays.push(null);
@@ -388,7 +564,9 @@ export default function MasterCalendar() {
                   <div key={wi}>
                     <div className="grid grid-cols-7 gap-px bg-border">
                       {week.map((day, di) => {
-                        if (!day) return <div key={`empty-${wi}-${di}`} className="bg-card min-h-[48px]" />;
+                        // PR M — taller cells on mobile so day numbers + item chips are
+                        // readable and tappable on ≤ 375px screens.
+                        if (!day) return <div key={`empty-${wi}-${di}`} className="bg-card min-h-[64px] sm:min-h-[48px]" />;
                         const dayItems = getItemsForDate(day);
                         const singleDayTimeline = dayItems.filter((it) => it.layer === "timeline" && it.startDate === it.endDate);
                         const singleDayEvents = dayItems.filter((it) => it.layer === "event" && it.startDate === it.endDate);
@@ -399,7 +577,7 @@ export default function MasterCalendar() {
                         return (
                           <div
                             key={day.toISOString()}
-                            className={`bg-card min-h-[48px] p-1 cursor-pointer transition-colors hover:bg-muted/30 ${isSelected ? "ring-2 ring-primary ring-inset" : ""}`}
+                            className={`bg-card min-h-[64px] sm:min-h-[48px] p-1 cursor-pointer transition-colors hover:bg-muted/30 ${isSelected ? "ring-2 ring-primary ring-inset" : ""}`}
                             onClick={() => setSelectedDate(day)}
                             data-testid={`master-day-${dateStr}`}
                           >
