@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
-import { insertSubMilestoneSchema, insertSectionSchema, insertTimeEntrySchema, insertCostCategorySchema, insertMarketRateSchema, insertProjectEstimateSchema, insertEstimateItemSchema, insertReceiptSchema, insertCrewRateSchema, insertSubcontractorSchema, insertSupplierSchema, insertSupplierPriceSchema, insertRegionalModifierSchema, insertTableRedesignPlanSchema, insertTableRedesignMaterialSchema, regionalModifiers } from "@shared/schema";
+import { insertSubMilestoneSchema, insertSectionSchema, insertTimeEntrySchema, insertCostCategorySchema, insertMarketRateSchema, insertProjectEstimateSchema, insertEstimateItemSchema, insertReceiptSchema, insertCrewRateSchema, insertSubcontractorSchema, insertSupplierSchema, insertSupplierPriceSchema, insertRegionalModifierSchema, insertTableRedesignPlanSchema, insertTableRedesignMaterialSchema, regionalModifiers, estimateItems, projectEstimates } from "@shared/schema";
 import { db } from "./db";
 import { eq as eqSql } from "drizzle-orm";
 import { z } from "zod";
@@ -3997,6 +3997,48 @@ Prefer faces, architectural focal subjects, strong compositional anchors (a fire
   }));
 
   // Project Estimates
+  //
+  // Status lifecycle (admin-only inside ELM):
+  //   draft     -> approved -> sent
+  // Once an estimate leaves 'draft' it is permanently locked. To make changes,
+  // call POST /api/estimates/:id/revise which clones it as a new draft. The
+  // original is preserved as a paper trail (revisedFromId on the clone points
+  // back).
+  //
+  // assertEstimateEditable() is the single chokepoint: any endpoint that
+  // mutates an estimate or its line items must call this first. It throws a
+  // 409 with `code: "estimate_locked"` when the estimate is approved or sent.
+  function isEstimateLocked(status: string | null | undefined): boolean {
+    return status === "approved" || status === "sent";
+  }
+  async function assertEstimateEditable(estimateId: number, res: any): Promise<boolean> {
+    const est = await storage.getEstimate(estimateId);
+    if (!est) {
+      res.status(404).json({ message: "Estimate not found" });
+      return false;
+    }
+    if (isEstimateLocked(est.status)) {
+      res.status(409).json({
+        message: `This estimate is ${est.status} and cannot be changed. Use Revise to create an editable copy.`,
+        code: "estimate_locked",
+        status: est.status,
+      });
+      return false;
+    }
+    return true;
+  }
+  async function assertItemEstimateEditable(estimateItemId: number, res: any): Promise<boolean> {
+    const items = await db
+      .select({ estimateId: estimateItems.estimateId })
+      .from(estimateItems)
+      .where(eqSql(estimateItems.id, estimateItemId));
+    if (items.length === 0) {
+      res.status(404).json({ message: "Estimate item not found" });
+      return false;
+    }
+    return assertEstimateEditable(items[0].estimateId, res);
+  }
+
   app.get("/api/projects/:projectId/estimates", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub;
     const dbUser = await authStorage.getUser(userId);
@@ -4032,8 +4074,15 @@ Prefer faces, architectural focal subjects, strong compositional anchors (a fire
     const dbUser = await authStorage.getUser(userId);
     if (!dbUser) return res.status(404).json({ message: "User not found" });
     if (dbUser.role === "client") return res.status(403).json({ message: "Crew or admin access required" });
-    const input = insertProjectEstimateSchema.partial().parse(req.body);
-    const updated = await storage.updateEstimate(parseInt(req.params.id), input);
+    const estimateId = parseInt(req.params.id);
+    if (!(await assertEstimateEditable(estimateId, res))) return;
+    // Strip status/approvedAt/approvedBy/sentAt/revisedFromId from arbitrary PATCH;
+    // those are managed by the dedicated /approve, /mark-sent, /revise endpoints
+    // so the audit trail can't be bypassed via a generic update.
+    const { status: _s, approvedAt: _aa, approvedBy: _ab, sentAt: _sa, revisedFromId: _rf, ...allowed } =
+      (req.body || {}) as any;
+    const input = insertProjectEstimateSchema.partial().parse(allowed);
+    const updated = await storage.updateEstimate(estimateId, input);
     res.json(updated);
     if (updated.projectId) {
       broadcastProjectChange(updated.projectId, ["estimates"], "updated", updated.id, userId);
@@ -4044,8 +4093,80 @@ Prefer faces, architectural focal subjects, strong compositional anchors (a fire
     const userId = req.user.claims.sub;
     const dbUser = await authStorage.getUser(userId);
     if (dbUser?.role !== "admin") return res.status(403).json({ message: "Admin access required" });
-    await storage.deleteEstimate(parseInt(req.params.id));
+    const estimateId = parseInt(req.params.id);
+    // Locked estimates (approved/sent) are part of the paper trail and must not
+    // be deleted. Use Revise to create an editable copy if you need to change
+    // anything.
+    if (!(await assertEstimateEditable(estimateId, res))) return;
+    await storage.deleteEstimate(estimateId);
     res.json({ message: "Deleted" });
+  }));
+
+  // ------- Status transition endpoints -------
+  app.post("/api/estimates/:id/approve", isAuthenticated, asyncHandler(async (req: any, res) => {
+    const userId = req.user.claims.sub as string;
+    const dbUser = await authStorage.getUser(userId);
+    if (dbUser?.role !== "admin") return res.status(403).json({ message: "Admin access required" });
+    const estimateId = parseInt(req.params.id);
+    const est = await storage.getEstimate(estimateId);
+    if (!est) return res.status(404).json({ message: "Estimate not found" });
+    if (est.status === "sent") {
+      return res.status(409).json({ message: "Cannot approve an estimate that has already been sent.", code: "already_sent" });
+    }
+    if (est.status === "approved") {
+      // Idempotent — return the existing record so the UI can refresh state.
+      return res.json(est);
+    }
+    const updated = await storage.updateEstimate(estimateId, {
+      status: "approved",
+      approvedAt: new Date(),
+      approvedBy: userId,
+    } as any);
+    res.json(updated);
+    if (updated.projectId) {
+      broadcastProjectChange(updated.projectId, ["estimates"], "updated", updated.id, userId);
+    }
+  }));
+
+  app.post("/api/estimates/:id/mark-sent", isAuthenticated, asyncHandler(async (req: any, res) => {
+    const userId = req.user.claims.sub as string;
+    const dbUser = await authStorage.getUser(userId);
+    if (dbUser?.role !== "admin") return res.status(403).json({ message: "Admin access required" });
+    const estimateId = parseInt(req.params.id);
+    const est = await storage.getEstimate(estimateId);
+    if (!est) return res.status(404).json({ message: "Estimate not found" });
+    if (est.status !== "approved") {
+      return res.status(409).json({
+        message: "Estimate must be approved before it can be marked as sent.",
+        code: "not_approved",
+        currentStatus: est.status,
+      });
+    }
+    const updated = await storage.updateEstimate(estimateId, {
+      status: "sent",
+      sentAt: new Date(),
+    } as any);
+    res.json(updated);
+    if (updated.projectId) {
+      broadcastProjectChange(updated.projectId, ["estimates"], "updated", updated.id, userId);
+    }
+  }));
+
+  app.post("/api/estimates/:id/revise", isAuthenticated, asyncHandler(async (req: any, res) => {
+    const userId = req.user.claims.sub as string;
+    const dbUser = await authStorage.getUser(userId);
+    if (dbUser?.role !== "admin") return res.status(403).json({ message: "Admin access required" });
+    const estimateId = parseInt(req.params.id);
+    const source = await storage.getEstimate(estimateId);
+    if (!source) return res.status(404).json({ message: "Estimate not found" });
+    // Revise is intended for locked estimates, but we also allow it on drafts
+    // ("clone this estimate") for convenience. The original is always preserved.
+    const name = typeof req.body?.name === "string" ? req.body.name : undefined;
+    const cloned = await storage.cloneEstimate(estimateId, { name, createdBy: userId });
+    res.status(201).json(cloned);
+    if (cloned.projectId) {
+      broadcastProjectChange(cloned.projectId, ["estimates"], "created", cloned.id, userId);
+    }
   }));
 
   // Estimate Items
@@ -4063,6 +4184,7 @@ Prefer faces, architectural focal subjects, strong compositional anchors (a fire
     if (!dbUser) return res.status(404).json({ message: "User not found" });
     if (dbUser.role === "client") return res.status(403).json({ message: "Crew or admin access required" });
     const estimateId = parseInt(req.params.id);
+    if (!(await assertEstimateEditable(estimateId, res))) return;
     const input = insertEstimateItemSchema.parse({ ...req.body, estimateId });
     const created = await storage.createEstimateItem(input);
     const estimateForBroadcast = await storage.getEstimate(estimateId);
@@ -4111,6 +4233,7 @@ Prefer faces, architectural focal subjects, strong compositional anchors (a fire
     if (!dbUser) return res.status(404).json({ message: "User not found" });
     if (dbUser.role === "client") return res.status(403).json({ message: "Crew or admin access required" });
     const id = parseInt(req.params.id);
+    if (!(await assertItemEstimateEditable(id, res))) return;
     const input = insertEstimateItemSchema.partial().parse(req.body);
     const updated = await storage.updateEstimateItem(id, input);
 
@@ -4160,6 +4283,7 @@ Prefer faces, architectural focal subjects, strong compositional anchors (a fire
     if (!dbUser) return res.status(404).json({ message: "User not found" });
     if (dbUser.role === "client") return res.status(403).json({ message: "Crew or admin access required" });
     const id = parseInt(req.params.id);
+    if (!(await assertItemEstimateEditable(id, res))) return;
     await storage.deleteWarningsByItem(id);
     await storage.deleteEstimateItem(id);
     res.json({ message: "Deleted" });
@@ -4265,6 +4389,7 @@ Prefer faces, architectural focal subjects, strong compositional anchors (a fire
     }
 
     const estimateId = parseInt(req.params.estimateId as string);
+    if (!(await assertEstimateEditable(estimateId, res))) return;
     const estimate = await storage.getEstimate(estimateId);
     if (!estimate) {
       return res.status(404).json({ message: "Estimate not found" });

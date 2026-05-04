@@ -625,7 +625,20 @@ export const projectEstimates = pgTable("project_estimates", {
   id: serial("id").primaryKey(),
   projectId: integer("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
   name: text("name").notNull().default("Main Estimate"),
+  // Status lifecycle (admin-only inside ELM):
+  //   draft     — freely editable
+  //   approved  — internally signed off; permanently locked. Use "Revise" to clone
+  //               into a new draft. Original stays read-only forever (paper trail).
+  //   sent      — pushed to QBO / emailed to client; also permanently locked.
+  // Client-side approval (e.g., signing the QBO estimate) is tracked in QBO,
+  // not here. Once status leaves 'draft', the estimate is immutable.
   status: text("status").notNull().default("draft"),
+  approvedAt: timestamp("approved_at"),
+  approvedBy: text("approved_by").references(() => users.id),
+  sentAt: timestamp("sent_at"),
+  // When this estimate was created via "Revise" on another estimate, point back
+  // to the source so we can reconstruct version history per project.
+  revisedFromId: integer("revised_from_id"),
   markupEnabled: boolean("markup_enabled").default(true),
   markupPercent: text("markup_percent").notNull().default("25"),
   budget: text("budget"),
