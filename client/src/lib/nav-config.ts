@@ -9,6 +9,7 @@ import {
   Sparkles,
   Sofa,
   User,
+  Settings,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -91,6 +92,14 @@ export const NAV_ITEMS: NavItem[] = [
     path: "/profile",
     icon: User,
     allowedRoles: ["admin", "crew", "client"],
+    group: "Personal",
+  },
+  {
+    // PR N — admin-only Brand editor (display-only white-label, Phase 4).
+    label: "Settings",
+    path: "/settings",
+    icon: Settings,
+    allowedRoles: ["admin"],
     group: "Personal",
   },
 ];

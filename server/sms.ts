@@ -2,46 +2,20 @@ import twilio from "twilio";
 import { authStorage } from "./replit_integrations/auth/storage";
 import type { User } from "@shared/models/auth";
 import { db } from "./db";
-import { queuedSms, tenantSettings, type TenantSettings } from "@shared/schema";
+import { queuedSms, type TenantSettings } from "@shared/schema";
 import { eq } from "drizzle-orm";
+// PR N — unified tenant settings access lives in ./tenant-settings. Re-export
+// the cache invalidator here so existing imports of
+// `invalidateTenantSettingsCache` from "./sms" keep working.
+import { getTenantSettings, invalidateTenantSettingsCache } from "./tenant-settings";
+
+export { invalidateTenantSettingsCache };
 
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
 const fromNumber = process.env.TWILIO_PHONE_NUMBER;
 
 let client: twilio.Twilio | null = null;
-
-// Tenant settings cache. Reloaded every 5 minutes to pick up admin changes
-// without forcing a server restart. See docs/PRODUCT_PHILOSOPHY.md.
-let cachedSettings: TenantSettings | null = null;
-let cachedSettingsAt = 0;
-const SETTINGS_CACHE_MS = 5 * 60 * 1000;
-
-async function getTenantSettings(): Promise<TenantSettings | null> {
-  const now = Date.now();
-  if (cachedSettings && now - cachedSettingsAt < SETTINGS_CACHE_MS) {
-    return cachedSettings;
-  }
-  try {
-    const rows = await db
-      .select()
-      .from(tenantSettings)
-      .where(eq(tenantSettings.tenantKey, "default"))
-      .limit(1);
-    cachedSettings = rows[0] ?? null;
-    cachedSettingsAt = now;
-    return cachedSettings;
-  } catch (err: any) {
-    // Table may not exist yet on a fresh DB — fail closed (no SMS).
-    console.warn("tenant_settings unavailable; defaulting to SMS off:", err.message || err);
-    return null;
-  }
-}
-
-export function invalidateTenantSettingsCache(): void {
-  cachedSettings = null;
-  cachedSettingsAt = 0;
-}
 
 /**
  * SMS message kind. Determines which tenant flag gates the send.

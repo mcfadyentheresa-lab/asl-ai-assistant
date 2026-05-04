@@ -47,6 +47,7 @@ function BoardDrawerRedirect({ drawer, params }: { drawer: "photos" | "furniture
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const ProjectDetails = lazy(() => import("@/pages/ProjectDetails"));
 const Profile = lazy(() => import("@/pages/Profile"));
+const AdminSettings = lazy(() => import("@/pages/AdminSettings"));
 const ColorPortfolio = lazy(() => import("@/pages/ColorPortfolio"));
 const Timesheets = lazy(() => import("@/pages/Timesheets"));
 const Payroll = lazy(() => import("@/pages/Payroll"));
@@ -154,6 +155,9 @@ function Router() {
               <Switch>
                 <Route path="/" component={Dashboard} />
                 <Route path="/profile" component={Profile} />
+                <Route path="/settings">
+                  {() => <RoleGuard component={AdminSettings} allowedRoles={["admin"]} />}
+                </Route>
                 <Route path="/project/:id" component={ProjectDetails} />
                 <Route path="/project/:id/estimate" component={CostEstimator} />
                 <Route path="/project/:id/settings" component={ProjectSettings} />

@@ -8,6 +8,7 @@ import { useRoute } from "wouter";
 import { Loader2 } from "lucide-react";
 import PresentationMode from "@/components/board/PresentationMode";
 import type { CanvasElement } from "@shared/schema";
+import { useTenantBrand } from "@/hooks/use-tenant-brand";
 
 interface PublicPresentationData {
   projectId: number;
@@ -17,6 +18,7 @@ interface PublicPresentationData {
 }
 
 export default function PublicPresentation() {
+  const brand = useTenantBrand();
   const [, params] = useRoute<{ token: string }>("/p/:token");
   const token = params?.token;
   const [data, setData] = useState<PublicPresentationData | null>(null);
@@ -45,7 +47,7 @@ export default function PublicPresentation() {
             {error}
           </div>
           <div className="text-sm text-muted-foreground" style={{ fontFamily: "var(--font-mono)" }}>
-            Aster &amp; Spruce
+            {brand.brandName}
           </div>
         </div>
       </div>

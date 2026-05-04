@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { X, Download, Link2, Check } from "lucide-react";
 import type { CanvasElement } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
+import { useTenantBrand } from "@/hooks/use-tenant-brand";
 
 interface PresentationModeProps {
   open: boolean;
@@ -101,6 +102,7 @@ export default function PresentationMode({
   watermarkOnly = false,
 }: PresentationModeProps) {
   const { toast } = useToast();
+  const brand = useTenantBrand();
   const project = useProject(projectId);
   const [titleEntered, setTitleEntered] = useState(false);
   const [copying, setCopying] = useState(false);
@@ -516,10 +518,10 @@ export default function PresentationMode({
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
           <div>
             <div className="text-2xl font-bold text-foreground" style={{ fontFamily: "var(--font-serif)", letterSpacing: "-0.025em" }}>
-              Aster &amp; Spruce
+              {brand.brandName}
             </div>
             <div className="text-[11px] text-muted-foreground mt-1" style={{ fontFamily: "var(--font-mono)" }}>
-              info@asterandspruceliving.ca
+              {brand.supportEmail}
             </div>
           </div>
           <div className="text-[10px] uppercase text-muted-foreground" style={{ fontFamily: "var(--font-mono)", letterSpacing: "0.2em" }}>
@@ -534,7 +536,7 @@ export default function PresentationMode({
           className="fixed bottom-4 right-4 z-[125] text-[10px] uppercase text-foreground/55 px-3 py-1.5 rounded-full bg-background/70 backdrop-blur border border-border/60"
           style={{ fontFamily: "var(--font-mono)", letterSpacing: "0.2em" }}
         >
-          Aster &amp; Spruce
+          {brand.brandName}
         </div>
       )}
     </div>

@@ -11,6 +11,7 @@ import { WalkthroughModal } from "@/components/WalkthroughModal";
 import { BookOpen, ZoomIn, Home, Clock } from "lucide-react";
 import { useRecentProjects } from "@/hooks/use-recent-projects";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useTenantBrand } from "@/hooks/use-tenant-brand";
 
 interface SidebarNavProps {
   onNavigate?: () => void;
@@ -228,14 +229,14 @@ export function SidebarNav({ onNavigate, compact = false }: SidebarNavProps) {
   );
 }
 
-function AslMonogram({ className }: { className?: string }) {
+function AslMonogram({ className, ariaLabel }: { className?: string; ariaLabel?: string }) {
   return (
     <svg
       viewBox="0 0 24 24"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       className={className}
-      aria-label="Aster & Spruce Living"
+      aria-label={ariaLabel ?? "Aster & Spruce Living"}
     >
       {/* Central stem */}
       <path d="M12 22V6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
@@ -254,6 +255,7 @@ function AslMonogram({ className }: { className?: string }) {
 }
 
 export function DesktopSidebar() {
+  const brand = useTenantBrand();
   return (
     <>
       <aside
@@ -262,7 +264,7 @@ export function DesktopSidebar() {
       >
         <div className="flex items-center justify-center h-14 shrink-0 border-b border-sidebar-border/50">
           <Link href="/" data-testid="link-sidebar-logo-compact">
-            <AslMonogram className="h-7 w-7 text-sidebar-primary" />
+            <AslMonogram className="h-7 w-7 text-sidebar-primary" ariaLabel={brand.legalName} />
           </Link>
         </div>
         <SidebarNav compact={true} />
@@ -287,7 +289,7 @@ export function DesktopSidebar() {
             </span>
           </Link>
           <span className="text-[9px] font-semibold tracking-[0.18em] uppercase text-sidebar-foreground/35 mt-1 select-none">
-            Aster &amp; Spruce Living
+            {brand.legalName}
           </span>
         </div>
         <SidebarNav compact={false} />

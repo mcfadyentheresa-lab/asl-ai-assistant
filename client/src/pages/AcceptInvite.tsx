@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Loader2, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { useTenantBrand } from "@/hooks/use-tenant-brand";
 
 interface InviteInfo {
   valid: boolean;
@@ -15,6 +16,7 @@ interface InviteInfo {
 }
 
 export default function AcceptInvite() {
+  const brand = useTenantBrand();
   const { token } = useParams<{ token: string }>();
   const [, navigate] = useLocation();
   const [info, setInfo] = useState<InviteInfo | null>(null);
@@ -123,7 +125,7 @@ export default function AcceptInvite() {
       <Card className="max-w-md w-full">
         <CardContent className="pt-8 pb-8 space-y-6">
           <div className="text-center space-y-2">
-            <h1 className="font-serif text-2xl font-bold text-primary">Welcome to Aster &amp; Spruce</h1>
+            <h1 className="font-serif text-2xl font-bold text-primary">Welcome to {brand.brandName}</h1>
             <p className="text-muted-foreground text-sm">
               Set up your {info.role === "admin" ? "admin" : info.role === "client" ? "client" : "crew"} account.
             </p>

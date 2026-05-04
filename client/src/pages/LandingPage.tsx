@@ -4,8 +4,10 @@ import { ArrowRight, ShieldCheck, Zap, Eye } from "lucide-react";
 import { motion } from "framer-motion";
 import heroImg from "@/assets/images/hero-cottage.png";
 import craftImg from "@/assets/images/craft-interior.png";
+import { useTenantBrand } from "@/hooks/use-tenant-brand";
 
 export default function LandingPage() {
+  const brand = useTenantBrand();
   const handleLogin = () => {
     window.location.href = "/login";
   };
@@ -24,7 +26,7 @@ export default function LandingPage() {
 
         <nav className="relative z-10 flex items-center justify-between px-6 md:px-12 py-6" data-testid="nav-landing">
           <span className="font-serif text-2xl font-semibold text-white tracking-tight" data-testid="text-logo">
-            Aster & Spruce
+            {brand.brandName}
           </span>
         </nav>
 
@@ -97,7 +99,7 @@ export default function LandingPage() {
                 Where Heritage Meets Innovation
               </h2>
               <p className="text-muted-foreground leading-relaxed text-lg">
-                Every Aster & Spruce project begins with deep respect for the land and the legacy of Muskoka architecture. We pair traditional craftsmanship with modern building science to create homes that endure for generations.
+                Every {brand.brandName} project begins with deep respect for the land and the legacy of Muskoka architecture. We pair traditional craftsmanship with modern building science to create homes that endure for generations.
               </p>
               <p className="text-muted-foreground leading-relaxed">
                 Our client portal keeps you connected to every decision, every milestone, and every detail of your build -- no matter where you are in the world.
@@ -171,10 +173,10 @@ export default function LandingPage() {
       <footer className="py-12 border-t border-border" data-testid="footer">
         <div className="container mx-auto px-6 md:px-12 flex flex-col md:flex-row justify-between items-center gap-4">
           <span className="font-serif text-lg font-semibold text-foreground">
-            Aster & Spruce
+            {brand.brandName}
           </span>
           <p className="text-sm text-muted-foreground">
-            &copy; {new Date().getFullYear()} Aster & Spruce Construction. All rights reserved.
+            &copy; {new Date().getFullYear()} {brand.legalName}. All rights reserved.
           </p>
         </div>
       </footer>

@@ -12,12 +12,14 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { useTenantBrand } from "@/hooks/use-tenant-brand";
 
 interface AppShellProps {
   children: React.ReactNode;
 }
 
 export function AppShell({ children }: AppShellProps) {
+  const brand = useTenantBrand();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const { user } = useAuth();
   const { viewMode } = useViewMode();
@@ -65,7 +67,7 @@ export function AppShell({ children }: AppShellProps) {
                     </span>
                   </Link>
                   <span className="text-[9px] font-semibold tracking-[0.18em] uppercase text-sidebar-foreground/35 mt-1 block select-none">
-                    Aster &amp; Spruce Living
+                    {brand.legalName}
                   </span>
                 </div>
               </SheetTitle>

@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Loader2, CheckCircle2, AlertTriangle, Clock } from "lucide-react";
 import { motion } from "framer-motion";
+import { useTenantBrand } from "@/hooks/use-tenant-brand";
 
 interface InviteValidation {
   valid: boolean;
@@ -20,6 +21,7 @@ interface InviteValidation {
 }
 
 export default function InviteAccept() {
+  const brand = useTenantBrand();
   const { token } = useParams<{ token: string }>();
   const { user, isLoading: authLoading } = useAuth();
   const [, navigate] = useLocation();
@@ -143,7 +145,7 @@ export default function InviteAccept() {
         <Card className="max-w-lg w-full">
           <CardContent className="pt-8 pb-8 space-y-6">
             <div className="text-center space-y-2">
-              <span className="font-serif text-2xl font-bold text-primary tracking-tight">Aster & Spruce</span>
+              <span className="font-serif text-2xl font-bold text-primary tracking-tight">{brand.brandName}</span>
               <h1 className="font-serif text-3xl font-bold" data-testid="text-invite-welcome">
                 Welcome, {invite.firstName}
               </h1>

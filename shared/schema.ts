@@ -1070,6 +1070,13 @@ export const tenantSettings = pgTable("tenant_settings", {
   brandName: text("brand_name").notNull().default("Aster & Spruce"),
   brandWebsite: text("brand_website").default("https://asterandspruceliving.ca"),
   supportEmail: text("support_email").default("info@asterandspruceliving.ca"),
+  // PR N — White-label Phase 4 (demo-safe). These are display-only fields the
+  // admin can edit. They do NOT introduce data isolation. Multiple tenants are
+  // still impossible until Phases 1–3 land.
+  legalName: text("legal_name"), // e.g. "Aster & Spruce Living" (used in footers/copyright)
+  logoUrl: text("logo_url"),     // optional URL to a header logo
+  primaryColor: text("primary_color"), // hex like "#1a3a2a" — used for theming hooks
+  appUrl: text("app_url"),       // canonical portal URL, e.g. "https://app.asl-portal.ca"
 
   // SMS gating (off by default per product philosophy)
   smsEnabled: boolean("sms_enabled").notNull().default(false),
