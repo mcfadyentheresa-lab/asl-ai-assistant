@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Camera, ArrowLeft, Save } from "lucide-react";
+import { Loader2, Camera, ArrowLeft, Save, KeyRound } from "lucide-react";
 import { Link } from "wouter";
 
 export default function Profile() {
@@ -24,6 +24,26 @@ export default function Profile() {
     email: "",
     phone: "",
   });
+
+  // Change-password section state. Kept local to this page; the endpoint is
+  // POST /api/auth/change-password and requires the current password.
+  const [pwCurrent, setPwCurrent] = useState("");
+  const [pwNew, setPwNew] = useState("");
+  const [pwConfirm, setPwConfirm] = useState("");
+  const [pwSaving, setPwSaving] = useState(false);
+
+  // P2-5 — Honour ?returnTo=<path> on the back link so users land where they came
+  // from. Falls back to "/" (dashboard). We sanitise: only same-origin paths.
+  const returnTo = (() => {
+    if (typeof window === "undefined") return "/";
+    const raw = new URLSearchParams(window.location.search).get("returnTo");
+    if (!raw) return "/";
+    // Must be a relative path starting with "/" and NOT "//" (which would be a
+    // protocol-relative URL to another host).
+    if (!raw.startsWith("/") || raw.startsWith("//")) return "/";
+    return raw;
+  })();
+  const backLabel = returnTo === "/" ? "Back to Dashboard" : "Back";
 
   useEffect(() => {
     if (user) {
@@ -111,10 +131,10 @@ export default function Profile() {
       <Navbar />
 
       <div className="max-w-2xl mx-auto px-4 md:px-6 pt-8">
-        <Link href="/" data-testid="link-back-dashboard">
+        <Link href={returnTo} data-testid="link-back-dashboard">
           <Button variant="ghost" size="sm" className="mb-6">
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Dashboard
+            {backLabel}
           </Button>
         </Link>
 
@@ -269,6 +289,100 @@ export default function Profile() {
                     <Save className="h-4 w-4 mr-2" />
                   )}
                   Save Changes
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="font-serif text-lg flex items-center gap-2">
+                <KeyRound className="h-4 w-4 text-muted-foreground" />
+                Change Password
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <label htmlFor="profile-pw-current" className="text-sm font-medium text-muted-foreground mb-1.5 block">
+                  Current password
+                </label>
+                <Input
+                  id="profile-pw-current"
+                  type="password"
+                  autoComplete="current-password"
+                  value={pwCurrent}
+                  onChange={(e) => setPwCurrent(e.target.value)}
+                  data-testid="input-pw-current"
+                />
+              </div>
+              <div>
+                <label htmlFor="profile-pw-new" className="text-sm font-medium text-muted-foreground mb-1.5 block">
+                  New password
+                </label>
+                <Input
+                  id="profile-pw-new"
+                  type="password"
+                  autoComplete="new-password"
+                  value={pwNew}
+                  onChange={(e) => setPwNew(e.target.value)}
+                  data-testid="input-pw-new"
+                />
+                <p className="text-xs text-muted-foreground mt-1">Minimum 8 characters.</p>
+              </div>
+              <div>
+                <label htmlFor="profile-pw-confirm" className="text-sm font-medium text-muted-foreground mb-1.5 block">
+                  Confirm new password
+                </label>
+                <Input
+                  id="profile-pw-confirm"
+                  type="password"
+                  autoComplete="new-password"
+                  value={pwConfirm}
+                  onChange={(e) => setPwConfirm(e.target.value)}
+                  data-testid="input-pw-confirm"
+                />
+              </div>
+              <div className="flex justify-end pt-2">
+                <Button
+                  variant="outline"
+                  disabled={pwSaving || !pwCurrent || !pwNew || !pwConfirm}
+                  data-testid="button-change-password"
+                  onClick={async () => {
+                    if (pwNew.length < 8) {
+                      toast({ title: "Password too short", description: "New password must be at least 8 characters.", variant: "destructive" });
+                      return;
+                    }
+                    if (pwNew !== pwConfirm) {
+                      toast({ title: "Passwords don't match", description: "New password and confirmation must match.", variant: "destructive" });
+                      return;
+                    }
+                    setPwSaving(true);
+                    try {
+                      const res = await fetch("/api/auth/change-password", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        credentials: "include",
+                        body: JSON.stringify({ currentPassword: pwCurrent, newPassword: pwNew }),
+                      });
+                      const data = await res.json().catch(() => ({}));
+                      if (!res.ok) throw new Error(data.message || "Failed to change password");
+                      toast({ title: "Password updated" });
+                      setPwCurrent("");
+                      setPwNew("");
+                      setPwConfirm("");
+                    } catch (err: any) {
+                      toast({ title: "Error", description: err.message, variant: "destructive" });
+                    } finally {
+                      setPwSaving(false);
+                    }
+                  }}
+                >
+                  {pwSaving ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <KeyRound className="h-4 w-4 mr-2" />
+                  )}
+                  Update password
                 </Button>
               </div>
             </CardContent>

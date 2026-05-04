@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { LogOut, User, Sun, Moon, Menu, MoreHorizontal, Check } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useViewMode } from "@/hooks/use-view-mode";
 import { useTheme } from "next-themes";
@@ -27,6 +27,15 @@ export function NavbarShell({ onMenuToggle }: NavbarShellProps) {
   const { viewMode, setViewMode } = useViewMode();
   const { theme, setTheme } = useTheme();
   const [tourOpen, setTourOpen] = useState(false);
+  const [location] = useLocation();
+
+  // P2-5 — When jumping to /profile we pass ?returnTo=<current path> so the
+  // back link returns the user to where they came from instead of always /.
+  // Skip when already on /profile to avoid recursive returnTo on rerender.
+  const profileHref =
+    location && location !== "/profile" && !location.startsWith("/profile?")
+      ? `/profile?returnTo=${encodeURIComponent(location)}`
+      : "/profile";
 
   useEffect(() => {
     if (!user) return;
@@ -164,7 +173,7 @@ export function NavbarShell({ onMenuToggle }: NavbarShellProps) {
                 </p>
               </div>
               <DropdownMenuSeparator />
-              <Link href="/profile">
+              <Link href={profileHref}>
                 <DropdownMenuItem data-testid="link-profile">
                   <User className="mr-2 h-4 w-4" />
                   Your Profile
