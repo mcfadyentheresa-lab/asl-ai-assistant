@@ -2,9 +2,9 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
-import { insertSubMilestoneSchema, insertSectionSchema, insertTimeEntrySchema, insertCostCategorySchema, insertMarketRateSchema, insertProjectEstimateSchema, insertEstimateItemSchema, insertReceiptSchema, insertCrewRateSchema, insertSubcontractorSchema, insertSupplierSchema, insertSupplierPriceSchema, insertRegionalModifierSchema, insertTableRedesignPlanSchema, insertTableRedesignMaterialSchema, regionalModifiers, estimateItems, projectEstimates } from "@shared/schema";
+import { insertSubMilestoneSchema, insertSectionSchema, insertTimeEntrySchema, insertCostCategorySchema, insertMarketRateSchema, insertProjectEstimateSchema, insertEstimateItemSchema, insertReceiptSchema, insertCrewRateSchema, insertSubcontractorSchema, insertSupplierSchema, insertSupplierPriceSchema, insertRegionalModifierSchema, insertTableRedesignPlanSchema, insertTableRedesignMaterialSchema, regionalModifiers, estimateItems, projectEstimates, projects, tasks, receipts as receiptsTable } from "@shared/schema";
 import { db } from "./db";
-import { eq as eqSql } from "drizzle-orm";
+import { eq as eqSql, and as andSql } from "drizzle-orm";
 import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
@@ -164,7 +164,16 @@ export async function registerRoutes(
   });
 
   // Receipt upload — accepts images and PDFs
-  app.post("/api/receipts/upload", isAuthenticated, (req: any, res) => {
+  // PR F (F1): admin/crew only. Previously any authenticated user (including
+  // a client) could upload arbitrary PDFs/images into the public /uploads/
+  // directory. The upload is not project-scoped, so a role gate is the only
+  // available control here.
+  app.post("/api/receipts/upload", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub as string;
+    const dbUser = await authStorage.getUser(userId);
+    if (!dbUser || (dbUser.role !== "admin" && dbUser.role !== "crew")) {
+      return res.status(403).json({ message: "Crew or admin access required" });
+    }
     docUpload.single("file")(req, res, (err: any) => {
       if (err) {
         const message = err instanceof multer.MulterError
@@ -4179,6 +4188,90 @@ Prefer faces, architectural focal subjects, strong compositional anchors (a fire
   function isEstimateLocked(status: string | null | undefined): boolean {
     return status === "approved" || status === "sent";
   }
+
+  // Project-membership gate (PR F).
+  //
+  // Today there is no dedicated project_members / project_assignments table.
+  // The signal we have:
+  //   - admin   → full access by policy.
+  //   - client  → access if projects.client_id === userId.
+  //   - crew    → access if a task exists with (projectId, assignedTo=userId).
+  // Anything else → 403.
+  //
+  // This intentionally returns 404 rather than 403 when the project is missing
+  // so we don't leak existence to clients fishing for project IDs.
+  async function requireProjectMember(
+    req: any,
+    res: any,
+    projectId: number,
+  ): Promise<boolean> {
+    const userId = req.user?.claims?.sub as string | undefined;
+    if (!userId) {
+      res.status(401).json({ message: "Unauthorized" });
+      return false;
+    }
+    if (!Number.isFinite(projectId)) {
+      res.status(400).json({ message: "Invalid project id" });
+      return false;
+    }
+    const dbUser = await authStorage.getUser(userId);
+    if (!dbUser) {
+      res.status(404).json({ message: "User not found" });
+      return false;
+    }
+    if (dbUser.role === "admin") return true;
+
+    const project = await storage.getProject(projectId);
+    if (!project) {
+      res.status(404).json({ message: "Project not found" });
+      return false;
+    }
+
+    if (dbUser.role === "client") {
+      if (project.clientId === userId) return true;
+      res.status(403).json({ message: "Forbidden" });
+      return false;
+    }
+
+    if (dbUser.role === "crew") {
+      const assigned = await db
+        .select({ id: tasks.id })
+        .from(tasks)
+        .where(andSql(eqSql(tasks.projectId, projectId), eqSql(tasks.assignedTo, userId)))
+        .limit(1);
+      if (assigned.length > 0) return true;
+      res.status(403).json({ message: "Not assigned to this project" });
+      return false;
+    }
+
+    res.status(403).json({ message: "Forbidden" });
+    return false;
+  }
+
+  // Look up the projectId for an estimate (used by /api/estimates/:id/* gates).
+  async function projectIdForEstimate(estimateId: number): Promise<number | null> {
+    const est = await storage.getEstimate(estimateId);
+    return est?.projectId ?? null;
+  }
+
+  // Look up the projectId for an estimate item.
+  async function projectIdForEstimateItem(itemId: number): Promise<number | null> {
+    const items = await db
+      .select({ estimateId: estimateItems.estimateId })
+      .from(estimateItems)
+      .where(eqSql(estimateItems.id, itemId));
+    if (items.length === 0) return null;
+    return projectIdForEstimate(items[0].estimateId);
+  }
+
+  // Look up the projectId for a receipt.
+  async function projectIdForReceipt(receiptId: number): Promise<number | null> {
+    const rows = await db
+      .select({ projectId: receiptsTable.projectId })
+      .from(receiptsTable)
+      .where(eqSql(receiptsTable.id, receiptId));
+    return rows[0]?.projectId ?? null;
+  }
   async function assertEstimateEditable(estimateId: number, res: any): Promise<boolean> {
     const est = await storage.getEstimate(estimateId);
     if (!est) {
@@ -4222,6 +4315,8 @@ Prefer faces, architectural focal subjects, strong compositional anchors (a fire
     if (!dbUser) return res.status(404).json({ message: "User not found" });
     if (dbUser.role === "client") return res.status(403).json({ message: "Crew or admin access required" });
     const projectId = parseInt(req.params.projectId);
+    // PR F (F2): crew must be assigned to this project (have a task on it).
+    if (!(await requireProjectMember(req, res, projectId))) return;
     const input = insertProjectEstimateSchema.parse({ ...req.body, projectId, createdBy: userId });
     const created = await storage.createEstimate(input);
     res.status(201).json(created);
@@ -4244,6 +4339,10 @@ Prefer faces, architectural focal subjects, strong compositional anchors (a fire
     if (dbUser.role === "client") return res.status(403).json({ message: "Crew or admin access required" });
     const estimateId = parseInt(req.params.id);
     if (!(await assertEstimateEditable(estimateId, res))) return;
+    // PR F (F2): crew must be assigned to the estimate's project.
+    const pid = await projectIdForEstimate(estimateId);
+    if (pid == null) return res.status(404).json({ message: "Estimate not found" });
+    if (!(await requireProjectMember(req, res, pid))) return;
     // Strip status/approvedAt/approvedBy/sentAt/revisedFromId from arbitrary PATCH;
     // those are managed by the dedicated /approve, /mark-sent, /revise endpoints
     // so the audit trail can't be bypassed via a generic update.
@@ -4353,6 +4452,10 @@ Prefer faces, architectural focal subjects, strong compositional anchors (a fire
     if (dbUser.role === "client") return res.status(403).json({ message: "Crew or admin access required" });
     const estimateId = parseInt(req.params.id);
     if (!(await assertEstimateEditable(estimateId, res))) return;
+    // PR F (F2): crew must be assigned to the estimate's project.
+    const pid = await projectIdForEstimate(estimateId);
+    if (pid == null) return res.status(404).json({ message: "Estimate not found" });
+    if (!(await requireProjectMember(req, res, pid))) return;
     const input = insertEstimateItemSchema.parse({ ...req.body, estimateId });
     const created = await storage.createEstimateItem(input);
     const estimateForBroadcast = await storage.getEstimate(estimateId);
@@ -4402,6 +4505,10 @@ Prefer faces, architectural focal subjects, strong compositional anchors (a fire
     if (dbUser.role === "client") return res.status(403).json({ message: "Crew or admin access required" });
     const id = parseInt(req.params.id);
     if (!(await assertItemEstimateEditable(id, res))) return;
+    // PR F (F2): crew must be assigned to the item's parent project.
+    const pid = await projectIdForEstimateItem(id);
+    if (pid == null) return res.status(404).json({ message: "Estimate item not found" });
+    if (!(await requireProjectMember(req, res, pid))) return;
     const input = insertEstimateItemSchema.partial().parse(req.body);
     const updated = await storage.updateEstimateItem(id, input);
 
@@ -4452,15 +4559,24 @@ Prefer faces, architectural focal subjects, strong compositional anchors (a fire
     if (dbUser.role === "client") return res.status(403).json({ message: "Crew or admin access required" });
     const id = parseInt(req.params.id);
     if (!(await assertItemEstimateEditable(id, res))) return;
+    // PR F (F2): crew must be assigned to the item's parent project.
+    const pid = await projectIdForEstimateItem(id);
+    if (pid == null) return res.status(404).json({ message: "Estimate item not found" });
+    if (!(await requireProjectMember(req, res, pid))) return;
     await storage.deleteWarningsByItem(id);
     await storage.deleteEstimateItem(id);
     res.json({ message: "Deleted" });
   }));
 
   // Receipts
-  app.get("/api/projects/:projectId/receipts", isAuthenticated, asyncHandler(async (req, res) => {
-    const receipts = await storage.getReceipts(parseInt(req.params.projectId));
-    res.json(receipts);
+  app.get("/api/projects/:projectId/receipts", isAuthenticated, asyncHandler(async (req: any, res) => {
+    // PR F (F3): previously had no role check at all, leaking vendor names
+    // and amounts across projects. Gate by project membership: admin always,
+    // client only if they own the project, crew only if assigned via tasks.
+    const projectId = parseInt(req.params.projectId);
+    if (!(await requireProjectMember(req, res, projectId))) return;
+    const list = await storage.getReceipts(projectId);
+    res.json(list);
   }));
 
   app.post("/api/projects/:projectId/receipts", isAuthenticated, asyncHandler(async (req: any, res) => {
@@ -4469,6 +4585,8 @@ Prefer faces, architectural focal subjects, strong compositional anchors (a fire
     if (!dbUser) return res.status(404).json({ message: "User not found" });
     if (dbUser.role === "client") return res.status(403).json({ message: "Crew or admin access required" });
     const projectId = parseInt(req.params.projectId);
+    // PR F (F2): crew must be assigned to this project.
+    if (!(await requireProjectMember(req, res, projectId))) return;
     const input = insertReceiptSchema.parse({ ...req.body, projectId, createdBy: userId });
     const created = await storage.createReceipt(input);
     res.status(201).json(created);
@@ -4480,18 +4598,41 @@ Prefer faces, architectural focal subjects, strong compositional anchors (a fire
     const dbUser = await authStorage.getUser(userId);
     if (!dbUser) return res.status(404).json({ message: "User not found" });
     if (dbUser.role === "client") return res.status(403).json({ message: "Crew or admin access required" });
-    await storage.deleteReceipt(parseInt(req.params.id));
+    const receiptId = parseInt(req.params.id);
+    // PR F (F2): crew must be assigned to the receipt's project.
+    const pid = await projectIdForReceipt(receiptId);
+    if (pid == null) return res.status(404).json({ message: "Receipt not found" });
+    if (!(await requireProjectMember(req, res, pid))) return;
+    await storage.deleteReceipt(receiptId);
     res.json({ message: "Deleted" });
   }));
 
   // Estimate Warnings
-  app.get("/api/estimates/:id/warnings", isAuthenticated, async (req, res) => {
-    const warnings = await storage.getWarningsByEstimate(parseInt(String(req.params.id)));
+  // PR F (F4): previously ungated. Warnings expose pricing-anomaly text on
+  // arbitrary estimates ("X% above market high"). Restrict to admin/crew and
+  // require project membership for the parent estimate.
+  app.get("/api/estimates/:id/warnings", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub as string;
+    const dbUser = await authStorage.getUser(userId);
+    if (!dbUser || (dbUser.role !== "admin" && dbUser.role !== "crew")) {
+      return res.status(403).json({ message: "Crew or admin access required" });
+    }
+    const estimateId = parseInt(String(req.params.id));
+    const pid = await projectIdForEstimate(estimateId);
+    if (pid == null) return res.status(404).json({ message: "Estimate not found" });
+    if (!(await requireProjectMember(req, res, pid))) return;
+    const warnings = await storage.getWarningsByEstimate(estimateId);
     res.json(warnings);
   });
 
+  // PR F (F5): admin-only. Warnings are an audit/QA signal; clients and crew
+  // must not be able to clear them.
   app.post("/api/warnings/:id/ignore", isAuthenticated, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+    const userId = req.user.claims.sub as string;
+    const dbUser = await authStorage.getUser(userId);
+    if (dbUser?.role !== "admin") {
+      return res.status(403).json({ message: "Admin access required" });
+    }
     const updated = await storage.ignoreWarning(parseInt(req.params.id), userId);
     res.json(updated);
   });
@@ -4730,6 +4871,13 @@ Otherwise, respond with valid JSON only, no markdown. Format:
       }
 
       const estimateId = Number(req.params.id);
+      // PR F (F6): respect estimate edit-lock and project ownership.
+      // Approved/sent estimates should not have AI alternatives regenerated
+      // (burns credits + re-implies they are still being changed).
+      if (!(await assertEstimateEditable(estimateId, res))) return;
+      const pid = await projectIdForEstimate(estimateId);
+      if (pid == null) return res.status(404).json({ message: "Estimate not found" });
+      if (!(await requireProjectMember(req, res, pid))) return;
       const { budget } = req.body;
 
       if (!budget) {
@@ -5554,8 +5702,36 @@ Respond with valid JSON only:
   app.post("/api/projects/:id/receipts/scan", isAuthenticated, async (req: any, res) => {
     let tempImagePath: string | null = null;
     try {
+      // PR F (F7): admin/crew only + project membership.
+      // Previously any authenticated user (including a client) could call
+      // OpenAI Vision against an arbitrary URL, and PDFs were resolved with
+      // path.join(cwd, imageUrl.replace(/^\//, "")) which is vulnerable to
+      // path traversal (e.g. imageUrl="/../etc/passwd.pdf" escapes cwd).
+      const userId = req.user.claims.sub as string;
+      const dbUser = await authStorage.getUser(userId);
+      if (!dbUser || (dbUser.role !== "admin" && dbUser.role !== "crew")) {
+        return res.status(403).json({ message: "Crew or admin access required" });
+      }
+      const projectId = parseInt(req.params.id);
+      if (!(await requireProjectMember(req, res, projectId))) return;
+
       const { imageUrl } = req.body;
-      if (!imageUrl) return res.status(400).json({ message: "Image URL is required" });
+      if (!imageUrl || typeof imageUrl !== "string") {
+        return res.status(400).json({ message: "Image URL is required" });
+      }
+
+      // PR F (F7): strict imageUrl validation. Must be a server-relative path
+      // under /uploads/, with no ".." segments or NUL bytes. We also resolve
+      // the absolute path and require it to remain inside the uploads dir.
+      // This blocks path traversal into /etc, /home, etc.
+      const uploadsDir = path.resolve(process.cwd(), "uploads");
+      if (
+        !imageUrl.startsWith("/uploads/") ||
+        imageUrl.includes("..") ||
+        imageUrl.includes("\0")
+      ) {
+        return res.status(400).json({ message: "Invalid image path" });
+      }
 
       const systemPrompt = `You are a receipt parsing assistant. Extract all information from the receipt image and respond with valid JSON only using this exact shape:
 {
@@ -5578,8 +5754,14 @@ Rules:
       let scanUrl = imageUrl;
       const isPdf = imageUrl.toLowerCase().endsWith(".pdf");
       if (isPdf) {
-        // Convert first PDF page to JPEG using pdftoppm
-        const filePath = path.join(process.cwd(), imageUrl.replace(/^\//, ""));
+        // Convert first PDF page to JPEG using pdftoppm.
+        // PR F (F7): resolve absolute path and re-verify it sits under
+        // uploadsDir before handing to pdftoppm — belt-and-braces against
+        // any traversal that slipped through the prefix check above.
+        const filePath = path.resolve(process.cwd(), imageUrl.replace(/^\//, ""));
+        if (!filePath.startsWith(uploadsDir + path.sep) && filePath !== uploadsDir) {
+          return res.status(400).json({ message: "Invalid image path" });
+        }
         const tempBase = path.join("/tmp", `receipt_${randomUUID()}`);
         await new Promise<void>((resolve, reject) => {
           execFile("pdftoppm", ["-jpeg", "-r", "200", "-f", "1", "-l", "1", filePath, tempBase], (err) => {
