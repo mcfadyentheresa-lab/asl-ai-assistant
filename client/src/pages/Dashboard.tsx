@@ -5,7 +5,7 @@ import { AdminDashboardView } from "@/components/dashboard/AdminDashboardView";
 import { CrewDashboardView } from "@/components/dashboard/CrewDashboardView";
 import { ClientDashboardView } from "@/components/dashboard/ClientDashboardView";
 import { Button } from "@/components/ui/button";
-import { Plus, Loader2, Eye, EyeOff, X, UserPlus, MoreHorizontal, Upload } from "lucide-react";
+import { Plus, Loader2, Eye, EyeOff, X, UserPlus, MoreHorizontal, Upload, Home } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { apiRequest, queryClient as qc } from "@/lib/queryClient";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -310,7 +310,9 @@ export default function Dashboard() {
         {isClientView && !clientProject && (
           <div className="flex flex-col items-center justify-center py-20 bg-secondary/30 rounded-xl border-2 border-dashed border-border" data-testid="empty-state">
             <div className="bg-background p-4 rounded-full shadow-sm mb-4">
-              <Plus className="h-6 w-6 text-muted-foreground" />
+              {/* Home (not Plus) — clients can't create projects, so a "+"
+                  icon implied an action they can't take. */}
+              <Home className="h-6 w-6 text-muted-foreground" />
             </div>
             <h3 className="font-serif text-xl font-semibold text-foreground mb-2 text-center">
               {isAdmin ? "No active project to preview" : "Your project will appear here"}

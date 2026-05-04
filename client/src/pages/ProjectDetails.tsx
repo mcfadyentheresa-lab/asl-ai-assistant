@@ -208,7 +208,7 @@ function ProjectDetailsInner() {
   // the Planning Board (see SpatialCanvas drawers). Materials drawer too.
   const isClientView = userRole === "client";
   const tabConfig: TabConfig[] = [
-    { id: "overview", label: isClientView ? "Plan" : "Overview", icon: Clock, roles: ["admin", "crew", "client"] },
+    { id: "overview", label: isClientView ? "Updates" : "Overview", icon: Clock, roles: ["admin", "crew", "client"] },
     { id: "checklist", label: "Progress", icon: BarChart3, roles: ["admin", "crew"] },
     { id: "docs", label: "Documents", icon: FileText, roles: ["admin", "client"] },
     { id: "chat", label: "Messages", icon: MessageSquare, roles: ["admin", "crew", "client"] },

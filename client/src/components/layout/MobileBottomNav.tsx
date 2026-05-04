@@ -9,6 +9,9 @@ import {
   Newspaper,
   Palette,
   MessageSquare,
+  FileText,
+  Users,
+  Hammer,
 } from "lucide-react";
 
 interface BottomNavItem {
@@ -20,10 +23,16 @@ interface BottomNavItem {
   isActiveFor: (location: string) => boolean;
 }
 
+// Crew mobile nav now includes the day-to-day surfaces a carpenter needs on
+// site: Dashboard, Log Hours, Calendar, Crew & Trade (rates / contacts), and
+// Colour Portfolio. Previously it stopped at 3 items, leaving the other two
+// reachable only through a hamburger menu that crew don't have.
 const CREW_ITEMS: BottomNavItem[] = [
   { label: "Dashboard", resolve: () => "/", icon: LayoutDashboard, isActiveFor: (l) => l === "/" },
   { label: "Log Hours", resolve: () => "/timesheets", icon: Clock, isActiveFor: (l) => l.startsWith("/timesheets") },
   { label: "Calendar", resolve: () => "/master-calendar", icon: CalendarDays, isActiveFor: (l) => l.startsWith("/master-calendar") },
+  { label: "Crew", resolve: () => "/crew-and-trade", icon: Users, isActiveFor: (l) => l.startsWith("/crew-and-trade") || l.startsWith("/labor-rates") || l.startsWith("/trade-contacts") || l.startsWith("/market-rates") },
+  { label: "Colour", resolve: () => "/colors", icon: Hammer, isActiveFor: (l) => l.startsWith("/colors") },
 ];
 
 // Client mobile nav now mirrors the desktop ClientTabsNav so users see the
@@ -52,6 +61,12 @@ const CLIENT_ITEMS: BottomNavItem[] = [
     resolve: (id) => (id ? `/project/${id}?tab=board` : "/"),
     icon: Palette,
     isActiveFor: (l) => l.includes("tab=board"),
+  },
+  {
+    label: "Docs",
+    resolve: (id) => (id ? `/project/${id}?tab=docs` : "/"),
+    icon: FileText,
+    isActiveFor: (l) => l.includes("tab=docs"),
   },
   {
     label: "Messages",

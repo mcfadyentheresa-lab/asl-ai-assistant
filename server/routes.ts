@@ -1855,25 +1855,48 @@ Respond with valid JSON only:
   }));
 
   // Checklist Items
-  app.get(api.checklist.list.path, isAuthenticated, asyncHandler(async (req, res) => {
-    const items = await storage.getChecklistItems(Number(req.params.projectId));
+  // Read: any authenticated user with project access (clients limited to their own project).
+  // Write: crew or admin only.
+  app.get(api.checklist.list.path, isAuthenticated, asyncHandler(async (req: any, res) => {
+    const projectId = Number(req.params.projectId);
+    const userId = req.user.claims.sub;
+    const project = await storage.getProject(projectId);
+    if (!project) return res.status(404).json({ message: "Project not found" });
+    const dbUser = await authStorage.getUser(userId);
+    if (dbUser?.role === "client" && project.clientId !== userId) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    const items = await storage.getChecklistItems(projectId);
     res.json(items);
   }));
 
   app.post(api.checklist.create.path, isAuthenticated, asyncHandler(async (req: any, res) => {
-    const input = api.checklist.create.input.parse(req.body);
+    const projectId = Number(req.params.projectId);
     const userId = req.user.claims.sub;
+    const dbUser = await authStorage.getUser(userId);
+    if (dbUser?.role !== "admin" && dbUser?.role !== "crew") {
+      return res.status(403).json({ message: "Only crew or admin can create checklist items" });
+    }
+    const project = await storage.getProject(projectId);
+    if (!project) return res.status(404).json({ message: "Project not found" });
+    const input = api.checklist.create.input.parse(req.body);
     const item = await storage.createChecklistItem({
       ...input,
-      projectId: Number(req.params.projectId),
+      projectId,
       createdBy: userId,
     });
     res.status(201).json(item);
-    broadcastProjectChange(Number(req.params.projectId), ["checklist"], "created", item.id, userId);
+    broadcastProjectChange(projectId, ["checklist"], "created", item.id, userId);
   }));
 
   app.put("/api/checklist/:id", isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.claims.sub;
+    const dbUser = await authStorage.getUser(userId);
+    if (dbUser?.role !== "admin" && dbUser?.role !== "crew") {
+      return res.status(403).json({ message: "Only crew or admin can update checklist items" });
+    }
+    const existing = await storage.getChecklistItem(Number(req.params.id));
+    if (!existing) return res.status(404).json({ message: "Checklist item not found" });
     const input = api.checklist.update.input.parse(req.body);
     const item = await storage.updateChecklistItem(Number(req.params.id), input);
     if (!item) return res.status(404).json({ message: "Checklist item not found" });
@@ -1883,7 +1906,14 @@ Respond with valid JSON only:
     }
   }));
 
-  app.delete("/api/checklist/:id", isAuthenticated, asyncHandler(async (req, res) => {
+  app.delete("/api/checklist/:id", isAuthenticated, asyncHandler(async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const dbUser = await authStorage.getUser(userId);
+    if (dbUser?.role !== "admin" && dbUser?.role !== "crew") {
+      return res.status(403).json({ message: "Only crew or admin can delete checklist items" });
+    }
+    const existing = await storage.getChecklistItem(Number(req.params.id));
+    if (!existing) return res.status(404).json({ message: "Checklist item not found" });
     await storage.deleteChecklistItem(Number(req.params.id));
     res.json({ success: true });
   }));

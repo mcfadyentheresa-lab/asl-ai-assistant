@@ -1,7 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Loader2, Check, X } from "lucide-react";
+import { Loader2, Check, X, AlertCircle } from "lucide-react";
 import { apiRequest, queryClient as qc } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -61,16 +60,21 @@ const STATUS_ORDER: Record<string, number> = {
 export function ChangeOrdersInboxCard({ projectId }: ChangeOrdersInboxCardProps) {
   const { toast } = useToast();
 
-  const { data: changeOrders, isLoading } = useQuery<ChangeOrder[]>({
+  // Distinguish a real fetch error from an empty list — a silent
+  // empty-on-error would hide a change order the client owes a decision on.
+  const { data: changeOrders, isLoading, isError } = useQuery<ChangeOrder[]>({
     queryKey: ["/api/projects", projectId, "change-orders"],
     queryFn: async () => {
       const res = await fetch(`/api/projects/${projectId}/change-orders`, {
         credentials: "include",
       });
-      if (!res.ok) return [];
+      if (!res.ok) {
+        throw new Error(`Failed to load change orders (${res.status})`);
+      }
       return res.json();
     },
     enabled: !!projectId,
+    retry: 1,
   });
 
   const decideMutation = useMutation({
@@ -111,6 +115,23 @@ export function ChangeOrdersInboxCard({ projectId }: ChangeOrdersInboxCardProps)
   });
 
   if (isLoading) return null;
+
+  if (isError) {
+    return (
+      <section
+        className="px-4 md:px-8 lg:px-12 py-6"
+        data-testid="change-orders-inbox-error"
+      >
+        <div className="flex items-center gap-2 rounded-md border border-border/60 bg-muted/30 px-4 py-3">
+          <AlertCircle className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden="true" />
+          <p className="text-sm text-muted-foreground">
+            We couldn't load change orders right now. Please refresh in a moment.
+          </p>
+        </div>
+      </section>
+    );
+  }
+
   const all = changeOrders || [];
   if (all.length === 0) return null;
 
@@ -142,13 +163,6 @@ export function ChangeOrdersInboxCard({ projectId }: ChangeOrdersInboxCardProps)
             </span>
           )}
         </h2>
-        <Link
-          href={`/project/${projectId}?tab=change-orders`}
-          className="font-mono text-[10px] tracking-[0.14em] text-muted-foreground uppercase hover:text-foreground transition-colors"
-          data-testid="link-all-change-orders"
-        >
-          View all
-        </Link>
       </div>
 
       <ul className="divide-y divide-border/60 border-y border-border/60">
