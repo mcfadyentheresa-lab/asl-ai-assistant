@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Navbar } from "@/components/layout/Navbar";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -28,7 +28,7 @@ import {
   Users, Building2, TrendingUp, Plus, Pencil, Trash2, DollarSign,
   Loader2, Phone, Mail, MapPin, Star, Search, Calendar, ArrowLeft, User,
 } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import type { CostCategory, MarketRate } from "@shared/schema";
 
 interface CrewRate {
@@ -69,8 +69,32 @@ export default function CrewAndTrade() {
   const isAdmin = (user as any)?.role === "admin";
   const isCrew = (user as any)?.role === "crew";
 
-  const defaultTab = isAdmin ? "crew" : "trade";
+  // Sub-paths registered in App.tsx (/labor-rates, /trade-contacts,
+  // /market-rates) used to all land on the role default — the four routes
+  // existed but didn't actually pick a tab. Now we derive the initial tab
+  // from the URL so deep links work, and we fall back to the role default
+  // (`/crew-and-trade`) when there's no specific sub-path.
+  //
+  // Crew don't have access to the `crew` (pay rates) or `benchmarks` tabs,
+  // so a crew user landing on /labor-rates or /market-rates is silently
+  // remapped to `trade` rather than getting an empty tab body.
+  const [location] = useLocation();
+  function tabFromLocation(path: string): string {
+    if (path.startsWith("/labor-rates")) return isAdmin ? "crew" : "trade";
+    if (path.startsWith("/trade-contacts")) return "trade";
+    if (path.startsWith("/market-rates")) return isAdmin ? "benchmarks" : "trade";
+    return isAdmin ? "crew" : "trade";
+  }
+  const defaultTab = tabFromLocation(location);
   const [activeTab, setActiveTab] = useState(defaultTab);
+
+  // Keep activeTab in sync if the user navigates between sub-paths without
+  // unmounting the component (e.g. via the sidebar / a future tab-aware nav).
+  useEffect(() => {
+    const next = tabFromLocation(location);
+    setActiveTab(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location, isAdmin]);
 
   // ── Crew state ──────────────────────────────────────────────
   const [showAddCrew, setShowAddCrew] = useState(false);

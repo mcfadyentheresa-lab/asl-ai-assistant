@@ -489,15 +489,24 @@ export default function Timesheets() {
                   ))}
                 </SelectContent>
               </Select>
-              <button
-                type="button"
-                onClick={() => setShowCreateProject(true)}
-                className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                data-testid="button-create-project-inline"
-              >
-                <FolderPlus className="h-3.5 w-3.5" />
-                Don't see your project? Create one
-              </button>
+              {/*
+                Project creation is admin-only on both the UI and the API
+                (server/routes.ts — POST /api/projects rejects non-admin).
+                Crew used to be able to spawn projects from this inline
+                button which caused admin confusion; hide it for crew so
+                the only path is to ask admin to create the project.
+              */}
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => setShowCreateProject(true)}
+                  className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  data-testid="button-create-project-inline"
+                >
+                  <FolderPlus className="h-3.5 w-3.5" />
+                  Don't see your project? Create one
+                </button>
+              )}
             </div>
 
             {projectIdNum > 0 && milestones && milestones.length > 0 && (
