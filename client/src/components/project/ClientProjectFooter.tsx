@@ -14,8 +14,9 @@ interface ClientProjectFooterProps {
   projectLocation?: string | null;
 }
 
-function deriveProjectCode(id: number): string {
-  return `ASL-${String(id).padStart(3, "0")}`;
+function deriveProjectCode(id: number, projectCode?: string | null): string {
+  const savedCode = projectCode?.trim();
+  return savedCode || `PRJ-${String(id).padStart(3, "0")}`;
 }
 
 export { deriveProjectCode };
