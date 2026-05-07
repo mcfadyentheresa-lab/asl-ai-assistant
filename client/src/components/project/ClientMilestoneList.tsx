@@ -212,7 +212,7 @@ export function ClientMilestoneList({
             Coming soon
           </div>
           <p className="mt-3 text-sm text-muted-foreground">
-            Milestones will appear here as Theresa plans the project.
+            Milestones will appear here as your team plans the project.
           </p>
         </div>
       ) : (
@@ -330,7 +330,7 @@ export function ClientMilestoneList({
                         <p>{updateText}</p>
                       ) : (
                         <p className="text-muted-foreground">
-                          Theresa will share an update here as work progresses.
+                          Your team will share an update here as work progresses.
                         </p>
                       )}
                       {milestonePhotos.length > 0 ? (

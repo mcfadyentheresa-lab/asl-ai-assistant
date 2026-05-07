@@ -171,8 +171,8 @@ export default function AdminSettings() {
           <div className="text-sm text-foreground/80 leading-relaxed">
             <strong className="font-semibold text-foreground">Display only.</strong> Editing these
             fields changes labels in the UI and AI prompt copy. It does <em>not</em> create a
-            second tenant — the database still has one shared workspace. Do not give a second
-            organisation production credentials.
+            second tenant; the database still has one shared workspace. Keep production
+            credentials limited to the primary organisation.
           </div>
         </div>
 

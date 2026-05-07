@@ -59,7 +59,7 @@ interface ProjectNowCardProps {
 }
 
 const FALLBACK_BODY =
-  "Theresa will share an update here as work progresses.";
+  "Your team will share an update here as work progresses.";
 
 const MAX_BODY_CHARS = 280;
 

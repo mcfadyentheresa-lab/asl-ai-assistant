@@ -1,4 +1,4 @@
-import { useParams, Link } from "wouter";
+import { useParams, Link, useLocation } from "wouter";
 import { queryClient } from "@/lib/queryClient";
 import {
   useProject, useMilestones, useTasks, useMessages, useSendMessage,
@@ -81,8 +81,58 @@ import { ClientReferenceCards } from "@/components/project/ClientReferenceCards"
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import type { ChecklistItem, BoardItem } from "@shared/schema";
 
+const PROJECT_TAB_ALIASES: Record<string, string> = {
+  overview: "overview",
+  updates: "overview",
+  plan: "overview",
+  checklist: "checklist",
+  progress: "checklist",
+  calendar: "checklist",
+  board: "board",
+  planning: "board",
+  photos: "board",
+  furniture: "board",
+  docs: "docs",
+  documents: "docs",
+  estimates: "estimates",
+  estimate: "estimates",
+  chat: "chat",
+  messages: "chat",
+  decisions: "decisions",
+  selections: "selections",
+  "change-orders": "change-orders",
+  site_visits: "site-visits",
+  "site-visits": "site-visits",
+};
+
+function defaultProjectTab(): string {
+  if (typeof window !== "undefined") {
+    const cachedRole = localStorage.getItem("userRole");
+    if (cachedRole === "admin" || cachedRole === "crew") return "checklist";
+  }
+  return "overview";
+}
+
+function projectTabFromSearch(search: string): string | null {
+  const params = new URLSearchParams(search);
+  const tab = params.get("tab")?.toLowerCase();
+  if (!tab) return null;
+  return PROJECT_TAB_ALIASES[tab] ?? null;
+}
+
+function projectTabFromLocation(location: string): string | null {
+  const queryStart = location.indexOf("?");
+  if (queryStart === -1) return null;
+  return projectTabFromSearch(location.slice(queryStart));
+}
+
+function searchForProjectTab(tab: string): string {
+  return `?tab=${tab}`;
+}
+
 function ProjectDetailsInner() {
   const { id } = useParams();
+  const [location, navigate] = useLocation();
   const projectId = Number(id);
   const { data: project, isLoading: loadingProject } = useProject(projectId);
   const { data: milestones } = useMilestones(projectId);
@@ -110,21 +160,9 @@ function ProjectDetailsInner() {
     }
   }, [project?.id, project?.name, user?.role]);
 
-  const [activeTab, setActiveTab] = useState(() => {
-    const params = new URLSearchParams(window.location.search);
-    const tab = params.get("tab");
-    if (tab === "planning") return "board";
-    if (tab === "calendar") return "calendar";
-    if (tab === "checklist") return "checklist";
-    // Photos and Furniture were removed as top-level tabs and live as drawers inside the board.
-    // Legacy ?tab=photos / ?tab=furniture deep links route to the board with the matching drawer.
-    if (tab === "photos" || tab === "furniture") return "board";
-    if (tab === "documents") return "documents";
-    if (tab === "board") return "board";
-    const cachedRole = localStorage.getItem("userRole");
-    if (cachedRole === "admin" || cachedRole === "crew") return "checklist";
-    return "overview";
-  });
+  const [activeTab, setActiveTab] = useState(
+    () => projectTabFromSearch(window.location.search) ?? defaultProjectTab(),
+  );
   // Initial board drawer derived from ?drawer= or legacy ?tab=photos/furniture; null = no drawer open.
   // Photos was merged into the unified Assets (materials) drawer — legacy ?drawer=photos and
   // ?tab=photos deep links now open the merged Assets drawer instead.
@@ -167,6 +205,11 @@ function ProjectDetailsInner() {
   const [heroEditing, setHeroEditing] = useState(false);
   const [heroLocal, setHeroLocal] = useState<{ focalX: number; focalY: number; zoom: number } | null>(null);
   const [isGeneratingSpecSheet, setIsGeneratingSpecSheet] = useState(false);
+
+  useEffect(() => {
+    const nextTab = projectTabFromLocation(location) ?? defaultProjectTab();
+    setActiveTab((current) => (current === nextTab ? current : nextTab));
+  }, [location]);
 
   useEffect(() => {
     if (activeTab !== "overview" || !activityLog || !user?.id) return;
@@ -231,6 +274,14 @@ function ProjectDetailsInner() {
   const visibleTabs = tabConfig.filter(canViewTab);
 
   const safeActiveTab = visibleTabs.find(t => t.id === activeTab) ? activeTab : (visibleTabs[0]?.id || "overview");
+
+  const handleActiveTabChange = (nextTab: string) => {
+    setActiveTab(nextTab);
+    const nextLocation = `/project/${projectId}${searchForProjectTab(nextTab)}`;
+    if (location !== nextLocation) {
+      navigate(nextLocation, { replace: true });
+    }
+  };
 
   if (loadingProject) {
     return (
@@ -344,7 +395,7 @@ function ProjectDetailsInner() {
   };
 
   return (
-    <div className={`min-h-screen bg-background ${safeActiveTab === "board" ? "h-[100dvh] flex flex-col overflow-hidden" : "pb-20"}`}>
+    <div className={`min-h-screen bg-background ${safeActiveTab === "board" ? "h-[100dvh] flex flex-col overflow-hidden" : "pb-[calc(5rem+env(safe-area-inset-bottom))]"}`}>
       <Navbar />
 
       {/* Client view: tall photo band + mono meta + 4-col dl row — only on Overview tab */}
@@ -556,7 +607,7 @@ function ProjectDetailsInner() {
               // this is the user's only way back into the project shell.
               <button
                 type="button"
-                onClick={() => setActiveTab("overview")}
+                onClick={() => handleActiveTabChange("overview")}
                 className="inline-flex items-center h-11 -my-1 px-2 -ml-2 text-[11px] text-muted-foreground transition-colors hover:text-foreground shrink-0 rounded-md hover:bg-foreground/[0.04]"
                 data-testid="link-back-thin"
               >
@@ -598,7 +649,7 @@ function ProjectDetailsInner() {
       )}
 
       <main className={`container px-5 md:px-8 ${safeActiveTab === "board" ? "mt-0 flex flex-col flex-1 min-h-0" : "mt-4"}`} id="project-main">
-        <Tabs value={safeActiveTab} onValueChange={setActiveTab} className={safeActiveTab === "board" ? "space-y-1 flex flex-col flex-1 min-h-0" : "space-y-4"}>
+        <Tabs value={safeActiveTab} onValueChange={handleActiveTabChange} className={safeActiveTab === "board" ? "space-y-1 flex flex-col flex-1 min-h-0" : "space-y-4"}>
           {/* Hide the tab strip entirely on the Planning Board — the board owns the
               full vertical space. SpatialCanvas renders its own thin breadcrumb chip
               at the top to navigate back to Overview. */}
@@ -631,7 +682,7 @@ function ProjectDetailsInner() {
                   checklistItems={checklistItems}
                   documents={documents}
                   onDecisionsClick={() => setShowOpenItemsDrawer(true)}
-                  onDocumentsClick={() => setActiveTab("docs")}
+                  onDocumentsClick={() => handleActiveTabChange("docs")}
                 />
                 <button
                   onClick={() => setShowOpenItemsDrawer(true)}
@@ -658,7 +709,7 @@ function ProjectDetailsInner() {
                     user={user}
                     activityLog={activityLog || []}
                     seenLocally={seenLocally}
-                    setActiveTab={setActiveTab}
+                    setActiveTab={handleActiveTabChange}
                   />
                   {isAdminUser && (
                     <Link href={`/project/${projectId}/settings`} className="inline-flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors h-11" data-testid="link-project-settings">
@@ -674,7 +725,7 @@ function ProjectDetailsInner() {
                     projectId={projectId}
                     milestones={milestones}
                     userRole={userRole}
-                    onNavigateToTimeline={() => setActiveTab("checklist")}
+                    onNavigateToTimeline={() => handleActiveTabChange("checklist")}
                   />
                   <button
                     onClick={() => setShowOpenItemsDrawer(true)}
@@ -724,7 +775,7 @@ function ProjectDetailsInner() {
                           user={user}
                           activityLog={activityLog || []}
                           seenLocally={seenLocally}
-                          setActiveTab={setActiveTab}
+                          setActiveTab={handleActiveTabChange}
                         />
                         {isAdminUser && (
                           <Link href={`/project/${projectId}/settings`} className="inline-flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors h-11" data-testid="link-project-settings-drawer">
@@ -754,7 +805,7 @@ function ProjectDetailsInner() {
                     user={user}
                     activityLog={activityLog || []}
                     seenLocally={seenLocally}
-                    setActiveTab={setActiveTab}
+                    setActiveTab={handleActiveTabChange}
                   />
                   {isAdminUser && (
                     <Link href={`/project/${projectId}/settings`} className="inline-flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors h-11" data-testid="link-project-settings">
@@ -783,7 +834,7 @@ function ProjectDetailsInner() {
               projectId={projectId}
               projectName={project.name}
               initialDrawer={initialBoardDrawer}
-              onBackToProject={() => setActiveTab("overview")}
+              onBackToProject={() => handleActiveTabChange("overview")}
             />
           </TabsContent>
 
@@ -1096,6 +1147,7 @@ function ProjectDetailsInner() {
         <ClientProjectFooter
           projectName={project.name}
           projectCode={deriveFooterProjectCode(project.id)}
+          projectLocation={project.city || project.address}
         />
       )}
     </div>

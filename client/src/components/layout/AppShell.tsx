@@ -42,7 +42,7 @@ export function AppShell({ children }: AppShellProps) {
           {!isClientView && <DesktopSidebar />}
 
           <main
-            className="flex-1 overflow-y-auto pb-16 md:pb-0"
+            className="flex-1 overflow-y-auto pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0"
             data-testid="app-main-content"
           >
             {children}

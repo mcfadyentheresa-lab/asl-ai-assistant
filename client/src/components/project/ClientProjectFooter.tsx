@@ -11,6 +11,7 @@ import { useTenantBrand } from "@/hooks/use-tenant-brand";
 interface ClientProjectFooterProps {
   projectName: string;
   projectCode: string;
+  projectLocation?: string | null;
 }
 
 function deriveProjectCode(id: number): string {
@@ -19,7 +20,7 @@ function deriveProjectCode(id: number): string {
 
 export { deriveProjectCode };
 
-export function ClientProjectFooter({ projectName, projectCode }: ClientProjectFooterProps) {
+export function ClientProjectFooter({ projectName, projectCode, projectLocation }: ClientProjectFooterProps) {
   const brand = useTenantBrand();
   const [openDoc, setOpenDoc] = useState<null | "privacy" | "terms">(null);
   const year = new Date().getFullYear();
@@ -44,15 +45,14 @@ export function ClientProjectFooter({ projectName, projectCode }: ClientProjectF
                 className="font-serif text-base font-semibold tracking-tight text-foreground"
                 data-testid="text-footer-wordmark"
               >
-                <span className="font-bold">ASTER</span>
-                <span className="mx-1.5 text-muted-foreground">&amp;</span>
-                <span className="font-bold">SPRUCE</span>
+                {brand.brandName}
               </div>
               <div
                 className="text-xs text-muted-foreground"
                 data-testid="text-footer-credit"
               >
-                Designed by {brand.legalName} • Muskoka, Ontario
+                Designed by {brand.legalName}
+                {projectLocation ? ` • ${projectLocation}` : ""}
               </div>
             </div>
 
@@ -126,11 +126,11 @@ export function ClientProjectFooter({ projectName, projectCode }: ClientProjectF
                 <p>
                   Questions? Email{" "}
                   <a
-                    href="mailto:info@asterandspruceliving.ca"
+                    href={`mailto:${brand.supportEmail}`}
                     className="text-foreground underline underline-offset-2"
                     data-testid="link-footer-privacy-email"
                   >
-                    info@asterandspruceliving.ca
+                    {brand.supportEmail}
                   </a>
                   .
                 </p>

@@ -142,7 +142,7 @@ export function ClientTabsNav() {
 
   return (
     <nav
-      className="hidden md:flex items-center gap-7 lg:gap-8 h-14"
+      className="hidden md:flex min-w-0 items-center gap-4 lg:gap-7 xl:gap-8 h-14"
       data-testid="client-tabs-nav"
       aria-label="Primary"
     >
@@ -151,33 +151,50 @@ export function ClientTabsNav() {
         const href = t.resolve(projectId);
         const disabled = !projectId && t.label !== "Plan";
 
+        const content = (
+          <span
+            className={cn(
+              "relative inline-flex items-center h-14 whitespace-nowrap text-sm lg:text-[15px] tracking-tight transition-colors",
+              active
+                ? "text-foreground font-semibold"
+                : disabled
+                ? "text-muted-foreground/50"
+                : "text-muted-foreground hover:text-foreground font-medium"
+            )}
+          >
+            {t.label}
+            {active && (
+              <span
+                className="absolute left-0 right-0 -bottom-px h-[2px] bg-foreground"
+                aria-hidden
+              />
+            )}
+          </span>
+        );
+
+        if (disabled) {
+          return (
+            <span
+              key={t.label}
+              data-testid={`client-tab-${t.label.toLowerCase().replace(/\s+/g, "-")}`}
+              // When the client has no project, only "Plan" is meaningful.
+              aria-disabled="true"
+              role="link"
+              className="cursor-not-allowed"
+            >
+              {content}
+            </span>
+          );
+        }
+
         return (
           <Link
             key={t.label}
             href={href}
             data-testid={`client-tab-${t.label.toLowerCase().replace(/\s+/g, "-")}`}
-            // When the client has no project, only "The Plan" is meaningful.
-            // Other tabs render but visually mute and effectively no-op (resolve to /).
-            aria-disabled={disabled || undefined}
+            aria-current={active ? "page" : undefined}
           >
-            <span
-              className={cn(
-                "relative inline-flex items-center h-14 text-[15px] tracking-tight transition-colors",
-                active
-                  ? "text-foreground font-semibold"
-                  : disabled
-                  ? "text-muted-foreground/50"
-                  : "text-muted-foreground hover:text-foreground font-medium"
-              )}
-            >
-              {t.label}
-              {active && (
-                <span
-                  className="absolute left-0 right-0 -bottom-px h-[2px] bg-foreground"
-                  aria-hidden
-                />
-              )}
-            </span>
+            {content}
           </Link>
         );
       })}
