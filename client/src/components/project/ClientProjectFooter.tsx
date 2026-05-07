@@ -14,8 +14,9 @@ interface ClientProjectFooterProps {
   projectLocation?: string | null;
 }
 
-function deriveProjectCode(id: number): string {
-  return `ASL-${String(id).padStart(3, "0")}`;
+function deriveProjectCode(id: number, projectCode?: string | null): string {
+  const savedCode = projectCode?.trim();
+  return savedCode || `PRJ-${String(id).padStart(3, "0")}`;
 }
 
 export { deriveProjectCode };
@@ -31,7 +32,7 @@ export function ClientProjectFooter({ projectName, projectCode, projectLocation 
         className="mt-12 border-t border-border/60 bg-background"
         data-testid="client-project-footer"
       >
-        {/* Spruce accent thin line */}
+        {/* Brand accent thin line */}
         <div
           className="h-px w-full bg-primary/30"
           aria-hidden="true"

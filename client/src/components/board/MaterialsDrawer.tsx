@@ -133,7 +133,7 @@ export function MaterialsDrawer({ projectId, onAddImageUrl, activeRoom, activeRo
   } | null>(null);
 
   // Grouping state. Users can stamp every tile with a free-form group label
-  // ("Kitchen", "Lighting", "Phase 2", whatever) so the Assets drawer organises
+  // ("Kitchen", "Lighting", "Phase 2", whatever) so the Assets drawer organizes
   // around their mental model, not just the kind buckets. Grouping is
   // project-scoped and independent of board tabs / rooms / categories.
   // - groupBy: when true, the grid renders sectioned by group.

@@ -280,7 +280,7 @@ export default function PresentationMode({
       >
         {heroImage ? (
           <div
-            className={`absolute inset-0 transition-all duration-[800ms] ease-out ${titleEntered ? "opacity-100" : "opacity-0"}`}
+            className={`absolute inset-0 transition-all duration-700 ease-out ${titleEntered ? "opacity-100" : "opacity-0"}`}
             style={{
               backgroundImage: `url(${heroImage})`,
               backgroundSize: "cover",

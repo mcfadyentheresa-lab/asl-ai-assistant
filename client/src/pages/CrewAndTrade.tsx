@@ -532,7 +532,7 @@ export default function CrewAndTrade() {
               <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
                 <div>
                   <h2 className="text-lg font-semibold normal-case">Market Benchmarks</h2>
-                  <p className="text-xs text-muted-foreground mt-0.5">Baseline pricing for high-end Muskoka renovations (CAD)</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Baseline pricing for high-end renovations (CAD)</p>
                 </div>
                 <div className="flex gap-2">
                   <Button variant="outline" size="sm" onClick={() => setShowAddCategory(true)} data-testid="button-add-category">

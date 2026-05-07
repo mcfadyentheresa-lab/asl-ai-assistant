@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,100..900&family=Inter+Tight:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -26,7 +24,7 @@ html {
   --popover-foreground: 160 15% 15%;
   --popover-border: 40 12% 90%;
 
-  /* Spruce #2f4a3a — brand primary. Single accent color across the app. */
+  /* Spruce green #2f4a3a — default brand primary. Single accent color across the app. */
   --primary: 152 22% 24%;
   --primary-foreground: 40 30% 96%;
 

@@ -6488,7 +6488,7 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
               <div className="absolute -top-8 right-0 flex gap-1">
                 {renderOpenButton()}
                 {/* Inspiration toggle — flags the image for the curated Presentation deck.
-                    Active state uses the Spruce primary so the chosen state reads at a glance. */}
+                    Active state uses the brand primary so the chosen state reads at a glance. */}
                 {c.url && (
                   <Tooltip>
                     <TooltipTrigger asChild>

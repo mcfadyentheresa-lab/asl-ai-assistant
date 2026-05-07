@@ -18,7 +18,7 @@ export default function LandingPage() {
       <section className="relative h-screen min-h-[600px] flex flex-col">
         <img
           src={heroImg}
-          alt="Luxury Muskoka cottage interior"
+          alt="Luxury home interior"
           className="absolute inset-0 h-full w-full object-cover"
           data-testid="img-hero"
         />
@@ -45,7 +45,7 @@ export default function LandingPage() {
                 Crafting Timeless Spaces for Modern Living
               </h1>
               <p className="text-lg md:text-xl text-white/80 max-w-lg leading-relaxed">
-                Bespoke cottage renovations in the heart of Muskoka. Transparent project management from blueprint to final walkthrough.
+                Bespoke renovations with transparent project management from blueprint to final walkthrough.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 pt-2">
                 <Button
@@ -75,7 +75,7 @@ export default function LandingPage() {
               <div className="rounded-xl overflow-hidden">
                 <img
                   src={craftImg}
-                  alt="Muskoka craftsmanship detail"
+                  alt="Craftsmanship detail"
                   className="w-full h-auto object-cover aspect-[4/5]"
                   data-testid="img-craft"
                 />
@@ -99,7 +99,7 @@ export default function LandingPage() {
                 Where Heritage Meets Innovation
               </h2>
               <p className="text-muted-foreground leading-relaxed text-lg">
-                Every {brand.brandName} project begins with deep respect for the land and the legacy of Muskoka architecture. We pair traditional craftsmanship with modern building science to create homes that endure for generations.
+                Every {brand.brandName} project begins with respect for the home, the people who live there, and the details that make the work endure. We pair traditional craftsmanship with modern building science to create spaces that feel calm, personal, and built to last.
               </p>
               <p className="text-muted-foreground leading-relaxed">
                 Our client portal keeps you connected to every decision, every milestone, and every detail of your build -- no matter where you are in the world.

@@ -210,7 +210,7 @@ export function ReceiptCaptureCard({ projects }: { projects: Project[] | undefin
               id="receipt-vendor"
               value={vendor}
               onChange={(e) => setVendor(e.target.value)}
-              placeholder="Muskoka Lumber"
+              placeholder="Local building supplier"
               className="mt-1.5"
               data-testid="input-receipt-vendor"
             />

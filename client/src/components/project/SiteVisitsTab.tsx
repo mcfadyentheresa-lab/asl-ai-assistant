@@ -401,7 +401,7 @@ export function SiteVisitsTab({ projectId, userRole }: SiteVisitsTabProps) {
                 <Label htmlFor="visit-attendees">Who was there</Label>
                 <Input
                   id="visit-attendees"
-                  placeholder="e.g. Claire, Theresa, Diego (electrician)"
+                  placeholder="e.g. Claire, Jordan, Diego (electrician)"
                   value={form.attendees}
                   onChange={(e) =>
                     setForm({ ...form, attendees: e.target.value })
