@@ -4239,6 +4239,158 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
   const isElementHidden = (el: CanvasElement): boolean =>
     isElementHiddenByPrimary(el) || isElementHiddenBySecondaryChips(el) || isElementHiddenByStatus(el);
 
+  const tidyCandidates = elementsList.filter((el) =>
+    !isElementHidden(el) &&
+    el.type !== "connector" &&
+    el.type !== "draw" &&
+    el.type !== "room_zone" &&
+    el.type !== "column" &&
+    !el.parentColumnId,
+  );
+
+  const handleTidyBoard = () => {
+    if (!selectedBoardId || lockLayout) return;
+
+    const candidates = tidyCandidates
+      .slice()
+      .sort((a, b) => (a.y - b.y) || (a.x - b.x));
+
+    if (candidates.length < 2) {
+      toast({
+        title: "Nothing to tidy yet",
+        description: "Add a few cards or images first.",
+      });
+      return;
+    }
+
+    const gap = 28;
+    const columnGap = 48;
+    const snap = (value: number) => Math.round(value / GRID_SIZE) * GRID_SIZE;
+    const widthOf = (el: CanvasElement) => Math.max(120, el.width || 240);
+    const heightOf = (el: CanvasElement) => Math.max(60, el.height || 140);
+    const currentMinX = Math.min(...candidates.map((el) => el.x));
+    const currentMinY = Math.min(...candidates.map((el) => el.y));
+    const startX = snap(Number.isFinite(currentMinX) ? currentMinX : 80);
+    const startY = snap(Number.isFinite(currentMinY) ? currentMinY : 80);
+
+    const isHeading = (el: CanvasElement) => {
+      const c = (el.content || {}) as any;
+      return isTextHeading(el) || (el.type === "text" && c.variant === "heading");
+    };
+    const isTextual = (el: CanvasElement) => el.type === "text" || el.type === "todo";
+    const isVisual = (el: CanvasElement) => el.type === "image" || el.type === "link";
+    const isSelection = (el: CanvasElement) =>
+      el.type === "surface" ||
+      el.type === "product" ||
+      el.type === "hardware" ||
+      el.type === "board_link";
+
+    const headings = candidates.filter(isHeading);
+    const notes = candidates.filter((el) => !isHeading(el) && isTextual(el));
+    const visuals = candidates.filter((el) => !isHeading(el) && isVisual(el));
+    const selections = candidates.filter((el) => !isHeading(el) && isSelection(el));
+    const others = candidates.filter((el) =>
+      !headings.includes(el) &&
+      !notes.includes(el) &&
+      !visuals.includes(el) &&
+      !selections.includes(el),
+    );
+
+    const nextPositions = new Map<number, { x: number; y: number }>();
+    let cursorY = startY;
+
+    for (const heading of headings) {
+      nextPositions.set(heading.id, { x: startX, y: cursorY });
+      cursorY += heightOf(heading) + 16;
+    }
+
+    const contentY = snap(headings.length > 0 ? cursorY + 12 : startY);
+    const leftWidth = Math.max(240, ...notes.map(widthOf), ...others.map(widthOf));
+    const visualColumnWidth = Math.max(220, Math.min(360, ...visuals.map(widthOf)));
+    const visualColumns = visuals.length <= 2 ? Math.max(1, visuals.length) : visuals.length >= 7 ? 3 : 2;
+    const visualGridWidth = visuals.length > 0
+      ? visualColumns * visualColumnWidth + (visualColumns - 1) * gap
+      : 0;
+
+    const xNotes = startX;
+    const xVisuals = startX + (notes.length || others.length ? leftWidth + columnGap : 0);
+    const xSelections = xVisuals + (visuals.length ? visualGridWidth + columnGap : 0);
+
+    let notesY = contentY;
+    for (const note of [...notes, ...others]) {
+      nextPositions.set(note.id, { x: xNotes, y: notesY });
+      notesY += heightOf(note) + gap;
+    }
+
+    if (visuals.length > 0) {
+      const columnHeights = Array.from({ length: visualColumns }, () => contentY);
+      for (const visual of visuals) {
+        const column = columnHeights.indexOf(Math.min(...columnHeights));
+        nextPositions.set(visual.id, {
+          x: xVisuals + column * (visualColumnWidth + gap),
+          y: columnHeights[column],
+        });
+        columnHeights[column] += heightOf(visual) + gap;
+      }
+    }
+
+    let selectionsY = contentY;
+    for (const selection of selections) {
+      nextPositions.set(selection.id, {
+        x: selections.length && (visuals.length || notes.length || others.length) ? xSelections : startX,
+        y: selectionsY,
+      });
+      selectionsY += heightOf(selection) + gap;
+    }
+
+    const movedIds: number[] = [];
+    const arrangedForFit: { x: number; y: number; width: number; height: number }[] = [];
+
+    for (const el of candidates) {
+      const next = nextPositions.get(el.id);
+      if (!next) continue;
+      const nextX = snap(next.x);
+      const nextY = snap(next.y);
+      arrangedForFit.push({ x: nextX, y: nextY, width: widthOf(el), height: heightOf(el) });
+      if (el.x === nextX && el.y === nextY) continue;
+      movedIds.push(el.id);
+      pushUndo({ type: "move", elementId: el.id, prevX: el.x, prevY: el.y });
+      updateElement(el.id, { x: nextX, y: nextY });
+      sendElementMove(el.id, nextX, nextY);
+    }
+
+    if (movedIds.length === 0) {
+      toast({ title: "Board already looks tidy" });
+      return;
+    }
+
+    setDroppingIds((prev) => {
+      const next = new Set(prev);
+      movedIds.forEach((id) => next.add(id));
+      return next;
+    });
+    movedIds.forEach((id) => {
+      const existingTimer = droppingTimersRef.current.get(id);
+      if (existingTimer) clearTimeout(existingTimer);
+      const timer = setTimeout(() => {
+        droppingTimersRef.current.delete(id);
+        setDroppingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+      }, 350);
+      droppingTimersRef.current.set(id, timer);
+    });
+
+    debouncedSavePositions(selectedBoardId, 0);
+    fitElementsToScreen(arrangedForFit, { animate: true });
+    toast({
+      title: "Board tidied",
+      description: `Arranged ${movedIds.length} visible item${movedIds.length === 1 ? "" : "s"} into a cleaner layout.`,
+    });
+  };
+
   // Status quick-cycle — used by the contextual chip on roomable cards.
   const cycleStatusForElement = (id: number) => {
     const el = elements[id];
@@ -7077,6 +7229,33 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
             </TooltipTrigger>
             <TooltipContent side="bottom" className="text-xs">{showDotGrid ? "Hide dot grid" : "Show dot grid"}</TooltipContent>
           </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-8 px-2 gap-1 hover:bg-primary/10 hover:text-primary disabled:opacity-40"
+                onClick={handleTidyBoard}
+                disabled={lockLayout || tidyCandidates.length < 2}
+                data-testid="button-tidy-board"
+              >
+                <LayoutGrid className="h-4 w-4" />
+                <span
+                  className="text-[10px] font-semibold uppercase tracking-[0.14em] hidden lg:inline"
+                  style={{ fontFamily: "var(--font-mono)" }}
+                >
+                  Tidy
+                </span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-xs">
+              {lockLayout
+                ? "Unlock layout to tidy"
+                : tidyCandidates.length < 2
+                  ? "Add more items to tidy"
+                  : "Tidy visible board items"}
+            </TooltipContent>
+          </Tooltip>
           <Separator orientation="vertical" className="h-4 mx-1" />
           <Tooltip>
             <TooltipTrigger asChild>
@@ -7163,6 +7342,14 @@ export default function SpatialCanvas({ projectId, projectName: _projectName, on
                 <Hand className={`h-4 w-4 mr-2 ${touchDrawing ? "text-primary" : ""}`} />
                 {touchDrawing ? "Touch drawing: On" : "Touch drawing: Off"}
               </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={handleTidyBoard}
+                    disabled={lockLayout || tidyCandidates.length < 2}
+                    data-testid="menu-tidy-board"
+                  >
+                    <LayoutGrid className="h-4 w-4 mr-2" />
+                    Tidy board
+                  </DropdownMenuItem>
               {(actualRole === "admin" || actualRole === "crew") && (
                 <>
                   <DropdownMenuItem
