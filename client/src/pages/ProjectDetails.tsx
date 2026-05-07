@@ -13,7 +13,6 @@ import {
 import { useViewMode } from "@/hooks/use-view-mode";
 import { useProjectRealtime } from "@/hooks/use-project-realtime";
 import { Navbar } from "@/components/layout/Navbar";
-import SpatialCanvas from "@/components/SpatialCanvas";
 import { Loader2, Clock, FileText, ImageIcon, MessageSquare, ArrowLeft, Send, Trash2, CheckSquare, LayoutGrid, Plus, ChevronDown, ChevronRight, Link2, StickyNote, Pencil, CalendarIcon, Upload, Download, X, Paperclip, ZoomIn, Palette, Check, Archive, ArchiveRestore, PanelRightOpen, MoreVertical, Flag, BarChart3, ArrowUpRight, Building2, Sparkles, Armchair, ScrollText, Package, FileSignature, Footprints, DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -56,7 +55,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { useState, useRef, useEffect } from "react";
+import { lazy, Suspense, useState, useRef, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { useRecentProjects } from "@/hooks/use-recent-projects";
@@ -80,6 +79,8 @@ import { ClientMilestoneList } from "@/components/project/ClientMilestoneList";
 import { ClientReferenceCards } from "@/components/project/ClientReferenceCards";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import type { ChecklistItem, BoardItem } from "@shared/schema";
+
+const SpatialCanvas = lazy(() => import("@/components/SpatialCanvas"));
 
 const PROJECT_TAB_ALIASES: Record<string, string> = {
   overview: "overview",
@@ -128,6 +129,14 @@ function projectTabFromLocation(location: string): string | null {
 
 function searchForProjectTab(tab: string): string {
   return `?tab=${tab}`;
+}
+
+function BoardTabFallback() {
+  return (
+    <div className="flex min-h-[320px] flex-1 items-center justify-center bg-background">
+      <Loader2 className="h-6 w-6 animate-spin text-primary" aria-label="Loading design board" />
+    </div>
+  );
 }
 
 function ProjectDetailsInner() {
@@ -830,12 +839,14 @@ function ProjectDetailsInner() {
           </TabsContent>
 
           <TabsContent value="board" className="flex-1 min-h-0">
-            <SpatialCanvas
-              projectId={projectId}
-              projectName={project.name}
-              initialDrawer={initialBoardDrawer}
-              onBackToProject={() => handleActiveTabChange("overview")}
-            />
+            <Suspense fallback={<BoardTabFallback />}>
+              <SpatialCanvas
+                projectId={projectId}
+                projectName={project.name}
+                initialDrawer={initialBoardDrawer}
+                onBackToProject={() => handleActiveTabChange("overview")}
+              />
+            </Suspense>
           </TabsContent>
 
           <TabsContent value="chat">
@@ -903,7 +914,7 @@ function ProjectDetailsInner() {
               <Input
                 value={addPersonForm.email}
                 onChange={(e) => setAddPersonForm({ ...addPersonForm, email: e.target.value })}
-                placeholder="email@example.com"
+                placeholder="name@email.com"
                 data-testid="input-add-email"
               />
             </div>
@@ -912,7 +923,7 @@ function ProjectDetailsInner() {
               <Input
                 value={addPersonForm.phone}
                 onChange={(e) => setAddPersonForm({ ...addPersonForm, phone: e.target.value })}
-                placeholder="(705) 555-0123"
+                placeholder="+1 (555) 123-4567"
                 data-testid="input-add-phone"
               />
             </div>
@@ -1008,7 +1019,7 @@ function ProjectDetailsInner() {
               <Input
                 value={profileForm.phone}
                 onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
-                placeholder="(705) 555-0123"
+                placeholder="+1 (555) 123-4567"
                 data-testid="input-edit-phone"
               />
             </div>

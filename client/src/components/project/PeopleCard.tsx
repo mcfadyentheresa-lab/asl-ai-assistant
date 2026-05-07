@@ -242,7 +242,7 @@ export function PeopleCard({
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="invite-email">Email</Label>
-                  <Input id="invite-email" type="email" value={inviteForm.email} onChange={(e) => setInviteForm(f => ({ ...f, email: e.target.value }))} placeholder="client@example.com" data-testid="input-invite-email" />
+                  <Input id="invite-email" type="email" value={inviteForm.email} onChange={(e) => setInviteForm(f => ({ ...f, email: e.target.value }))} placeholder="name@email.com" data-testid="input-invite-email" />
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="invite-phone">Phone Number (optional)</Label>

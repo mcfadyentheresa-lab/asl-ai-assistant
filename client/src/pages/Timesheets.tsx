@@ -702,7 +702,7 @@ export default function Timesheets() {
                   id="new-project-name"
                   value={newProjectName}
                   onChange={(e) => setNewProjectName(e.target.value)}
-                  placeholder="e.g., Muskoka Lakehouse Renovation"
+                  placeholder="e.g., Lake House Renovation"
                   className="mt-1.5"
                   data-testid="input-new-project-name"
                   onKeyDown={(e) => {

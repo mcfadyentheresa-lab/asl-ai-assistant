@@ -340,7 +340,7 @@ export default function SocialMediaGenerator() {
           <h1 className="font-serif text-2xl uppercase tracking-normal text-foreground" data-testid="text-social-heading">
             Social Media Content
           </h1>
-          <p className="text-muted-foreground">Generate, collect, and organise social content from your projects.</p>
+          <p className="text-muted-foreground">Generate, collect, and organize social content from your projects.</p>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>

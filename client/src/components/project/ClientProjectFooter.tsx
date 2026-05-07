@@ -31,7 +31,7 @@ export function ClientProjectFooter({ projectName, projectCode, projectLocation 
         className="mt-12 border-t border-border/60 bg-background"
         data-testid="client-project-footer"
       >
-        {/* Spruce accent thin line */}
+        {/* Brand accent thin line */}
         <div
           className="h-px w-full bg-primary/30"
           aria-hidden="true"

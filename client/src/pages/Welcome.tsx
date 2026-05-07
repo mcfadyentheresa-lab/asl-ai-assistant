@@ -104,7 +104,7 @@ export default function Welcome() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
+                  placeholder="name@email.com"
                   data-testid="input-welcome-email"
                 />
                 <p className="text-xs text-muted-foreground">
@@ -117,7 +117,7 @@ export default function Welcome() {
                   id="phone"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  placeholder="(705) 555-0123"
+                  placeholder="+1 (555) 123-4567"
                   data-testid="input-welcome-phone"
                 />
                 <p className="text-xs text-muted-foreground">
