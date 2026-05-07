@@ -767,7 +767,7 @@ function QuickAddTaskSheet({
                 disabled={!milestoneId}
               >
                 <SelectTrigger className="h-10 mt-1" data-testid="quick-add-task-section">
-                  <SelectValue placeholder={milestoneId ? "Pick" : "Building first"} />
+                  <SelectValue placeholder={milestoneId ? "Pick" : "Pick building first"} />
                 </SelectTrigger>
                 <SelectContent>
                   {sectionsForMilestone.map((s) => (

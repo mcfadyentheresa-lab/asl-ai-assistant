@@ -29,6 +29,7 @@ interface ProjectLike {
   id: number;
   name: string;
   status?: string | null;
+  code?: string | null;
   address?: string | null;
   thumbnailUrl?: string | null;
   heroFocalX?: number | null;
@@ -63,8 +64,9 @@ function formatStatus(status?: string | null): string {
   return status.charAt(0).toUpperCase() + status.slice(1);
 }
 
-function deriveProjectCode(id: number): string {
-  return `ASL-${String(id).padStart(3, "0")}`;
+function deriveProjectCode(id: number, projectCode?: string | null): string {
+  const savedCode = projectCode?.trim();
+  return savedCode || `PRJ-${String(id).padStart(3, "0")}`;
 }
 
 function derivePhase(milestones: Milestone[] | undefined, status?: string | null): string {
@@ -147,7 +149,7 @@ export function ClientProjectHeader({
   const heroObjectPosition = `${(focalX * 100).toFixed(2)}% ${(focalY * 100).toFixed(2)}%`;
   const heroTransform = `scale(${zoom.toFixed(3)})`;
 
-  const projectCode = deriveProjectCode(project.id);
+  const projectCode = deriveProjectCode(project.id, project.code);
   const statusLabel = formatStatus(project.status);
   const phase = derivePhase(milestones, project.status);
   const schedule = deriveSchedule(project.startDate, project.endDate);

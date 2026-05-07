@@ -1146,7 +1146,7 @@ function ProjectDetailsInner() {
       {userRole === "client" && safeActiveTab !== "board" && (
         <ClientProjectFooter
           projectName={project.name}
-          projectCode={deriveFooterProjectCode(project.id)}
+          projectCode={deriveFooterProjectCode(project.id, project.code)}
           projectLocation={project.city || project.address}
         />
       )}
