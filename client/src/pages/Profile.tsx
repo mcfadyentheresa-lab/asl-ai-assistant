@@ -270,7 +270,7 @@ export default function Profile() {
                 <Input
                   value={form.phone}
                   onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                  placeholder="(705) 555-0123"
+                  placeholder="+1 (555) 123-4567"
                   data-testid="input-profile-phone"
                 />
                 <p className="text-xs text-muted-foreground mt-1">

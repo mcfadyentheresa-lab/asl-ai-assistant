@@ -1275,7 +1275,7 @@ export default function GanttChart({ projectId, milestones, sections, tasks, use
       {currentRows.length === 0 && !addingBuilding && !addingRoomFor && !addingTask ? (
         <div className="py-12 text-center">
           <p className="text-sm text-muted-foreground" data-testid="text-gantt-empty">
-            {drillLevel === "buildings" && "No milestones yet. Add a milestone to start organising your project timeline."}
+            {drillLevel === "buildings" && "No milestones yet. Add a milestone to start organizing your project timeline."}
             {drillLevel === "tasks" && "No tasks in this room yet. Add a task to get started."}
           </p>
         </div>

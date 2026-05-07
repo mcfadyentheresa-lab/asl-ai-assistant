@@ -500,7 +500,7 @@ function CreateProjectDialog({ externalOpen, onExternalChange }: { externalOpen?
             <FormField control={form.control} name="name" render={({ field }) => (
               <FormItem>
                 <FormLabel>Project Name</FormLabel>
-                <FormControl><Input placeholder="e.g. Muskoka Lake House" {...field} data-testid="input-project-name" /></FormControl>
+                <FormControl><Input placeholder="e.g. Lake House Renovation" {...field} data-testid="input-project-name" /></FormControl>
                 <FormMessage />
               </FormItem>
             )} />
@@ -545,11 +545,11 @@ function CreateProjectDialog({ externalOpen, onExternalChange }: { externalOpen?
                   </div>
                   <div className="space-y-1">
                     <Label htmlFor="create-invite-email" className="text-xs">Email</Label>
-                    <Input id="create-invite-email" type="email" value={inviteForm.email} onChange={(e) => setInviteForm(f => ({ ...f, email: e.target.value }))} placeholder="client@example.com" data-testid="input-create-invite-email" />
+                    <Input id="create-invite-email" type="email" value={inviteForm.email} onChange={(e) => setInviteForm(f => ({ ...f, email: e.target.value }))} placeholder="name@email.com" data-testid="input-create-invite-email" />
                   </div>
                   <div className="space-y-1">
                     <Label htmlFor="create-invite-phone" className="text-xs">Phone</Label>
-                    <Input id="create-invite-phone" value={inviteForm.phone} onChange={(e) => setInviteForm(f => ({ ...f, phone: e.target.value }))} placeholder="(705) 555-0123" data-testid="input-create-invite-phone" />
+                    <Input id="create-invite-phone" value={inviteForm.phone} onChange={(e) => setInviteForm(f => ({ ...f, phone: e.target.value }))} placeholder="+1 (555) 123-4567" data-testid="input-create-invite-phone" />
                   </div>
                   <p className="text-[11px] text-muted-foreground">Client will receive an email with a link to access their portal after the project is created.</p>
                 </div>
