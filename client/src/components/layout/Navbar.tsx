@@ -69,7 +69,7 @@ export function NavbarShell({ onMenuToggle }: NavbarShellProps) {
         className="sticky top-0 z-50 flex items-center justify-between gap-4 px-4 md:px-6 h-14 shrink-0 border-b border-border/60 bg-background/95 backdrop-blur-md"
         data-testid="navbar"
       >
-        <div className="flex items-center gap-3">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
           {onMenuToggle && (
             <Button
               variant="ghost"
@@ -85,7 +85,7 @@ export function NavbarShell({ onMenuToggle }: NavbarShellProps) {
           <Link
             href="/"
             data-testid="link-home"
-            className={isClientView ? "" : "lg:hidden"}
+            className={isClientView ? "shrink-0" : "shrink-0 lg:hidden"}
           >
             <div className="flex flex-col">
               <span className="font-serif text-lg font-bold tracking-tight text-foreground leading-none select-none">
@@ -100,7 +100,7 @@ export function NavbarShell({ onMenuToggle }: NavbarShellProps) {
           {isClientView && <ClientTabsNav />}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -108,6 +108,7 @@ export function NavbarShell({ onMenuToggle }: NavbarShellProps) {
                 size="icon"
                 onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
                 data-testid="button-theme-toggle"
+                aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
               >
                 {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
               </Button>
@@ -218,8 +219,7 @@ export function PreviewBanner() {
 
   return (
     <div
-      className="w-full flex items-center justify-center gap-3 text-white"
-      style={{ height: 32, backgroundColor: "#2f4a3a", fontFamily: "Inter, sans-serif", fontWeight: 600 }}
+      className="flex h-8 w-full items-center justify-center gap-3 bg-primary text-primary-foreground font-semibold"
       data-testid="banner-preview"
       role="status"
     >

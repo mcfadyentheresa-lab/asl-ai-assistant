@@ -233,11 +233,11 @@ export function PeopleCard({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <Label htmlFor="invite-first">First Name</Label>
-                    <Input id="invite-first" value={inviteForm.firstName} onChange={(e) => setInviteForm(f => ({ ...f, firstName: e.target.value }))} placeholder="Theresa" data-testid="input-invite-first" />
+                    <Input id="invite-first" value={inviteForm.firstName} onChange={(e) => setInviteForm(f => ({ ...f, firstName: e.target.value }))} placeholder="First name" data-testid="input-invite-first" />
                   </div>
                   <div className="space-y-1">
                     <Label htmlFor="invite-last">Last Name</Label>
-                    <Input id="invite-last" value={inviteForm.lastName} onChange={(e) => setInviteForm(f => ({ ...f, lastName: e.target.value }))} placeholder="McFadyen" data-testid="input-invite-last" />
+                    <Input id="invite-last" value={inviteForm.lastName} onChange={(e) => setInviteForm(f => ({ ...f, lastName: e.target.value }))} placeholder="Last name" data-testid="input-invite-last" />
                   </div>
                 </div>
                 <div className="space-y-1">
@@ -246,7 +246,7 @@ export function PeopleCard({
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="invite-phone">Phone Number (optional)</Label>
-                  <Input id="invite-phone" value={inviteForm.phone} onChange={(e) => setInviteForm(f => ({ ...f, phone: e.target.value }))} placeholder="(705) 555-0123" data-testid="input-invite-phone" />
+                  <Input id="invite-phone" value={inviteForm.phone} onChange={(e) => setInviteForm(f => ({ ...f, phone: e.target.value }))} placeholder="Optional phone number" data-testid="input-invite-phone" />
                 </div>
                 <Button
                   className="w-full"

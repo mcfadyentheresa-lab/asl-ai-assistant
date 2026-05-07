@@ -11,7 +11,7 @@ import {
   MessageSquare,
   FileText,
   Users,
-  Hammer,
+  DollarSign,
 } from "lucide-react";
 
 interface BottomNavItem {
@@ -32,7 +32,7 @@ const CREW_ITEMS: BottomNavItem[] = [
   { label: "Log Hours", resolve: () => "/timesheets", icon: Clock, isActiveFor: (l) => l.startsWith("/timesheets") },
   { label: "Calendar", resolve: () => "/master-calendar", icon: CalendarDays, isActiveFor: (l) => l.startsWith("/master-calendar") },
   { label: "Crew", resolve: () => "/crew-and-trade", icon: Users, isActiveFor: (l) => l.startsWith("/crew-and-trade") || l.startsWith("/labor-rates") || l.startsWith("/trade-contacts") || l.startsWith("/market-rates") },
-  { label: "Colour", resolve: () => "/colors", icon: Hammer, isActiveFor: (l) => l.startsWith("/colors") },
+  { label: "Colour", resolve: () => "/colors", icon: Palette, isActiveFor: (l) => l.startsWith("/colors") },
 ];
 
 // Client mobile nav now mirrors the desktop ClientTabsNav so users see the
@@ -67,6 +67,12 @@ const CLIENT_ITEMS: BottomNavItem[] = [
     resolve: (id) => (id ? `/project/${id}?tab=docs` : "/"),
     icon: FileText,
     isActiveFor: (l) => l.includes("tab=docs"),
+  },
+  {
+    label: "Estimate",
+    resolve: (id) => (id ? `/project/${id}?tab=estimates` : "/"),
+    icon: DollarSign,
+    isActiveFor: (l) => l.includes("tab=estimates"),
   },
   {
     label: "Messages",
@@ -119,8 +125,9 @@ export function MobileBottomNav() {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-50 flex md:hidden bg-background border-t border-border/60"
+      className="fixed bottom-0 left-0 right-0 z-50 flex md:hidden bg-background/95 border-t border-border/60 pb-[env(safe-area-inset-bottom)] backdrop-blur-md"
       data-testid="mobile-bottom-nav"
+      aria-label="Primary"
     >
       {items.map((item) => {
         const active = item.isActiveFor(location);
@@ -132,10 +139,11 @@ export function MobileBottomNav() {
             href={href}
             className="flex-1"
             data-testid={`mobile-nav-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
+            aria-current={active ? "page" : undefined}
           >
             <div
               className={cn(
-                "flex flex-col items-center justify-center gap-0.5 py-2 transition-colors",
+                "flex min-h-14 flex-col items-center justify-center gap-0.5 px-1 py-2 transition-colors",
                 active
                   ? "text-primary"
                   : "text-muted-foreground"
@@ -149,7 +157,7 @@ export function MobileBottomNav() {
               />
               <span
                 className={cn(
-                  "text-[10px] font-medium leading-none",
+                  "text-[9px] sm:text-[10px] font-medium leading-none",
                   active && "font-semibold"
                 )}
               >

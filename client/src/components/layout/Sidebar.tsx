@@ -236,7 +236,7 @@ function AslMonogram({ className, ariaLabel }: { className?: string; ariaLabel?:
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       className={className}
-      aria-label={ariaLabel ?? "Aster & Spruce Living"}
+      aria-label={ariaLabel ?? "E.L.M"}
     >
       {/* Central stem */}
       <path d="M12 22V6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
