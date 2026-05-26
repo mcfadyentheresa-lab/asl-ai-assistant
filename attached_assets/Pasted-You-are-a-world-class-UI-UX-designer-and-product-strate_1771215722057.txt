@@ -1,43 +1,0 @@
-You are a world-class UI/UX designer and product strategist creating a premium client + crew portal app for Aster & Spruce Living, a high-end Muskoka cottage, boathouse, and lakefront renovation company in Ontario.
-App Name: Aster & Spruce Connect (or “The Canopy” as a classy alternative — use whichever feels more elegant).
-Core Purpose
-A secure, beautiful cloud-based platform (web + mobile) where clients and crew have completely separate, role-based experiences for the same renovation projects. The entire experience must feel like a luxury extension of the Aster & Spruce brand: clean, modern, designer-level, warm and inviting, but never feminine and never construction-site industrial. Think high-end residential real estate portal meets quiet-luxury project management.
-Brand & Visual Direction (extremely important)
-•  Aesthetic keywords: Warm minimalism, sophisticated cottage modern, Muskoka luxury, natural elegance, quiet luxury, timeless craftsmanship.
-•  Color palette (use these exact directions): – Deep forest / spruce green (#1F3A2F or #2C3F35) as primary accent – Warm neutrals: soft greige, oat milk, warm stone (#F5F1EB, #EDE6DC) – Rich wood tones and deep charcoal for depth – Crisp white and off-white backgrounds – Very subtle terracotta / warm sienna accents for warmth – Soft navy or lake blue as secondary accent
-•  Typography: Elegant, highly legible modern sans-serif (e.g. Neue Haas Grotesk, Satoshi, or Inter with generous tracking). Headings slightly warmer and bolder.
-•  Overall feel: Generous white space, soft rounded corners (6–12 px), subtle depth and shadows, high-quality lifestyle photography of finished cottages, lake views, and natural materials as hero imagery. Very refined, calm, and premium — like the Aesop or Hermès of construction apps. No hard edges, no yellows, no safety orange, no clip-art tools or hard hats.
-Platforms
-•  Responsive web app (clients primarily use desktop/tablet)
-•  Native-feeling mobile app (crew uses on phones in the field — large touch targets, offline capability)
-User Roles & Separate Experiences
-1. Client Portal (Homeowners / Cottage Owners)
-Clients log in and see only their own project(s).
-Key screens & features:
-•  Dashboard: Beautiful hero image of their property + project status at a glance (percentage complete, next milestone, days until next site visit).
-•  Project Hub: One clean page per project with tabs or sections: – Live Calendar (beautiful, simple calendar showing key dates, deliveries, site visits, approvals due) – Progress Timeline (elegant horizontal or vertical timeline with milestones and subtasks) – Photo Gallery (grid of progress photos — before/after, in-progress, with dates and captions) – Documents Vault (contracts, invoices, material selections, change orders — view, download, e-sign) – Approvals Center (pending items they need to approve — materials, designs, extras — with one-tap approve/reject + comments) – Activity Feed (what happened this week, new photos, crew notes)
-•  Chat & Comments: Threaded messaging with their project manager and crew (can @mention, attach photos). Also inline comments directly on photos or tasks.
-•  Budget & Invoices: Clean overview of budget used vs remaining, invoice history.
-•  Notifications: Elegant in-app + email/push for approvals needed, new photos, messages.
-2. Crew / Field Team Portal (Mobile-first)
-Completely separate login and interface — more functional but still beautiful and on-brand.
-Key screens & features:
-•  Today / My Jobs: Simple list or map view of today’s tasks and active jobs.
-•  Time Tracking: One-tap clock in/out per job or subtask. Ability to log hours against specific milestones/subtasks. GPS stamp optional for accuracy.
-•  Live Calendar: Their personal + team schedule (different view than clients — shows crew availability, weather impact notes, etc.).
-•  Job Details: Full task list with milestones, subtasks, dependencies, status updates, photo upload (multiple at once with captions).
-•  Internal Chat: Team-only group chats + direct messages + client chat (visible but separate).
-•  Material & Issue Logging: Quick forms to log materials used, request more, or flag issues with photos.
-•  Daily Log: Simple end-of-day summary they can fill out (progress notes, photos, hours).
-•  Offline mode that syncs when back online.
-3. Admin / Office View (full access to all projects, reporting, user management)
-Additional Premium Features (add these naturally)
-•  Real-time push notifications and elegant in-app activity stream
-•  Two-factor authentication and bank-level security
-•  Beautiful PDF export for progress reports (branded with Aster & Spruce)
-•  Client “wow” moments: ability for crew to tag special before/after photos that auto-appear in a “Project Story” section for the client
-•  Simple analytics dashboard for the company (project health, on-time %, client satisfaction)
-•  Dark mode toggle (still warm and on-brand)
-Tone & Microcopy
-Warm, confident, professional, human. Use language like “Your project is taking beautiful shape,” “We’re making great progress at the lake,” etc.
-Now generate [choose what you want: full set of high-fidelity mobile + desktop mockups / detailed feature specification document / Figma-style component library description / etc.] in this exact visual style and structure. Make every screen feel cohesive, luxurious, and unmistakably Aster & Spruce.
